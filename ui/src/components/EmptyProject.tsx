@@ -30,7 +30,8 @@ export function EmptyProject() {
 // The person writes the first item here, or connects an agent that will. A project with no board
 // yet starts from the agent prompt, first thing on the page: pasted into an agent's chat, it sets
 // the project up, interviews the person and drafts its boards; picking the boards oneself comes
-// second. The boards go by their names, never by a hidden id.
+// second. The boards go by their names, never by a hidden id. Where the project lives (its folders
+// and its store) is Settings' to say: it is not what a first screen is for.
 export function EmptyProjectView({
   settings,
   boards,
@@ -46,7 +47,7 @@ export function EmptyProjectView({
   onConnect: () => void;
   onPickBoards: () => void;
 }) {
-  const { name, dataDir, paths } = settings;
+  const { name } = settings;
   const none = boards.length === 0;
   return (
     <div className="pj-empty-project">
@@ -85,19 +86,12 @@ export function EmptyProjectView({
         <p className="pj-empty-agents">
           {tx('emptyProject.agents', { command: <code>otea board</code> })}
         </p>
-        <dl className="pj-facts">
-          <dt>{t('emptyProject.path')}</dt>
-          <dd>
-            {paths.map((path) => path.path).join(' · ')} ·{' '}
-            {t('settings.repoCount', {
-              count: paths.reduce((sum, path) => sum + path.repos.length, 0),
-            })}
-          </dd>
-          <dt>{t('emptyProject.store')}</dt>
-          <dd>{dataDir}</dd>
-          <dt>{t('emptyProject.boards')}</dt>
-          <dd>{none ? t('emptyProject.noBoardsYet') : boards.join(', ')}</dd>
-        </dl>
+        {none ? null : (
+          <dl className="pj-facts">
+            <dt>{t('emptyProject.boards')}</dt>
+            <dd>{boards.join(', ')}</dd>
+          </dl>
+        )}
       </div>
     </div>
   );
