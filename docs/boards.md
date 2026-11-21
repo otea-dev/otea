@@ -32,6 +32,11 @@ The first Studio's boards (`tasks`, `bugs`, `blog`, `triage`, `review`) are reti
 
 ## The Matrix
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/demo-matrix-dark.gif">
+  <img src="images/demo-matrix-light.gif" alt="The Matrix of a board: items settle into the effort by impact grid as an agent estimates them, and the person puts one on top of the order agents take them in">
+</picture>
+
 The Matrix is a board view that weighs open items by two of their fields. **Ideas** and **Cambios** use effort × impact, and **Errores** uses effort × risk. These three boards have it from the start. In Studio, any board gets it once two of its fields play the effort, risk or impact roles (`analysis` in `board.json`).
 
 - **The scales.** Effort is a size (Pequeño, Mediano, Grande, Enorme).
