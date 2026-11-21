@@ -20,23 +20,39 @@ You keep the copyright in your work. The CLA grants the maintainer the right to 
 
 ## Releasing
 
-A release is one `v*` tag. The tag publishes the desktop installers as a GitHub Release (`.github/workflows/desktop.yml`) and the `@otea/cli` package to npm (`.github/workflows/npm-publish.yml`), which stages it and waits for the owner's approval (last step below). The npm job refuses a tag that is not the `version` in the root `package.json`, so bump it on `main` first:
+The owner decides when to release by merging one pull request. Nobody computes a version or makes a tag by hand.
 
-```sh
-npm version 0.2.0 --no-git-tag-version   # also commit the change, through a pull request
-git tag v0.2.0 && git push origin v0.2.0
-```
+[release-please](https://github.com/googleapis/release-please) (`.github/workflows/release-please.yml`) keeps one pull request open on `main`, titled `chore: release <version>`. It reads the conventional commits since the last release and proposes the next version of `@otea/cli` and of `desktop/package.json` together (one version, one `v<version>` tag), and it writes `CHANGELOG.md`. Below 1.0 a `feat:` bumps the minor, a `fix:` the patch, and a breaking change (`feat!:`, or a `BREAKING CHANGE:` footer) also the minor. `docs`, `chore`, `ci`, `build`, `test`, `refactor` and `style` commits do not bump the version and stay out of the changelog, so write a user-visible change as `feat:` or `fix:` and say in its subject what the user gets. The pull request updates itself on every push to `main`.
 
-`desktop/package.json` takes its version from the tag in CI, so it is not bumped by hand. A tag with a prerelease suffix (`v0.2.0-rc.1`) is staged under the `next` tag, which `npm i -g @otea/cli` never installs.
+To release:
 
-The last step is yours: **approve the staged version on npm.** The workflow does not publish, it stages (`npm stage publish`), so the version is not public until someone with 2FA approves it. When the staging works, the workflow opens an issue titled `Approve @otea/cli <version> on npm`, assigned to the owner and labeled `release` (GitHub emails the assignee), and writes the same text to the run's summary. In the issue:
+1. Read the release pull request (the version and the changelog) and merge it, with the same rebase merge as any other pull request. The required checks run on it like on any pull request.
+2. The merge makes the workflow create the `v<version>` tag and the GitHub Release, with the changelog as its notes, and start the two release workflows on that tag:
+   - `.github/workflows/desktop.yml` builds the installers on the three systems, tries them, and attaches them with `SHA256SUMS.txt` to the Release.
+   - `.github/workflows/npm-publish.yml` checks the tag against the package version, packs and tries the package, and **stages** `@otea/cli` on npm.
+3. **Approve the staged version on npm** (below). That is the only manual step after the merge.
+
+The npm workflow does not publish, it stages (`npm stage publish`), so the version is not public until someone with 2FA approves it. When the staging works, the workflow opens an issue titled `Approve @otea/cli <version> on npm`, assigned to the owner and labeled `release` (GitHub emails the assignee), and writes the same text to the run's summary. In the issue:
 
 1. Open `https://www.npmjs.com/package/@otea/cli`, then the **Staged Packages** tab, review the version and choose **Approve** (npm asks for 2FA). Or run `npm stage approve <stage-id>`, with the id from the issue.
 2. Tick the checks in the issue (`npm view @otea/cli@<version> version`, a clean `npm i -g @otea/cli`), then close it.
 
-A re-run of the workflow does not open a second issue while the first one is open.
+A re-run of the workflow does not open a second issue while the first one is open. A version with a prerelease suffix is staged under the `next` tag, which `npm i -g @otea/cli` never installs.
 
-The package is the compiled CLI (`dist/`, built by `npm run build`), the built UI (`ui/dist`), the presets and the schemas. `prepack` builds both, so `npm pack` and `npm publish` always carry a fresh build. Node does not strip types from files under `node_modules`, which is why an installed package runs `dist/` while a checkout runs `src/` directly. To try what would ship, run `npm pack`, then install the `.tgz` into a throwaway prefix (`npm i -g --prefix <folder> <file>.tgz`). A manual run of the npm workflow (Actions › Publish to npm › Run workflow) does the checks, the pack and `npm stage publish --dry-run`, and stages nothing and opens no issue.
+How it fits together, for when something breaks:
+
+- The workflow uses the run's `GITHUB_TOKEN`, with no secret. GitHub starts no workflow for what that token creates (the release pull request, the tag) except a `workflow_dispatch`. So `release-please.yml` starts `desktop.yml` and `npm-publish.yml` itself, with `gh workflow run --ref <tag>`, and runs `ci.yml` and `cla.yml` on the release pull request's branch so that the required checks exist. Because the tag push fires nothing, a release runs each workflow once. A `v*` tag pushed by a person still runs both workflows (and `desktop.yml` creates the Release then), which is the way to release by hand if `release-please.yml` ever fails.
+- The two release workflows are not reusable workflows called from `release-please.yml`: npm trusted publishing checks the name of the workflow that calls `npm`, and for a called workflow it checks the caller's, so the trusted publisher on npm (`npm-publish.yml`) would stop matching.
+- If a run of `npm-publish.yml` fails after the tag exists (a failing check, say), fix `main`, then run **Actions > Publish to npm > Run workflow** from the tag with **publish** checked. Nothing has reached npm before the staging step, so this is safe to repeat. The same for `desktop.yml` from the tag (it replaces the files on the Release).
+- `bootstrap-sha` and `initial-version` in `release-please-config.json` only matter until the first release is merged: they cut the first changelog at a recent commit, and make the first version `0.1.0`. After it, the manifest records the version and they can be deleted.
+- Moving to a GitHub App or personal access token for release-please (`token:` in the workflow) would make GitHub start the workflows by itself, and the dispatch steps could then go. Do not keep both, or each release runs twice.
+
+The package is the compiled CLI (`dist/`, built by `npm run build`), the built UI (`ui/dist`), the presets and the schemas. `prepack` builds both, so `npm pack` and `npm publish` always carry a fresh build. Node does not strip types from files under `node_modules`, which is why an installed package runs `dist/` while a checkout runs `src/` directly. To try what would ship, run `npm pack`, then install the `.tgz` into a throwaway prefix (`npm i -g --prefix <folder> <file>.tgz`). A manual run of the npm workflow (Actions > Publish to npm > Run workflow, **publish** unchecked) does the checks, the pack and `npm stage publish --dry-run`, and stages nothing and opens no issue.
+
+### One-time setup
+
+- **GitHub:** in Settings > Actions > General, under Workflow permissions, check **Allow GitHub Actions to create and approve pull requests**. Without it release-please cannot open the release pull request.
+- **npm:** see below.
 
 ### npm one-time setup
 

@@ -1,0 +1,74 @@
+name: Release
+
+# Keeps one release pull request open on main: it bumps the version of @otea/cli and of
+# desktop/package.json together, from the conventional commits since the last release, and writes
+# CHANGELOG.md. Merging that pull request is how the owner decides to release: this workflow then
+# creates the v* tag and the GitHub Release (with the changelog as its notes) and starts the two
+# release workflows, desktop.yml (installers, attached to that Release) and npm-publish.yml (stages
+# @otea/cli on npm and opens the approval issue). Config: release-please-config.json and
+# .release-please-manifest.json. See CONTRIBUTING.md > Releasing.
+#
+# This uses the run's GITHUB_TOKEN, so no secret is needed. Anything it creates with that token (the
+# release pull request, the tag) does not start other workflows by itself, which GitHub does on
+# purpose to avoid loops, except a workflow_dispatch. So the two steps below start what the missing
+# events would have started:
+#
+# - A release creates its tag with no `push: tags` event: the tag is dispatched to desktop.yml and
+#   npm-publish.yml with `gh workflow run --ref <tag>`. Each of them runs as its own top-level
+#   workflow, which npm trusted publishing needs: it checks the workflow file that is running (see
+#   npm-publish.yml). Calling it as a reusable workflow from this file would name this file instead.
+#   Because the tag push never fires, a release runs each workflow once.
+# - The release pull request opens with no pull_request event, so the required checks would never
+#   run on it: ci.yml and cla.yml are dispatched on its branch, and the checks attach to its head.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # The tag, the release, the release branch and CHANGELOG.md.
+      contents: write
+      # The release pull request and its labels.
+      pull-requests: write
+      issues: write
+      # `gh workflow run`.
+      actions: write
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Start the installer and npm workflows on the new tag
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          gh workflow run desktop.yml --ref "$TAG"
+          gh workflow run npm-publish.yml --ref "$TAG" -f publish=true
+          echo "Started desktop.yml and npm-publish.yml on $TAG" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run the required checks on the release pull request
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ steps.release.outputs.pr }}
+        run: |
+          branch="$(jq -r '.headBranchName' <<< "$PR")"
+          gh workflow run ci.yml --ref "$branch"
+          gh workflow run cla.yml --ref "$branch"
+          echo "Started ci.yml and cla.yml on $branch" >> "$GITHUB_STEP_SUMMARY"

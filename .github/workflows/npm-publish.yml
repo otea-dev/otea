@@ -1,18 +1,31 @@
 name: Publish to npm
 
-# A v* tag stages @otea/cli on npm, once the checks pass and the tag names the version in
+# A release stages @otea/cli on npm, once the checks pass and the tag names the version in
 # package.json (v0.2.0 for "version": "0.2.0"). Nothing is public yet: the workflow opens an issue
-# for the owner, who approves the staged version on npmjs.com with 2FA. A manual run
-# (workflow_dispatch) does all of it up to the end and then only `npm stage publish --dry-run`:
-# nothing reaches npm and no issue is opened.
+# for the owner, who approves the staged version on npmjs.com with 2FA.
+#
+# It runs as a release in two ways, with the same result:
+# - release-please.yml dispatches it on the v* tag it just created (`publish` = true, run from the
+#   tag). That is the normal way: a tag made with GITHUB_TOKEN fires no push event.
+# - A v* tag pushed by a person fires `push: tags`.
+# Any other manual run (workflow_dispatch with `publish` unchecked, from any branch or tag) does
+# all of it up to the end and then only `npm stage publish --dry-run`: nothing reaches npm and no
+# issue is opened.
 #
 # Staging signs in with npm trusted publishing (OIDC): no token is stored, and the package page on
 # npm shows where it was built from (provenance). The trusted publisher on npmjs.com is stage-only
-# ("Allow npm publish" unchecked), so a plain `npm publish` from here is rejected. See CONTRIBUTING.md.
+# ("Allow npm publish" unchecked), so a plain `npm publish` from here is rejected. npm checks the
+# name of the workflow that runs: this file must be the top-level workflow, never a reusable one
+# called from another file, or npm would see the caller's name (see CONTRIBUTING.md).
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Stage the version of this v* tag on npm (run from the tag). Unchecked: a dry run."
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -32,6 +45,25 @@ jobs:
       # The issue that asks the owner to approve the staged version.
       issues: write
     steps:
+      # A release is a v* tag, from a push or from a dispatch with `publish`. Anything else is a dry run.
+      - name: Decide release or dry run
+        id: mode
+        env:
+          EVENT: ${{ github.event_name }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          release=false
+          if [ "$EVENT" = push ]; then
+            release=true
+          elif [ "$PUBLISH" = true ]; then
+            case "$GITHUB_REF" in
+              refs/tags/v*) release=true ;;
+              *) echo "::error::publish needs a run from a v* tag, not ${GITHUB_REF}"; exit 1 ;;
+            esac
+          fi
+          echo "release=${release}" >> "$GITHUB_OUTPUT"
+          echo "This run is a $([ "$release" = true ] && echo release || echo dry run) from ${GITHUB_REF}"
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -47,11 +79,11 @@ jobs:
       - run: npx vitest run --maxWorkers=2
 
       - name: Check that the tag names the package version
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.mode.outputs.release == 'true'
         run: |
           version="$(node -p "require('./package.json').version")"
           if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
-            echo "::error::The tag is ${GITHUB_REF_NAME} but package.json says version ${version}: bump the version, then tag again"
+            echo "::error::The tag is ${GITHUB_REF_NAME} but package.json says version ${version}: the tag must be v<package.json version>"
             exit 1
           fi
 
@@ -73,12 +105,12 @@ jobs:
           "$RUNNER_TEMP/prefix/bin/otea" --help > /dev/null
 
       - name: Stage (dry run)
-        if: github.event_name == 'workflow_dispatch'
+        if: steps.mode.outputs.release != 'true'
         run: npm stage publish --dry-run --access public
 
       - name: Stage on npm
         id: stage
-        if: github.event_name != 'workflow_dispatch'
+        if: steps.mode.outputs.release == 'true'
         # bash with pipefail, so a failing npm is not hidden by the tee after it.
         shell: bash
         run: |
@@ -95,7 +127,7 @@ jobs:
           echo "stage_id=${stage_id}" >> "$GITHUB_OUTPUT"
 
       - name: Ask the owner to approve
-        if: github.event_name != 'workflow_dispatch'
+        if: steps.mode.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           STAGE_ID: ${{ steps.stage.outputs.stage_id }}

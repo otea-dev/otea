@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "node",
+  "include-component-in-tag": false,
+  "bump-minor-pre-major": true,
+  "initial-version": "0.1.0",
+  "bump-patch-for-minor-pre-major": false,
+  "pull-request-title-pattern": "chore: release ${version}",
+  "bootstrap-sha": "cd84fc9ee88b63a5fc44ee0c81abdaca94a05327",
+  "changelog-sections": [
+    { "type": "feat", "section": "Features" },
+    { "type": "fix", "section": "Bug fixes" },
+    { "type": "perf", "section": "Performance" },
+    { "type": "revert", "section": "Reverts" },
+    { "type": "docs", "section": "Documentation", "hidden": true },
+    { "type": "chore", "section": "Chores", "hidden": true },
+    { "type": "ci", "section": "CI", "hidden": true },
+    { "type": "build", "section": "Build", "hidden": true },
+    { "type": "test", "section": "Tests", "hidden": true },
+    { "type": "refactor", "section": "Refactoring", "hidden": true },
+    { "type": "style", "section": "Style", "hidden": true }
+  ],
+  "packages": {
+    ".": {
+      "package-name": "@otea/cli",
+      "extra-files": [
+        { "type": "json", "path": "desktop/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "desktop/package-lock.json", "jsonpath": "$.version" },
+        {
+          "type": "json",
+          "path": "desktop/package-lock.json",
+          "jsonpath": "$.packages[''].version"
+        }
+      ]
+    }
+  }
+}
