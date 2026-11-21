@@ -22,6 +22,7 @@ import {
   showItem,
   updateItem,
 } from '../app/items.ts';
+import { rememberLanguage, resolveLang, storedLanguage } from '../app/language.ts';
 import type { Launcher } from '../app/launcher.ts';
 import { memoryMachine } from '../app/machine.ts';
 import { boardRoundOf, liveBoards, rowFactsOf } from '../app/next.ts';
@@ -74,6 +75,7 @@ import { undoMove } from '../app/undo.ts';
 import { mergedOutside } from '../cli/merged-outside.ts';
 import { agentPrompt, isPromptKind, PROMPT_KINDS } from '../core/agent-prompts.ts';
 import { PERIOD_HINT, parsePeriod } from '../core/board/performance.ts';
+import { LANGS, type Lang } from '../core/board/template-words.ts';
 import { OteaError } from '../core/errors.ts';
 import { MAX_EVIDENCE_MB } from '../core/evidence.ts';
 import { TURNS, type Turn } from '../core/workflow.ts';
@@ -310,6 +312,10 @@ type Doors = {
 };
 
 const TransportBody = z.object({ transport: z.string() });
+const LanguageBody = z.object({
+  lang: z.enum(LANGS as [Lang, ...Lang[]]),
+  onlyIfUnset: z.boolean().optional(),
+});
 const ServeBody = z.object({ command: z.string() });
 const TopicsSwitchBody = z.object({ on: z.boolean() });
 const TopicNoteBody = z.object({ text: z.string() });
@@ -335,6 +341,22 @@ function machineApi(doors: Doors): Hono<OteaEnv> {
           canConfigure: auth.canConfigure(c),
         }),
       )
+      // The language the person's desk is in, kept for what is made without a desk (otea init, otea
+      // board add): the desk says it when it opens while none is kept, and on every switch.
+      .get('/language', (c) => c.json({ language: storedLanguage(machine) ?? null }))
+      .post('/language', async (c) => {
+        assertWritable(c, auth);
+        const parsed = LanguageBody.safeParse(await c.req.json().catch(() => undefined));
+        if (!parsed.success) {
+          throw new RejectedRequest(
+            400,
+            'invalid_body',
+            'Expected {"lang": "en" | "es", "onlyIfUnset"?: boolean}',
+          );
+        }
+        const { lang, onlyIfUnset } = parsed.data;
+        return c.json({ language: rememberLanguage(machine, lang, onlyIfUnset) });
+      })
       .get('/lan', (c) => {
         assertCanManageDevices(c, auth);
         return c.json(pairingView(machine, phone, port(), c.req.query('address')));
@@ -495,7 +517,8 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         const { kind, lang: asked } = c.req.query();
         if (kind !== undefined && !isPromptKind(kind))
           throw new InvalidQuery(`kind must be one of ${PROMPT_KINDS.join(', ')}`);
-        const lang = asked === 'es' ? 'es' : 'en';
+        const lang =
+          asked === 'es' || asked === 'en' ? asked : resolveLang(storedLanguage(machine), env);
         const moment = kind ?? promptKindOf(project);
         const facts = promptFacts(project, moment);
         const first = 'first' in facts && facts.first === true ? { first: true } : {};

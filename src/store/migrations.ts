@@ -467,9 +467,14 @@ export const MIGRATIONS = [
   ALTER TABLE devices ADD COLUMN via TEXT;
   `,
   // The language the project's own words are made in (its template boards, its Pedidos board, the
-  // boards agents draft for it): chosen with `otea init --lang`, Spanish until then.
+  // boards agents draft for it), per project; dropped by the migration after it.
   `
   ALTER TABLE project ADD COLUMN lang TEXT NOT NULL DEFAULT 'es';
+  `,
+  // That language is not the project's: what Otea makes with no desk to ask takes the language the
+  // person uses (app/language.ts, kept in the machine store), so the column goes.
+  `
+  ALTER TABLE project DROP COLUMN lang;
   `,
 ];
 

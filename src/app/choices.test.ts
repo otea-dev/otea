@@ -26,7 +26,7 @@ const OPTIONS = [
 
 function refinedDecision() {
   const ctx = memoryContext();
-  initBoards(ctx, 'ideas');
+  initBoards(ctx, 'ideas', 'es');
   const { id } = createItem(
     ctx,
     {

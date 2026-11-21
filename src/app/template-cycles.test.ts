@@ -137,7 +137,10 @@ function newItem(
 describe('a project made from an official template', () => {
   it('takes an Idea through Refinar, Diseñar and Planificar, and its Tarea to Hecho', () => {
     const ctx = memoryContext();
-    expect(initBoards(ctx, 'ideas').map(({ name }) => name)).toEqual(['Ideas', 'Implementación']);
+    expect(initBoards(ctx, 'ideas', 'es').map(({ name }) => name)).toEqual([
+      'Ideas',
+      'Implementación',
+    ]);
     const ideas = boardOf(ctx, 'Ideas');
     const tasks = boardOf(ctx, 'Implementación');
 
@@ -155,7 +158,10 @@ describe('a project made from an official template', () => {
 
   it('takes a Trabajo through Analizar and Entregar once its Entrega is merged in', () => {
     const ctx = memoryContext();
-    expect(initBoards(ctx, 'repos').map(({ name }) => name)).toEqual(['Trabajos', 'Entregas']);
+    expect(initBoards(ctx, 'repos', 'es').map(({ name }) => name)).toEqual([
+      'Trabajos',
+      'Entregas',
+    ]);
     const jobs = boardOf(ctx, 'Trabajos');
     const deliveries = boardOf(ctx, 'Entregas');
 
@@ -173,7 +179,7 @@ describe('a project made from an official template', () => {
 
   it('takes a Cambio through Aclarar, Hacerlo and Integrar, with one approval', () => {
     const ctx = memoryContext();
-    expect(initBoards(ctx, 'changes').map(({ name }) => name)).toEqual(['Cambios']);
+    expect(initBoards(ctx, 'changes', 'es').map(({ name }) => name)).toEqual(['Cambios']);
     const changes = boardOf(ctx, 'Cambios');
 
     const change = newItem(ctx, changes);
@@ -195,7 +201,7 @@ describe('a project made from an official template', () => {
   for (const [key, name, walk] of CATALOGUE) {
     it(`takes an item of the ${key} template through ${walk.join(', ')} to Hecho`, () => {
       const ctx = memoryContext();
-      expect(initBoards(ctx, key).map(({ name: made }) => made)).toEqual([name]);
+      expect(initBoards(ctx, key, 'es').map(({ name: made }) => made)).toEqual([name]);
       const board = boardOf(ctx, name);
       const item = newItem(ctx, board);
       expect(runToDone(ctx, item, board)).toEqual(walk);

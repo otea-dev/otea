@@ -20,7 +20,7 @@ export function hasOwnBoards(ctx: Context): boolean {
   return listBoardSummaries(ctx).some(({ builtin }) => !builtin);
 }
 
-export function initBoards(ctx: Context, template?: string, lang: Lang = 'es'): InitBoard[] {
+export function initBoards(ctx: Context, template: string | undefined, lang: Lang): InitBoard[] {
   if (template !== undefined && template !== NO_BOARDS && !isListedKey(template)) {
     throw new OteaError('not_found', `There is no template ${template}`);
   }

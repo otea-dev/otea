@@ -13,43 +13,52 @@ describe('initBoards', () => {
   it.each([[undefined], ['none']])('makes no board with template %s', (template) => {
     const ctx = memoryContext();
 
-    expect(initBoards(ctx, template)).toEqual([]);
+    expect(initBoards(ctx, template, 'es')).toEqual([]);
     expect(names(ctx)).toEqual([]);
   });
 
   it('makes every board of a template set, the part board joined to its parent', () => {
     const ctx = memoryContext();
 
-    expect(initBoards(ctx, 'repos').map(({ name }) => name)).toEqual(['Trabajos', 'Entregas']);
+    expect(initBoards(ctx, 'repos', 'es').map(({ name }) => name)).toEqual([
+      'Trabajos',
+      'Entregas',
+    ]);
     expect(names(ctx).sort()).toEqual(['Entregas live', 'Trabajos live']);
   });
 
   it('makes one board from a single template', () => {
     const ctx = memoryContext();
 
-    expect(initBoards(ctx, 'decisions').map(({ name }) => name)).toEqual(['Decisiones']);
+    expect(initBoards(ctx, 'decisions', 'es').map(({ name }) => name)).toEqual(['Decisiones']);
   });
 
   it('makes no board from a template on a project that has boards of its own', () => {
     const ctx = memoryContext();
-    initBoards(ctx, 'changes');
+    initBoards(ctx, 'changes', 'es');
 
-    expect(initBoards(ctx, 'repos')).toEqual([]);
-    expect(initBoards(ctx, 'decisions')).toEqual([]);
+    expect(initBoards(ctx, 'repos', 'es')).toEqual([]);
+    expect(initBoards(ctx, 'decisions', 'es')).toEqual([]);
     expect(names(ctx)).toEqual(['Cambios live']);
   });
 
   it('refuses a retired template: the catalogue replaced it', () => {
     const ctx = memoryContext();
-    expect(() => initBoards(ctx, 'tasks')).toThrow(expect.objectContaining({ code: 'not_found' }));
+    expect(() => initBoards(ctx, 'tasks', 'es')).toThrow(
+      expect.objectContaining({ code: 'not_found' }),
+    );
   });
 
   it('refuses a template it does not know with not_found, boards or not', () => {
     const ctx = memoryContext();
-    expect(() => initBoards(ctx, 'nope')).toThrow(expect.objectContaining({ code: 'not_found' }));
-    initBoards(ctx, 'changes');
-    expect(() => initBoards(ctx, 'nope')).toThrow(expect.objectContaining({ code: 'not_found' }));
-    expect(() => initBoards(ctx, 'deliveries')).toThrow(
+    expect(() => initBoards(ctx, 'nope', 'es')).toThrow(
+      expect.objectContaining({ code: 'not_found' }),
+    );
+    initBoards(ctx, 'changes', 'es');
+    expect(() => initBoards(ctx, 'nope', 'es')).toThrow(
+      expect.objectContaining({ code: 'not_found' }),
+    );
+    expect(() => initBoards(ctx, 'deliveries', 'es')).toThrow(
       expect.objectContaining({ code: 'not_found' }),
     );
   });

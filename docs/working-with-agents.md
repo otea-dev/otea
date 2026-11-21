@@ -145,7 +145,7 @@ otea stats --board Errores --json                          # one board, as JSON
 
 ## What to paste into an agent's chat
 
-`otea prompt` prints what the person pastes into an agent's chat, the same text the UI copies (**Conectar un agente** and the empty project page), in the project's language (Spanish until `otea init --lang en` says otherwise) or with `--lang`:
+`otea prompt` prints what the person pastes into an agent's chat, the same text the UI copies (**Conectar un agente** and the empty project page), in the language you use (the desk's, else the computer's, else English) or with `--lang`:
 
 - `start`, the first contact on a new project: set it up (`otea init`, no template) and connect (`otea connect` with the agent's own name, model and effort), read the project (README, code, git history, CLAUDE.md or AGENTS.md, CI; in a folder that is no git repository, what is in it, with no git words), ask the person one question at a time how they want to work, draft the boards with `otea board draft --new … --why … --template <key>`, say where to review them and to try them with a first item, and then keep working.
 - `join`, one more agent on a project that has boards: pick a name none of the listening agents has (they are named), connect (`otea connect`, which writes nothing that names it) and put the name on every command, declare its profile, read the guide and the boards, written from the project as it is now (each board's agent steps and how many items wait for an agent), and work the queue (`otea next --claim`, hand off, `otea wait`), never taking an item another agent holds and never designing boards.

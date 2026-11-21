@@ -3,7 +3,6 @@ import { randomBytes } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import type { Lang } from '../core/board/template-words.ts';
 import { OteaError } from '../core/errors.ts';
 import { assertIconName } from '../core/icons.ts';
 import { PROJECT_ID_RANDOM_BYTES, projectId } from '../core/project-id.ts';
@@ -14,9 +13,7 @@ import {
   type ProjectIdentity,
   selectProjectIcon,
   selectProjectIdentity,
-  selectProjectLang,
   updateProjectIcon,
-  updateProjectLang,
 } from '../store/queries.ts';
 import {
   type ProjectPath,
@@ -41,6 +38,7 @@ import {
   registerProject,
   withRegistry,
 } from './home.ts';
+import { defaultLang } from './language.ts';
 import { loadPresets } from './presets.ts';
 
 // `root` is the folder the project was found from (where AGENTS.md and .mcp.json go); `dataDir`
@@ -51,9 +49,6 @@ export type Project = Context & {
   dataDir: string;
   storage: Storage;
   identity: ProjectIdentity;
-  // The language its own words are made in (the boards it starts with, its Pedidos board, the
-  // boards agents draft): chosen with `otea init --lang`, Spanish, the owner's, until then.
-  lang: Lang;
 };
 
 type Found = { root: string; dataDir: string; storage: Storage };
@@ -119,44 +114,42 @@ function ensureIdentity(db: DatabaseSync, identity: () => ProjectIdentity): Proj
   return selectProjectIdentity(db) as ProjectIdentity;
 }
 
-function open(
-  found: Found,
-  identity = () => newIdentity(found.root),
-  // The language a project being created starts in.
-  lang?: Lang,
-): Project {
+function open(found: Found, env: Env, identity = () => newIdentity(found.root)): Project {
   const db = openDatabase(databasePath(found.dataDir));
   migrate(db);
   const presets = loadPresets(found.dataDir);
   nameImplicitTypes({ db, presets });
-  const ensured = ensureIdentity(db, identity);
-  if (lang !== undefined) updateProjectLang(db, lang);
   const project: Project = {
     ...found,
     db,
     presets,
-    identity: ensured,
-    lang: selectProjectLang(db),
+    identity: ensureIdentity(db, identity),
   };
   // Published boards join the catalog as compiled presets (app/boards.ts); a collection still on a
   // preset file is read as a published board, and every project has its Pedidos board.
   syncBoardPresets(project);
-  migrateProjectBoards(project, project.lang);
-  ensureRequestsBoard(project, project.lang);
+  // What it makes now, with no desk to ask, is in the language the person uses (app/language.ts).
+  const lang = defaultLang(env);
+  migrateProjectBoards(project, lang);
+  ensureRequestsBoard(project, lang);
   return project;
 }
 
 // A common project's data lives apart from its folders, so it can go missing on its own.
-function openFound(found: Found): Project {
+function openFound(found: Found, env: Env): Project {
   if (found.storage === 'common' && !existsSync(databasePath(found.dataDir))) {
     throw new OteaError('not_found', `The data of the Otea project at ${found.root} is missing`);
   }
-  return open(found);
+  return open(found, env);
 }
 
 // Opens a registered project's data, as seen from `root` (one of its folders).
-export function openRegistered(project: RegisteredProject, root: string): Project {
-  return openFound({ root, dataDir: project.dataDir, storage: project.storage });
+export function openRegistered(
+  project: RegisteredProject,
+  root: string,
+  env: Env = process.env,
+): Project {
+  return openFound({ root, dataDir: project.dataDir, storage: project.storage }, env);
 }
 
 export type Env = Readonly<Record<string, string | undefined>>;
@@ -221,7 +214,7 @@ function named(cwd: string, value: string, env: Env): Found {
 // Opens the project named by OTEA_PROJECT, or else the nearest one to the working directory.
 export function openProject(cwd: string, env: Env = process.env): Project {
   const override = env.OTEA_PROJECT;
-  if (override) return openFound(named(cwd, override, env));
+  if (override) return openFound(named(cwd, override, env), env);
   const { root } = locate(cwd);
   const found = nearest(cwd, root, env);
   if (found === undefined) {
@@ -235,20 +228,20 @@ export function openProject(cwd: string, env: Env = process.env): Project {
       { kind: 'no_project', root },
     );
   }
-  return openFound(found);
+  return openFound(found, env);
 }
 
-export type InitOptions = { here?: boolean; local?: boolean; join?: string; lang?: Lang };
+export type InitOptions = { here?: boolean; local?: boolean; join?: string };
 
-function createLocal({ root, gitCommonDir }: Location, lang?: Lang): Project {
+function createLocal({ root, gitCommonDir }: Location, env: Env): Project {
   mkdirSync(oteaDir(root), { recursive: true });
   if (gitCommonDir) excludeFromGit(gitCommonDir);
-  return open(local(root), undefined, lang);
+  return open(local(root), env);
 }
 
 // Common storage leaves no trace in the folder: the data goes to the Otea home and the registry
 // links the folder to it.
-function createCommon({ root }: Location, env: Env, lang?: Lang): Project {
+function createCommon({ root }: Location, env: Env): Project {
   const identity = newIdentity(root);
   const dataDir = join(oteaHome(env), 'data', identity.id);
   const registry = openRegistry(env);
@@ -261,7 +254,7 @@ function createCommon({ root }: Location, env: Env, lang?: Lang): Project {
     registry.close();
   }
   mkdirSync(dataDir, { recursive: true });
-  return open({ root, dataDir, storage: 'common' }, () => identity, lang);
+  return open({ root, dataDir, storage: 'common' }, env, () => identity);
 }
 
 // Links `path` to a registered project; linking it again to the same project changes nothing.
@@ -295,7 +288,7 @@ function joinProject({ root }: Location, ref: string, env: Env): Project {
   } finally {
     registry.close();
   }
-  return openFound({ root, dataDir: project.dataDir, storage: project.storage });
+  return openFound({ root, dataDir: project.dataDir, storage: project.storage }, env);
 }
 
 // Creates the project at the repo root (or the folder itself outside git), in common storage unless
@@ -310,7 +303,7 @@ export function initProject(
   const { root } = location;
   if (options.join !== undefined) return joinProject(location, options.join, env);
   const existing = nearest(root, root, env);
-  if (existing && samePath(existing.root, root)) return openFound(existing);
+  if (existing && samePath(existing.root, root)) return openFound(existing, env);
   if (existing && !options.here) {
     throw new OteaError(
       'already_exists',
@@ -318,9 +311,7 @@ export function initProject(
       { kind: 'covered', root, covering: existing.root },
     );
   }
-  return options.local
-    ? createLocal(location, options.lang)
-    : createCommon(location, env, options.lang);
+  return options.local ? createLocal(location, env) : createCommon(location, env);
 }
 
 // The project as clients see it: its identity and the icon it was given, null when none was (the
@@ -329,12 +320,6 @@ export type ProjectView = ProjectIdentity & { icon: string | null };
 
 export function projectView(project: Project): ProjectView {
   return { ...project.identity, icon: selectProjectIcon(project.db) };
-}
-
-// Changes the language the project's boards are made in from now on; the ones it has keep theirs.
-export function setProjectLang(project: Project, lang: Lang): void {
-  updateProjectLang(project.db, lang);
-  project.lang = lang;
 }
 
 export function setProjectIcon(project: Project, icon: string | null): ProjectView {
