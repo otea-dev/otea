@@ -5,7 +5,14 @@ import { reduced } from '../motion/reduced.ts';
 import { breathe } from './breathe.ts';
 import { type Lane, lanePaths, lerpPinches, X } from './geometry.ts';
 import { type Carry, type End, planHandoff } from './handoff-plan.ts';
-import { type CarryGeom, handoffClock, type Pose, plegarPose, progressAt } from './handoff-pose.ts';
+import {
+  type CarryGeom,
+  handoffClock,
+  LAND,
+  type Pose,
+  plegarPose,
+  progressAt,
+} from './handoff-pose.ts';
 import { type BlockSnap, type Snap, snap, type Universe } from './handoff-snap.ts';
 import { drawLight } from './light.ts';
 import { type Look, laneColor, lookColor, lookGlyph } from './looks.ts';
@@ -487,7 +494,7 @@ export function runHandoff(
       ltr?.setAttribute('d', paths.trunk);
       ltr?.setAttribute('stroke', paths.trunkStroke);
       for (const l of lit) {
-        if (l.carried) l.g.style.opacity = sstep(clamp((t - FA - T * 0.9) / 240)).toFixed(3);
+        if (l.carried) l.g.style.opacity = sstep(clamp((t - FA - T * LAND) / 240)).toFixed(3);
         else if (l.dy)
           l.g.setAttribute('transform', `translate(16.5 ${(l.y + l.dy * (1 - pr)).toFixed(1)})`);
       }

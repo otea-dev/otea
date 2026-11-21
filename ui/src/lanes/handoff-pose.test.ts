@@ -4,6 +4,7 @@ import {
   type CarryGeom,
   FOLD,
   handoffClock,
+  LAND,
   plegarPose,
   progressAt,
   UNFOLD,
@@ -32,16 +33,29 @@ describe('the clock', () => {
     expect(handoffClock([])).toEqual({ T: 480, FA: 0, Cc: 0, total: 480 });
     const c = handoffClock([100, -400]);
     expect(c.T).toBeCloseTo(480 + 28 * 20);
-    expect(c).toMatchObject({ FA: FOLD, Cc: UNFOLD, total: FOLD + c.T + UNFOLD });
-    expect(FOLD).toBe(420);
+    // the unfold starts when the pulse lands, not after the travel's quiet tail
+    expect(c).toMatchObject({ FA: FOLD, Cc: UNFOLD, total: FOLD + LAND * c.T + UNFOLD });
+    const short = handoffClock([100]);
+    expect(short.total).toBeLessThan(FOLD + short.T + UNFOLD);
+    expect(short.total).toBeGreaterThanOrEqual(FOLD + short.T);
+    expect(FOLD).toBe(260);
     expect(UNFOLD).toBe(460);
   });
 
-  it('moves rows on settle after the fold, the rooms 40 ms behind', () => {
-    expect(progressAt(0, 420, 600).p).toBe(0);
-    expect(progressAt(420 + 300, 420, 600).p).toBeCloseTo(F.settle(0.5));
-    expect(progressAt(420 + 300, 420, 600).pr).toBeCloseTo(F.settle(260 / 600));
-    expect(progressAt(420 + 600, 420, 600)).toMatchObject({ p: 1, s: 1 });
+  it('moves a carried row on settle after the fold, the rooms starting 100 ms before it', () => {
+    expect(progressAt(0, 260, 600)).toMatchObject({ p: 0, pr: 0 });
+    expect(progressAt(260 + 300, 260, 600).p).toBeCloseTo(F.settle(0.5));
+    expect(progressAt(260 + 300, 260, 600).pr).toBeCloseTo(F.settle(400 / 740));
+    // The slot the row left is closing while it is still folding, never held open for the travel.
+    expect(progressAt(260 - 50, 260, 600).pr).toBeGreaterThan(0);
+    expect(progressAt(260 - 50, 260, 600).p).toBe(0);
+    expect(progressAt(260 + 600, 260, 600)).toMatchObject({ p: 1, s: 1 });
+    expect(progressAt(260 + 640, 260, 600).pr).toBe(1);
+  });
+
+  it('moves the rooms of a change with no carry 40 ms behind the travel', () => {
+    expect(progressAt(0, 0, 480).pr).toBe(0);
+    expect(progressAt(300, 0, 480).pr).toBeCloseTo(F.settle(260 / 480));
   });
 });
 
@@ -59,16 +73,18 @@ describe('Plegar', () => {
   });
 
   it('folds the row into a line at its node, the line absorbed into the node', () => {
-    const mid = plegarPose(200, T, g());
+    const mid = plegarPose(120, T, g());
     expect(mid.lift.opacity).toBe(1);
     expect(mid.lift.clip?.[0]).toBeGreaterThan(0);
     expect(mid.lift.clip?.[0]).toBeLessThan(19.5);
     expect(mid.line.o).toBeGreaterThan(0);
+    // a thread of light, never at full strength
+    expect(mid.line.o).toBeLessThanOrEqual(0.45);
     expect(mid.line.w).toBeCloseTo(700 - 40.5 - 16);
-    const late = plegarPose(330, T, g());
+    const late = plegarPose(200, T, g());
     expect(late.line.w).toBeLessThan(mid.line.w);
     expect(late.pulse.o).toBeGreaterThan(0);
-    const folded = plegarPose(419, T, g());
+    const folded = plegarPose(FOLD - 1, T, g());
     expect(folded.lift.opacity).toBe(0);
     expect(folded.line.w).toBeLessThan(1);
     expect(folded.pulse.o).toBeCloseTo(1, 2);
@@ -93,7 +109,7 @@ describe('Plegar', () => {
     expect(land.pulse.o).toBeLessThan(1);
     expect(land.line.w).toBeGreaterThan(0);
     expect(land.trail).toBe(0);
-    const end = plegarPose(FOLD + T + UNFOLD, T, g());
+    const end = plegarPose(FOLD + LAND * T + UNFOLD, T, g());
     expect(end.y).toBe(0);
     expect(end.lift).toEqual({ opacity: 1, clip: [0, 0] });
     expect(end.pulse.o).toBe(0);
@@ -103,8 +119,8 @@ describe('Plegar', () => {
   });
 
   it('breathes on the destination lane near the end of the travel', () => {
-    expect(plegarPose(FOLD + T * 0.9, T, g()).breath).toBe(false);
-    expect(plegarPose(FOLD + T * 0.93, T, g()).breath).toBe(true);
+    expect(plegarPose(FOLD + T * 0.45, T, g()).breath).toBe(false);
+    expect(plegarPose(FOLD + T * 0.55, T, g()).breath).toBe(true);
   });
 
   it('has no row to fold from a virtual start, and none to unfold into a virtual end', () => {
