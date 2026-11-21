@@ -17,7 +17,85 @@ Esta es la guía corta en español. Todo lo demás está en el [README en inglé
 
 ## 1. Instalar
 
-Todavía no hay descarga: Otea se instala desde el código. Necesitas Git y Node.js 22.18 o posterior (se recomienda Node 24).
+> [!NOTE]
+> Otea todavía no tuvo su primera versión publicada. Hasta entonces no hay nada para descargar y `@otea/cli` en npm es solo un nombre reservado: instálalo [desde el código](#desde-el-código). Los pasos de abajo son para cuando salga la primera versión.
+
+Hay dos formas de instalar Otea: la **app de escritorio** o el **comando `otea` desde npm**. Las dos son el mismo Otea, con los mismos tableros, el mismo teléfono y los mismos agentes.
+
+**¿Cuál elijo?**
+
+- **Windows:** la app de escritorio. Se instala con un clic, se actualiza sola y deja `otea` en tu terminal.
+- **macOS:** la app de escritorio, si quieres Otea en su propia ventana y con avisos. Todavía no se actualiza sola: cada versión nueva la descargas tú. Si ya usas Node, npm sirve igual.
+- **Linux:** la app de escritorio en `.deb` si usas Debian o Ubuntu. En otras distribuciones, el AppImage, o npm si quieres `otea` en tu terminal.
+
+### Qué te da cada una
+
+| | App de escritorio | npm (`npm i -g @otea/cli`) |
+| --- | --- | --- |
+| Cómo abres Otea | Su propia ventana, desde el ícono de la app | Una pestaña del navegador, después de `otea serve` en una terminal |
+| Ícono en la bandeja o la barra de menús | ✅ Muestra lo que te espera; al cerrar la ventana sigue corriendo | ❌ |
+| Número en la barra de tareas o el Dock | ✅ Windows y macOS · ❌ Linux | ❌ |
+| Avisos en esta computadora | ✅ Los del sistema | ❌ |
+| Actualizaciones | ✅ Windows · ✅ Linux (el `.deb` te pide tu contraseña) · macOS: te avisa y la descargas tú | A mano: `npm i -g @otea/cli` otra vez |
+| `otea` en tu terminal | ✅ Windows y `.deb` · macOS: un clic en la barra de menús · ❌ AppImage | ✅ |
+| Necesita Node.js | ❌ Trae el suyo | ✅ Node.js 22.18 o posterior |
+
+Todo lo demás funciona igual de las dos formas: los tableros, el teléfono (emparejarlo y recibir avisos en él) y los agentes por la terminal o por MCP. Ninguna de las dos arranca sola al iniciar sesión.
+
+### La app de escritorio
+
+Descarga el instalador de tu sistema desde la [última versión](https://github.com/otea-dev/otea/releases/latest):
+
+| Sistema | Archivo |
+| --- | --- |
+| Windows | `Otea-Setup-<versión>.exe` |
+| macOS (Apple silicon e Intel) | `Otea-<versión>-mac.dmg` |
+| Linux, Debian o Ubuntu | `Otea-<versión>-amd64.deb` |
+| Linux, cualquier otra | `Otea-<versión>-x86_64.AppImage` |
+
+Los instaladores todavía no están firmados: Otea es un proyecto de código abierto que aún no tiene un certificado de firma de pago. Tu sistema te avisa la primera vez; así lo pasas.
+
+**Windows.** Abre el `.exe`. Si aparece una ventana azul que dice «Windows protegió su PC», haz clic en **Más información** y después en **Ejecutar de todos modos**. Otea se instala solo para ti (no hace falta ser administrador) y se abre.
+
+**macOS.** Abre el `.dmg` y arrastra Otea a Aplicaciones. Abre Otea: macOS dice que no puede comprobarlo. Haz clic en **Listo** (o **OK**), abre **Configuración del Sistema › Privacidad y seguridad**, baja hasta el mensaje sobre Otea y haz clic en **Abrir igualmente**. Confirma y Otea se abre; desde entonces se abre como cualquier app. Para tener `otea` en tu terminal, haz clic en el ícono de Otea en la barra de menús y elige **Instalar el comando otea**. Por ahora las actualizaciones son a mano: cuando sale una versión nueva, Otea te avisa, y tú la descargas y la arrastras otra vez a Aplicaciones.
+
+**Linux, `.deb`.** En una terminal, en la carpeta del archivo:
+
+```sh
+sudo apt install ./Otea-*.deb
+```
+
+Así Otea queda en el menú de aplicaciones y `otea` en tu terminal.
+
+**Linux, AppImage.** En una terminal, en la carpeta del archivo:
+
+```sh
+chmod +x Otea-*.AppImage
+./Otea-*.AppImage
+```
+
+### Comprobar la descarga
+
+Cada versión trae un `SHA256SUMS.txt` con la huella de cada instalador. Si la huella de tu archivo coincide con su línea, es el archivo que publicó la versión. Descarga `SHA256SUMS.txt` en la misma carpeta y después:
+
+- **Windows** (PowerShell): `Get-FileHash .\Otea-Setup-*.exe` muestra la huella. Busca el mismo texto en `SHA256SUMS.txt` (no importan mayúsculas o minúsculas).
+- **macOS** (Terminal): `shasum -a 256 Otea-*-mac.dmg` muestra la huella. Busca el mismo texto en `SHA256SUMS.txt`.
+- **Linux**: `sha256sum -c --ignore-missing SHA256SUMS.txt` revisa los archivos que tienes y dice `OK` (o `La suma coincide`) para cada uno.
+
+### El comando `otea` desde npm
+
+Necesitas [Node.js](https://nodejs.org/) 22.18 o posterior (se recomienda Node 24). Compruébalo con `node --version`. Después:
+
+```sh
+npm i -g @otea/cli
+otea --version
+```
+
+Para actualizar, corre `npm i -g @otea/cli` otra vez. Para quitarlo, `npm uninstall -g @otea/cli`. El escritorio lo abres con `otea serve` (paso 3).
+
+### Desde el código
+
+Hasta la primera versión, esta es la forma. Necesitas Git y Node.js 22.18 o posterior (se recomienda Node 24).
 
 ```sh
 git clone https://github.com/otea-dev/otea.git
@@ -28,7 +106,7 @@ npm link            # deja el comando otea disponible en tu terminal
 otea --version
 ```
 
-`npm link` instala un comando de verdad, así que también lo encuentra la terminal de tu agente. Si `otea` no aparece, `npm prefix -g` te dice dónde quedó: agrega esa carpeta a tu PATH (en macOS y Linux, su `bin`). Para actualizar, corre `git pull`, `npm ci` y `npm run build:ui` otra vez.
+`npm link` instala un comando de verdad, así que también lo encuentra la terminal de tu agente. Si `otea` no aparece, `npm prefix -g` te dice dónde quedó: agrega esa carpeta a tu PATH (en macOS y Linux, su `bin`). Para actualizar, corre `git pull`, `npm ci` y `npm run build:ui` otra vez. Para armar la app de escritorio desde el código, mira [`desktop/README.md`](desktop/README.md) (en inglés).
 
 ## 2. Crear el proyecto
 
