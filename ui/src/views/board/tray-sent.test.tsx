@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act } from 'react';
+import { act, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { moveItem } from '../../api.ts';
 import { AppTestProvider } from '../../app/context.tsx';
@@ -141,5 +141,44 @@ describe('a bulk move from the tray', () => {
       { method: 'POST', url: '/api/items/ERR-1/move', body: back },
       { method: 'POST', url: '/api/items/ERR-2/move', body: back },
     ]);
+  });
+});
+
+// The tray closes over about half a second after the last item is unticked: what it says then is
+// what it said, never a count of none.
+let clearTicks = () => undefined as unknown;
+
+function Ticked() {
+  const [ids, setIds] = useState(['ERR-1']);
+  clearTicks = () => setIds([]);
+  return (
+    <Tray
+      items={ids.map(row)}
+      collection={errores}
+      onUntick={() => undefined}
+      onKeep={() => undefined}
+      onClear={() => undefined}
+    />
+  );
+}
+
+describe('the tray closing', () => {
+  it('keeps saying what was ticked, not "0", while it closes', async () => {
+    page = mount(
+      <AppTestProvider value={app}>
+        <Ticked />
+      </AppTestProvider>,
+    );
+    await settle();
+    expect(page.root.querySelector('.ttitle')?.textContent).toContain('1');
+
+    await act(async () => {
+      clearTicks();
+    });
+
+    const said = page.root.textContent ?? '';
+    expect(page.root.querySelector('.tray')).not.toBeNull();
+    expect(said).not.toContain('0');
+    expect(said).not.toContain('ninguna acción');
   });
 });

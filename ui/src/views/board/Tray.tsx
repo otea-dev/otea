@@ -221,9 +221,14 @@ export function Tray({
     }
   }, [want, present]);
 
-  const moves = useMoves(items);
+  // The tray takes about half a second to close once nothing is ticked: it says what it said, not
+  // a selection of none.
+  const last = useRef(items);
+  if (items.length > 0) last.current = items;
+  const shown = items.length > 0 ? items : last.current;
+  const moves = useMoves(shown);
   const def = useStudioBoard(collection.name)?.live;
-  const selected: Selected[] = items.map((item) => {
+  const selected: Selected[] = shown.map((item) => {
     const m = moves.get(at(item));
     const picks = def ? pickAt(def, item)?.forward : undefined;
     return { item, moves: m?.moves, blockers: m?.blockers ?? 0, picks };
@@ -232,7 +237,7 @@ export function Tray({
   const buttons = trayButtons(plan.moves, word);
   const { main, closing } = trayGroups(buttons);
   const byState = plan.states;
-  const notice = trayNotice(plan, items.length);
+  const notice = trayNotice(plan, shown.length);
 
   if (!present) return null;
 
@@ -285,7 +290,7 @@ export function Tray({
 
   // «Poner arriba»: the ticked items go on top of the agents' work, in the order ticked;
   // «Quitar de arriba» once they all are.
-  const allPinned = items.length > 0 && items.every((it) => it.priority?.pin !== undefined);
+  const allPinned = shown.length > 0 && shown.every((it) => it.priority?.pin !== undefined);
   const pin = (pinned: boolean) => {
     const ids = items.map((it) => it.id);
     Q.run(() => pinItems(ids, pinned)).then(
@@ -331,7 +336,7 @@ export function Tray({
     );
   } else {
     k = phase.kind;
-    const count = items.length;
+    const count = shown.length;
     // With nothing shared, choosing one step is the way on: it leads.
     const keepMain = !main.length && byState.length > 1;
     body = (
@@ -340,7 +345,7 @@ export function Tray({
           <h3 className="ttitle">
             <Count value={count} /> {t('boardView.tray.selected', { count })}
           </h3>
-          <p className="tsteps">{trayStates(items, word)}</p>
+          <p className="tsteps">{trayStates(shown, word)}</p>
         </div>
         <div className="tmoves">
           {phase.kind === 'reason' ? (
