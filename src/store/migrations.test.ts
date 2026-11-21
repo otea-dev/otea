@@ -51,14 +51,14 @@ describe('migrate', () => {
         'process_beats',
       ]),
     );
-    expect(userVersion(db)).toBe(39);
+    expect(userVersion(db)).toBe(40);
   });
 
   it('is idempotent', () => {
     migrate(db);
     migrate(db);
 
-    expect(userVersion(db)).toBe(39);
+    expect(userVersion(db)).toBe(40);
   });
 
   describe('from version 1', () => {
