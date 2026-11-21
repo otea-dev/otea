@@ -1,12 +1,14 @@
 name: Publish to npm
 
-# A v* tag publishes @otea/cli to npm, once the checks pass and the tag names the version in
-# package.json (v0.2.0 for "version": "0.2.0"). A manual run (workflow_dispatch) does all of it up to
-# the end and then only `npm publish --dry-run`: nothing reaches npm.
+# A v* tag stages @otea/cli on npm, once the checks pass and the tag names the version in
+# package.json (v0.2.0 for "version": "0.2.0"). Nothing is public yet: the workflow opens an issue
+# for the owner, who approves the staged version on npmjs.com with 2FA. A manual run
+# (workflow_dispatch) does all of it up to the end and then only `npm stage publish --dry-run`:
+# nothing reaches npm and no issue is opened.
 #
-# Publishing signs in with npm trusted publishing (OIDC): no token is stored, and the package page
-# on npm shows where it was built from (provenance). It needs a one-time setup on npmjs.com, see
-# CONTRIBUTING.md. A repository secret named NPM_TOKEN, if there is one, is used instead.
+# Staging signs in with npm trusted publishing (OIDC): no token is stored, and the package page on
+# npm shows where it was built from (provenance). The trusted publisher on npmjs.com is stage-only
+# ("Allow npm publish" unchecked), so a plain `npm publish` from here is rejected. See CONTRIBUTING.md.
 on:
   push:
     tags: ["v*"]
@@ -27,6 +29,8 @@ jobs:
       contents: read
       # Trusted publishing and the provenance statement are signed with the run's OIDC token.
       id-token: write
+      # The issue that asks the owner to approve the staged version.
+      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -35,8 +39,8 @@ jobs:
           node-version: 22
           cache: npm
           registry-url: https://registry.npmjs.org
-      # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
-      - run: npm install -g npm@11
+      # `npm stage` needs npm 11.15.0 or later; Node 22 ships npm 10.
+      - run: npm install -g npm@11.15.0
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -68,22 +72,32 @@ jobs:
           fi
           "$RUNNER_TEMP/prefix/bin/otea" --help > /dev/null
 
-      - name: Publish (dry run)
+      - name: Stage (dry run)
         if: github.event_name == 'workflow_dispatch'
-        run: npm publish --dry-run --access public
+        run: npm stage publish --dry-run --access public
 
-      - name: Publish
+      - name: Stage on npm
+        id: stage
         if: github.event_name != 'workflow_dispatch'
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # bash with pipefail, so a failing npm is not hidden by the tee after it.
+        shell: bash
         run: |
           # A prerelease (v0.2.0-rc.1) goes to the "next" tag, so npm i -g @otea/cli never takes it.
           tag=latest
           case "${GITHUB_REF_NAME}" in *-*) tag=next ;; esac
-          if [ -n "${NPM_TOKEN}" ]; then
-            echo "Signing in with the NPM_TOKEN secret"
-            export NODE_AUTH_TOKEN="${NPM_TOKEN}"
-          else
-            echo "Signing in with trusted publishing"
+          npm stage publish --provenance --access public --tag "$tag" 2>&1 | tee "$RUNNER_TEMP/stage.log"
+          # npm prints: + @otea/cli@0.2.0 (staged with id <id>)
+          stage_id="$(sed -n 's/.*(staged with id \([^)]*\)).*/\1/p' "$RUNNER_TEMP/stage.log" | head -n 1)"
+          if [ -z "$stage_id" ]; then
+            echo "::warning::npm did not print a stage id: find the version under Staged Packages on npmjs.com, or run npm stage list @otea/cli"
+            stage_id="unknown (see Staged Packages on npmjs.com, or run npm stage list @otea/cli)"
           fi
-          npm publish --provenance --access public --tag "$tag"
+          echo "stage_id=${stage_id}" >> "$GITHUB_OUTPUT"
+
+      - name: Ask the owner to approve
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STAGE_ID: ${{ steps.stage.outputs.stage_id }}
+        run: |
+          VERSION="$(node -p "require('./package.json').version")" bash .github/scripts/npm-stage-notify.sh
