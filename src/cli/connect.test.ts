@@ -6,7 +6,6 @@ import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { listAgents } from '../app/presence.ts';
 import { openProject } from '../app/project.ts';
-import { AGENT_GUIDE } from '../core/agent-guide.ts';
 import { createMcpServer } from '../mcp/server.ts';
 import { COMMANDS, INIT_NEXT } from './commands.ts';
 import { type Cli, cliAt, tempGitRepo } from './testing.ts';
@@ -20,11 +19,7 @@ const BLOCK = [
   '<!-- otea:begin -->',
   '## Otea',
   '',
-  'This project hands work between humans and agents through Otea. Run `otea next` (or call the `next` tool of the Otea MCP server) to get the item to take and what its step asks, and `otea board <name>` (the `board` tool) to read the instructions of a board. Hand off with `otea handoff <id>`; `otea show <id>` says what to do next with each item.',
-  '',
-  'The guide below is as it was when this block was written. A rule the project turned on since (such as Topics) is not here: `otea board` (the `board` tool) prints the guide as it stands now.',
-  '',
-  AGENT_GUIDE,
+  "This project hands work between people and agents through Otea. Follow Otea's agent guide to the letter. Over MCP it is the Otea server's instructions. On the command line, or when your client shows no instructions, read it first with `otea board` (MCP: the `board` tool with no name), which also lists the boards. Then `otea next` gives the item to take and what its step asks.",
   '<!-- otea:end -->',
 ].join('\n');
 

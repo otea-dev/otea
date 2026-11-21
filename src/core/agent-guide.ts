@@ -1,6 +1,7 @@
 // Otea's agent guide: how an agent works a board, in one text. The MCP server gives it as its
-// instructions on initialize, `otea init --agents-md` writes it into AGENTS.md, and `otea board`
-// prints it first. Every agent reads it once a session, so every word costs: keep it short.
+// instructions on initialize, and `otea board`'s index prints it first, for an agent on the command
+// line, where the AGENTS.md block sends it (that block holds no copy). Every agent reads it once a
+// session, so every word costs: keep it short.
 export const AGENT_GUIDE = [
   "Otea's agent guide: the board is the procedure; follow it to the letter.",
   "1. Name yourself on every call: --as <name> (MCP tools: as). A new session runs otea whoami first (MCP: whoami): reuse the name it gives back, or pick a new one when it gives none. Each agent and every subagent has its own unique name (a subagent: <your name>-<role>); never reuse your parent's.",

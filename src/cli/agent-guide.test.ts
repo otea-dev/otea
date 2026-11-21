@@ -80,15 +80,38 @@ describe("Otea's agent guide", () => {
     await client.close();
   });
 
-  it('is in the AGENTS.md block init --agents-md writes', async () => {
+  // One copy in context: an MCP agent has the instructions, a CLI agent reads otea board. The
+  // AGENTS.md block points at both instead of a third copy, which also went stale (MCP-TOKENS).
+  it('is not copied into the AGENTS.md block, which says where to read it', async () => {
     await otea('init', '--local', '--agents-md');
     const written = readFileSync(join(repo.dir, 'AGENTS.md'), 'utf8');
-    expect(AGENTS_BLOCK).toContain(AGENT_GUIDE);
-    expect(written).toContain(AGENT_GUIDE);
+    expect(written).toContain(AGENTS_BLOCK);
+    expect(AGENTS_BLOCK).not.toContain(AGENT_GUIDE.split('\n')[1]);
+    expect(AGENTS_BLOCK).toContain("Over MCP it is the Otea server's instructions");
+    expect(AGENTS_BLOCK).toContain('read it first with `otea board`');
+  });
+
+  it('opens the board index, and no single board, on the CLI and over MCP', async () => {
+    expect((await otea('board')).out).toContain(AGENT_GUIDE);
+    expect((await otea('board', 'tasks')).out).not.toContain(AGENT_GUIDE.split('\n')[1]);
+    const server = createMcpServer(COMMANDS, { cwd: repo.dir, agent: 'claude', warn: () => {} });
+    const client = new Client({ name: 'test', version: '0' });
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverSide);
+    await client.connect(clientSide);
+    const text = async (args: Record<string, unknown>) =>
+      (
+        (await client.callTool({ name: 'board', arguments: args })) as {
+          content: { text: string }[];
+        }
+      ).content[0]?.text ?? '';
+    expect(await text({})).toContain(AGENT_GUIDE.split('\n')[0]);
+    expect(await text({ name: 'tasks' })).not.toContain(AGENT_GUIDE.split('\n')[0]);
+    await client.close();
   });
 
   it('stays out of otea board --json, which scripts read', async () => {
-    const { out } = await otea('board', 'tasks', '--json');
-    expect(out).not.toContain(AGENT_GUIDE);
+    const { out } = await otea('board', '--json');
+    expect(out).not.toContain(AGENT_GUIDE.split('\n')[0]);
   });
 });

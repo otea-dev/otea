@@ -194,15 +194,12 @@ describe('mcp server', () => {
       );
     });
 
-    // The guide is the server's instructions: the board's text does not give it a second time.
-    it('reads a board as otea board prints it, without the guide the instructions gave', async () => {
+    // The guide is the server's instructions: one board does not give it a second time.
+    it('reads a board as otea board prints it, without the guide', async () => {
       const board = await text('board', { name: 'tasks' });
 
       expect(board).not.toContain(AGENT_GUIDE.split('\n')[0]);
-      expect(mcpWords(await cliText('board', 'tasks'), COMMANDS)).toBe(
-        `${mcpWords(AGENT_GUIDE, COMMANDS)}\n\n${board}`,
-      );
-      expect(await text('board')).not.toContain(AGENT_GUIDE.split('\n')[0]);
+      expect(board).toBe(mcpWords(await cliText('board', 'tasks'), COMMANDS));
     });
 
     it('gives the events one a line, each with its id first', async () => {

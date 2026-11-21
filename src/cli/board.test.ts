@@ -41,7 +41,7 @@ describe('board', () => {
     const def = read((project) => liveBoardOf(project, 'work')?.def);
     expect(code).toBe(0);
     expect(def).toBeDefined();
-    expect(out).toBe(`${AGENT_GUIDE}\n\n${boardText(def ?? ({} as never))}\n`);
+    expect(out).toBe(`${boardText(def ?? ({} as never))}\n`);
     expect(out).toContain(
       '1. Completar: any agent does it\n\n2. Hacerlo: any agent does it; the person reviews it',
     );

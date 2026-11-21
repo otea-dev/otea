@@ -171,7 +171,6 @@ import { validateProject } from '../app/validate.ts';
 import { watch } from '../app/watch.ts';
 import { agentGuideFor, TOPICS_REMINDER, TOPICS_RULE } from '../core/agent-guide.ts';
 import { agentPrompt, isPromptKind, PROMPT_KINDS, type PromptKind } from '../core/agent-prompts.ts';
-import type { AgentChannel } from '../core/authority.ts';
 import { isClosed, isLandStep, positionOf, waysOf } from '../core/board/engine.ts';
 import { DONE, guardedBranch, isEvidence, stepById } from '../core/board/model.ts';
 import { DROPPED_NAME } from '../core/board/next.ts';
@@ -1122,10 +1121,11 @@ ${text}`;
   },
 };
 
-// otea board text opens with Otea's agent guide; --json keeps the board's data alone. Over MCP the
-// server's instructions are the guide, so the board does not give it again.
-const withAgentGuide = (project: Project, text: string, channel: AgentChannel) =>
-  channel === 'mcp' ? text : `${agentGuideFor(topicsOn(project))}\n\n${text}`;
+// otea board's index opens with Otea's agent guide, where AGENTS.md sends a CLI agent (and an MCP
+// one whose client shows no instructions) to read it once; one board gives it no second time.
+// --json keeps the data alone.
+const withAgentGuide = (project: Project, text: string) =>
+  `${agentGuideFor(topicsOn(project))}\n\n${text}`;
 
 // --lang (checked against LANGS as the option's choices), the project's language without it.
 const langOption = (given: string | undefined): Lang =>
@@ -1391,7 +1391,7 @@ const board: Command = {
     return withReader(input, (project) => {
       if (name !== '') {
         const guide = boardGuide(project, name);
-        return { data: guide, text: withAgentGuide(project, guide.text, input.channel) };
+        return { data: guide, text: guide.text };
       }
       const boards = guideIndex(project);
       const index =
@@ -1409,7 +1409,7 @@ const board: Command = {
                 ),
               ),
             ].join('\n');
-      return { data: { boards }, text: withAgentGuide(project, index, input.channel) };
+      return { data: { boards }, text: withAgentGuide(project, index) };
     });
   },
 };
