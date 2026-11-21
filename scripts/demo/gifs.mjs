@@ -59,7 +59,11 @@ async function startDesk(label) {
   mkdirSync(project, { recursive: true });
   const rel = relative(repo, project);
   if (!rel.startsWith('..') && !isAbsolute(rel)) throw new Error('project inside the repo');
-  const env = { ...process.env, OTEA_HOME: home };
+  // English comes from the computer's own language, which is where Otea looks while no desk has told
+  // it the person's (the desk does, once the browser opens in English): everything made before that
+  // moment, init and the boards, comes in English.
+  const env = { ...process.env, OTEA_HOME: home, LC_ALL: 'en_US.UTF-8', LANG: 'en_US.UTF-8' };
+  delete env.LC_MESSAGES;
   delete env.OTEA_AGENT;
   const otea = async (argv, as) => {
     const full = [join(repo, 'bin', 'otea.mjs'), ...(as ? ['--as', as] : []), ...argv];
@@ -70,8 +74,8 @@ async function startDesk(label) {
       throw new Error(`otea ${argv.join(' ')} failed: ${e.stderr || e.message}`);
     }
   };
-  // An English project: its boards, steps and Pedidos board all come in English.
-  await otea(['init', '--lang', 'en']);
+  // An English project: its boards, steps and Requests board all come in English.
+  await otea(['init']);
 
   const server = spawn(
     process.execPath,
