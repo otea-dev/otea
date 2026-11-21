@@ -40,7 +40,7 @@ const NOTES: Readonly<Record<string, string>> = {
   'board draft':
     'Pass id (the Pedido) or new (the name of a board the person asked you for, with why); not both. file is a path on this machine, which the server reads; a relative one is resolved against the directory otea mcp runs in.',
   events:
-    'Returns the events after the event id given to since, as a JSON array; call it again with the last id to read newer ones.',
+    'Returns the events after the event id given to since, one a line with its id first; call it again with the last id to read newer ones.',
   wait: `Gives up with the timeout error after timeout (default ${WAIT_TIMEOUT}, at most ${WAIT_MAX.text}); call it again to keep waiting.`,
 };
 
@@ -51,6 +51,9 @@ const NOTES: Readonly<Record<string, string>> = {
 // before its first call.
 export type McpContext = {
   cwd: string;
+  // Results as the data otea --json prints (otea mcp --json), for a program that reads them; else
+  // as the text the CLI prints, which is what an agent reads, at a fraction of the tokens.
+  json?: boolean;
   // The project the agent is pinned to (otea connect's OTEA_PROJECT_ID): writes elsewhere refused.
   pin?: string;
   agent?: string;
@@ -69,6 +72,9 @@ export type McpContext = {
 };
 
 type Values = Record<string, unknown>;
+
+// A record a command printed one by one (events): its data and its text.
+type Printed = { data: unknown; text: string };
 
 // A number an option takes (a note's, an event id) may come as a JSON number: it is read as its
 // digits, as the CLI reads it.
@@ -130,7 +136,7 @@ function inputFor(
   values: Values,
   context: McpContext,
   signal: AbortSignal,
-  records: unknown[],
+  records: Printed[],
   harness: Harness | undefined,
   seen: Set<string>,
 ): Input {
@@ -175,7 +181,7 @@ function inputFor(
     warn: context.warn,
     ask: async () => undefined,
     stdin: async () => '',
-    print: (data) => records.push(data),
+    print: (data, text) => records.push({ data, text }),
     args: command.args.flatMap((name) => {
       const key = name.endsWith('?') ? name.slice(0, -1) : name;
       const value = values[key];
@@ -199,8 +205,10 @@ function reply(text: string, isError: boolean): CallToolResult {
   return { content: [{ type: 'text', text }], isError };
 }
 
-// Runs the command as the CLI would under --json: its data, or the records it printed one by one,
-// as the result; a failure as the same {"error":{"code","message"}} the CLI prints.
+// Runs the command as the CLI would: the text it prints, in the words of the tools, as the only
+// content (no structuredContent, which some clients put in context next to it); a failure, its
+// message. Under otea mcp --json: its data, or the records it printed one by one, and a failure as
+// the same {"error":{"code","message"}} the CLI prints.
 async function callCommand(
   command: Command,
   values: Values,
@@ -210,15 +218,22 @@ async function callCommand(
   seen: Set<string>,
   commands: readonly Command[],
 ): Promise<CallToolResult> {
-  const records: unknown[] = [];
+  const records: Printed[] = [];
   let input: Input | undefined;
   const done = context.calling?.(command.name);
   try {
     const given = command.name === 'wait' ? waitValues(values) : values;
     input = inputFor(command, given, context, signal, records, harness, seen);
     const output = await command.execute(input);
-    const data = output === undefined ? records : inMcpWords(output.data, commands);
-    return reply(JSON.stringify(data), false);
+    if (context.json) {
+      const data =
+        output === undefined ? records.map(({ data }) => data) : inMcpWords(output.data, commands);
+      return reply(JSON.stringify(data), false);
+    }
+    const text = output === undefined ? records.map(({ text }) => text).join('\n') : output.text;
+    // A command with nothing to say (no events yet) still answers: with its data.
+    if (text === '') return reply(JSON.stringify(output === undefined ? [] : output.data), false);
+    return reply(mcpWords(text, commands), false);
   } catch (error) {
     // A first call that failed starts no session: the next call is its first again (P2S-R2-3).
     if (input?.newSession && input.agent !== undefined) {
@@ -228,6 +243,7 @@ async function callCommand(
     const { error: data } = errorData(error);
     const message =
       typeof data.message === 'string' ? mcpWords(data.message, commands) : data.message;
+    if (!context.json) return reply(String(message), true);
     return reply(JSON.stringify({ error: { ...data, message } }), true);
   } finally {
     done?.();

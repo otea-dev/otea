@@ -119,7 +119,12 @@ describe('an agent asks the person, on the CLI and over MCP', () => {
     expect((await otea('answer', 'CRI-1', 'Otra')).err).toContain('no question waits');
 
     await otea('ask', 'CRI-1', '¿Verde o gris?');
-    const server = createMcpServer(COMMANDS, { cwd: repo.dir, agent: 'claude', warn: () => {} });
+    const server = createMcpServer(COMMANDS, {
+      json: true,
+      cwd: repo.dir,
+      agent: 'claude',
+      warn: () => {},
+    });
     const client = new Client({ name: 'test', version: '0' });
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     await server.connect(serverSide);
@@ -141,7 +146,12 @@ describe('an agent asks the person, on the CLI and over MCP', () => {
   });
 
   it('asks over MCP with the ask tool', async () => {
-    const server = createMcpServer(COMMANDS, { cwd: repo.dir, agent: 'claude', warn: () => {} });
+    const server = createMcpServer(COMMANDS, {
+      json: true,
+      cwd: repo.dir,
+      agent: 'claude',
+      warn: () => {},
+    });
     const client = new Client({ name: 'test', version: '0' });
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     await server.connect(serverSide);

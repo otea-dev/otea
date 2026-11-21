@@ -47,6 +47,7 @@ describe('board moves over MCP', () => {
       project.db.close();
     }
     const server = createMcpServer(COMMANDS, {
+      json: true,
       cwd: repo.dir,
       agent: 'mender',
       warn: () => {},

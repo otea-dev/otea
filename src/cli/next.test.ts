@@ -197,6 +197,7 @@ describe('next and the board moves', () => {
 
     const client = new Client({ name: 'test', version: '0' });
     const server = createMcpServer(COMMANDS, {
+      json: true,
       cwd: repo.dir,
       agent: 'quill',
       warn: () => {},
@@ -248,6 +249,7 @@ describe('next and the board moves', () => {
 
     const client = new Client({ name: 'test', version: '0' });
     const server = createMcpServer(COMMANDS, {
+      json: true,
       cwd: repo.dir,
       agent: 'scout',
       warn: () => {},
