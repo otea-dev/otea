@@ -18,7 +18,7 @@ Esta es la guía corta en español. Todo lo demás está en el [README en inglé
 ## 1. Instalar
 
 > [!NOTE]
-> Otea todavía no tuvo su primera versión publicada. Hasta entonces no hay nada para descargar y `@otea/cli` en npm es solo un nombre reservado: instálalo [desde el código](#desde-el-código). Los pasos de abajo son para cuando salga la primera versión.
+> La primera versión todavía no salió: hasta entonces no hay nada para descargar y `@otea/cli` en npm es solo un nombre reservado, así que [instala desde el código](#desde-el-código). Desde la primera versión, los pasos de abajo valen tal cual.
 
 Hay dos formas de instalar Otea: la **app de escritorio** o el **comando `otea` desde npm**. Las dos son el mismo Otea, con los mismos tableros, el mismo teléfono y los mismos agentes.
 
@@ -95,7 +95,7 @@ Para actualizar, corre `npm i -g @otea/cli` otra vez. Para quitarlo, `npm uninst
 
 ### Desde el código
 
-Hasta la primera versión, esta es la forma. Necesitas Git y Node.js 22.18 o posterior (se recomienda Node 24).
+Para trabajar en Otea, o para correr lo que aún no se publicó (hasta la primera versión, es la única forma). Necesitas Git y Node.js 22.18 o posterior (se recomienda Node 24).
 
 ```sh
 git clone https://github.com/otea-dev/otea.git
