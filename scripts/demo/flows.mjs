@@ -52,7 +52,7 @@ async function makeEvidence(browser, dir) {
 }
 
 // Two agents with names and models, and a board the way the project starts it (the project is
-// English: `otea init --lang en`, so every word on the desk is).
+// English: the demo's computer speaks English, so every word on the desk is).
 async function seedAgents({ otea }) {
   await otea(['board', 'add', 'Changes', '--template', 'changes']);
   await otea(
@@ -150,16 +150,9 @@ async function agentLoop({ browser, desk, scheme, dir }) {
   await page.getByRole('button', { name: 'Approve' }).first().waitFor();
   await take('handed', [doing, 1], 1.4, 420);
   await stage.point(page.getByRole('button', { name: 'Approve' }).first(), [0.6, 0.6]);
-  await take('approve', [doing, 1], 0.9, 420);
-  await page.mouse.down();
-  await sleep(80);
-  await page.mouse.up();
-  await page
-    .getByText(/Nothing to review|approved/i)
-    .first()
-    .waitFor({ timeout: 8000 });
-  await page.mouse.move(1100, 700);
-  await take('done', [doing, 1], 1.8, 420);
+  // The GIF ends here, on the Approve moment: pressing it would leave the desk on its empty
+  // "Waiting for an agent..." panel, which says nothing about the loop.
+  await take('approve', [doing, 1], 2.2, 420);
   await stage.context.close();
 
   const height = Math.round((crop.height * W) / crop.width) + CAP;
@@ -200,9 +193,12 @@ async function question({ browser, desk, scheme, dir }) {
   );
   await otea(['next', '--claim'], 'lumen');
 
+  // Tall enough that the question's page, the longest one, ends inside the phone; where a page goes
+  // on below the screen, it fades out there (see `fade`) instead of a line cut against the edge.
+  const PHONE_H = 860;
   const phone = await openStage(browser, {
     width: 390,
-    height: 700,
+    height: PHONE_H,
     scheme,
     pointer: 'finger',
     dir: join(dir, 'phone'),
@@ -219,7 +215,7 @@ async function question({ browser, desk, scheme, dir }) {
   // The phone offers to be installed on a first visit: dismissed before the first shot.
   const gotIt = phone.page.getByRole('button', { name: 'Got it' });
   if (await gotIt.isVisible().catch(() => false)) await gotIt.click();
-  await phone.page.mouse.move(300, 560);
+  await phone.page.mouse.move(300, 760);
   const tokens = await readTokens(phone.page);
 
   await otea(['ask', 'CHA-1', 'Should the code apply before or after VAT?'], 'lumen');
@@ -231,14 +227,15 @@ async function question({ browser, desk, scheme, dir }) {
   // The desk's list around Questions for you: the count and the row, small, beside the phone.
   const deskCrop = { x: 180, y: 362, width: 330, height: 106 };
   const states = [];
-  const take = async (name, label, hold) =>
+  const take = async (name, label, hold, fade = true) =>
     states.push({
+      fade,
       phone: await phone.shot(name),
       desk: await big.shot(name, deskCrop),
       label,
       hold,
     });
-  await take('asked', 'lumen is waiting for your answer', 1.4);
+  await take('asked', 'lumen is waiting for your answer', 1.4, false);
 
   await phone.point(phone.page.getByRole('button', { name: 'Answer' }).first());
   await phone.page.mouse.down();
@@ -247,7 +244,7 @@ async function question({ browser, desk, scheme, dir }) {
   const box = phone.page.locator('textarea').first();
   await box.waitFor();
   await sleep(600);
-  await phone.page.mouse.move(300, 640);
+  await phone.page.mouse.move(300, 800);
   await take('open', 'lumen is waiting for your answer', 1.0);
   await box.click();
   await phone.page.keyboard.type('After VAT, on the total.', { delay: 12 });
@@ -262,14 +259,15 @@ async function question({ browser, desk, scheme, dir }) {
     .waitFor({ state: 'detached' })
     .catch(() => {});
   await sleep(1200);
-  await phone.page.mouse.move(300, 640);
-  await take('sent', 'lumen has your answer', 1.8);
+  // The page now fits the phone, so nothing fades, and the pointer rests where it covers no text.
+  await phone.page.mouse.move(330, 165);
+  await take('sent', 'lumen has your answer', 1.8, false);
   await phone.context.close();
   await big.context.close();
 
   // The picture: the phone large on the left in its frame, the small desk on the right.
   const PW = 342;
-  const PH = Math.round((PW * 700) / 390);
+  const PH = Math.round((PW * PHONE_H) / 390);
   const DW = 262;
   const DH = Math.round((DW * deskCrop.height) / deskCrop.width);
   const height = PH + 64 + CAP;
@@ -279,7 +277,7 @@ async function question({ browser, desk, scheme, dir }) {
     const png = join(dir, `frame-${String(i).padStart(2, '0')}.png`);
     const top = Math.round((height - CAP - PH) / 2);
     await composer.frame(
-      `<div style="position:absolute;left:34px;top:${top}px;width:${PW}px;height:${PH}px;border-radius:30px;overflow:hidden;border:7px solid ${scheme === 'light' ? 'var(--ink)' : '#3b4254'};box-sizing:content-box;margin:-7px 0 0 -7px;box-shadow:0 18px 40px -22px rgba(20,30,60,.55)"><img src="${composer.img(s.phone)}" style="width:${PW}px;height:${PH}px;display:block"></div>
+      `<div style="position:absolute;left:34px;top:${top}px;width:${PW}px;height:${PH}px;border-radius:30px;overflow:hidden;border:7px solid ${scheme === 'light' ? 'var(--ink)' : '#3b4254'};box-sizing:content-box;margin:-7px 0 0 -7px;box-shadow:0 18px 40px -22px rgba(20,30,60,.55)"><img src="${composer.img(s.phone)}" style="width:${PW}px;height:${PH}px;display:block">${s.fade ? `<div style="position:absolute;left:0;right:0;bottom:0;height:46px;background:linear-gradient(to bottom,transparent,var(--ground))"></div>` : ''}</div>
        <div style="position:absolute;left:${34 + PW + 34}px;top:${top + Math.round(PH / 2) - 70}px;width:${DW}px">
          <div style="font:600 11px/1 'Schibsted Grotesk';letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:10px">On your desk</div>
          <div style="border:1px solid var(--rule-2);border-radius:10px;overflow:hidden;background:var(--ground)"><img src="${composer.img(s.desk)}" style="width:${DW}px;height:${DH}px;display:block"></div>
