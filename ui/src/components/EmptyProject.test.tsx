@@ -62,10 +62,18 @@ describe('the empty project page', () => {
     expect(html).toContain('>Elegir un tablero</button>');
     expect(html.indexOf('Copiar la instrucción')).toBeLessThan(html.indexOf('Elegir un tablero'));
     expect(html).not.toContain('Nuevo ítem');
-    expect(html).toContain('ninguno todavía');
     setLanguage('en');
     expect(render([])).toContain('>Pick a board</button>');
     setLanguage('es');
+  });
+
+  // A first screen is not for where the project lives: its folders and store are in Settings.
+  it('does not show where the project lives, with boards or without', () => {
+    for (const boards of [[], ['Pedidos', 'Tareas']]) {
+      const html = render(boards);
+      expect(html).not.toContain('D:/code/tipcalc');
+      expect(html).not.toContain('tipcalc-k3x7qa');
+    }
   });
 
   it('shows no prompt once the project has boards, nor while it loads', () => {
