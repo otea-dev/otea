@@ -147,7 +147,7 @@ Questions and bugs go to [GitHub Issues](https://github.com/otea-dev/otea/issues
 
 Otea is free software under the [GNU Affero General Public License v3.0](LICENSE). You can use, study, modify and share it. If you distribute a modified version, or let people use it over a network, you must publish its source under the same license, keeping the copyright notices.
 
-**Commercial license.** If the AGPL does not fit your use (for example, embedding Otea in a closed product), a commercial license is available. Open an issue or contact [@Lartweib](https://github.com/Lartweib).
+**Commercial license.** If the AGPL does not fit your use (for example, embedding Otea in a closed product), a commercial license is available. Open an issue or contact Federico Daniel Ara ([@Lartweib](https://github.com/Lartweib)).
 
 **Name.** "Otea" and its logo identify this project. Forks are welcome under the AGPL, but must use a different name.
 

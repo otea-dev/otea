@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "The Otea desktop app: the UI of otea serve in a window, its state on the taskbar, the Dock and the tray, and the otea command on PATH.",
-  "author": "Lartweib",
+  "author": "Federico Daniel Ara",
   "homepage": "https://github.com/otea-dev/otea",
   "license": "AGPL-3.0-only",
   "type": "module",
