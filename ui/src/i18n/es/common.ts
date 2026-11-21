@@ -72,13 +72,12 @@ export const common = {
     other: 'en cola: {count} agentes ocupados',
   },
   'listen.busyLead': {
-    one: 'Nadie escucha ahora: {agent} está ocupado con otro ítem.',
-    other: 'Nadie escucha ahora: {count} agentes están ocupados con otros ítems.',
+    one: '{agent} está ocupado con otro ítem; lo verá cuando vuelva a esperar.',
+    other: '{count} agentes están ocupados con otros ítems; lo verán cuando vuelvan a esperar.',
   },
   'listen.activeLead': {
-    one: 'Nadie escucha ahora: {agent} está trabajando y lo verá cuando vuelva a esperar.',
-    other:
-      'Nadie escucha ahora: {count} agentes están trabajando y lo verán cuando vuelvan a esperar.',
+    one: '{agent} está trabajando y lo verá cuando vuelva a esperar.',
+    other: '{count} agentes están trabajando y lo verán cuando vuelvan a esperar.',
   },
   'listen.notice':
     '{lead} Ningún agente espera con otea wait: esto queda aquí hasta que uno vuelva. Pídele a tu agente que siga atento con {command}.',
