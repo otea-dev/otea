@@ -40,7 +40,8 @@
     "build": "tsc -p tsconfig.build.json",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build:ui && npm run build",
     "prepack": "npm run build:ui && npm run build",
-    "otea": "node --disable-warning=ExperimentalWarning src/cli/main.ts"
+    "otea": "node --disable-warning=ExperimentalWarning src/cli/main.ts",
+    "demo:gifs": "node scripts/demo/gifs.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
@@ -56,6 +57,7 @@
     "happy-dom": "21.0.4",
     "micromark": "4.0.3",
     "pdfjs-dist": "6.5.438",
+    "playwright-core": "1.61.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "typescript": "7.0.2",

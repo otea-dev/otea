@@ -27,6 +27,13 @@ Agents produce work faster than a human can follow it live. Otea is where work c
 - **Traceable**: every change is an append-only event, with who made it and through which channel.
 
 <picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-agent-loop-dark.gif">
+  <img src="docs/images/demo-agent-loop-light.gif" alt="The desk, live: a person adds a change, an agent takes it, fills in what the board asks, attaches a diff and screenshots and hands it over, and the person approves it">
+</picture>
+
+You add a change; an agent takes it, does it and hands it over with its proof; you approve it. The desk updates as each command runs.
+
+<picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/desk-your-turn-dark.png">
   <img src="docs/images/desk-your-turn-light.png" alt="The desk's Your turn page in a demo project: an agent's question, a change to review, a bug to triage and a change an agent is working on">
 </picture>
@@ -46,6 +53,13 @@ A change under review, with the evidence its step asked for: the diff and before
 </picture>
 
 The same change on a phone, with the agent's note and your two moves.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-phone-answer-dark.gif">
+  <img src="docs/images/demo-phone-answer-light.gif" alt="An agent asks a question with otea ask; it appears on a phone beside the desk, the person types an answer on the phone, and the desk shows the agent going on">
+</picture>
+
+An agent asks, and the question reaches your phone. You answer there, and the agent goes on.
 
 ## Status
 

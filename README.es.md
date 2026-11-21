@@ -124,6 +124,13 @@ otea serve    # abre el escritorio de Otea en tu navegador
 
 Déjalo corriendo mientras trabajas. Es tu escritorio: ahí revisas, apruebas y devuelves el trabajo de tus agentes.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-agent-loop-dark.gif">
+  <img src="docs/images/demo-agent-loop-light.gif" alt="El escritorio en vivo: una persona agrega un cambio, un agente lo toma, completa lo que pide el tablero, adjunta un diff y capturas y lo entrega, y la persona lo aprueba">
+</picture>
+
+Agregas un cambio; un agente lo toma, lo hace y te lo entrega con su evidencia; tú lo apruebas. El escritorio se actualiza a medida que corre cada comando.
+
 ## 4. Pegarle el texto a tu agente
 
 El escritorio vacío te muestra un texto bajo «Esto es para tu agente». Cópialo y pégalo en el chat de tu agente (Claude Code, OpenCode, Codex o cualquier otro con terminal o MCP). `otea prompt` imprime el mismo texto en la terminal.
@@ -131,6 +138,13 @@ El escritorio vacío te muestra un texto bajo «Esto es para tu agente». Cópia
 Con ese texto, el agente se conecta solo, lee el proyecto y te hace unas preguntas para armar contigo sus tableros. Tú los pruebas y los publicas en Studio. Desde ahí, cada pedido pasa por un tablero, y tú revisas los pasos que el tablero te asigna.
 
 Si trabajas directo en `main` y no quieres que nada se suba antes de verlo, pídele el tablero «Código en main». Al publicarlo, deja marcada la opción de instalar el hook de git de Otea (`otea hook install --git`): sin ese hook, git deja pasar un push antes de que lo apruebes.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-phone-answer-dark.gif">
+  <img src="docs/images/demo-phone-answer-light.gif" alt="Un agente hace una pregunta con otea ask; aparece en un teléfono junto al escritorio, la persona escribe la respuesta en el teléfono y el escritorio muestra al agente siguiendo">
+</picture>
+
+Cuando un agente te pregunta algo, la pregunta te llega al teléfono. La respondes ahí y el agente sigue.
 
 ## En Windows, con Git Bash
 
