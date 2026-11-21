@@ -1,12 +1,31 @@
 {
   "name": "@otea/cli",
   "version": "0.1.0",
-  "private": true,
   "description": "The asynchronous handoff surface between you and your AI agents.",
   "license": "AGPL-3.0-only",
+  "author": "Federico Daniel Ara",
+  "homepage": "https://github.com/otea-dev/otea",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/otea-dev/otea.git"
+  },
+  "bugs": {
+    "url": "https://github.com/otea-dev/otea/issues"
+  },
   "type": "module",
   "bin": {
     "otea": "bin/otea.mjs"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "ui/dist",
+    "presets",
+    "schemas",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=22.18"
@@ -18,7 +37,9 @@
     "test": "vitest run",
     "build:ui": "vite build ui",
     "dev:ui": "vite ui",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run build:ui",
+    "build": "tsc -p tsconfig.build.json",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build:ui && npm run build",
+    "prepack": "npm run build:ui && npm run build",
     "otea": "node --disable-warning=ExperimentalWarning src/cli/main.ts"
   },
   "devDependencies": {
