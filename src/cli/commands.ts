@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { resolve } from 'node:path';
+import { extname, resolve } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { renderUnicodeCompact } from 'uqr';
@@ -708,12 +708,16 @@ const migrateCommand: Command = {
   },
 };
 
-// How what Otea writes (hooks, the MCP server connect prints) runs this Otea again: a checkout on
-// Node, the desktop app on its own Electron. connect prefers the otea command on $PATH.
-const OTEA = oteaLauncher(fileURLToPath(new URL('./main.ts', import.meta.url)), {
-  execPath: process.execPath,
-  electron: process.versions.electron,
-});
+// How what Otea writes (hooks, the MCP server connect prints) runs this Otea again: Node on
+// main.ts in a checkout, main.js in the published package; the desktop app on its own
+// Electron. connect prefers the otea command on $PATH.
+const OTEA = oteaLauncher(
+  fileURLToPath(new URL(`./main${extname(import.meta.url)}`, import.meta.url)),
+  {
+    execPath: process.execPath,
+    electron: process.versions.electron,
+  },
+);
 
 // The MCP server as an agent adds it to its own harness's config: every harness keeps that config
 // its own way, so Otea gives one instruction and writes none of them.
