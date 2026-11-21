@@ -596,6 +596,16 @@ export function updateProjectIcon(db: DatabaseSync, icon: string | null): void {
   db.prepare('UPDATE project SET icon = ?').run(icon);
 }
 
+// The language the project's own words are made in; Spanish for a project that never chose one.
+export function selectProjectLang(db: DatabaseSync): 'en' | 'es' {
+  const row = db.prepare('SELECT lang FROM project').get() as { lang: string } | undefined;
+  return row?.lang === 'en' ? 'en' : 'es';
+}
+
+export function updateProjectLang(db: DatabaseSync, lang: 'en' | 'es'): void {
+  db.prepare('UPDATE project SET lang = ?').run(lang);
+}
+
 // A repo of the project: the name its items give it, and what identifies it (core/repo.ts).
 export type RepoRecord = { name: string; identity: string };
 

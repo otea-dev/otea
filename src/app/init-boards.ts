@@ -11,9 +11,6 @@ import type { Context } from './context.ts';
 
 const BY: Actor = { kind: 'human', name: 'otea' };
 
-// The project's own language (project.ts PROJECT_LANG), which imports this file.
-const LANG: Lang = 'es';
-
 // Starts the project without boards (they are made later in Studio or with otea board add).
 export const NO_BOARDS = 'none';
 
@@ -23,7 +20,7 @@ export function hasOwnBoards(ctx: Context): boolean {
   return listBoardSummaries(ctx).some(({ builtin }) => !builtin);
 }
 
-export function initBoards(ctx: Context, template?: string): InitBoard[] {
+export function initBoards(ctx: Context, template?: string, lang: Lang = 'es'): InitBoard[] {
   if (template !== undefined && template !== NO_BOARDS && !isListedKey(template)) {
     throw new OteaError('not_found', `There is no template ${template}`);
   }
@@ -31,16 +28,16 @@ export function initBoards(ctx: Context, template?: string): InitBoard[] {
   // A project starts with no board: the person picks the ones it uses, here or in Studio.
   if (template === undefined) return [];
   if (isSetKey(template)) {
-    const made = addBoardSet(ctx, { set: template, lang: LANG, boards: [], by: BY });
+    const made = addBoardSet(ctx, { set: template, lang, boards: [], by: BY });
     return made.map(({ record }) => named(record));
   }
-  return [single(ctx, template)];
+  return [single(ctx, template, lang)];
 }
 
-function single(ctx: Context, key: string): InitBoard {
+function single(ctx: Context, key: string, lang: Lang): InitBoard {
   const template = TEMPLATES.find((candidate) => candidate.key === key);
-  const name = template?.board[LANG] ?? key;
-  return named(addBoard(ctx, { name, template: key, lang: LANG, by: BY }).record);
+  const name = template?.board[lang] ?? key;
+  return named(addBoard(ctx, { name, template: key, lang, by: BY }).record);
 }
 
 function named(record: BoardRecord): InitBoard {
