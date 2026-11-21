@@ -417,6 +417,11 @@ export function postLost(): Promise<NotifyView> {
   return post<NotifyView>('/api/notify/lost', {});
 }
 
+// The language the person uses, for what Otea makes without a desk (language-sync.ts).
+export function postLanguage(lang: Language, onlyIfUnset: boolean): Promise<unknown> {
+  return post('/api/language', { lang, onlyIfUnset });
+}
+
 export function postNotifyPrefs(prefs: NotifyPrefs, lang: Language): Promise<NotifyView> {
   return post<NotifyView>('/api/notify/prefs', { prefs, lang });
 }

@@ -51,14 +51,30 @@ describe('migrate', () => {
         'process_beats',
       ]),
     );
-    expect(userVersion(db)).toBe(40);
+    expect(userVersion(db)).toBe(41);
   });
 
   it('is idempotent', () => {
     migrate(db);
     migrate(db);
 
-    expect(userVersion(db)).toBe(40);
+    expect(userVersion(db)).toBe(41);
+  });
+
+  describe('from version 40, which kept a language on the project', () => {
+    it('drops the column and keeps the project', () => {
+      migrate(db, 40);
+      db.exec("INSERT INTO project (id, name, lang) VALUES ('p-1', 'p', 'en')");
+
+      migrate(db);
+
+      const columns = db
+        .prepare('PRAGMA table_info(project)')
+        .all()
+        .map((row) => row.name);
+      expect(columns).not.toContain('lang');
+      expect(db.prepare('SELECT id FROM project').all()).toEqual([{ id: 'p-1' }]);
+    });
   });
 
   describe('from version 1', () => {

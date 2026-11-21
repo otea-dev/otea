@@ -41,7 +41,6 @@ export function projectOf(root: string, context: Context): Project {
     dataDir: join(root, '.otea'),
     storage: 'local',
     identity: IDENTITY,
-    lang: 'es',
     ...context,
   };
 }

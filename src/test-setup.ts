@@ -17,3 +17,7 @@ const home = mkdtempSync(join(tmpdir(), 'otea-home-'));
 process.env.OTEA_HOME = home;
 // A process a test started and ended can hold the folder a moment longer on Windows (EPERM).
 afterAll(() => rmSync(home, { recursive: true, force: true, maxRetries: 10 }));
+
+// The language of what Otea makes with no desk to ask follows this computer's: a test that does not
+// choose one gets Spanish, the owner's, whatever computer it runs on.
+process.env.LC_ALL = 'es_ES.UTF-8';

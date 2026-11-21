@@ -41,7 +41,7 @@ describe('GET /api/agent-prompt', () => {
   });
 
   it('gives the join prompt once there are boards, naming who listens and what waits', async () => {
-    initBoards(project, 'changes');
+    initBoards(project, 'changes', 'es');
     const want = liveBoardOf(project, 'Cambios')?.def.form[0]?.ref ?? '';
     createItem(project, {
       collection: 'Cambios',
@@ -65,7 +65,7 @@ describe('GET /api/agent-prompt', () => {
   });
 
   it('names an agent working under a lease though it is not listening now', async () => {
-    initBoards(project, 'changes');
+    initBoards(project, 'changes', 'es');
     const want = liveBoardOf(project, 'Cambios')?.def.form[0]?.ref ?? '';
     const item = createItem(project, {
       collection: 'Cambios',
@@ -84,7 +84,7 @@ describe('GET /api/agent-prompt', () => {
   });
 
   it('tells the first agent of a project with boards to connect, with nobody to join', async () => {
-    initBoards(project, 'changes');
+    initBoards(project, 'changes', 'es');
 
     const { body } = await get('?lang=es');
     expect(body).toMatchObject({ kind: 'join', first: true });

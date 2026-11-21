@@ -22,6 +22,7 @@ import { Dialog } from './kit/pop/Dialog.tsx';
 import { ToastHost } from './kit/pop/toast.tsx';
 import { Tooltip } from './kit/Tooltip.tsx';
 import { LaneDefs } from './lanes/LaneDefs.tsx';
+import { useKeepLanguage } from './language-sync.ts';
 import { MODULES } from './modules/registry.ts';
 import { useQuestionNotice } from './notify/question-notice.ts';
 import { InstallBanner } from './offline/InstallBanner.tsx';
@@ -181,6 +182,7 @@ function Shell() {
 export function App() {
   // Every word on screen follows the language: a switch renders the whole app again.
   useLanguage();
+  useKeepLanguage();
   useRoute();
   return (
     <AppProvider>

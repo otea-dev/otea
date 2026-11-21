@@ -2,9 +2,10 @@ import type { DatabaseSync } from 'node:sqlite';
 import { applyMigrations } from './migrations.ts';
 
 // What belongs to this computer's one Otea server rather than to a project ($OTEA_HOME/machine.db):
-// the paired devices, how a phone reaches the server, who is told when something becomes yours, and
-// the local projects the server was asked to serve. The tables of devices, phone and notify_targets
-// are laid out as a project's used to be, so the use cases in app/ read them the same way.
+// the paired devices, how a phone reaches the server, who is told when something becomes yours, the
+// local projects the server was asked to serve and the person's preferences. The tables of devices,
+// phone and notify_targets are laid out as a project's used to be, so the use cases in app/ read
+// them the same way.
 const MACHINE_MIGRATIONS = [
   `
   CREATE TABLE devices (
@@ -44,10 +45,32 @@ const MACHINE_MIGRATIONS = [
   `
   ALTER TABLE devices ADD COLUMN via TEXT;
   `,
+  // What the person chose, not a device: today the language of the desk, which everything Otea
+  // makes without a desk to ask (otea init, otea board add) is written in.
+  `
+  CREATE TABLE preferences (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+  `,
 ];
 
 export function migrateMachine(db: DatabaseSync): void {
   applyMigrations(db, MACHINE_MIGRATIONS);
+}
+
+export function selectPreference(db: DatabaseSync, key: string): string | undefined {
+  const row = db.prepare('SELECT value FROM preferences WHERE key = ?').get(key) as
+    | { value: string }
+    | undefined;
+  return row?.value;
+}
+
+export function upsertPreference(db: DatabaseSync, key: string, value: string): void {
+  db.prepare(
+    `INSERT INTO preferences (key, value) VALUES (?, ?)
+     ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+  ).run(key, value);
 }
 
 // A local project (.otea/ in its folder) the server serves beside the registered ones.

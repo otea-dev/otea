@@ -61,6 +61,7 @@ import {
   updateItem,
 } from '../app/items.ts';
 import { keepWaitingCommand, keepWaitingLine, waitAgainLine } from '../app/keep-waiting.ts';
+import { defaultLang } from '../app/language.ts';
 import { type Launcher, oteaLauncher, withHome } from '../app/launcher.ts';
 import { claimItem, heartbeatItem, releaseItem } from '../app/leases.ts';
 import { openMachine, rememberLocalProject, withMachine } from '../app/machine.ts';
@@ -125,7 +126,6 @@ import {
   type ProjectView,
   projectView,
   setProjectIcon,
-  setProjectLang,
 } from '../app/project.ts';
 import { type ProofSource, tickPoint } from '../app/proofs.ts';
 import {
@@ -451,7 +451,7 @@ export const INIT_NEXT = [
 
 const init: Command = {
   name: 'init',
-  summary: `Create or reuse the project at the repository root: in the Otea home ($OTEA_HOME, default ~/.otea), or with --local in .otea at the root; --join <project> links the repo to a registered project instead (refused when a project in a folder above covers it, unless --here); it makes no board unless --template <key> names one, and only on a project with no boards of its own yet: the boards of that template (${TEMPLATE_KEYS}; a set such as ideas or repos makes all of its boards); you can also pick them later in Studio or with otea board add <name> --template <key>; --lang en|es sets the language its boards and its Pedidos board are made in (es until then; boards it already has keep theirs); --icon gives the project an icon (without one the UI draws a monogram of its name); --agents-md also adds (or refreshes) a block in AGENTS.md telling agents to run "otea next" and "otea board"`,
+  summary: `Create or reuse the project at the repository root: in the Otea home ($OTEA_HOME, default ~/.otea), or with --local in .otea at the root; --join <project> links the repo to a registered project instead (refused when a project in a folder above covers it, unless --here); it makes no board unless --template <key> names one, and only on a project with no boards of its own yet: the boards of that template (${TEMPLATE_KEYS}; a set such as ideas or repos makes all of its boards); you can also pick them later in Studio or with otea board add <name> --template <key>; its boards and its Pedidos board are made in the language you use (the desk's, else this computer's, else English) and keep it; --icon gives the project an icon (without one the UI draws a monogram of its name); --agents-md also adds (or refreshes) a block in AGENTS.md telling agents to run "otea next" and "otea board"`,
   details: TEMPLATE_LIST,
   args: [],
   options: {
@@ -461,27 +461,21 @@ const init: Command = {
     join: { placeholder: 'project' },
     template: { placeholder: 'key' },
     icon: { placeholder: 'icon' },
-    lang: { choices: LANGS },
   },
   execute: ({ cwd, flag, option }) => {
     const target = option('join');
-    const lang = option('lang') as Lang | undefined;
     const template = option('template');
     const icon = option('icon');
     if (icon !== undefined) assertIconName(icon);
-    if (
-      target !== undefined &&
-      (flag('local') || flag('here') || template !== undefined || lang !== undefined)
-    ) {
+    if (target !== undefined && (flag('local') || flag('here') || template !== undefined)) {
       throw new UsageError(
-        '--join links to an existing project; it takes no --local, --here, --template or --lang',
+        '--join links to an existing project; it takes no --local, --here or --template',
       );
     }
     const options = {
       here: flag('here'),
       local: flag('local'),
       ...(target === undefined ? {} : { join: target }),
-      ...(lang === undefined ? {} : { lang }),
     };
     const project = initProject(cwd, options);
     const { root, dataDir: path, storage } = project;
@@ -489,13 +483,11 @@ const init: Command = {
     let shown: ProjectView;
     let kept = false;
     try {
-      // A project that exists takes the language for the boards made from now on.
-      if (lang !== undefined && project.lang !== lang) setProjectLang(project, lang);
       shown = icon === undefined ? projectView(project) : setProjectIcon(project, icon);
       // The repos at the project's folders are added now, before any clone of them is linked.
       if (target === undefined) {
         kept = template !== undefined && template !== NO_BOARDS && hasOwnBoards(project);
-        made = initBoards(project, template, project.lang);
+        made = initBoards(project, template, defaultLang());
         listRepos(project);
       } else readReposAtFolder(project, root);
     } finally {
@@ -1143,7 +1135,7 @@ const boardName = (record: BoardRecord) => (record.live ?? record.draft)?.defini
 
 const boardAdd: Command = {
   name: 'board add',
-  summary: `For the person, with no agent name: make a board and publish it, from a template (${TEMPLATE_KEYS}) or blank, in the project's language (otea init --lang; es until then) or the one --lang gives; --item names what each item is; a set such as ideas or repos makes all of its boards, the name and --item naming the first; --prefix chooses how its item ids start (2 to 6 letters or digits; one board only)`,
+  summary: `For the person, with no agent name: make a board and publish it, from a template (${TEMPLATE_KEYS}) or blank, in the language you use (the desk's, else this computer's, else English) or the one --lang gives, once; --item names what each item is; a set such as ideas or repos makes all of its boards, the name and --item naming the first; --prefix chooses how its item ids start (2 to 6 letters or digits; one board only)`,
   details: TEMPLATE_LIST,
   args: ['name'],
   options: {
@@ -1153,8 +1145,8 @@ const boardAdd: Command = {
     prefix: { placeholder: 'letters' },
   },
   execute: ({ cwd, args: [name = ''], option, agent }) => {
-    // --lang (checked against LANGS as the option's choices); the project's language without it.
-    const given = option('lang') as Lang | undefined;
+    // --lang (checked against LANGS as the option's choices); the language the person uses without it.
+    const lang = (option('lang') as Lang | undefined) ?? defaultLang();
     // Publishing is the person's: an agent that names itself proposes the board instead.
     if (agent !== undefined) {
       throw new OteaError(
@@ -1173,7 +1165,7 @@ const boardAdd: Command = {
       const boards = withProject(cwd, (project) =>
         addBoardSet(project, {
           set: template,
-          lang: given ?? project.lang,
+          lang,
           by: { kind: 'human', name: 'human' },
           boards: [{ name, ...(item === undefined ? {} : { item }) }],
         }),
@@ -1184,7 +1176,7 @@ const boardAdd: Command = {
     const added = withProject(cwd, (project) =>
       addBoard(project, {
         name,
-        lang: given ?? project.lang,
+        lang,
         by: { kind: 'human', name: 'human' },
         ...(template === undefined ? {} : { template }),
         ...(item === undefined ? {} : { item }),
@@ -1255,7 +1247,7 @@ function proposeBoard(input: Input, name: string, piped?: string): Output {
     const made = proposeAgentDraft(project, {
       name,
       need: why,
-      lang: project.lang,
+      lang: defaultLang(),
       actor,
       channel,
       ...(text === undefined ? {} : { text }),
@@ -1289,7 +1281,7 @@ function proposeChange(input: Input, board: string, piped?: string): Output {
     const made = proposeBoardChange(project, {
       board,
       need: why,
-      lang: project.lang,
+      lang: defaultLang(),
       actor,
       channel,
       ...(text === undefined ? {} : { text }),
@@ -1361,12 +1353,12 @@ function projectPrompt(cwd: string, kind: PromptKind | undefined, asked: Lang | 
     project = openProject(cwd);
   } catch (error) {
     if (error instanceof OteaError && error.code === 'not_found' && kind !== 'join')
-      return agentPrompt(kind ?? 'start', asked ?? 'es', empty);
+      return agentPrompt(kind ?? 'start', asked ?? defaultLang(), empty);
     throw error;
   }
   try {
     const moment = kind ?? promptKindOf(project);
-    return agentPrompt(moment, asked ?? project.lang, promptFacts(project, moment));
+    return agentPrompt(moment, asked ?? defaultLang(), promptFacts(project, moment));
   } finally {
     project.db.close();
   }
@@ -1375,7 +1367,7 @@ function projectPrompt(cwd: string, kind: PromptKind | undefined, asked: Lang | 
 const promptCommand: Command = {
   name: 'prompt',
   summary:
-    "Print what to paste into an agent's chat: start (a new project: set up, connect, read the project, interview you one question at a time and draft its boards), join (one more agent working the boards there are, named from the project now) or design (one more board); without one, start until the project has boards of its own, then join. --lang en|es (default: the project's language, es until otea init --lang)",
+    "Print what to paste into an agent's chat: start (a new project: set up, connect, read the project, interview you one question at a time and draft its boards), join (one more agent working the boards there are, named from the project now) or design (one more board); without one, start until the project has boards of its own, then join. --lang en|es (default: the language you use: the desk's, else this computer's, else English)",
   args: ['moment?'],
   options: { lang: { placeholder: 'en|es' } },
   execute: (input) => {
