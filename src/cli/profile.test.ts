@@ -196,7 +196,7 @@ describe('otea profile', () => {
     let client: Client;
 
     const connectClient = async (agent?: string) => {
-      const context = { cwd: repo.dir, warn: () => {}, ...(agent ? { agent } : {}) };
+      const context = { cwd: repo.dir, json: true, warn: () => {}, ...(agent ? { agent } : {}) };
       const server = createMcpServer(COMMANDS, context);
       const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
       await server.connect(serverSide);

@@ -298,7 +298,9 @@ describe('otea whoami', () => {
     later();
     const client = new Client({ name: 'claude-code', version: '2.1.0' });
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-    await createMcpServer(COMMANDS, { cwd: repo.dir, warn: () => {} }).connect(serverSide);
+    await createMcpServer(COMMANDS, { cwd: repo.dir, json: true, warn: () => {} }).connect(
+      serverSide,
+    );
     await client.connect(clientSide);
     try {
       const reply = await client.callTool({ name: 'whoami', arguments: {} });

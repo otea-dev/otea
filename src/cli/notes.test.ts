@@ -146,7 +146,12 @@ describe('notes from the person, on the CLI and over MCP', () => {
 
   it('answers over MCP with the reply tool, and gives the notes as JSON with the text', async () => {
     note('¿Y la cola?');
-    const server = createMcpServer(COMMANDS, { cwd: repo.dir, agent: 'claude', warn: () => {} });
+    const server = createMcpServer(COMMANDS, {
+      json: true,
+      cwd: repo.dir,
+      agent: 'claude',
+      warn: () => {},
+    });
     const client = new Client({ name: 'test', version: '0' });
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     await server.connect(serverSide);

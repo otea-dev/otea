@@ -13,6 +13,7 @@ import {
   seedOnce,
   type TempRepo,
 } from '../cli/testing.ts';
+import { AGENT_GUIDE } from '../core/agent-guide.ts';
 import type { Actor } from '../core/item.ts';
 import {
   AGENT_COMMANDS,
@@ -25,11 +26,19 @@ import { mcpWords } from './words.ts';
 
 type Reply = { isError?: boolean; content: { type: string; text: string }[] };
 
-// `name`: the agent the server was started as (otea mcp --as), or none.
-async function connect(cwd: string, name?: string, pin?: string): Promise<Client> {
+// `name`: the agent the server was started as (otea mcp --as), or none. Most of these tests read
+// the data a result carries, so they run the server as otea mcp --json does; `text` runs it as
+// agents get it, with the CLI's text.
+async function connect(cwd: string, name?: string, pin?: string, text = false): Promise<Client> {
   const agent = name === undefined ? {} : { agent: name };
   const pinned = pin === undefined ? {} : { pin };
-  const server = createMcpServer(COMMANDS, { cwd, ...agent, ...pinned, warn: () => {} });
+  const server = createMcpServer(COMMANDS, {
+    cwd,
+    ...agent,
+    ...pinned,
+    ...(text ? {} : { json: true }),
+    warn: () => {},
+  });
   const client = new Client({ name: 'test', version: '0' });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
@@ -136,6 +145,81 @@ describe('mcp server', () => {
         'wait',
         'whoami',
       ]);
+    });
+  });
+
+  // What a tool returns is what the agent reads, on every call: the CLI's text, in the words of
+  // the tools, never the whole item as JSON (MCP-TOKENS: a cycle cost 54% more over MCP).
+  describe('results', () => {
+    let agent: Client;
+    const text = async (name: string, args: Record<string, unknown> = {}) => {
+      const reply = await call(name, args, agent);
+      expect(reply.isError, reply.content[0]?.text).toBeFalsy();
+      expect(reply.content).toHaveLength(1);
+      expect(reply).not.toHaveProperty('structuredContent');
+      return reply.content[0]?.text ?? '';
+    };
+    const cliText = async (...argv: string[]) => (await otea(...argv)).out.trimEnd();
+
+    beforeEach(async () => {
+      agent = await connect(repo.dir, 'claude', undefined, true);
+    });
+
+    afterEach(async () => {
+      await agent.close();
+    });
+
+    it('answers a write with the line otea prints, not the item', async () => {
+      await otea('claim', 'TASKS-1');
+      const updated = await text('update', { id: 'TASKS-1', field: ['priority=high'] });
+
+      expect(updated).toBe(await cliText('update', 'TASKS-1', '--field', 'priority=high'));
+      expect(updated).not.toContain('{');
+    });
+
+    it('shows an item as otea show prints it, in the words of the tools', async () => {
+      const shown = await text('show', { id: 'TASKS-1' });
+
+      expect(shown).toBe(mcpWords(await cliText('show', 'TASKS-1'), COMMANDS));
+      expect(shown).toContain('claim { id: "TASKS-1" }');
+      expect(shown).toContain('Docs');
+    });
+
+    it('ends a handoff with the exact calls to keep going, as tools', async () => {
+      expect(await text('handoff', { id: 'TASKS-1' })).toBe(
+        [
+          'Handed off. TASKS-1 waits for the person to review Hacerlo.',
+          'Then keep going: next; when it has nothing, wait again in a background shell: $ otea wait --turn agent --unclaimed --as claude. Without a shell, wait { turn: "agent", unclaimed: true } holds your chat until it returns.',
+        ].join('\n'),
+      );
+    });
+
+    // The guide is the server's instructions: the board's text does not give it a second time.
+    it('reads a board as otea board prints it, without the guide the instructions gave', async () => {
+      const board = await text('board', { name: 'tasks' });
+
+      expect(board).not.toContain(AGENT_GUIDE.split('\n')[0]);
+      expect(mcpWords(await cliText('board', 'tasks'), COMMANDS)).toBe(
+        `${mcpWords(AGENT_GUIDE, COMMANDS)}\n\n${board}`,
+      );
+      expect(await text('board')).not.toContain(AGENT_GUIDE.split('\n')[0]);
+    });
+
+    it('gives the events one a line, each with its id first', async () => {
+      const events = await text('events', { item: 'TASKS-1' });
+
+      expect(events).toBe(await cliText('events', '--item', 'TASKS-1'));
+      expect(events).toMatch(/^1 {2}TASKS-1 {2}/);
+    });
+
+    it('refuses with the message otea prints, in the words of the tools', async () => {
+      const reply = await call('events', { since: 'soon' }, agent);
+
+      expect(reply.isError).toBe(true);
+      expect(reply.content[0]?.text).toBe('{ since } must be an integer of at least 0');
+      expect((await call('show', { id: 'TASKS-9' }, agent)).content[0]?.text).toBe(
+        (await otea('show', 'TASKS-9')).err.trim().replace(/^otea: /, ''),
+      );
     });
   });
 

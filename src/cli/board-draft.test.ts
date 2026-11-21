@@ -249,7 +249,7 @@ describe('otea board draft --new', () => {
   });
 
   it('proposes the set over MCP too', async () => {
-    const server = createMcpServer(COMMANDS, { cwd: repo.dir, warn: () => {} });
+    const server = createMcpServer(COMMANDS, { json: true, cwd: repo.dir, warn: () => {} });
     const client = new Client({ name: 'test', version: '0' });
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     await server.connect(serverSide);
@@ -332,7 +332,7 @@ describe('otea board draft --new', () => {
   });
 
   it('is the board_draft tool over MCP, as the agent named', async () => {
-    const server = createMcpServer(COMMANDS, { cwd: repo.dir, warn: () => {} });
+    const server = createMcpServer(COMMANDS, { json: true, cwd: repo.dir, warn: () => {} });
     const client = new Client({ name: 'test', version: '0' });
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     await server.connect(serverSide);

@@ -1,6 +1,8 @@
 import { writeFileSync } from 'node:fs';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { leaveNote } from '../app/notes.ts';
+import { openProject } from '../app/project.ts';
 import { createMcpServer } from '../mcp/server.ts';
 import { COMMANDS } from './commands.ts';
 import { type Cli, cliAt, declareProfiles, presetCollection, tempGitRepo } from './testing.ts';
@@ -10,6 +12,10 @@ import { type Cli, cliAt, declareProfiles, presetCollection, tempGitRepo } from 
 // rounded up: no tokenizer, close enough to catch a regression. Each budget is the size measured on
 // the bug below when the budget was set, plus about 10% headroom. Raise one only on purpose, and
 // say why in the commit. OTEA_TOKEN_REPORT=<file> writes the measured sizes there.
+// A tool answers with the CLI's text in the words of the tools, so each MCP budget is lowered to
+// about the text's: the whole item as JSON had made a work cycle cost 54% more over MCP than over
+// the CLI (MCP-TOKENS). Measured at show 607, list 25, board index 20, board 157, create 18,
+// claim 25, handoff 70, attach 12 and wait 80; otea mcp --json keeps the data, under --json's.
 const tokens = (text: string) => Math.ceil(text.length / 4);
 
 type Surface = 'text' | 'json' | 'mcp';
@@ -22,9 +28,9 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // Raised when --json and MCP gave each field as { id, name, value } and each step its name.
   // Raised when each file got a path an agent can open: one per file in --json and MCP, one line
   // with the first as the example in the text (P5-R2-4; measured at 584, 1174 and 1179).
-  show: { text: 640, json: 1290, mcp: 1290 },
+  show: { text: 640, json: 1290, mcp: 670 },
   // One row per item; measured with that bug alone. Raised with show, for the same names.
-  list: { text: 25, json: 285, mcp: 285 },
+  list: { text: 25, json: 285, mcp: 30 },
   // Raised when otea board began with Otea's agent guide (instructions below): read once a session.
   // Raised again with the guide's line on declaring the profile (otea profile), and with its line
   // on asking the person with otea ask (measured at 308), and its line on proposing a new board
@@ -46,22 +52,22 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // another agent took the item over (P1-R3-6; measured at 720). Raised to 755 with rule 4 saying
   // a new board or a change to one goes through board draft, never otea create, as an agent made
   // a Pedido with otea create and board draft --change made a second one (P8-R3-3; measured at 746).
-  'board index': { text: 755, json: 53, mcp: 53 },
+  'board index': { text: 755, json: 53, mcp: 25 },
   // The bug board's own words and each step's instructions, read once per session; show's Next:
   // block covers the step at hand. Raised when a preset collection read as a board kept its
   // playbook as the board's text: what agents read on the preset, as before.
-  // Its text opens with Otea's agent guide too.
-  board: { text: 3255, json: 3090, mcp: 3090 },
+  // Its text opens with Otea's agent guide too, but over MCP: the server's instructions are it.
+  board: { text: 3255, json: 3090, mcp: 175 },
   // On a board, create says where the item starts (and why its first step was skipped).
   // The item rows below were raised with show, for the same names.
-  create: { text: 20, json: 270, mcp: 270 },
-  claim: { text: 25, json: 285, mcp: 285 },
+  create: { text: 20, json: 270, mcp: 22 },
+  claim: { text: 25, json: 285, mcp: 30 },
   // Raised for its last line, the exact commands to keep going and wait, as wait's: an agent said it
   // left a wait running and started none (P3C-R3-9; measured at 50, and 308 in --json and MCP).
-  handoff: { text: 55, json: 340, mcp: 340 },
-  attach: { text: 15, json: 90, mcp: 90 },
+  handoff: { text: 55, json: 340, mcp: 80 },
+  attach: { text: 15, json: 90, mcp: 15 },
   // Raised for its last line, the exact command to keep going and wait again (measured at 60).
-  wait: { text: 70, json: 285, mcp: 285 },
+  wait: { text: 70, json: 285, mcp: 90 },
   // The tool definitions an MCP client reads when it connects.
   // Raised for next, handoff, approve and send_back, the board moves.
   // drop, handoff's --note and its ways back. Raised for the as every tool takes: the agent making
@@ -265,4 +271,137 @@ describe('token budget', () => {
       }
     });
   }
+});
+
+// One work cycle as MCP-TOKENS measured it, on the Pendientes board: next --claim, show, update a
+// field, ask, reply to the person's note and hand off, then next. Each step counts the call as the
+// harness writes it (a Bash command for the CLI, a tool call for MCP) and what comes back; the
+// person's answer and note are off the meter. Measured at 2,122 over the CLI and 3,267 over MCP,
+// which returned the whole item as JSON; with the CLI's text, at 2,122 and 2,244.
+const CYCLE_BUDGET = { cli: 2340, mcp: 2470 };
+
+describe('token budget of a work cycle', () => {
+  let repo: ReturnType<typeof tempGitRepo>;
+  let otea: Cli;
+  let client: Client;
+  const spent = { cli: 0, mcp: 0 };
+
+  const ok = async (...argv: string[]) => {
+    const result = await otea(...argv);
+    if (result.code !== 0) throw new Error(`otea ${argv.join(' ')}: ${result.err}`);
+    return result.out;
+  };
+  const quote = (arg: string) => (/[\s"'=]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg);
+
+  // The item the person filed, as each surface's agent will find it.
+  const file = (title: string) =>
+    ok(
+      'create',
+      '--as',
+      'setup',
+      '--collection',
+      'Pendientes',
+      '--title',
+      title,
+      '--field',
+      'Qué hace falta=Write a short welcome text for the README',
+      '--field',
+      'Listo cuando=The README starts with a welcome paragraph',
+      '--field',
+      'Lo hago yo=no',
+      '--field',
+      'Impacto=media',
+      '--field',
+      'Esfuerzo=Pequeño',
+    );
+
+  // The person answers the question and leaves a note, off the meter; the note's number.
+  const person = async (id: string) => {
+    await ok('answer', id, 'No, keep it short', '--as', 'relay');
+    const project = openProject(repo.dir);
+    try {
+      return leaveNote(project, {
+        id,
+        text: 'Use a friendly tone',
+        actor: { kind: 'human', name: 'human' },
+        channel: 'ui',
+      }).note;
+    } finally {
+      project.db.close();
+    }
+  };
+
+  const stepsOn = (id: string) => ({
+    show: { id },
+    update: { id, field: ['Lo que hice=Wrote the welcome paragraph at the top of README.md'] },
+    ask: { id, question: 'Should the welcome mention the license?' },
+  });
+
+  beforeAll(async () => {
+    repo = tempGitRepo();
+    otea = cliAt(repo.dir);
+    await ok('init', '--template', 'todos');
+    declareProfiles(repo.dir, 'cli-a', 'mcp-a');
+    for (const title of ['cli item 1', 'cli item 2']) await file(title);
+
+    const cli = async (...args: string[]) => {
+      const command = ['otea', ...args, '--as', 'cli-a'].map(quote).join(' ');
+      const out = await ok(...args, '--as', 'cli-a');
+      spent.cli += tokens(JSON.stringify({ name: 'Bash', input: { command } })) + tokens(out);
+      return out;
+    };
+    const id = (await cli('next', '--claim')).match(/\b[A-Z]+-\d+\b/)?.[0] ?? '';
+    const steps = stepsOn(id);
+    await cli('show', id);
+    await cli('update', id, '--field', steps.update.field[0] ?? '');
+    await cli('ask', id, steps.ask.question);
+    const note = await person(id);
+    await cli('reply', id, 'Done, the tone is friendly now', '--note', String(note));
+    await cli('handoff', id, '--note', 'Welcome paragraph added');
+    await cli('next');
+
+    for (const title of ['mcp item 1', 'mcp item 2']) await file(title);
+    const server = createMcpServer(COMMANDS, { cwd: repo.dir, warn: () => {} });
+    client = new Client({ name: 'claude-code', version: '0' });
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverSide);
+    await client.connect(clientSide);
+    const mcp = async (name: string, args: Record<string, unknown>) => {
+      const input = { as: 'mcp-a', ...args };
+      const reply = (await client.callTool({ name, arguments: input })) as {
+        isError?: boolean;
+        content: { text: string }[];
+      };
+      const text = reply.content.map((part) => part.text).join('\n');
+      if (reply.isError) throw new Error(`${name}: ${text}`);
+      spent.mcp += tokens(JSON.stringify({ name: `mcp__otea__${name}`, input })) + tokens(text);
+      return text;
+    };
+    // A session declares its profile once, before the cycle (MCP-TOKENS counts it as fixed).
+    await client.callTool({
+      name: 'profile',
+      arguments: { as: 'mcp-a', model: 'claude-opus-5-5', effort: 'high' },
+    });
+    const taken = (await mcp('next', { claim: true })).match(/\b[A-Z]+-\d+\b/)?.[0] ?? '';
+    const on = stepsOn(taken);
+    await mcp('show', on.show);
+    await mcp('update', on.update);
+    await mcp('ask', on.ask);
+    const asked = await person(taken);
+    await mcp('reply', { id: taken, answer: 'Done, the tone is friendly now', note: asked });
+    await mcp('handoff', { id: taken, note: 'Welcome paragraph added' });
+    await mcp('next', {});
+  }, 60_000);
+
+  afterAll(async () => {
+    await client?.close();
+    repo?.remove();
+    const report = process.env.OTEA_TOKEN_REPORT;
+    if (report) writeFileSync(`${report}.cycle.json`, `${JSON.stringify(spent, null, 2)}\n`);
+  });
+
+  it('keeps a cycle within its budget on each surface', () => {
+    expect(spent.cli, 'cli').toBeLessThanOrEqual(CYCLE_BUDGET.cli);
+    expect(spent.mcp, 'mcp').toBeLessThanOrEqual(CYCLE_BUDGET.mcp);
+  });
 });

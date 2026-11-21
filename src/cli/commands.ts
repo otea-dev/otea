@@ -37,7 +37,7 @@ import { handInText, openDraftsOf } from '../app/draft-request.ts';
 import { listEvents } from '../app/events.ts';
 import { attachEvidence, detachEvidence, evidenceReadPath } from '../app/evidence.ts';
 import { type Brings, checkGate, type GateCheck, protectedBases, type Tip } from '../app/gates.ts';
-import { boardGuide, type Guide, guideIndex, hintFor } from '../app/guide.ts';
+import { boardGuide, guideIndex, hintFor } from '../app/guide.ts';
 import {
   forgetProjectPath,
   listProjects,
@@ -171,6 +171,7 @@ import { validateProject } from '../app/validate.ts';
 import { watch } from '../app/watch.ts';
 import { agentGuideFor, TOPICS_REMINDER, TOPICS_RULE } from '../core/agent-guide.ts';
 import { agentPrompt, isPromptKind, PROMPT_KINDS, type PromptKind } from '../core/agent-prompts.ts';
+import type { AgentChannel } from '../core/authority.ts';
 import { isClosed, isLandStep, positionOf, waysOf } from '../core/board/engine.ts';
 import { DONE, guardedBranch, isEvidence, stepById } from '../core/board/model.ts';
 import { DROPPED_NAME } from '../core/board/next.ts';
@@ -1121,14 +1122,10 @@ ${text}`;
   },
 };
 
-// otea board text opens with Otea's agent guide; --json keeps the board's data alone.
-const withAgentGuide = (project: Project, text: string) => `${agentGuideFor(topicsOn(project))}
-
-${text}`;
-
-function guideText(project: Project, guide: Guide): string {
-  return withAgentGuide(project, guide.text);
-}
+// otea board text opens with Otea's agent guide; --json keeps the board's data alone. Over MCP the
+// server's instructions are the guide, so the board does not give it again.
+const withAgentGuide = (project: Project, text: string, channel: AgentChannel) =>
+  channel === 'mcp' ? text : `${agentGuideFor(topicsOn(project))}\n\n${text}`;
 
 // --lang (checked against LANGS as the option's choices), the project's language without it.
 const langOption = (given: string | undefined): Lang =>
@@ -1394,7 +1391,7 @@ const board: Command = {
     return withReader(input, (project) => {
       if (name !== '') {
         const guide = boardGuide(project, name);
-        return { data: guide, text: guideText(project, guide) };
+        return { data: guide, text: withAgentGuide(project, guide.text, input.channel) };
       }
       const boards = guideIndex(project);
       const index =
@@ -1412,7 +1409,7 @@ const board: Command = {
                 ),
               ),
             ].join('\n');
-      return { data: { boards }, text: withAgentGuide(project, index) };
+      return { data: { boards }, text: withAgentGuide(project, index, input.channel) };
     });
   },
 };
@@ -3161,10 +3158,10 @@ function claimedBy(cwd: string, agent: string, fresh: boolean, client?: Harness)
 const mcp: Command = {
   name: 'mcp',
   summary:
-    'Serve the agent commands as MCP tools on stdin and stdout until the client disconnects; each tool call acts as the agent its as argument names (or the one --as names). --project <id> pins the server to that project: it refuses writes from a folder of another one, and serves it when started outside any project',
+    'Serve the agent commands as MCP tools on stdin and stdout until the client disconnects; each tool call acts as the agent its as argument names (or the one --as names). --project <id> pins the server to that project: it refuses writes from a folder of another one, and serves it when started outside any project. A tool answers with the text the command prints; --json makes it answer with the data otea --json prints, for a program that reads it',
   args: [],
   options: { project: { placeholder: 'id' } },
-  execute: async ({ cwd, agent, pin: pinned, option, signal, warn }) => {
+  execute: async ({ cwd, agent, pin: pinned, option, flag, signal, warn }) => {
     if (agent !== undefined) assertAgentName(agent);
     const pin = option('project') ?? pinned;
     // A harness that starts the server outside any project (its own config, kept for every folder)
@@ -3290,6 +3287,8 @@ const mcp: Command = {
           cwd,
           ...named,
           ...(pin === undefined ? {} : { pin }),
+          // otea mcp --json: results as the data --json prints, for a program; else the text.
+          ...(flag('json') ? { json: true } : {}),
           topics,
           warn,
           greeted,

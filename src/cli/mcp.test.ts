@@ -200,9 +200,9 @@ describe('mcp', () => {
 
       const refused = await second.callTool({ name: 'claim', arguments: { id: 'TASKS-1' } });
       expect(refused.isError).toBe(true);
-      expect(JSON.parse((refused.content as { text: string }[])[0]?.text ?? '')).toMatchObject({
-        error: { code: 'name_in_use' },
-      });
+      expect((refused.content as { text: string }[])[0]?.text).toMatch(
+        /^Another session works as claude right now/,
+      );
       const renamed = await second.callTool({ name: 'list', arguments: { as: 'claude-b' } });
       expect(renamed.isError).toBeFalsy();
     } finally {
@@ -243,9 +243,9 @@ describe('mcp', () => {
 
       const refused = await old.callTool({ name: 'list', arguments: {} });
       expect(refused.isError).toBe(true);
-      expect(JSON.parse((refused.content as { text: string }[])[0]?.text ?? '')).toMatchObject({
-        error: { code: 'name_in_use' },
-      });
+      expect((refused.content as { text: string }[])[0]?.text).toMatch(
+        /^Another session works as claude right now/,
+      );
     } finally {
       await old.close();
       await restarted.close();
@@ -291,9 +291,9 @@ describe('mcp', () => {
 
       const refused = await old.callTool({ name: 'list', arguments: { as: 'claude' } });
       expect(refused.isError).toBe(true);
-      expect(JSON.parse((refused.content as { text: string }[])[0]?.text ?? '')).toMatchObject({
-        error: { code: 'name_in_use' },
-      });
+      expect((refused.content as { text: string }[])[0]?.text).toMatch(
+        /^Another session works as claude right now/,
+      );
     } finally {
       await old.close();
       await reloaded.close();
@@ -387,5 +387,34 @@ describe('mcp', () => {
         .split('\n')
         .map((line) => JSON.parse(line).id),
     ).toEqual([1]);
+  });
+
+  // An agent reads the CLI's text; a program that reads the data starts the server with --json.
+  it('answers with the text otea prints, or with its --json data under --json', async () => {
+    const read = async (...flags: string[]) => {
+      const client = new Client({ name: 'claude-code', version: '2.1.0' });
+      await client.connect(
+        new StdioClientTransport({
+          command: process.execPath,
+          args: [...ARGS, '--as', 'quill', ...flags],
+          cwd: repo.dir,
+          env: { ...getDefaultEnvironment(), OTEA_HOME: process.env.OTEA_HOME ?? '' },
+          stderr: 'pipe',
+        }),
+      );
+      try {
+        const reply = (await client.callTool({ name: 'list', arguments: {} })) as {
+          content: { text: string }[];
+        };
+        return reply.content[0]?.text ?? '';
+      } finally {
+        await client.close();
+      }
+    };
+
+    expect(await read()).toBe((await otea('list')).out.trimEnd());
+    expect(JSON.parse(await read('--json'))).toEqual(
+      JSON.parse((await otea('list', '--json')).out),
+    );
   });
 });
