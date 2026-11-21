@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { AGENTS_BLOCK } from '../app/agents.ts';
 import { leaveNote } from '../app/notes.ts';
 import { openProject } from '../app/project.ts';
 import { createMcpServer } from '../mcp/server.ts';
@@ -52,12 +53,15 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // another agent took the item over (P1-R3-6; measured at 720). Raised to 755 with rule 4 saying
   // a new board or a change to one goes through board draft, never otea create, as an agent made
   // a Pedido with otea create and board draft --change made a second one (P8-R3-3; measured at 746).
-  'board index': { text: 755, json: 53, mcp: 25 },
+  // Over MCP too, from when AGENTS.md stopped copying the guide: there it sends an agent whose
+  // client shows no instructions (measured at 756).
+  'board index': { text: 755, json: 53, mcp: 835 },
   // The bug board's own words and each step's instructions, read once per session; show's Next:
   // block covers the step at hand. Raised when a preset collection read as a board kept its
   // playbook as the board's text: what agents read on the preset, as before.
-  // Its text opens with Otea's agent guide too, but over MCP: the server's instructions are it.
-  board: { text: 3255, json: 3090, mcp: 175 },
+  // Lowered when the guide moved to the index alone: one board gives it no second time (measured
+  // at 159 and 157).
+  board: { text: 175, json: 3090, mcp: 175 },
   // On a board, create says where the item starts (and why its first step was skipped).
   // The item rows below were raised with show, for the same names.
   create: { text: 20, json: 270, mcp: 22 },
@@ -128,6 +132,10 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // as an agent made a Pedido with otea create and board draft --change made a second (P8-R3-3;
   // measured at 727).
   instructions: { mcp: 735 },
+  // The AGENTS.md block, in the context of every agent whose harness reads AGENTS.md: it says where
+  // the guide is and holds no copy of it, which the instructions or otea board's index give
+  // (MCP-TOKENS: the guide was in context two or three times; measured at 874 with the copy, 107).
+  'AGENTS.md': { text: 120 },
 };
 
 // A bug as an agent files it in the bug-triage preset, every field filled.
@@ -255,6 +263,7 @@ describe('token budget', () => {
     );
     sizes.tools = { mcp: tokens(JSON.stringify(await client.listTools())) };
     sizes.instructions = { mcp: tokens(client.getInstructions() ?? '') };
+    sizes['AGENTS.md'] = { text: tokens(AGENTS_BLOCK) };
   }, 60_000);
 
   afterAll(async () => {
