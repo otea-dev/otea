@@ -23,7 +23,7 @@ extraResources:
     to: bin
 publish:
   provider: github
-  owner: Lartweib
+  owner: otea-dev
   repo: otea
   releaseType: release
 
@@ -59,7 +59,7 @@ linux:
   executableName: otea-desktop
   icon: ../ui/public/icons/otea-512.png
   synopsis: The handoff surface between you and your AI agents
-  maintainer: Lartweib <https://github.com/Lartweib/otea>
+  maintainer: Lartweib <https://github.com/otea-dev/otea>
 appImage:
   artifactName: ${productName}-${version}-${arch}.${ext}
 deb:

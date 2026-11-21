@@ -102,7 +102,7 @@ const ASKED_DIR =
 const PORT = typeof options.port === 'string' ? Number(options.port) : undefined;
 // CI starts the packaged app with OTEA_DESKTOP_SMOKE=1: it opens the project, says so and quits.
 const SMOKE = process.env.OTEA_DESKTOP_SMOKE === '1';
-const RELEASES_URL = 'https://github.com/Lartweib/otea/releases/latest';
+const RELEASES_URL = 'https://github.com/otea-dev/otea/releases/latest';
 
 const APPLY_MS = 500; // at most twice a second per surface
 const ATTENTION_MS = 30_000; // one flash or bounce per 30s

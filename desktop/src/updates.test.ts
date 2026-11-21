@@ -7,7 +7,7 @@ import {
   updateMode,
 } from './updates.ts';
 
-const RELEASES = 'https://github.com/Lartweib/otea/releases/latest';
+const RELEASES = 'https://github.com/otea-dev/otea/releases/latest';
 
 // A fake electron-updater and a fake clock: `tick` runs what the interval would run.
 function rig(versions: (string | undefined | Error)[], mode: 'install' | 'notify' = 'install') {

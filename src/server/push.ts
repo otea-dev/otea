@@ -63,7 +63,7 @@ function networkDetail(error: unknown): string {
 export const PUSH_KEYS_FILE = 'push-keys.json';
 
 // Who to reach about this sender, which push services ask for: the project's home, never a person.
-const SUBJECT = 'https://github.com/Lartweib/otea';
+const SUBJECT = 'https://github.com/otea-dev/otea';
 // A notice that waits a day at the push service is not news any more.
 const TTL_SECONDS = 24 * 60 * 60;
 const CLAIM_SECONDS = 12 * 60 * 60;

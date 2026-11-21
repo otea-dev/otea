@@ -27,7 +27,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           path-to-signatures: signatures/cla.json
-          path-to-document: https://github.com/Lartweib/otea/blob/main/CLA.md
+          path-to-document: https://github.com/otea-dev/otea/blob/main/CLA.md
           # Signatures live on their own branch so they never touch main's history.
           branch: cla-signatures
           allowlist: Lartweib,dependabot[bot],renovate[bot]
