@@ -168,23 +168,35 @@ describe('handsToAgent', () => {
 // nothing: it was claiming this very item. «Busy with another item» is said only of an agent that
 // holds another one; one at work holding none is only at work.
 describe('unheardLead', () => {
+  // An agent at work is no silence: the desk does not open with the alarm for it, only with the
+  // plain fact, so a person watching agents work is never told that nobody is there.
+  it('never opens with "nobody is listening" while an agent is at work', () => {
+    const free = agent('claude-a', { holding: [], actedAt: ago(0.5) });
+    for (const lang of ['en', 'es'] as const) {
+      setLanguage(lang);
+      expect(unheardLead(['claude-a'], [free], 'TASK-1')).not.toMatch(/nobody|nadie/i);
+      expect(unheardLead(['claude-a', 'claude-b'], [free], 'TASK-1')).not.toMatch(/nobody|nadie/i);
+    }
+    setLanguage('en');
+  });
+
   it('says an agent is busy with another item only when it holds one', () => {
     setLanguage('es');
     const busy = agent('claude-a', { holding: ['TASK-2'] });
     expect(unheardLead(['claude-a'], [busy], 'TASK-1')).toBe(
-      'Nadie escucha ahora: claude-a está ocupado con otro ítem.',
+      'claude-a está ocupado con otro ítem; lo verá cuando vuelva a esperar.',
     );
     const free = agent('claude-a', { holding: [], actedAt: ago(0.5) });
     expect(unheardLead(['claude-a'], [free], 'TASK-1')).toBe(
-      'Nadie escucha ahora: claude-a está trabajando y lo verá cuando vuelva a esperar.',
+      'claude-a está trabajando y lo verá cuando vuelva a esperar.',
     );
     const here = agent('claude-a', { holding: ['TASK-1'] });
     expect(unheardLead(['claude-a'], [here], 'TASK-1')).toBe(
-      'Nadie escucha ahora: claude-a está trabajando y lo verá cuando vuelva a esperar.',
+      'claude-a está trabajando y lo verá cuando vuelva a esperar.',
     );
     setLanguage('en');
     expect(unheardLead(['claude-a'], [free], 'TASK-1')).toBe(
-      'Nobody is listening now: claude-a is at work and will see it when it waits again.',
+      'claude-a is at work and will see it when it waits again.',
     );
     expect(unheardLead([], [free], 'TASK-1')).toBe('Nobody is listening.');
   });

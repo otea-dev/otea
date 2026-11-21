@@ -250,14 +250,11 @@ export const surfaces = {
     'Items arrive when you write one, or when an agent creates them through the CLI or MCP. Nothing here is waiting for you.',
   'emptyProject.agents':
     'A connected agent reads {command} first: it tells it how this project works.',
-  'emptyProject.path': 'path',
-  'emptyProject.store': 'store',
   'emptyProject.boards': 'boards',
   'emptyProject.noBoards':
     'This project has no boards yet. The easiest way to start: paste this into your agent’s chat. It reads the project, asks how you work and proposes the boards for you to try.',
   'emptyProject.orPick': 'Or choose yourself from the catalogue:',
   'emptyProject.pickBoards': 'Pick a board',
-  'emptyProject.noBoardsYet': 'none yet',
   'emptyProject.example': 'Write the first task',
 
   // Connect an agent
