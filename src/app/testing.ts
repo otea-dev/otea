@@ -36,7 +36,14 @@ export const IDENTITY = { id: 'memory-aaaaaa', name: 'memory' };
 
 // A local project at `root` over the given context, without touching the disk.
 export function projectOf(root: string, context: Context): Project {
-  return { root, dataDir: join(root, '.otea'), storage: 'local', identity: IDENTITY, ...context };
+  return {
+    root,
+    dataDir: join(root, '.otea'),
+    storage: 'local',
+    identity: IDENTITY,
+    lang: 'es',
+    ...context,
+  };
 }
 
 export function memoryContext(...presets: Preset[]): Context {

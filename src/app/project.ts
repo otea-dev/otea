@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
+import type { Lang } from '../core/board/template-words.ts';
 import { OteaError } from '../core/errors.ts';
 import { assertIconName } from '../core/icons.ts';
 import { PROJECT_ID_RANDOM_BYTES, projectId } from '../core/project-id.ts';
@@ -13,7 +14,9 @@ import {
   type ProjectIdentity,
   selectProjectIcon,
   selectProjectIdentity,
+  selectProjectLang,
   updateProjectIcon,
+  updateProjectLang,
 } from '../store/queries.ts';
 import {
   type ProjectPath,
@@ -48,11 +51,10 @@ export type Project = Context & {
   dataDir: string;
   storage: Storage;
   identity: ProjectIdentity;
+  // The language its own words are made in (the boards it starts with, its Pedidos board, the
+  // boards agents draft): chosen with `otea init --lang`, Spanish, the owner's, until then.
+  lang: Lang;
 };
-
-// The language a project's own words start in (the boards it reads from presets, its Pedidos
-// board): Spanish, the owner's, since a project carries no language of its own yet.
-export const PROJECT_LANG = 'es' as const;
 
 type Found = { root: string; dataDir: string; storage: Storage };
 
@@ -117,22 +119,30 @@ function ensureIdentity(db: DatabaseSync, identity: () => ProjectIdentity): Proj
   return selectProjectIdentity(db) as ProjectIdentity;
 }
 
-function open(found: Found, identity = () => newIdentity(found.root)): Project {
+function open(
+  found: Found,
+  identity = () => newIdentity(found.root),
+  // The language a project being created starts in.
+  lang?: Lang,
+): Project {
   const db = openDatabase(databasePath(found.dataDir));
   migrate(db);
   const presets = loadPresets(found.dataDir);
   nameImplicitTypes({ db, presets });
+  const ensured = ensureIdentity(db, identity);
+  if (lang !== undefined) updateProjectLang(db, lang);
   const project: Project = {
     ...found,
     db,
     presets,
-    identity: ensureIdentity(db, identity),
+    identity: ensured,
+    lang: selectProjectLang(db),
   };
   // Published boards join the catalog as compiled presets (app/boards.ts); a collection still on a
   // preset file is read as a published board, and every project has its Pedidos board.
   syncBoardPresets(project);
-  migrateProjectBoards(project, PROJECT_LANG);
-  ensureRequestsBoard(project, PROJECT_LANG);
+  migrateProjectBoards(project, project.lang);
+  ensureRequestsBoard(project, project.lang);
   return project;
 }
 
@@ -228,17 +238,17 @@ export function openProject(cwd: string, env: Env = process.env): Project {
   return openFound(found);
 }
 
-export type InitOptions = { here?: boolean; local?: boolean; join?: string };
+export type InitOptions = { here?: boolean; local?: boolean; join?: string; lang?: Lang };
 
-function createLocal({ root, gitCommonDir }: Location): Project {
+function createLocal({ root, gitCommonDir }: Location, lang?: Lang): Project {
   mkdirSync(oteaDir(root), { recursive: true });
   if (gitCommonDir) excludeFromGit(gitCommonDir);
-  return open(local(root));
+  return open(local(root), undefined, lang);
 }
 
 // Common storage leaves no trace in the folder: the data goes to the Otea home and the registry
 // links the folder to it.
-function createCommon({ root }: Location, env: Env): Project {
+function createCommon({ root }: Location, env: Env, lang?: Lang): Project {
   const identity = newIdentity(root);
   const dataDir = join(oteaHome(env), 'data', identity.id);
   const registry = openRegistry(env);
@@ -251,7 +261,7 @@ function createCommon({ root }: Location, env: Env): Project {
     registry.close();
   }
   mkdirSync(dataDir, { recursive: true });
-  return open({ root, dataDir, storage: 'common' }, () => identity);
+  return open({ root, dataDir, storage: 'common' }, () => identity, lang);
 }
 
 // Links `path` to a registered project; linking it again to the same project changes nothing.
@@ -308,7 +318,9 @@ export function initProject(
       { kind: 'covered', root, covering: existing.root },
     );
   }
-  return options.local ? createLocal(location) : createCommon(location, env);
+  return options.local
+    ? createLocal(location, options.lang)
+    : createCommon(location, env, options.lang);
 }
 
 // The project as clients see it: its identity and the icon it was given, null when none was (the
@@ -317,6 +329,12 @@ export type ProjectView = ProjectIdentity & { icon: string | null };
 
 export function projectView(project: Project): ProjectView {
   return { ...project.identity, icon: selectProjectIcon(project.db) };
+}
+
+// Changes the language the project's boards are made in from now on; the ones it has keep theirs.
+export function setProjectLang(project: Project, lang: Lang): void {
+  updateProjectLang(project.db, lang);
+  project.lang = lang;
 }
 
 export function setProjectIcon(project: Project, icon: string | null): ProjectView {
