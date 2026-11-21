@@ -6,6 +6,9 @@ on:
   pull_request:
   # The merge queue runs the checks on main plus the queued pull requests before it merges them.
   merge_group:
+  # release-please.yml runs it on the release pull request's branch: a pull request that Actions
+  # opens with GITHUB_TOKEN starts no pull_request run, and the required checks would never appear.
+  workflow_dispatch:
 
 permissions:
   contents: read

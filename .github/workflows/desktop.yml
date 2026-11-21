@@ -4,8 +4,10 @@ name: Desktop
 # opens a project with the CLI it carries, the installer puts `otea` on PATH and the uninstaller
 # takes it off. On a pull request that touches the app it stops there (the installers are kept as
 # the run's artifacts for a week, with a SHA256SUMS.txt over every installer); on a v* tag it also
-# publishes them, with the update metadata electron-updater reads and that SHA256SUMS.txt, as the
-# GitHub Release of that tag.
+# publishes them, with the update metadata electron-updater reads and that SHA256SUMS.txt, on the
+# GitHub Release of that tag. release-please.yml creates that Release (its notes are the changelog)
+# and dispatches this workflow on the tag, since a tag made with GITHUB_TOKEN fires no push event;
+# a v* tag pushed by a person fires it too, and then the Release is created here.
 on:
   push:
     tags: ["v*"]
@@ -249,11 +251,17 @@ jobs:
           pattern: otea-desktop-*
           path: release
           merge-multiple: true
-      - name: Publish the release
+      - name: Attach the installers to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
           ls -la release
-          gh release create "$GITHUB_REF_NAME" release/* \
-            --verify-tag --title "Otea ${GITHUB_REF_NAME#v}" --generate-notes
+          # release-please made the Release with the tag: add the files to it (a re-run replaces
+          # them). With no Release yet (a tag pushed by hand) create it here.
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release/* \
+              --verify-tag --title "Otea ${GITHUB_REF_NAME#v}" --generate-notes
+          fi
