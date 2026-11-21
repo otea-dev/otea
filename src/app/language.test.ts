@@ -31,6 +31,7 @@ describe('the default language', () => {
     expect(systemLanguage({ LC_ALL: 'en_US', LANG: 'es_ES' }, nothing)).toBe('en');
     expect(systemLanguage({ LC_MESSAGES: 'es_ES', LANG: 'en_US' }, nothing)).toBe('es');
     expect(systemLanguage({ LANG: 'C' }, () => 'es-ES')).toBe('es');
+    expect(systemLanguage({ LANG: 'C.UTF-8' }, () => 'es-ES')).toBe('es');
     expect(systemLanguage({ LC_ALL: 'POSIX', LANG: 'es_ES' }, nothing)).toBe('es');
   });
 
