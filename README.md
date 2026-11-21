@@ -54,7 +54,7 @@ Early: usable, still changing fast. The product definition lives in [`docs/otea-
 ## Install
 
 > [!NOTE]
-> Otea has not had its first release yet. Until it does, there is nothing to download and `@otea/cli` on npm is only a placeholder: install it [from source](#from-source). The steps below are how you install a release once it is out.
+> The first release is not out yet: until it is, there is nothing to download and `@otea/cli` on npm is only a placeholder, so [install from source](#from-source). From the first release, the steps below work as written.
 
 There are two ways to install Otea: the **desktop app**, or the **`otea` command from npm**. Both are the same Otea, with the same boards, phone and agents.
 
@@ -131,7 +131,7 @@ To update, run `npm i -g @otea/cli` again. To remove it, `npm uninstall -g @otea
 
 ### From source
 
-Until the first release, this is the way. It takes Git and Node.js 22.18 or later (Node 24 recommended):
+To work on Otea, or to run what is not released yet (until the first release, this is the only way). It takes Git and Node.js 22.18 or later (Node 24 recommended):
 
 ```sh
 git clone https://github.com/otea-dev/otea.git
@@ -209,7 +209,7 @@ When not to use it:
 
 - You pair live with one agent and never step away: the chat already is the handoff.
 - You need cloud sync or accounts: Otea is local-first, and its data stays on your computer.
-- You need a released installer today: until the first release, Otea installs from source.
+- You need a signed installer: Otea's installers are not signed yet.
 
 ## Help
 
