@@ -51,12 +51,87 @@ The same change on a phone, with the agent's note and your two moves.
 
 Early: usable, still changing fast. The product definition lives in [`docs/otea-product-definition.md`](docs/otea-product-definition.md).
 
-> [!NOTE]
-> Otea has not had its first release yet, so there is no download: you install it from source. The release brings the one-line installer, packages (npm and other package managers) and the desktop app's download.
-
 ## Install
 
-Installing from source takes Git and Node.js 22.18 or later (Node 24 recommended):
+> [!NOTE]
+> Otea has not had its first release yet. Until it does, there is nothing to download and `@otea/cli` on npm is only a placeholder: install it [from source](#from-source). The steps below are how you install a release once it is out.
+
+There are two ways to install Otea: the **desktop app**, or the **`otea` command from npm**. Both are the same Otea, with the same boards, phone and agents.
+
+**Which one?**
+
+- **Windows:** the desktop app. One click installs it, it updates itself and it puts `otea` in your terminal.
+- **macOS:** the desktop app, if you want Otea in its own window with notifications. It cannot update itself yet: you download each new version. If you already use Node, npm is just as good.
+- **Linux:** the desktop app as a `.deb` on Debian or Ubuntu. On other distributions, the AppImage, or npm if you want `otea` in your terminal.
+
+### What each one gives you
+
+| | Desktop app | npm (`npm i -g @otea/cli`) |
+| --- | --- | --- |
+| How you open Otea | Its own window, from the app icon | A tab in your browser, after `otea serve` in a terminal |
+| Icon in the tray or menu bar | ✅ Shows what waits for you; closing the window keeps it running | ❌ |
+| Count on the taskbar or Dock | ✅ Windows and macOS · ❌ Linux | ❌ |
+| Notifications on this computer | ✅ The system's own | ❌ |
+| Updates | ✅ Windows · ✅ Linux (the `.deb` asks for your password) · macOS: it tells you, you download it | By hand: `npm i -g @otea/cli` again |
+| `otea` in your terminal | ✅ Windows and `.deb` · macOS: one click in the menu bar · ❌ AppImage | ✅ |
+| Needs Node.js | ❌ It brings its own | ✅ Node.js 22.18 or later |
+
+Everything else works the same both ways: boards, the phone (pairing and notifications on it), agents over the CLI or MCP. Neither starts on its own when you log in.
+
+### The desktop app
+
+Download the installer for your system from the [latest release](https://github.com/otea-dev/otea/releases/latest):
+
+| System | File |
+| --- | --- |
+| Windows | `Otea-Setup-<version>.exe` |
+| macOS (Apple silicon and Intel) | `Otea-<version>-mac.dmg` |
+| Linux, Debian or Ubuntu | `Otea-<version>-amd64.deb` |
+| Linux, any other | `Otea-<version>-x86_64.AppImage` |
+
+The installers are not signed yet: Otea is an open-source project without a paid signing certificate so far. Your system warns you the first time; here is how to get past it.
+
+**Windows.** Open the `.exe`. If a blue window says "Windows protected your PC", click **More info**, then **Run anyway**. Otea installs for you alone (no administrator needed) and opens.
+
+**macOS.** Open the `.dmg` and drag Otea to Applications. Open Otea: macOS says it cannot check it. Click **Done** (or **OK**), then open **System Settings › Privacy & Security**, scroll down to the message about Otea and click **Open Anyway**. Confirm, and Otea opens; from then on it opens normally. To have `otea` in your terminal, click the Otea icon in the menu bar and choose **Install the otea command**. Updates are manual for now: when a new version is out, Otea tells you, and you download it and drag it to Applications again.
+
+**Linux, `.deb`.** In a terminal, in the folder with the file:
+
+```sh
+sudo apt install ./Otea-*.deb
+```
+
+This puts Otea in your apps menu and `otea` in your terminal.
+
+**Linux, AppImage.** In a terminal, in the folder with the file:
+
+```sh
+chmod +x Otea-*.AppImage
+./Otea-*.AppImage
+```
+
+### Check your download
+
+Each release has a `SHA256SUMS.txt` with a fingerprint of every installer. If your file's fingerprint matches its line, it is the file the release published. Download `SHA256SUMS.txt` to the same folder, then:
+
+- **Windows** (PowerShell): `Get-FileHash .\Otea-Setup-*.exe` prints the fingerprint. Find the same text in `SHA256SUMS.txt` (case does not matter).
+- **macOS** (Terminal): `shasum -a 256 Otea-*-mac.dmg` prints the fingerprint. Find the same text in `SHA256SUMS.txt`.
+- **Linux**: `sha256sum -c --ignore-missing SHA256SUMS.txt` checks the files you have and says `OK` for each.
+
+### The `otea` command from npm
+
+You need [Node.js](https://nodejs.org/) 22.18 or later (Node 24 recommended). Check with `node --version`. Then:
+
+```sh
+npm i -g @otea/cli
+otea --version
+```
+
+To update, run `npm i -g @otea/cli` again. To remove it, `npm uninstall -g @otea/cli`. You open the desk with `otea serve` (see [Quickstart](#quickstart)).
+
+### From source
+
+Until the first release, this is the way. It takes Git and Node.js 22.18 or later (Node 24 recommended):
 
 ```sh
 git clone https://github.com/otea-dev/otea.git
@@ -67,15 +142,12 @@ npm link            # puts the otea command on your PATH
 otea --version
 ```
 
-`npm link` installs a real command, not an alias: a symlink in npm's global `bin` on macOS and Linux, and `otea.cmd`, `otea.ps1` and a shell script in npm's global folder on Windows. Every shell finds it, so an agent's own shell (Claude Code's, OpenCode's, a script's) runs `otea` the same as your terminal. Run `npm prefix -g` to see where it went; if `otea` is not found, add that folder (on macOS and Linux, its `bin`) to your PATH. To update, `git pull`, `npm ci` and `npm run build:ui` again; `npm unlink -g @otea/cli` takes the command away.
+`npm link` installs a real command, not an alias: a symlink in npm's global `bin` on macOS and Linux, and `otea.cmd`, `otea.ps1` and a shell script in npm's global folder on Windows. Every shell finds it, so an agent's own shell (Claude Code's, OpenCode's, a script's) runs `otea` the same as your terminal. Run `npm prefix -g` to see where it went; if `otea` is not found, add that folder (on macOS and Linux, its `bin`) to your PATH. To update, `git pull`, `npm ci` and `npm run build:ui` again; `npm unlink -g @otea/cli` takes the command away. To build the desktop app from source, see [`desktop/README.md`](desktop/README.md).
 
 ### On Windows, in Git Bash
 
 Git Bash turns an argument that starts with `/` into a path (`/deploy` reaches Otea as `C:/Program Files/Git/deploy`). Otea undoes it for the text it is given (a title, a field, a note), so `otea create --title "/deploy fails"` keeps its slash. Anywhere else, set `MSYS_NO_PATHCONV=1` for that command, or start the value with `//`.
 
-### The desktop app
-
-The desktop app (in `desktop/`) carries its own CLI and needs no Node. Until it is released you build its installer from source: see [`desktop/README.md`](desktop/README.md). Installed, it puts `otea` on your PATH, opens a project at start (**Open folder** or **Create project**) and runs this computer's one `otea serve` itself, with no console.
 
 ## Quickstart
 
