@@ -107,6 +107,8 @@ export function trayNotice(
   },
   count: number,
 ): { say: string; why: boolean } | null {
+  // The tray closes over a moment with nothing ticked: it has nothing to say about none.
+  if (count === 0) return null;
   if (plan.loading) return { say: t('boardView.tray.reading'), why: false };
   const why = plan.hidden.some((h) => h.moves.length > 0);
   if (why && plan.hidden.every((h) => h.pick))

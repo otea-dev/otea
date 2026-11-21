@@ -123,6 +123,12 @@ describe('the tray notice', () => {
     });
   });
 
+  // The tray stays on screen a moment while it closes, with nothing ticked any more.
+  it('says nothing about a selection of none', () => {
+    expect(trayNotice(plan({}), 0)).toBeNull();
+    expect(trayNotice(plan({ hidden: ['accepted'] }), 0)).toBeNull();
+  });
+
   it('says nothing when every move shows', () => {
     expect(trayNotice(plan({ moves: [ACCEPT] }), 1)).toBeNull();
   });
