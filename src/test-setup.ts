@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, vi } from 'vitest';
+import { system } from './app/language.ts';
 
 // No test may touch the user's real ~/.otea. Each test file gets its own OTEA_HOME, which processes
 // it spawns inherit, and the home folder is off limits: code that falls back to it throws.
@@ -21,3 +22,5 @@ afterAll(() => rmSync(home, { recursive: true, force: true, maxRetries: 10 }));
 // The language of what Otea makes with no desk to ask follows this computer's: a test that does not
 // choose one gets Spanish, the owner's, whatever computer it runs on.
 process.env.LC_ALL = 'es_ES.UTF-8';
+// ...and so does one given an env of its own, which has no locale variables to read.
+system.locale = () => 'es-ES';

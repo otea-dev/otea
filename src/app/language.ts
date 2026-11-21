@@ -40,13 +40,18 @@ export function storedLanguageAt(env: Env = process.env): Lang | undefined {
   return withMachine(env, storedLanguage);
 }
 
-const systemLocale = () => Intl.DateTimeFormat().resolvedOptions().locale;
+// Where the system's own locale is read from; tests replace it, so no result depends on the computer
+// they run on.
+export const system = {
+  locale: (): string => Intl.DateTimeFormat().resolvedOptions().locale,
+};
 
 // This computer's language: the locale variables a person set (LC_ALL, then LC_MESSAGES, then LANG;
-// C and POSIX say nothing), else the one the runtime reads from the system.
-export function systemLanguage(env: Env = process.env, locale = systemLocale): Lang {
+// C and POSIX, with or without an encoding, say nothing), else the one the runtime reads from the
+// system.
+export function systemLanguage(env: Env = process.env, locale = system.locale): Lang {
   const set = [env.LC_ALL, env.LC_MESSAGES, env.LANG].find(
-    (value) => value && value !== 'C' && value !== 'POSIX',
+    (value) => value && !/^(C|POSIX)(\.|$)/.test(value),
   );
   return /^es(?![a-z])/i.test(set ?? locale()) ? 'es' : 'en';
 }
