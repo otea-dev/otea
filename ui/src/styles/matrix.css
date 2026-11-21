@@ -72,6 +72,9 @@
 .mx-wrap {
   min-width: 0;
   overflow-x: auto;
+  /* the room the docked tray takes at the foot of the page (about 96 px and its gap): scrolled into
+     view, the axis words rest above it instead of under it */
+  scroll-margin-bottom: 120px;
 }
 
 .mx-grid {

@@ -1,8 +1,9 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { mappedScales, type ScaleRole } from '../../../../src/core/board/analysis.ts';
 import type { BoardDefinition } from '../../../../src/core/board/model.ts';
 import { roleWord } from '../../board-studio/words.ts';
 import { t } from '../../i18n/i18n.ts';
+import { reduced } from '../../motion/reduced.ts';
 import type { Item } from '../../types.ts';
 import {
   type Axes,
@@ -58,6 +59,17 @@ export function MatrixView({
   children?: ReactNode;
 }) {
   const [picked, setPicked] = useState<Partial<Axes>>(() => readAxes(collection));
+  const root = useRef<HTMLDivElement>(null);
+  // The tray docks over the foot of the page: when the first item is ticked, the axis words (under
+  // the grid) are brought up clear of it, never left behind it (.mx-wrap keeps the room).
+  const picking = ticked.length > 0;
+  useEffect(() => {
+    if (!picking) return;
+    root.current?.querySelector('.mx-wrap')?.scrollIntoView({
+      block: 'nearest',
+      behavior: reduced() ? 'auto' : 'smooth',
+    });
+  }, [picking]);
   const axes = axesOf(def, picked);
   if (!axes) return null;
   const m = matrixOf(def, items, axes);
@@ -69,7 +81,7 @@ export function MatrixView({
   };
   const order = orderList(items);
   return (
-    <div className="matriz" data-mode="matriz">
+    <div className="matriz" data-mode="matriz" ref={root}>
       <div className="mx-axes">
         <label>
           <span>{t('matrix.across')}</span>
