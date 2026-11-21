@@ -1,6 +1,6 @@
 # Otea Individual Contributor License Agreement
 
-Thank you for contributing to Otea. This agreement documents the rights you grant to Federico Ara (the "Maintainer") for your contributions. It is adapted from the Apache Software Foundation Individual Contributor License Agreement v2.0. You keep the copyright in your contributions; you only grant the licenses below.
+Thank you for contributing to Otea. This agreement documents the rights you grant to Federico Daniel Ara (the "Maintainer") for your contributions. It is adapted from the Apache Software Foundation Individual Contributor License Agreement v2.0. You keep the copyright in your contributions; you only grant the licenses below.
 
 By commenting on a pull request with the sentence "I have read the CLA Document and I hereby sign the CLA", you accept this agreement for that contribution and for every future contribution you submit to the Otea project.
 
