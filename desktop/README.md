@@ -45,7 +45,7 @@ The icons come from one drawing, `src/marks.ts`: the app draws its window, tray 
 
 ## Release
 
-`.github/workflows/desktop.yml` builds the installers on Windows, macOS and Linux and tries each on its runner: the bundled `otea` makes and reads a project, the app opens it (`OTEA_DESKTOP_SMOKE=1` makes the app open the project, print `OTEA_DESKTOP_SMOKE ok` and quit), the Windows installer puts `otea` on PATH and its uninstaller takes it off, the deb gives `/usr/bin/otea` and removing it takes it away. It runs on pull requests that touch `desktop/` (the installers are kept as the run's artifacts for a week) and on `v*` tags, where it takes the version from the tag and publishes every installer and `latest*.yml` as the GitHub Release of that tag. To release:
+`.github/workflows/desktop.yml` builds the installers on Windows, macOS and Linux and tries each on its runner: the bundled `otea` makes and reads a project, the app opens it (`OTEA_DESKTOP_SMOKE=1` makes the app open the project, print `OTEA_DESKTOP_SMOKE ok` and quit), the Windows installer puts `otea` on PATH and its uninstaller takes it off, the deb gives `/usr/bin/otea` and removing it takes it away. It runs on pull requests that touch `desktop/` (the installers are kept as the run's artifacts for a week) and on `v*` tags, where it takes the version from the tag and publishes every installer and `latest*.yml` as the GitHub Release of that tag. The same tag publishes `@otea/cli` to npm (`.github/workflows/npm-publish.yml`), which needs the root `package.json` version bumped first: see "Releasing" in `../CONTRIBUTING.md`. To release:
 
 ```sh
 git tag v0.2.0 && git push origin v0.2.0

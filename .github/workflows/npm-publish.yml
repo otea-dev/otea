@@ -1,0 +1,89 @@
+name: Publish to npm
+
+# A v* tag publishes @otea/cli to npm, once the checks pass and the tag names the version in
+# package.json (v0.2.0 for "version": "0.2.0"). A manual run (workflow_dispatch) does all of it up to
+# the end and then only `npm publish --dry-run`: nothing reaches npm.
+#
+# Publishing signs in with npm trusted publishing (OIDC): no token is stored, and the package page
+# on npm shows where it was built from (provenance). It needs a one-time setup on npmjs.com, see
+# CONTRIBUTING.md. A repository secret named NPM_TOKEN, if there is one, is used instead.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # Trusted publishing and the provenance statement are signed with the run's OIDC token.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # The oldest Node the package supports (engines).
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
+      - run: npm install -g npm@11
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npx vitest run --maxWorkers=2
+
+      - name: Check that the tag names the package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "::error::The tag is ${GITHUB_REF_NAME} but package.json says version ${version}: bump the version, then tag again"
+            exit 1
+          fi
+
+      # Packs what npm would publish (prepack builds the UI and compiles the CLI), installs it the
+      # way a person does, with nothing of the checkout around it, and runs it.
+      - name: Try the package from a clean install
+        run: |
+          mkdir -p "$RUNNER_TEMP/pack" "$RUNNER_TEMP/prefix" "$RUNNER_TEMP/work"
+          npm pack --pack-destination "$RUNNER_TEMP/pack"
+          npm install -g --prefix "$RUNNER_TEMP/prefix" "$RUNNER_TEMP"/pack/otea-cli-*.tgz
+          cd "$RUNNER_TEMP/work"
+          export OTEA_HOME="$RUNNER_TEMP/otea-home"
+          installed="$("$RUNNER_TEMP/prefix/bin/otea" --version)"
+          expected="$(node -p "require('$GITHUB_WORKSPACE/package.json').version")"
+          if [ "$installed" != "$expected" ]; then
+            echo "::error::The installed otea says $installed, expected $expected"
+            exit 1
+          fi
+          "$RUNNER_TEMP/prefix/bin/otea" --help > /dev/null
+
+      - name: Publish (dry run)
+        if: github.event_name == 'workflow_dispatch'
+        run: npm publish --dry-run --access public
+
+      - name: Publish
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # A prerelease (v0.2.0-rc.1) goes to the "next" tag, so npm i -g @otea/cli never takes it.
+          tag=latest
+          case "${GITHUB_REF_NAME}" in *-*) tag=next ;; esac
+          if [ -n "${NPM_TOKEN}" ]; then
+            echo "Signing in with the NPM_TOKEN secret"
+            export NODE_AUTH_TOKEN="${NPM_TOKEN}"
+          else
+            echo "Signing in with trusted publishing"
+          fi
+          npm publish --provenance --access public --tag "$tag"
