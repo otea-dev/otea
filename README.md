@@ -4,7 +4,7 @@
 <img src="docs/images/otea-logo-light.svg" alt="Otea" width="116" height="161">
 </picture><ruby><rp>Otea</rp></ruby>
 <br>
-<a href="https://github.com/Lartweib/otea/actions/workflows/ci.yml"><img src="https://github.com/Lartweib/otea/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+<a href="https://github.com/otea-dev/otea/actions/workflows/ci.yml"><img src="https://github.com/otea-dev/otea/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License: AGPL-3.0"></a>
 <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-%3E%3D22.18-339933" alt="Node &gt;=22.18"></a>
 </h1>
@@ -59,7 +59,7 @@ Early: usable, still changing fast. The product definition lives in [`docs/otea-
 Installing from source takes Git and Node.js 22.18 or later (Node 24 recommended):
 
 ```sh
-git clone https://github.com/Lartweib/otea.git
+git clone https://github.com/otea-dev/otea.git
 cd otea
 npm ci              # the CLI's dependencies
 npm run build:ui    # the web UI that otea serve shows
@@ -141,7 +141,7 @@ When not to use it:
 
 ## Help
 
-Questions and bugs go to [GitHub Issues](https://github.com/Lartweib/otea/issues). Report a security problem privately, as [SECURITY.md](SECURITY.md) says.
+Questions and bugs go to [GitHub Issues](https://github.com/otea-dev/otea/issues). Report a security problem privately, as [SECURITY.md](SECURITY.md) says.
 
 ## License
 

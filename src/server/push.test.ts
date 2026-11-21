@@ -114,7 +114,7 @@ describe('vapidAuthorization', () => {
     expect(JSON.parse(b64(claims ?? '').toString())).toEqual({
       aud: 'https://fcm.googleapis.com',
       exp: now / 1000 + 12 * 60 * 60,
-      sub: 'https://github.com/Lartweib/otea',
+      sub: 'https://github.com/otea-dev/otea',
     });
     const raw = b64(keys.publicKey);
     const publicKey = createPublicKey({
