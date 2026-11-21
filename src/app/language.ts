@@ -5,6 +5,7 @@ import { LANGS, type Lang } from '../core/board/template-words.ts';
 import { selectPreference, upsertPreference } from '../store/machine.ts';
 import { machineDir, withMachine } from './machine.ts';
 import type { Env } from './project.ts';
+import { system } from './system-locale.ts';
 
 // The language of what Otea makes for the person: the language they use at that moment, kept as
 // it was made. Switching later rewrites nothing that exists; what agents write is up to the agents.
@@ -39,12 +40,6 @@ export function storedLanguageAt(env: Env = process.env): Lang | undefined {
   if (!existsSync(join(machineDir(env), 'machine.db'))) return undefined;
   return withMachine(env, storedLanguage);
 }
-
-// Where the system's own locale is read from; tests replace it, so no result depends on the computer
-// they run on.
-export const system = {
-  locale: (): string => Intl.DateTimeFormat().resolvedOptions().locale,
-};
 
 // This computer's language: the locale variables a person set (LC_ALL, then LC_MESSAGES, then LANG;
 // C and POSIX, with or without an encoding, say nothing), else the one the runtime reads from the

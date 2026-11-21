@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, vi } from 'vitest';
-import { system } from './app/language.ts';
+import { system } from './app/system-locale.ts';
 
 // No test may touch the user's real ~/.otea. Each test file gets its own OTEA_HOME, which processes
 // it spawns inherit, and the home folder is off limits: code that falls back to it throws.

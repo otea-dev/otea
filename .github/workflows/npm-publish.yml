@@ -76,7 +76,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npx vitest run --maxWorkers=2
+      # The same entry as ci.yml (npm run check runs it), so the two cannot drift.
+      - run: npm run test
 
       - name: Check that the tag names the package version
         if: steps.mode.outputs.release == 'true'
