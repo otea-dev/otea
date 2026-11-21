@@ -28,10 +28,10 @@ Agents produce work faster than a human can follow it live. Otea is where work c
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-agent-loop-dark.gif">
-  <img src="docs/images/demo-agent-loop-light.gif" alt="The desk, live: a person adds a change, an agent takes it, fills in what the board asks, attaches a diff and screenshots and hands it over, and the person approves it">
+  <img src="docs/images/demo-agent-loop-light.gif" alt="A change's page on the desk: the agent ticks the checklist (branch, diff, screenshots), the route moves from its lane to yours, and the person presses Approve. Caption: The agent does the steps. You only review.">
 </picture>
 
-You add a change; an agent takes it, does it and hands it over with its proof; you approve it. The desk updates as each command runs.
+**The agent does the steps; you only review.** It ticks the checklist the board asks for, the route moves from its lane to yours, and all that is left for you is Approve.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/desk-your-turn-dark.png">
@@ -56,10 +56,10 @@ The same change on a phone, with the agent's note and your two moves.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-phone-answer-dark.gif">
-  <img src="docs/images/demo-phone-answer-light.gif" alt="An agent asks a question with otea ask; it appears on a phone beside the desk, the person types an answer on the phone, and the desk shows the agent going on">
+  <img src="docs/images/demo-phone-answer-light.gif" alt="A phone shows a question from an agent; the person taps Answer, types a reply and sends it, and the small desk beside it shows the question gone. Caption: Answer your agents from your phone.">
 </picture>
 
-An agent asks, and the question reaches your phone. You answer there, and the agent goes on.
+**Answer your agents from your phone.** A question from an agent reaches your phone; you answer there, and the desk shows the agent going on.
 
 ## Status
 
