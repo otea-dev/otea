@@ -126,10 +126,10 @@ Déjalo corriendo mientras trabajas. Es tu escritorio: ahí revisas, apruebas y 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-agent-loop-dark.gif">
-  <img src="docs/images/demo-agent-loop-light.gif" alt="El escritorio en vivo: una persona agrega un cambio, un agente lo toma, completa lo que pide el tablero, adjunta un diff y capturas y lo entrega, y la persona lo aprueba">
+  <img src="docs/images/demo-agent-loop-light.gif" alt="La página de un cambio en el escritorio: el agente tilda la lista (rama, diff, capturas), la ruta pasa de su carril al tuyo y la persona pulsa Aprobar. Leyenda en inglés: The agent does the steps. You only review.">
 </picture>
 
-Agregas un cambio; un agente lo toma, lo hace y te lo entrega con su evidencia; tú lo apruebas. El escritorio se actualiza a medida que corre cada comando.
+**El agente hace los pasos; tú solo revisas.** Tilda la lista que pide el tablero, la ruta pasa de su carril al tuyo y a ti solo te queda aprobar.
 
 ## 4. Pegarle el texto a tu agente
 
@@ -141,10 +141,10 @@ Si trabajas directo en `main` y no quieres que nada se suba antes de verlo, píd
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-phone-answer-dark.gif">
-  <img src="docs/images/demo-phone-answer-light.gif" alt="Un agente hace una pregunta con otea ask; aparece en un teléfono junto al escritorio, la persona escribe la respuesta en el teléfono y el escritorio muestra al agente siguiendo">
+  <img src="docs/images/demo-phone-answer-light.gif" alt="Un teléfono muestra la pregunta de un agente; la persona toca Responder, escribe y envía, y el escritorio pequeño a su lado muestra que la pregunta ya no está. Leyenda en inglés: Answer your agents from your phone.">
 </picture>
 
-Cuando un agente te pregunta algo, la pregunta te llega al teléfono. La respondes ahí y el agente sigue.
+**Responde a tus agentes desde el teléfono.** La pregunta de un agente te llega al teléfono; la respondes ahí y el escritorio muestra al agente siguiendo.
 
 ## En Windows, con Git Bash
 

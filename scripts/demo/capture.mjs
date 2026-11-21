@@ -1,13 +1,17 @@
-// Screen capture for the README GIFs: a CDP screencast of a Playwright page (crisp frames, taken
-// when the page repaints and stamped by the browser), a visible cursor with click ripples, and
-// ffmpeg to turn the frames into a GIF.
+// Frames for the README GIFs. A GIF here is a short list of settled states, each held long enough
+// to read and joined by hard cuts: every state is a screenshot of the real desk (taken once its
+// animations are over), cropped to the part where the change happens, then laid out with a caption
+// by a small composer page and encoded by ffmpeg. Nothing is cross-faded.
 import { execFile, spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
+const repo = process.env.OTEA_REPO ?? resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const require = createRequire(join(repo, 'package.json'));
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -15,45 +19,48 @@ export function hasFfmpeg() {
   return spawnSync('ffmpeg', ['-version'], { encoding: 'utf8' }).status === 0;
 }
 
-// A cursor and a click ripple drawn in the page, so they are in the frames. Playwright's own
-// pointer is invisible. Styled to stay legible on both the light and the dark desk.
-const CURSOR_SCRIPT = `
+// A pointer drawn in the page, so it is in the screenshots (Playwright's own is invisible): an
+// arrow for the desk, a soft disc for a finger, and a ring where a press lands.
+const POINTER_SCRIPT = `
 (() => {
   const css = document.createElement('style');
   css.textContent = [
-    '#demo-cursor{position:fixed;left:0;top:0;width:22px;height:22px;margin:-2px 0 0 -2px;z-index:2147483647;pointer-events:none;opacity:0;transition:opacity .2s;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}',
-    '#demo-cursor.finger{width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;background:rgba(40,50,80,.35);border:2px solid rgba(255,255,255,.9);box-shadow:0 1px 4px rgba(0,0,0,.35)}',
-    '#demo-ripple{position:fixed;left:0;top:0;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:2px solid #2f5bd8;background:rgba(47,91,216,.18);z-index:2147483646;pointer-events:none;opacity:0}',
-    '#demo-ripple.go{animation:demo-ripple .5s ease-out}',
-    '@keyframes demo-ripple{0%{opacity:.95;transform:scale(.3)}100%{opacity:0;transform:scale(1.5)}}',
+    '#demo-ptr{position:fixed;left:0;top:0;z-index:2147483647;pointer-events:none;opacity:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}',
+    '#demo-ptr.finger{width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:rgba(40,50,80,.28);border:2px solid rgba(255,255,255,.95);box-shadow:0 1px 5px rgba(0,0,0,.35)}',
+    '#demo-ptr.arrow{width:24px;height:24px;margin:-2px 0 0 -2px}',
+    '#demo-ptr.down{transform:scale(.86)}',
+    '#demo-ring{position:fixed;left:0;top:0;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:2.5px solid #2f5bd8;background:rgba(47,91,216,.16);z-index:2147483646;pointer-events:none;opacity:0}',
   ].join('');
-  // No red squiggles under what is typed.
   window.addEventListener('focusin', (e) => {
     if (e.target && 'spellcheck' in e.target) e.target.spellcheck = false;
   }, true);
   const mount = () => {
-    if (document.getElementById('demo-cursor')) return;
+    if (document.getElementById('demo-ptr')) return;
     document.head.append(css);
-    const cur = document.createElement('div');
-    cur.id = 'demo-cursor';
-    cur.innerHTML = '<svg viewBox="0 0 22 22" width="22" height="22"><path d="M3 2l14 8.2-6 1.6 3.6 6.4-2.8 1.6-3.6-6.4L4 18.6z" fill="#fff" stroke="#111" stroke-width="1.5" stroke-linejoin="round"/></svg>';
-    if (window.__demoFinger) {
-      cur.className = 'finger';
-      cur.textContent = '';
-    }
-    const rip = document.createElement('div');
-    rip.id = 'demo-ripple';
-    document.body.append(rip, cur);
-    window.addEventListener('mousemove', (e) => {
-      cur.style.opacity = '1';
-      cur.style.transform = 'translate(' + e.clientX + 'px,' + e.clientY + 'px)';
-    }, true);
+    const ptr = document.createElement('div');
+    ptr.id = 'demo-ptr';
+    ptr.className = window.__demoFinger ? 'finger' : 'arrow';
+    if (!window.__demoFinger)
+      ptr.innerHTML = '<svg viewBox="0 0 22 22" width="24" height="24"><path d="M3 2l14 8.2-6 1.6 3.6 6.4-2.8 1.6-3.6-6.4L4 18.6z" fill="#fff" stroke="#111" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+    const ring = document.createElement('div');
+    ring.id = 'demo-ring';
+    document.body.append(ring, ptr);
+    const at = (e) => {
+      ptr.style.opacity = '1';
+      ptr.style.left = e.clientX + 'px';
+      ptr.style.top = e.clientY + 'px';
+    };
+    window.addEventListener('mousemove', at, true);
     window.addEventListener('mousedown', (e) => {
-      rip.style.left = e.clientX + 'px';
-      rip.style.top = e.clientY + 'px';
-      rip.classList.remove('go');
-      void rip.offsetWidth;
-      rip.classList.add('go');
+      at(e);
+      ptr.classList.add('down');
+      ring.style.left = e.clientX + 'px';
+      ring.style.top = e.clientY + 'px';
+      ring.style.opacity = '1';
+    }, true);
+    window.addEventListener('mouseup', () => {
+      ptr.classList.remove('down');
+      ring.style.opacity = '0';
     }, true);
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
@@ -61,11 +68,11 @@ const CURSOR_SCRIPT = `
 })();
 `;
 
-// A page whose frames are captured. `start()` begins the capture at the moment the scene is set,
-// `stop()` returns the frames, `glide`/`click`/`type` move the pointer so it can be seen.
+// A page of the desk to take states from. `shot` waits for the page to be still before it takes
+// one (nothing moving, so no half-finished animation ends up in a frame).
 export async function openStage(
   browser,
-  { width, height, scale = 1, scheme = 'light', cursor = 'arrow' },
+  { width, height, scale = 2, scheme = 'light', pointer = 'arrow', dir },
 ) {
   const context = await browser.newContext({
     viewport: { width, height },
@@ -74,178 +81,123 @@ export async function openStage(
     colorScheme: scheme,
     reducedMotion: 'no-preference',
   });
-  if (cursor === 'finger') await context.addInitScript('window.__demoFinger = true;');
-  if (cursor) await context.addInitScript(CURSOR_SCRIPT);
+  if (pointer === 'finger') await context.addInitScript('window.__demoFinger = true;');
+  await context.addInitScript(POINTER_SCRIPT);
   const page = await context.newPage();
-  const cdp = await context.newCDPSession(page);
-  const pos = { x: width * 0.55, y: height * 0.4 };
-  const frames = [];
-  let writes = [];
-  let dir = null;
+  mkdirSync(dir, { recursive: true });
   let n = 0;
-
-  cdp.on('Page.screencastFrame', (f) => {
-    const file = join(dir, `f${String(n++).padStart(5, '0')}.jpg`);
-    frames.push({ at: f.metadata.timestamp, file });
-    writes.push(writeFile(file, Buffer.from(f.data, 'base64')));
-    cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {});
-  });
-
+  const pos = { x: width * 0.6, y: height * 0.5 };
   const stage = {
     page,
     context,
     pos,
-    skips: [],
-    // DEMO_TRACE=1 prints when each step happened, in seconds into the clip.
-    trace(what) {
-      if (process.env.DEMO_TRACE)
-        console.log(what, (Date.now() / 1000 - stage.startedAt).toFixed(1));
+    // Rests the pointer on a locator (it glides there in a few steps, so hover states are right).
+    async point(locator, at = [0.5, 0.5]) {
+      await locator.scrollIntoViewIfNeeded({ timeout: 8000 });
+      const b = await locator.boundingBox();
+      if (!b) throw new Error('nothing to point at');
+      await page.mouse.move(b.x + b.width * at[0], b.y + b.height * at[1], { steps: 6 });
     },
-    async start(framesDir) {
-      dir = framesDir;
-      mkdirSync(dir, { recursive: true });
-      await cdp.send('Page.startScreencast', {
-        format: 'jpeg',
-        quality: 90,
-        maxWidth: width * scale,
-        maxHeight: height * scale,
-        everyNthFrame: 4,
-      });
-      // Force a first frame even when the page is still.
-      await page.evaluate(() => window.scrollBy(0, 0));
-      stage.startedAt = Date.now() / 1000;
-    },
-    async stop() {
-      stage.stoppedAt = Date.now() / 1000;
-      await cdp.send('Page.stopScreencast').catch(() => {});
-      await Promise.all(writes);
-      writes = [];
-      return frames;
-    },
-    // Time-based, so a busy browser makes it choppier, not longer.
-    async glide(x, y, ms = 500) {
-      const from = { ...pos };
-      const t0 = Date.now();
-      for (;;) {
-        const t = Math.min(1, (Date.now() - t0) / ms);
-        const e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
-        await page.mouse.move(from.x + (x - from.x) * e, from.y + (y - from.y) * e);
-        if (t >= 1) break;
-        await sleep(8);
+    // Waits until what is in view stops changing, then takes it. `clip` is in CSS pixels.
+    async shot(name, clip) {
+      let prev = null;
+      for (let i = 0; i < 40; i++) {
+        const now = await page.screenshot({ ...(clip ? { clip } : {}), type: 'png' });
+        if (prev && Buffer.compare(prev, now) === 0) break;
+        prev = now;
+        await sleep(120);
       }
-      pos.x = x;
-      pos.y = y;
-    },
-    // Glide onto a locator and press it, as a person would.
-    async click(locator, { ms = 450, hold = 70, at = [0.5, 0.5] } = {}) {
-      try {
-        await locator.scrollIntoViewIfNeeded({ timeout: 8000 });
-      } catch (e) {
-        // Leave a picture of where the scene got stuck, beside the frames.
-        await page.screenshot({ path: join(dir, 'stuck.png') }).catch(() => {});
-        throw e;
-      }
-      // A row that is still sliding into place is waited for, then the pointer is nudged onto it.
-      const settled = async () => {
-        let last = await locator.boundingBox();
-        for (let i = 0; i < 60; i++) {
-          await sleep(50);
-          const now = await locator.boundingBox();
-          if (now && last && Math.abs(now.x - last.x) + Math.abs(now.y - last.y) < 0.5) return now;
-          last = now;
-        }
-        return last;
-      };
-      const aim = (b) => [b.x + b.width * at[0], b.y + b.height * at[1]];
-      let box = await settled();
-      if (!box) throw new Error('nothing to click');
-      await stage.glide(...aim(box), ms);
-      box = await settled();
-      if (!box) throw new Error('nothing to click');
-      const [ax, ay] = aim(box);
-      if (Math.abs(ax - pos.x) + Math.abs(ay - pos.y) > 2) await stage.glide(ax, ay, 160);
-      await sleep(hold);
-      await page.mouse.down();
-      await sleep(60);
-      await page.mouse.up();
-      stage.trace('click');
-    },
-    async type(text, perChar = 28) {
-      await page.keyboard.type(text, { delay: perChar });
-      stage.trace('typed');
-    },
-    // Something that takes real time but nothing a viewer needs to wait for, such as an agent's
-    // command: the clip jumps from before it to after it.
-    async skip(work) {
-      const a = Date.now() / 1000;
-      const result = await work();
-      stage.skips.push([a, Date.now() / 1000]);
-      stage.trace('skipped');
-      return result;
+      const file = join(dir, `${String(n++).padStart(2, '0')}-${name}.png`);
+      writeFileSync(file, prev);
+      return file;
     },
   };
   return stage;
 }
 
-// Frames -> GIF. `from` and `to` are epoch seconds: the part of the capture to keep. Every frame
-// lasts until the next one, so a still page costs nothing.
-export function framesToClip(rawFrames, { from: rawFrom, to: rawTo, out, skips = [] }) {
-  // Skipped stretches are cut out: what lies inside collapses onto its start, so only the state
-  // at its end is left to show.
-  const shift = (t) => {
-    let cut = 0;
-    for (const [a, b] of skips) cut += t >= b ? b - a : t > a ? t - a : 0;
-    return t - cut;
-  };
-  const frames = rawFrames.map((f) => ({ ...f, at: shift(f.at) }));
-  const from = shift(rawFrom);
-  const to = shift(rawTo);
-  const kept = frames.filter((f) => f.at < to);
-  const first = kept.findLastIndex((f) => f.at <= from);
-  const list = kept.slice(Math.max(first, 0));
-  const lines = ['ffconcat version 1.0'];
-  list.forEach((f, i) => {
-    const start = Math.max(f.at, from);
-    const end = i + 1 < list.length ? list[i + 1].at : to;
-    lines.push(
-      `file '${f.file.replaceAll('\\', '/')}'`,
-      `duration ${Math.max(end - start, 0.001).toFixed(4)}`,
+// The desk's own colours, so the composer's ground and ink are the page's.
+export async function readTokens(page) {
+  return page.evaluate(() => {
+    const cs = getComputedStyle(document.documentElement);
+    const get = (n) => cs.getPropertyValue(n).trim();
+    return Object.fromEntries(
+      ['--ground', '--sheet', '--ink', '--ink-2', '--ink-3', '--you', '--rule', '--rule-2'].map(
+        (n) => [n, get(n)],
+      ),
     );
   });
-  const last = list.at(-1);
-  lines.push(`file '${last.file.replaceAll('\\', '/')}'`);
-  const listFile = `${out}.txt`;
-  writeFileSync(listFile, `${lines.join('\n')}\n`);
-  return { list: listFile, length: to - from };
 }
 
-// One or two clips side by side (same height) -> a GIF of `width` px, `fps`, `colors`.
-export async function toGif(
-  lists,
-  { out, width, fps = 15, colors = 160, duration, divider, dither = 'bayer:bayer_scale=5' },
-) {
-  const inputs = lists.flatMap((l) => ['-f', 'concat', '-safe', '0', '-i', l]);
-  const chains = lists.map((_, i) => `[${i}:v]fps=${fps}[v${i}]`);
-  const join =
-    lists.length > 1
-      ? `${chains.join(';')};${lists.map((_, i) => `[v${i}]`).join('')}hstack=inputs=${lists.length}${divider ? `,drawbox=x=${divider - 1}:y=0:w=2:h=ih:color=0x8a93a6:t=fill` : ''}[m]`
-      : `[0:v]fps=${fps}[m]`;
-  const filter = `${join};[m]scale=${width}:-2:flags=lanczos,split[a][b];[a]palettegen=max_colors=${colors}:stats_mode=diff[p];[b][p]paletteuse=dither=${dither}:diff_mode=rectangle`;
+function fontCss() {
+  const file = require.resolve(
+    '@fontsource-variable/schibsted-grotesk/files/schibsted-grotesk-latin-wght-normal.woff2',
+  );
+  const data = readFileSync(file).toString('base64');
+  return `@font-face{font-family:"Schibsted Grotesk";font-weight:400 900;src:url(data:font/woff2;base64,${data}) format("woff2")}`;
+}
+
+const img = (file) => `data:image/png;base64,${readFileSync(file).toString('base64')}`;
+
+// Lays a frame out on a page of the final size and returns its PNG. `layout` writes the html of
+// the frame from the tokens; the canvas is `width` x `height` pixels, drawn at 1:1.
+export async function openComposer(browser, tokens, { width, height }) {
+  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+  const page = await context.newPage();
+  const vars = Object.entries(tokens)
+    .map(([k, v]) => `${k}:${v}`)
+    .join(';');
+  const base = `<style>${fontCss()}
+    :root{${vars}}
+    *{box-sizing:border-box}
+    html,body{margin:0;width:${width}px;height:${height}px;background:var(--ground);color:var(--ink);font:500 17px/1.25 "Schibsted Grotesk",system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+  </style>`;
+  return {
+    img,
+    async frame(body, out) {
+      await page.setContent(`${base}${body}`);
+      await page.evaluate(() => document.fonts.ready);
+      await page.evaluate(() =>
+        Promise.all([...document.images].map((i) => (i.complete ? 1 : i.decode().catch(() => 1)))),
+      );
+      await page.screenshot({ path: out, type: 'png' });
+      return out;
+    },
+    close: () => context.close(),
+  };
+}
+
+// Frames -> GIF: each PNG held for its time, hard cuts, one palette for the whole clip.
+export async function toGif(frames, { out, listFile, colors = 128, fps = 10 }) {
+  const lines = ['ffconcat version 1.0'];
+  for (const f of frames) {
+    lines.push(`file '${f.png.replaceAll('\\', '/')}'`, `duration ${f.hold.toFixed(3)}`);
+  }
+  // ffconcat ignores the last duration unless the file is repeated.
+  lines.push(`file '${frames.at(-1).png.replaceAll('\\', '/')}'`);
+  writeFileSync(listFile, `${lines.join('\n')}\n`);
+  const total = frames.reduce((sum, f) => sum + f.hold, 0);
+  const filter = `fps=${fps},split[a][b];[a]palettegen=max_colors=${colors}:stats_mode=full[p];[b][p]paletteuse=dither=none:diff_mode=rectangle`;
   await run(
     'ffmpeg',
     [
       '-y',
       '-loglevel',
       'error',
-      ...inputs,
-      '-filter_complex',
+      '-f',
+      'concat',
+      '-safe',
+      '0',
+      '-i',
+      listFile,
+      '-vf',
       filter,
       '-t',
-      String(duration),
+      total.toFixed(3),
       '-loop',
       '0',
       out,
     ],
     { maxBuffer: 1 << 26 },
   );
+  return frames.reduce((s, f) => s + f.hold, 0);
 }
