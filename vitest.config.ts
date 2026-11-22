@@ -41,8 +41,15 @@ export default defineConfig({
         test: {
           name: 'processes',
           include: SPAWNS_PROCESSES,
-          testTimeout: 20_000,
-          hookTimeout: 30_000,
+          // Every file here spawns processes, so a worker per core (23 on a big machine) starts
+          // hundreds of git and Node processes at once, each waiting on the others: a test that
+          // takes 2s alone takes over 20s. A few workers finish sooner and do not time out.
+          maxWorkers: 4,
+          // A test here is a chain of spawns (a hook install, a push through it, a wait): alone it
+          // takes seconds, on a machine other work keeps busy ten times that. The budget is for
+          // that slowness; a test that hangs still fails, a minute later.
+          testTimeout: 60_000,
+          hookTimeout: 60_000,
           sequence: { groupOrder: 1 },
         },
       },
