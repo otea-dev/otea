@@ -7,7 +7,7 @@ import {
   type Step,
   stepById,
 } from '../../../../src/core/board/model.ts';
-import { listOf, t, tx } from '../../i18n/i18n.ts';
+import { listOf, listOr, t, tx } from '../../i18n/i18n.ts';
 import { Seg } from '../../kit/Seg.tsx';
 import { LaneList } from '../../lanes/LaneList.tsx';
 import type { Look } from '../../lanes/looks.ts';
@@ -246,6 +246,30 @@ export function ItemPreview({
                 </span>
                 <span>{part.name}</span>
                 <small>{word}</small>
+              </button>
+            );
+          })}
+          {(step.groups ?? []).map((group) => {
+            const ok = at !== 'doing';
+            return (
+              <button
+                type="button"
+                key={group.id}
+                className={['bsp-hc', ok ? 'ok' : 'miss', 'req'].join(' ')}
+                onClick={reveal({ kind: 'step', id: step.id })}
+                title={t('bs.preview.why')}
+              >
+                <span className="bx" aria-hidden="true">
+                  {ok ? <Tick /> : null}
+                </span>
+                <span>
+                  {t('bi.hand.group', {
+                    name: group.name,
+                    min: group.min,
+                    list: listOr(group.parts.map((ref) => partOf(def, ref)?.name ?? ref)),
+                  })}
+                </span>
+                <small>{t(ok ? 'bs.preview.check.ready' : 'bs.preview.check.missing')}</small>
               </button>
             );
           })}

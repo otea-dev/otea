@@ -341,12 +341,15 @@ export function bodySections(o: {
           ) : null}
           {canWrite && item.turn !== 'none' ? <AttachFile id={item.id} /> : null}
         </div>
-        {evidence.length ? (
-          <div className="evs">{evidence}</div>
+        {evidence.length ||
+        (board?.gaps?.groups.length ?? 0) + (board?.gaps?.optional.length ?? 0) ? (
+          <div className="evs">
+            {evidence}
+            {board?.gaps ? <EvidenceGaps gaps={board.gaps} /> : null}
+          </div>
         ) : (
           <p className="noev">{t('sheet.noEvidence')}</p>
         )}
-        {board?.gaps ? <EvidenceGaps gaps={board.gaps} /> : null}
       </section>
     ),
   });

@@ -670,6 +670,7 @@ export const detail = {
   'bi.hand.note': 'Nota de la entrega',
   'bi.hand.missing': 'falta',
   'bi.hand.optional': 'opcional',
+  'bi.hand.group': '{name}: al menos {min} de {list}',
   'bi.hand.ready': 'listo',
   'bi.hand.fill': 'Rellenar',
   'bi.hand.save': 'Guardar',

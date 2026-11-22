@@ -662,6 +662,7 @@ export const detail = {
   'bi.hand.note': 'Handoff note',
   'bi.hand.missing': 'missing',
   'bi.hand.optional': 'optional',
+  'bi.hand.group': '{name}: at least {min} of {list}',
   'bi.hand.ready': 'ready',
   'bi.hand.fill': 'Fill in',
   'bi.hand.save': 'Save',
