@@ -20,6 +20,7 @@ import {
   noteCall,
   offerName,
   ownerGone,
+  ownName,
   presenceSignature,
   quietVoices,
   seeAgent,
@@ -709,6 +710,70 @@ describe('agent presence', () => {
       hearAgent(ctx.db, { agent: 'claude', channel: 'cli', harness: CLI_HARNESS }, at(T0));
 
       expect(() => claimName(ctx.db, 'claude', 202, alive([202]), at(T1))).not.toThrow();
+    });
+  });
+
+  // One status per agent for every surface: after a handoff the agent was still «trabajando» for the
+  // listening window, and one working a long step over the command line read as nobody connected.
+  describe('status', () => {
+    it('is working while it holds an item', () => {
+      seeAgent(ctx.db, { agent: 'claude', channel: 'cli', call: true }, at(T0));
+      claimItem(ctx, { id: 'TASKS-1', actor: claude }, at(T0));
+
+      expect(listAgents(ctx.db, at(T0_20S), running)[0]?.status).toBe('working');
+    });
+
+    it('is no longer working once it handed its work off, though it called Otea a moment ago', () => {
+      seeAgent(ctx.db, { agent: 'claude', channel: 'cli', call: true }, at(T0));
+      claimItem(ctx, { id: 'TASKS-1', actor: claude }, at(T0));
+      releaseItem(ctx, { id: 'TASKS-1', actor: claude }, at(T0_20S));
+      seeAgent(ctx.db, { agent: 'claude', channel: 'cli', call: true }, at(T0_20S));
+
+      expect(listAgents(ctx.db, at(T1), running)[0]?.status).toBe('connected');
+    });
+
+    it('is listening while it waits, and working again once it calls after its handoff', () => {
+      waitBeat(ctx.db, { agent: 'claude', channel: 'cli', waiter: 500 }, at(T0)).run();
+      expect(listAgents(ctx.db, at(T0_20S), running)[0]?.status).toBe('listening');
+
+      seeAgent(ctx.db, { agent: 'claude', channel: 'cli', call: true }, at(T2));
+      expect(listAgents(ctx.db, at(T2), running)[0]?.status).toBe('working');
+    });
+
+    it('is silent, not away, while it holds a live lease nothing says ended', () => {
+      seeAgent(ctx.db, { agent: 'claude', channel: 'cli', call: true }, at(T0));
+      claimItem(ctx, { id: 'TASKS-1', actor: claude, ttlMs: 60 * 60_000 }, at(T0));
+
+      expect(listAgents(ctx.db, at(T5))[0]).toMatchObject({ live: false, status: 'silent' });
+    });
+
+    it('is away once its session ended, whatever it still holds', () => {
+      hearAgent(ctx.db, { agent: 'claude', channel: 'mcp', session: 101 }, at(T0));
+      claimItem(ctx, { id: 'TASKS-1', actor: claude }, at(T0));
+
+      expect(listAgents(ctx.db, at(T1), () => false)[0]?.status).toBe('away');
+    });
+  });
+
+  // After a mid-session rename the old name stayed connected: the server beat it for as long as the
+  // session was open, as «the agent this session is».
+  describe('ownName', () => {
+    it('is the first name that called, then the one the session took after', () => {
+      expect(ownName(undefined, 'claude')).toBe('claude');
+      expect(ownName('claude', 'claude-2')).toBe('claude-2');
+    });
+
+    it('keeps the session its own name for its subagents', () => {
+      expect(ownName('claude', 'claude-haiku-hacer')).toBe('claude');
+      expect(ownName('claude', 'claude')).toBe('claude');
+    });
+
+    it('lets the old name go quiet after a rename', () => {
+      const calls = new Map([
+        ['claude', 0],
+        ['claude-2', 100_000],
+      ]);
+      expect(quietVoices(calls, ownName('claude', 'claude-2'), 170_000)).toEqual(['claude']);
     });
   });
 
