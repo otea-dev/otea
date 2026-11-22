@@ -383,7 +383,7 @@ describe('LAN access', () => {
       call(path, { host: LOCAL_HOST, from: '127.0.0.1', cookie: SESSION_COOKIE, ...call_ });
 
     it('works from localhost as before', async () => {
-      expect((await desk('/p/memory-aaaaaa/api/items', { cookie: '' })).status).toBe(200);
+      expect((await desk('/p/memory-aaaaaa/api/items')).status).toBe(200);
       expect((await desk('/p/memory-aaaaaa/api/items', { from: '::ffff:127.0.0.1' })).status).toBe(
         200,
       );
@@ -483,14 +483,14 @@ describe('LAN access', () => {
           cookie: '',
         });
 
-        expect(response.status).toBe(403);
+        expect(response.status).toBe(401);
       });
     });
 
     it('needs the signed-in browser to see the code', async () => {
       issue();
 
-      expect((await desk('/p/memory-aaaaaa/api/lan', { cookie: '' })).status).toBe(403);
+      expect((await desk('/p/memory-aaaaaa/api/lan', { cookie: '' })).status).toBe(401);
     });
   });
 });

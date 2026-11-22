@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Project } from '../app/project.ts';
 import { createServer, type OteaServer } from './server.ts';
-import { memoryProject, request } from './testing.ts';
+import { memoryProject, request, TOKEN } from './testing.ts';
 
 describe('host guard', () => {
   let project: Project;
@@ -9,7 +9,7 @@ describe('host guard', () => {
 
   beforeEach(() => {
     project = memoryProject();
-    server = createServer(project);
+    server = createServer(project, { token: TOKEN });
   });
 
   afterEach(() => {
@@ -73,9 +73,11 @@ describe('host guard', () => {
   it('accepts only the port it listens on', async () => {
     server.listeningOn(5000);
 
-    expect((await request(server, '/p/memory-aaaaaa/api/items', '127.0.0.1:5000')).status).toBe(
-      200,
-    );
+    // The session cookie is named after the port the server listens on.
+    const onPort = await server.app.request('/p/memory-aaaaaa/api/items', {
+      headers: { host: '127.0.0.1:5000', cookie: `otea_session_5000=${TOKEN}` },
+    });
+    expect(onPort.status).toBe(200);
     expect((await request(server, '/p/memory-aaaaaa/api/items', '127.0.0.1:4400')).status).toBe(
       403,
     );

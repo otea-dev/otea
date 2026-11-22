@@ -458,7 +458,7 @@ class Shell {
     this.detach();
     this.connection = connection;
     this.snapshot = { items: [], collections: [] };
-    this.watch = watchItems(connection.url, {
+    this.watch = watchItems(connection.url, connection.cookie, {
       onSnapshot: (snapshot) => {
         this.snapshot = snapshot;
         this.derive();
@@ -468,7 +468,9 @@ class Shell {
         this.derive();
       },
     });
-    this.notices = watchNotices(connection.url, this.lang, (notice) => this.notify(notice));
+    this.notices = watchNotices(connection.url, connection.cookie, this.lang, (notice) =>
+      this.notify(notice),
+    );
   }
 
   // Preferencias › Avisos in the desktop app: the server's notices as the system's notifications;

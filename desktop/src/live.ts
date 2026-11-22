@@ -14,16 +14,22 @@ export type WatchEvents = {
 
 const MAX_BACKOFF_MS = 10_000;
 
-async function getJson<T>(url: string, signal: AbortSignal): Promise<T> {
-  const response = await fetch(url, { signal, headers: { accept: 'application/json' } });
+// The server answers its API to a signed-in browser or a paired device only: the main process reads
+// as the window does, with the session `cookie` the sign-in sets (see sessionCookie, server.ts).
+async function getJson<T>(url: string, cookie: string, signal: AbortSignal): Promise<T> {
+  const response = await fetch(url, { signal, headers: { accept: 'application/json', cookie } });
   if (!response.ok) throw new Error(`GET ${url} answered ${response.status}`);
   return (await response.json()) as T;
 }
 
-export async function readSnapshot(base: string, signal: AbortSignal): Promise<Snapshot> {
+export async function readSnapshot(
+  base: string,
+  cookie: string,
+  signal: AbortSignal,
+): Promise<Snapshot> {
   const [items, collections] = await Promise.all([
-    getJson<DeskItem[]>(`${base}/api/items`, signal),
-    getJson<{ name: string }[]>(`${base}/api/collections`, signal),
+    getJson<DeskItem[]>(`${base}/api/items`, cookie, signal),
+    getJson<{ name: string }[]>(`${base}/api/collections`, cookie, signal),
   ]);
   return { items, collections: collections.map((each) => each.name) };
 }
@@ -57,12 +63,16 @@ export function sseEvents(buffer: string): { events: string[]; rest: string } {
 // the server goes away or restarts.
 function keepFollowing(
   url: string,
+  cookie: string,
   stop: AbortSignal,
   onMessage: (message: SseMessage) => Promise<void> | void,
   onLost: () => void,
 ): void {
   const follow = async () => {
-    const response = await fetch(url, { signal: stop, headers: { accept: 'text/event-stream' } });
+    const response = await fetch(url, {
+      signal: stop,
+      headers: { accept: 'text/event-stream', cookie },
+    });
     if (!response.ok || !response.body)
       throw new Error(`The live stream answered ${response.status}`);
     const decoder = new TextDecoder();
@@ -91,7 +101,7 @@ function keepFollowing(
   })();
 }
 
-export function watchItems(base: string, events: WatchEvents): Watch {
+export function watchItems(base: string, cookie: string, events: WatchEvents): Watch {
   const stop = new AbortController();
   let reading = false;
   let again = false;
@@ -106,7 +116,7 @@ export function watchItems(base: string, events: WatchEvents): Watch {
     try {
       do {
         again = false;
-        events.onSnapshot(await readSnapshot(base, stop.signal));
+        events.onSnapshot(await readSnapshot(base, cookie, stop.signal));
       } while (again && !stop.signal.aborted);
     } finally {
       reading = false;
@@ -115,6 +125,7 @@ export function watchItems(base: string, events: WatchEvents): Watch {
 
   keepFollowing(
     `${base}/api/stream`,
+    cookie,
     stop.signal,
     async ({ event }) => {
       if (event === 'ready') {
@@ -154,12 +165,14 @@ export function parseNotice(data: string): DeskNotice | undefined {
 // phone's pushes), worded in the system's language until one is chosen in Preferencias.
 export function watchNotices(
   base: string,
+  cookie: string,
   lang: 'es' | 'en',
   onNotice: (notice: DeskNotice) => void,
 ): Watch {
   const stop = new AbortController();
   keepFollowing(
     `${base}/api/notify/stream?lang=${lang}`,
+    cookie,
     stop.signal,
     ({ event, data }) => {
       if (event !== 'notice') return;

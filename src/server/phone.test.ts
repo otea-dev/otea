@@ -354,7 +354,7 @@ describe('phone transports on the server', () => {
       expect(guide.stores.ios?.qr.size).toBeGreaterThan(20);
       expect(cli.calls).toEqual(['status', 'serve status']);
       const signedOut = await desk('/p/memory-aaaaaa/api/phone/tailscale', { cookie: '' });
-      expect(signedOut.status).toBe(403);
+      expect(signedOut.status).toBe(401);
     });
 
     it('reads the last step from the paired devices: paired over Tailscale, then with notifications', async () => {

@@ -21,6 +21,8 @@ export const common = {
   'error.unreachable': 'No se puede conectar con Otea. ¿Está en marcha `otea serve`?',
   'error.signIn':
     'Este navegador no tiene sesión iniciada. Ejecuta `otea open` para actuar desde él.',
+  'error.readSignIn':
+    'Este navegador no tiene sesión iniciada. Ejecuta `otea open` para abrir el escritorio desde él.',
   'error.requestFailed': 'La solicitud falló con {status}',
   'error.getFailed': 'GET {path} falló con {status}',
 

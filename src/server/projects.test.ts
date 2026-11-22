@@ -49,7 +49,9 @@ describe('the projects api', () => {
 
   const get = async <T>(path: string): Promise<T> =>
     (
-      await server.app.request(`/p/${here.identity.id}${path}`, { headers: { host: LOCAL_HOST } })
+      await server.app.request(`/p/${here.identity.id}${path}`, {
+        headers: { host: LOCAL_HOST, cookie: SESSION_COOKIE },
+      })
     ).json() as Promise<T>;
   const post = (path: string, payload: unknown) =>
     Promise.resolve(

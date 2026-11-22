@@ -51,9 +51,10 @@ async function get(path: string, signal: AbortSignal): Promise<Response> {
       .clone()
       .json()
       .catch(() => undefined);
-    if ((body as { error?: { code?: unknown } } | undefined)?.error?.code === 'unpaired') {
-      window.location.assign('/pair');
-    }
+    const code = (body as { error?: { code?: unknown } } | undefined)?.error?.code;
+    if (code === 'unpaired') window.location.assign('/pair');
+    // This computer's browser without the sign-in cookie: the server reads to no one else.
+    if (code === 'unauthorized') throw new Error(t('error.readSignIn'));
   }
   if (!response.ok && response.status !== 404) {
     throw new Error(t('error.getFailed', { path, status: response.status }));

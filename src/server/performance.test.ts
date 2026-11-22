@@ -6,7 +6,7 @@ import { publishAs } from '../app/testing.ts';
 import { creatures } from '../core/board/testing.ts';
 import { saveProfile } from '../store/queries.ts';
 import { createServer, type OteaServer } from './server.ts';
-import { memoryProject, request } from './testing.ts';
+import { memoryProject, request, TOKEN } from './testing.ts';
 
 describe('GET /api/performance', () => {
   let project: Project;
@@ -28,7 +28,7 @@ describe('GET /api/performance', () => {
       actor,
     });
     handoffItem(project, { id: item.id, actor: { kind: 'agent', name: 'kiln' }, channel: 'cli' });
-    server = createServer(project);
+    server = createServer(project, { token: TOKEN });
   });
 
   afterEach(() => {

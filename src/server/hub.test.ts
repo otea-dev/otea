@@ -38,7 +38,12 @@ describe('one server for every project', () => {
         path,
         {
           ...init,
-          headers: { host: from === 'desk' ? LOCAL_HOST : LAN_HOST, ...(init.headers ?? {}) },
+          headers: {
+            host: from === 'desk' ? LOCAL_HOST : LAN_HOST,
+            // The desk's browser is signed in; a phone shows its own device cookie.
+            ...(from === 'desk' ? { cookie: SESSION_COOKIE } : {}),
+            ...(init.headers ?? {}),
+          },
         },
         { incoming: { socket: { remoteAddress: from === 'desk' ? '127.0.0.1' : PHONE } } },
       ),
