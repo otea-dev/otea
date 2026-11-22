@@ -111,6 +111,16 @@ export const studioEditor = {
   'bs.editor.lead.is': 'es',
   'bs.editor.lead.to': 'va a',
   'bs.editor.lead.remove': 'Quitar este desvío',
+  // «Al menos N de»: un grupo de evidencias opcionales entre las que el agente elige (Step.groups).
+  'bs.editor.group.add': 'Pedir al menos una de varias',
+  'bs.editor.group.default_name': 'Prueba',
+  'bs.editor.group.name': 'Nombre del grupo',
+  'bs.editor.group.min': 'Al menos',
+  'bs.editor.group.from': 'de estas, la que encaje',
+  'bs.editor.group.remove': 'Quitar este grupo',
+  'bs.editor.group.conseq':
+    'El agente adjunta las que encajen con el trabajo. No puede entregar con menos de {min}.',
+  'bs.editor.group.need_two': 'Marca dos o más de lo que entrega como opcional para agruparlas.',
   'bs.editor.ways.to_done': 'termina aquí',
   'bs.editor.ways.to_step': 'salta los pasos de en medio',
   'bs.editor.ways.approve': 'Al aprobar eliges: Aprobar {ways}.',

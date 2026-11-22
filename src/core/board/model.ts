@@ -120,6 +120,10 @@ export type When = { part: string; value: string };
 // One thing a step hands off. `fresh`: new in each round (evidence only), so a send-back empties it.
 export type Hand = { ref: string; req: Requirement; when?: When; fresh: boolean };
 
+// "At least N of": a step asks for `min` of the evidence parts in `parts` (each handed by the step
+// and not required on its own), and the agent picks what fits. Its id is hidden, like every id.
+export type Group = { id: string; name: string; parts: string[]; min: number };
+
 // Where a way leads: a later step's id, or DONE.
 export const DONE = 'done';
 export const DROPPED = 'dropped';
@@ -159,6 +163,8 @@ export type Step = {
   doer: Doer;
   reviewer: Reviewer;
   hand: Hand[];
+  // The "at least N of" groups of evidence the handoff asks for; none when left out.
+  groups?: Group[];
   ways: Target[];
   back: string;
   instructions: StepInstructions;

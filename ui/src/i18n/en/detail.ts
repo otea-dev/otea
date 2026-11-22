@@ -238,6 +238,9 @@ export const detail = {
   'evidence.attachBlind':
     'Agents attach {accepts}: two versions, A and B, to pick from without knowing which is which.',
   'evidence.required': 'required',
+  'evidence.gap.required': '{name}: required, not attached yet',
+  'evidence.gap.group': '{name}: at least {min} of {list} ({have} attached)',
+  'evidence.gap.optional': '+ {list} (optional, not provided)',
   'evidence.files': '{label}: files',
   'evidence.latest': 'latest',
   'evidence.before': 'before',

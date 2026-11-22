@@ -33,6 +33,9 @@ export type ProblemCode =
   | 'part_missing'
   | 'reserved_name'
   | 'when_unreadable'
+  | 'group_unnamed'
+  | 'group_small'
+  | 'group_member'
   | 'way_invalid'
   | 'back_invalid'
   | 'cap_invalid'
@@ -180,6 +183,12 @@ export function problemsOf(def: BoardDefinition, context: ProblemContext): Probl
     }
   }
 
+  for (const step of def.steps) {
+    for (const fault of groupFaults(def, step)) {
+      add('error', fault.code, { kind: 'step', id: step.id }, fault.params);
+    }
+  }
+
   // A way leads to another step, later or earlier (taken back), or to Hecho; never to itself.
   def.steps.forEach((step, index) => {
     for (const way of step.ways) {
@@ -301,6 +310,34 @@ function initialFits(kind: string, options: readonly { id: string }[], value: st
   if (kind === 'choice') return options.some(({ id }) => id === value);
   if (kind === 'branch') return isBranchName(value);
   return false;
+}
+
+// What is wrong with the "at least N of" groups of a step: a group with no name, one that asks for
+// more than it has (or for fewer than one), a member that is no evidence the step hands off, or one
+// the step already requires on its own (the group would ask for nothing more of it).
+export function groupFaults(
+  def: BoardDefinition,
+  step: BoardDefinition['steps'][number],
+): { code: 'group_unnamed' | 'group_small' | 'group_member'; params: ProblemParams }[] {
+  const out: { code: 'group_unnamed' | 'group_small' | 'group_member'; params: ProblemParams }[] =
+    [];
+  for (const group of step.groups ?? []) {
+    const params = { step: step.name, group: group.name.trim() };
+    if (key(group.name) === '') out.push({ code: 'group_unnamed', params });
+    const members = new Set(group.parts);
+    if (!Number.isInteger(group.min) || group.min < 1 || group.min > members.size)
+      out.push({ code: 'group_small', params: { ...params, min: group.min, of: members.size } });
+    for (const ref of members) {
+      const part = def.parts[ref];
+      const hand = step.hand.find((entry) => entry.ref === ref);
+      if (!part || !isEvidence(part) || !hand || hand.req === 'always')
+        out.push({
+          code: 'group_member',
+          params: { ...params, part: part?.name ?? ref },
+        });
+    }
+  }
+  return out;
 }
 
 export function blocking(problems: readonly Problem[]): boolean {

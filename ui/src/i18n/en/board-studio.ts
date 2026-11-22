@@ -16,6 +16,11 @@ export const boardStudio = {
   'bs.problem.reserved_name': '“{name}” is already an Otea word. Call the step something else?',
   'bs.problem.when_unreadable':
     '{part} in {step} is required only when…, but reads nothing the item already carries. Pick a choice, level or yes-or-no field asked for before it.',
+  'bs.problem.group_unnamed': 'A group of evidence in {step} has no name.',
+  'bs.problem.group_small':
+    'The group “{group}” in {step} asks for {min} of {of}. It needs at least one, and no more than it has.',
+  'bs.problem.group_member':
+    '“{part}” in the group “{group}” of {step} is not optional evidence of that step. Take it out of the group.',
   'bs.problem.way_invalid':
     'A way out of {step} leads to the step itself or to a step that no longer exists. Pick another step or Done.',
   'bs.problem.back_invalid':

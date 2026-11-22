@@ -33,6 +33,7 @@ import {
   setLead,
   setReviewer,
 } from './edits.ts';
+import { GroupRows } from './Groups.tsx';
 import { Glyph, kindGlyph } from './glyphs.tsx';
 import { MentionArea } from './MentionArea.tsx';
 import { BackMenu, Blank, EdPop, useAnchor, WayMenu, WhoMenu } from './menus.tsx';
@@ -412,6 +413,7 @@ export function StepCard({ step }: { step: Step }) {
         <div className="se-addrow">
           <AddPart at={{ type: 'step', step: step.id }} label={t('bs.editor.card.hand_add')} />
         </div>
+        <GroupRows step={step} />
         <SkipLine step={step} />
       </Section>
 

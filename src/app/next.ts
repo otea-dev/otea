@@ -7,6 +7,7 @@ import {
   drop,
   type GateAnswer,
   gateAt,
+  groupStates,
   handoff,
   handoffCheck,
   type ItemFacts,
@@ -378,7 +379,7 @@ export function itemOnBoard(ctx: Context, item: ItemRecord, def: BoardDefinition
   const history = historyFor(item, def, events);
   const rounds = roundsOf(def, history.initial, history.createdAt, history.moves);
   const evidence = selectEvidence(ctx.db, item.id).flatMap((entry) =>
-    entry.module === null ? [] : [{ part: entry.module, at: entry.createdAt }],
+    entry.module === null ? [] : [{ part: entry.module, at: entry.createdAt, size: entry.size }],
   );
   const step = isClosed(position) ? undefined : position.step;
   const startedAt = step === undefined ? undefined : rounds.startedAt[step];
@@ -908,6 +909,12 @@ function textFor(
           command: handInCommand(item.id, me ?? item.lease?.holder ?? '<your name>'),
         };
   const retaken = isClosed(on.position) ? undefined : retakeLine(ctx, item.id);
+  const here = isClosed(on.position) ? undefined : stepById(def, on.position.step);
+  const states = here ? groupStates(def, here, on.facts) : [];
+  const groups =
+    states.length === 0
+      ? undefined
+      : Object.fromEntries(states.map(({ group, state }) => [group.id, state]));
   return nextText(def, {
     id: item.id,
     title: item.title,
@@ -916,6 +923,7 @@ function textFor(
     fields: item.fields,
     evidence: counts,
     missing,
+    ...(groups === undefined ? {} : { groups }),
     parts: on.links.parts,
     blockers: on.links.blockers,
     ...(child === undefined ? {} : { child: child.def }),

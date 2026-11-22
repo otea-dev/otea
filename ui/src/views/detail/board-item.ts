@@ -3,6 +3,9 @@ import type { ItemChoice } from '../../../../src/core/board/choices.ts';
 import {
   type GateAnswer,
   gateAt,
+  groupStates,
+  handoffCheck,
+  isAsked,
   isClosed,
   isLandStep,
   type Linked,
@@ -40,7 +43,7 @@ import { listOf, t } from '../../i18n/i18n.ts';
 import type { Look } from '../../lanes/looks.ts';
 import type { AgentProfile } from '../../presence.ts';
 import { keptStateWord } from '../../preset-words.ts';
-import type { ItemEvent, RelatedItem } from '../../types.ts';
+import type { Evidence, ItemEvent, RelatedItem } from '../../types.ts';
 import type { ProofChecklistView } from './proof-checklist.ts';
 
 // An item on a published board, as the step engine reads it: the agent whose turn it is by the
@@ -820,4 +823,51 @@ export function roundStartOf(def: BoardDefinition, item: ItemLike): string | und
   if (isClosed(position)) return undefined;
   const history = historyFor(def, item.events, item.createdAt);
   return roundsOf(def, history.initial, history.createdAt, history.moves).startedAt[position.step];
+}
+
+// What the step the item stands on asks of its evidence, against what is attached, as the item page
+// and the phone say it: the required parts still empty (drawn in red, `required`, by part id and
+// name), the "at least N of" groups not met yet, and the optional parts nothing was attached to,
+// listed once and quietly (`optional`, by name). Every other empty part of the board is left out of
+// the review. A file with no bytes counts as nothing, as the handoff counts it.
+export type EvidenceGaps = {
+  required: { ref: string; name: string }[];
+  groups: { id: string; name: string; min: number; have: number; parts: string[] }[];
+  optional: string[];
+};
+
+export function evidenceGaps(
+  def: BoardDefinition,
+  item: ItemLike & { evidence: readonly Evidence[] },
+): EvidenceGaps {
+  const none: EvidenceGaps = { required: [], groups: [], optional: [] };
+  const position = positionOf(item.state);
+  if (isClosed(position)) return none;
+  const step = stepById(def, position.step);
+  if (!step) return none;
+  const since = roundStartOf(def, item);
+  const facts = {
+    fields: item.fields ?? {},
+    evidence: item.evidence.flatMap((entry) =>
+      entry.module === null ? [] : [{ part: entry.module, at: entry.createdAt, size: entry.size }],
+    ),
+    ...(since === undefined ? {} : { roundStartedAt: since }),
+  };
+  const held = (ref: string) => facts.evidence.some(({ part, size }) => part === ref && size !== 0);
+  const missing = new Set(handoffCheck(def, step.id, facts).missing.map(({ ref }) => ref));
+  const required: EvidenceGaps['required'] = [];
+  const optional: string[] = [];
+  for (const hand of step.hand) {
+    const part = def.parts[hand.ref];
+    if (!part || !isEvidence(part)) continue;
+    if (isAsked(def, facts, hand)) {
+      if (missing.has(part.id)) required.push({ ref: part.id, name: part.name });
+    } else if (!held(part.id)) optional.push(part.name);
+  }
+  const groups = groupStates(def, step, facts).flatMap(({ group, state }) =>
+    state.have < state.min
+      ? [{ id: group.id, name: group.name, min: state.min, have: state.have, parts: state.parts }]
+      : [],
+  );
+  return { required, groups, optional };
 }

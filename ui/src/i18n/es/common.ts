@@ -141,6 +141,7 @@ export const common = {
   'refusal.why.fresh': 'nuevo en esta ronda',
   'refusal.why.unchecked': 'con todas las casillas marcadas',
   'refusal.why.unproved': 'con prueba en {list}',
+  'refusal.why.group': 'al menos {min} de {list}; {have} adjuntados',
   'refusal.why.note': 'una nota',
   'refusal.why.part': 'su parte {list} sigue sin terminar',
   'refusal.why.partsUnmerged': {

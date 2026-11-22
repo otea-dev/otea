@@ -1,9 +1,9 @@
 import { type BoardDefinition, clone, DONE, isEvidenceKind, SAME, TITLE } from './model.ts';
 
-// Hidden ids: a kind letter (b board, s step, f field, e evidence, c choice) and seven base-36
-// characters. They are valid field keys (snake_case) and evidence module ids (dashes) at once, so
-// the compiled workflow and layout take them as they are.
-export type IdKind = 'b' | 's' | 'f' | 'e' | 'c';
+// Hidden ids: a kind letter (b board, s step, f field, e evidence, c choice, g group) and seven
+// base-36 characters. They are valid field keys (snake_case) and evidence module ids (dashes) at
+// once, so the compiled workflow and layout take them as they are.
+export type IdKind = 'b' | 's' | 'f' | 'e' | 'c' | 'g';
 
 export const ID_PATTERN = /^[a-z][a-z0-9]*$/;
 
@@ -72,6 +72,12 @@ export function freshIds(def: BoardDefinition, ids: IdSource = newId): BoardDefi
       }
       return next;
     });
+    if (step.groups)
+      step.groups = step.groups.map((group) => ({
+        ...group,
+        id: ids('g'),
+        parts: group.parts.map(ref),
+      }));
     step.instructions = {
       take: rewriteMentions(step.instructions.take, map),
       before: rewriteMentions(step.instructions.before, map),

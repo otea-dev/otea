@@ -4,6 +4,7 @@ import {
   DONE,
   DROPPED,
   defaultWay,
+  type Group,
   guardedBranch,
   type Hand,
   isEvidence,
@@ -160,7 +161,8 @@ export type Linked = {
 // notes the person left in the round (core/board/notes.ts) the agent has not answered yet.
 export type ItemFacts = {
   fields: Readonly<Record<string, unknown>>;
-  evidence: readonly { part: string; at: string }[];
+  // `size`: the file's bytes; an empty file (0) never counts as evidence a step asks for.
+  evidence: readonly { part: string; at: string; size?: number }[];
   roundStartedAt?: string;
   note?: string;
   sentBack?: boolean;
@@ -184,11 +186,13 @@ export const WAIT_BLOCKERS = 'wait:blockers';
 // with boxes still open; `unproved`: a checklist that asks for proof with ticked points that have
 // none this round (`points`, by name); `open`: a wait whose items are not finished (`open`, of `total`). The note
 // carries its `hint` ("Qué va aquí"), and `sentBack` when it is wanted because the round was sent
-// back. The person's unanswered notes carry their numbers (`notes`).
+// back. The person's unanswered notes carry their numbers (`notes`). `group`: an "at least N of"
+// group of evidence not met yet (its ref is group:<id>, its reason `group`).
 export type Missing = {
   ref: string;
   name: string;
-  reason: 'missing' | 'not_new' | 'unchecked' | 'unproved' | 'open';
+  reason: 'missing' | 'not_new' | 'unchecked' | 'unproved' | 'open' | 'group';
+  group?: GroupState;
   fresh: boolean;
   hint?: string;
   sentBack?: boolean;
@@ -199,6 +203,64 @@ export type Missing = {
 };
 
 export type HandoffCheck = { ok: boolean; missing: Missing[] };
+
+// Where a group stands: it needs `min` of its parts (their names, in the step's order); `have`
+// are the ones with a file (`held`, by name), counting only files with bytes and, for a part new
+// in each round, from this round.
+export type GroupState = { min: number; have: number; parts: string[]; held: string[] };
+
+// The ref a group answers to in what a handoff lacks.
+export const GROUP_PREFIX = 'group:';
+
+export function groupRef(id: string): string {
+  return `${GROUP_PREFIX}${id}`;
+}
+
+// Whether a part has evidence that counts for the step's handoff: a file with bytes, and a new one
+// this round when the step asks for it new in each round.
+function holdsEvidence(step: Step, facts: ItemFacts, ref: string): boolean {
+  const attached = facts.evidence.filter((entry) => entry.part === ref && entry.size !== 0);
+  if (attached.length === 0) return false;
+  const fresh = step.hand.find((hand) => hand.ref === ref)?.fresh === true;
+  const since = facts.roundStartedAt;
+  return !fresh || since === undefined || attached.some((entry) => entry.at >= since);
+}
+
+// Every group of the step with where it stands, met or not.
+export function groupStates(
+  def: BoardDefinition,
+  step: Step,
+  facts: ItemFacts,
+): { group: Group; state: GroupState }[] {
+  return (step.groups ?? []).map((group) => {
+    const parts = group.parts.flatMap((ref) => {
+      const part = partOf(def, ref);
+      return part ? [{ ref, name: part.name }] : [];
+    });
+    const held = parts.filter(({ ref }) => holdsEvidence(step, facts, ref));
+    return {
+      group,
+      state: {
+        min: group.min,
+        have: held.length,
+        parts: parts.map(({ name }) => name),
+        held: held.map(({ name }) => name),
+      },
+    };
+  });
+}
+
+function groupsMissing(def: BoardDefinition, step: Step, facts: ItemFacts): Missing[] {
+  return groupStates(def, step, facts)
+    .filter(({ state }) => state.have < state.min)
+    .map(({ group, state }) => ({
+      ref: groupRef(group.id),
+      name: group.name,
+      reason: 'group' as const,
+      fresh: false,
+      group: state,
+    }));
+}
 
 function asList(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(String);
@@ -265,7 +327,11 @@ function unprovedOf(part: Part, facts: ItemFacts, fresh: boolean): MissingPart[]
 }
 
 // A part the step's handoff asks for: always, or when its condition holds.
-function isAsked(def: BoardDefinition, facts: ItemFacts, hand: Hand): boolean {
+export function isAsked(
+  def: BoardDefinition,
+  facts: Pick<ItemFacts, 'fields'>,
+  hand: Hand,
+): boolean {
   if (hand.req === 'always') return true;
   return (
     hand.req === 'when' &&
@@ -283,7 +349,7 @@ function missingOf(def: BoardDefinition, step: Step, facts: ItemFacts): MissingP
     if (!isAsked(def, facts, hand)) return unprovedOf(part, facts, false);
     const fresh = hand.fresh && isEvidence(part);
     if (isEvidence(part)) {
-      const attached = facts.evidence.filter((entry) => entry.part === part.id);
+      const attached = facts.evidence.filter((entry) => entry.part === part.id && entry.size !== 0);
       if (attached.length === 0) return [{ ref: part.id, part, reason: 'missing', fresh }];
       const since = facts.roundStartedAt;
       if (fresh && since !== undefined && !attached.some((entry) => entry.at >= since))
@@ -339,7 +405,11 @@ export function deliverables(
   const asked = step.hand.filter((hand) => partOf(def, hand.ref) && isAsked(def, facts, hand));
   const refs = new Set(asked.map(({ ref }) => ref));
   const missing = missingOf(def, step, facts).filter(({ ref }) => refs.has(ref));
-  return { done: asked.length - missing.length, of: asked.length };
+  const groups = (step.groups ?? []).length;
+  return {
+    done: asked.length - missing.length + groups - groupsMissing(def, step, facts).length,
+    of: asked.length + groups,
+  };
 }
 
 // What the step's handoff still lacks: the parts in the order the step lists them, then the note,
@@ -356,6 +426,7 @@ export function handoffCheck(def: BoardDefinition, stepId: string, facts: ItemFa
       ...(points === undefined ? {} : { points }),
     }),
   );
+  missing.push(...groupsMissing(def, step, facts));
   const sentBack = step.note.req !== 'always' && facts.sentBack === true;
   if ((step.note.req === 'always' || sentBack) && !facts.note?.trim())
     missing.push({

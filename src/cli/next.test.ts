@@ -371,8 +371,9 @@ describe('audio and other files on a board', () => {
       '--json',
     );
 
-    expect(sound.code, sound.err).toBe(2);
-    expect(sound.err).toContain('module');
+    // A part for any file never competes with the part made for the sound: it goes to Voz.
+    expect(sound.code, sound.err).toBe(0);
+    expect(JSON.parse(sound.out)).toMatchObject({ module: 'evoice', moduleName: 'Voz' });
     const voice = await otea(
       'attach',
       'CRI-1',

@@ -52,6 +52,7 @@ import {
   boardItemOf,
   branchStrip,
   deliverLabel,
+  evidenceGaps,
   handRefusal,
   handRows,
   holdApproval,
@@ -740,6 +741,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
           steps: rail ? { def: live, step: rail } : { def: live },
           railName,
           noted,
+          gaps: evidenceGaps(live, item),
         }
       : undefined,
   });

@@ -1,5 +1,11 @@
 import { OteaError } from './errors.ts';
-import { type EvidenceRole, evidenceTypeOf } from './evidence.ts';
+import {
+  EVIDENCE_FILE_KINDS,
+  type EvidenceKind,
+  type EvidenceRole,
+  evidenceTypeOf,
+  extensionsOf,
+} from './evidence.ts';
 import { type Layout, type LayoutEntry, type LayoutSlot, MODULE_REGISTRY } from './modules.ts';
 
 // Where evidence modules may sit, in the order attach and show read them.
@@ -29,6 +35,36 @@ const REPORTS = new Set(['xml', 'json']);
 // What a module takes: its `accepts` (kinds or extensions), or every kind its family draws.
 function takes(entry: LayoutEntry): readonly string[] {
   return entry.accepts ?? MODULE_REGISTRY[entry.module].accepts ?? [];
+}
+
+// What a module takes, as someone attaching reads it: the extensions (".png .jpg"), not the kinds
+// the layout names them by. A module of every kind takes "any file"; one that takes the files no
+// kind covers (an svg, a zip) adds "any other file".
+export function takesText(entry: LayoutEntry): string {
+  const accepted = takes(entry);
+  const kinds = EVIDENCE_FILE_KINDS.filter((kind) => accepted.includes(kind));
+  if (kinds.length === EVIDENCE_FILE_KINDS.length) return 'any file';
+  const named = (kind: EvidenceKind) => extensionsOf(kind).map((extension) => `.${extension}`);
+  const extensions = [
+    ...kinds.flatMap(named),
+    // A log part also reads a test run's report (JUnit XML, vitest or jest JSON).
+    ...(kinds.includes('log') ? [...REPORTS].map((extension) => `.${extension}`) : []),
+    ...accepted.filter((item) => !(EVIDENCE_FILE_KINDS as readonly string[]).includes(item)),
+  ];
+  const words = [...new Set(extensions.map((item) => (item.startsWith('.') ? item : `.${item}`)))];
+  return [...words, ...(kinds.includes('file') ? ['any other file'] : [])].join(' ');
+}
+
+// A module that takes any file, as the files part does: another that fits the file draws it first.
+function takesAnything(entry: LayoutEntry): boolean {
+  return entry.module === 'files' && entry.accepts === undefined;
+}
+
+// The modules a file goes to: those that draw it, else the ones that take any file.
+function fittingModules(modules: EvidenceModuleEntry[], filename: string): EvidenceModuleEntry[] {
+  const fitting = modules.filter((entry) => moduleAccepts(entry, filename));
+  const specific = fitting.filter((entry) => !takesAnything(entry));
+  return specific.length > 0 ? specific : fitting;
 }
 
 export function moduleAccepts(entry: LayoutEntry, filename: string): boolean {
@@ -127,15 +163,15 @@ function chosen(
     if (!moduleAccepts(found, filename)) {
       throw new OteaError(
         'evidence_not_accepted',
-        `${named(found)} takes ${takes(found).join(', ')}, not ${filename}${asDiff(found, filename)}`,
+        `${named(found)} takes ${takesText(found)}, not ${filename}${asDiff(found, filename)}`,
       );
     }
     return found;
   }
-  const fitting = modules.filter((entry) => moduleAccepts(entry, filename));
+  const fitting = fittingModules(modules, filename);
   const [only, ...more] = fitting;
   if (!only) {
-    const list = modules.map((entry) => `${named(entry)}: ${takes(entry).join(', ')}`).join('; ');
+    const list = modules.map((entry) => `${named(entry)}: ${takesText(entry)}`).join('; ');
     throw new OteaError(
       'evidence_not_accepted',
       `${subject} does not take ${filename}. It takes: ${list}`,
@@ -198,11 +234,11 @@ export type Placed = { module: string | null; filename: string };
 // attached to no part (the person's, outside the parts the agents hand) stays outside them.
 export function holderOf(layout: Layout, evidence: Placed, keepLoose = false): string | null {
   if (keepLoose && evidence.module === null) return null;
-  const modules = evidenceModules(layout).filter((entry) =>
-    moduleAccepts(entry, evidence.filename),
+  const all = evidenceModules(layout);
+  const recorded = all.find(
+    (entry) => entry.id === evidence.module && moduleAccepts(entry, evidence.filename),
   );
-  const recorded = modules.find(({ id }) => id === evidence.module);
-  return (recorded ?? modules[0])?.id ?? null;
+  return (recorded ?? fittingModules(all, evidence.filename)[0])?.id ?? null;
 }
 
 export type EvidenceGroups<T> = {

@@ -10,6 +10,7 @@ import {
 import type { BoardDefinition } from '../../../../src/core/board/model.ts';
 import { evidenceFileUrl } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
+import { EvidenceGaps } from '../../components/evidence/EvidenceGaps.tsx';
 import {
   EvidenceReader,
   type Picked,
@@ -36,6 +37,7 @@ import { roundsOf } from '../../rounds.ts';
 import type { Evidence, ItemView, TypeView } from '../../types.ts';
 import { evidenceWords } from '../toca/phone.ts';
 import { Acts, type ActsMode } from './Acts.tsx';
+import { evidenceGaps, type EvidenceGaps as Gaps } from './board-item.ts';
 import type { Facts } from './facts.ts';
 import { resumedToastOf, toastOf } from './frame.ts';
 import { type MoveChoice, type MovePlan, moveSaysOf, otherMoves } from './moves.ts';
@@ -456,8 +458,11 @@ function RoundView({
   onSeen,
   handed,
   blind,
+  gaps,
 }: {
   r: PhoneRound;
+  // What the step asks of its evidence that is not attached, on the newest round only.
+  gaps?: Gaps | undefined;
   // The compare parts judged blind, by module id: their files are never marked (P5-R2-2).
   blind: ReadonlySet<string>;
   // The fields the step handed off (Commit en main), on the newest round only: their values today.
@@ -510,6 +515,7 @@ function RoundView({
           comment={comment}
           onSeen={onSeen}
         />
+        {gaps ? <EvidenceGaps gaps={gaps} required /> : null}
       </section>
       {r.asked ? (
         <section className="p-part" data-c>
@@ -681,6 +687,10 @@ export function PhoneItem(p: PhoneItemProps) {
           }))
         : [],
     [p.board, p.type, item.fields],
+  );
+  const gaps = useMemo(
+    () => (p.board ? evidenceGaps(p.board.def, item) : undefined),
+    [p.board, item],
   );
   const [pick, setPick] = useState<number | 'compare' | null>(null);
   const shown = pick === 'compare' ? null : (rounds.find((r) => r.n === pick) ?? rounds[0] ?? null);
@@ -959,6 +969,7 @@ export function PhoneItem(p: PhoneItemProps) {
           comment={shown === newest ? p.notes?.review?.reader : undefined}
           onSeen={markSeen}
           handed={shown === newest ? handed : undefined}
+          gaps={shown === newest ? gaps : undefined}
           blind={blind}
         />
       ) : null}

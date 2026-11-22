@@ -216,7 +216,10 @@ export function reusePart(def: BoardDefinition, at: PartPlace, ref: string): voi
 export function removePart(def: BoardDefinition, at: PartPlace, ref: string): void {
   if (at.type === 'step') {
     const step = stepOf(def, at.step);
-    if (step) step.hand = step.hand.filter((h) => h.ref !== ref);
+    if (step) {
+      step.hand = step.hand.filter((h) => h.ref !== ref);
+      tidyGroups(step);
+    }
   } else if (at.type === 'form') def.form = def.form.filter((f) => f.ref !== ref);
   else def.anytime = def.anytime.filter((r) => r !== ref);
   if (usedRefs(def).has(ref)) return;
@@ -316,6 +319,85 @@ export function setRequirement(
   if (req !== 'when') delete hand.when;
   if (fresh !== undefined) hand.fresh = fresh;
   if (req === 'no') hand.fresh = false;
+  const step = stepOf(def, stepId);
+  if (step) tidyGroups(step);
+}
+
+// ---- "al menos N de": groups of optional evidence a step asks for ----
+
+// A group asks only for evidence the step hands off and does not already require: a part that
+// leaves the step or becomes required leaves its groups, a group left with nothing goes, and a
+// minimum never asks for more than the group has.
+function tidyGroups(step: Step): void {
+  if (!step.groups) return;
+  const optional = new Set(step.hand.filter((h) => h.req !== 'always').map((h) => h.ref));
+  for (const group of step.groups) {
+    group.parts = group.parts.filter((ref) => optional.has(ref));
+    group.min = Math.max(1, Math.min(group.min, group.parts.length));
+  }
+  step.groups = step.groups.filter((group) => group.parts.length > 0);
+  if (step.groups.length === 0) delete step.groups;
+}
+
+// The evidence a group of the step may name: what it hands off and does not require on its own.
+export function groupable(def: BoardDefinition, step: Step): string[] {
+  return step.hand
+    .filter(
+      (h) => h.req !== 'always' && def.parts[h.ref] && isEvidenceKind(def.parts[h.ref]?.kind ?? ''),
+    )
+    .map((h) => h.ref);
+}
+
+// A new group of every optional evidence of the step, asking for one: the person takes out what
+// does not belong.
+export function addGroup(def: BoardDefinition, stepId: string, name: string): string | undefined {
+  const step = stepOf(def, stepId);
+  if (!step) return undefined;
+  const parts = groupable(def, step);
+  if (parts.length === 0) return undefined;
+  const id = ids('g');
+  step.groups = [...(step.groups ?? []), { id, name, parts, min: 1 }];
+  return id;
+}
+
+function groupOf(def: BoardDefinition, stepId: string, id: string) {
+  return stepOf(def, stepId)?.groups?.find((group) => group.id === id);
+}
+
+export function renameGroup(def: BoardDefinition, stepId: string, id: string, name: string): void {
+  const group = groupOf(def, stepId, id);
+  if (group) group.name = name;
+}
+
+export function setGroupMin(def: BoardDefinition, stepId: string, id: string, min: number): void {
+  const group = groupOf(def, stepId, id);
+  if (group) group.min = Math.max(1, Math.min(Math.trunc(min) || 1, group.parts.length));
+}
+
+// Puts a part in the group or takes it out, in the order the step hands them; the last one cannot
+// leave (a group asks for something).
+export function toggleGroupPart(
+  def: BoardDefinition,
+  stepId: string,
+  id: string,
+  ref: string,
+): void {
+  const step = stepOf(def, stepId);
+  const group = groupOf(def, stepId, id);
+  if (!step || !group) return;
+  if (group.parts.includes(ref)) {
+    if (group.parts.length > 1) group.parts = group.parts.filter((r) => r !== ref);
+  } else if (groupable(def, step).includes(ref)) {
+    group.parts = step.hand.map((h) => h.ref).filter((r) => r === ref || group.parts.includes(r));
+  }
+  group.min = Math.max(1, Math.min(group.min, group.parts.length));
+}
+
+export function removeGroup(def: BoardDefinition, stepId: string, id: string): void {
+  const step = stepOf(def, stepId);
+  if (!step?.groups) return;
+  step.groups = step.groups.filter((group) => group.id !== id);
+  if (step.groups.length === 0) delete step.groups;
 }
 
 export function setFresh(def: BoardDefinition, stepId: string, ref: string, fresh: boolean) {

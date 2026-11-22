@@ -71,7 +71,7 @@ describe('placeEvidence', () => {
     refused(
       () => place(IMPR, 'junit.xml'),
       'evidence_not_accepted',
-      `${SUBJECT} does not take junit.xml. It takes: "screens" (images, gallery): image; "diff" (diff): diff; "mockup" (images): image; "recording" (recording): video`,
+      `${SUBJECT} does not take junit.xml. It takes: "screens" (images, gallery): .gif .png .jpg .jpeg .webp; "diff" (diff): .diff .patch; "mockup" (images): .gif .png .jpg .jpeg .webp; "recording" (recording): .mp4 .webm .mov`,
     );
   });
 
@@ -83,8 +83,33 @@ describe('placeEvidence', () => {
     refused(
       () => place(BUG, 'shot.jpg', { role: 'before' }),
       'evidence_not_accepted',
-      `${SUBJECT} does not take shot.jpg. It takes: "Before and after" (images, compare): png, gif; "log" (log): log`,
+      `${SUBJECT} does not take shot.jpg. It takes: "Before and after" (images, compare): .png .gif; "log" (log): .log .txt .xml .json`,
     );
+  });
+
+  // The owner's finding: a wrong extension named no way out. The refusal lists what each part takes,
+  // as extensions, never as the kinds a layout names them by.
+  it('lists the extensions each module takes when a file fits none', () => {
+    refused(
+      () => place(IMPR, 'scene.blend'),
+      'evidence_not_accepted',
+      `${SUBJECT} does not take scene.blend. It takes: "screens" (images, gallery): .gif .png .jpg .jpeg .webp; "diff" (diff): .diff .patch; "mockup" (images): .gif .png .jpg .jpeg .webp; "recording" (recording): .mp4 .webm .mov`,
+    );
+  });
+
+  it('takes a log and a text file in a files module, and gives a kind to the module that draws it', () => {
+    const files = layoutOf({
+      evidence: [
+        { module: 'images', id: 'shot' },
+        { module: 'files', id: 'anything' },
+      ],
+    });
+    expect(place(files, 'run.log')).toEqual({ module: 'anything', role: 'single' });
+    expect(place(files, 'notes.txt')).toEqual({ module: 'anything', role: 'single' });
+    expect(place(files, 'a.png')).toEqual({ module: 'shot', role: 'single' });
+    expect(holderOf(files, { module: null, filename: 'a.png' })).toBe('shot');
+    // A part named on purpose keeps what was put in it.
+    expect(holderOf(files, { module: 'anything', filename: 'a.png' })).toBe('anything');
   });
 
   it('asks which module when two accept the file', () => {
@@ -131,7 +156,7 @@ describe('placeEvidence', () => {
     refused(
       () => place(IMPR, 'home.png', { module: 'diff' }),
       'evidence_not_accepted',
-      '"diff" (diff) takes diff, not home.png',
+      '"diff" (diff) takes .diff .patch, not home.png',
     );
   });
 
@@ -140,7 +165,7 @@ describe('placeEvidence', () => {
     refused(
       () => place(IMPR, 'fix.txt', { module: 'diff' }),
       'evidence_not_accepted',
-      '"diff" (diff) takes diff, not fix.txt: a diff is known by its extension, so save it as fix.diff (or .patch) and attach that',
+      '"diff" (diff) takes .diff .patch, not fix.txt: a diff is known by its extension, so save it as fix.diff (or .patch) and attach that',
     );
   });
 

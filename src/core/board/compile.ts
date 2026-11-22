@@ -23,6 +23,7 @@ import {
   usedRefs,
   type Zone,
 } from './model.ts';
+import { groupFaults } from './problems.ts';
 import { stateName } from './reading.ts';
 import { defaultZone, LANGS, type Lang } from './templates.ts';
 
@@ -258,6 +259,24 @@ function uncompiled(def: BoardDefinition, problems: readonly string[]): string |
 export function compileBoard(id: string, version: number, def: BoardDefinition): Preset {
   const first = def.steps[0];
   if (!first) throw new OteaError('invalid_board', `Board ${def.name} has no steps`);
+  // An "at least N of" group the engine could never meet, or that names no evidence the step
+  // hands, would refuse every handoff of its step: it is never published.
+  for (const step of def.steps) {
+    const [fault] = groupFaults(def, step);
+    if (!fault) continue;
+    const { group = '', part = '' } = fault.params as { group?: string; part?: string };
+    const why =
+      fault.code === 'group_member'
+        ? `"${part}" is no optional evidence of the step`
+        : fault.code === 'group_small'
+          ? 'it asks for more than it has'
+          : 'it has no name';
+    throw new OteaError(
+      'invalid_board',
+      `Board ${def.name} does not compile: the group "${group}" of step "${step.name}" is wrong: ${why}`,
+      { kind: 'draft_uncompilable' },
+    );
+  }
   const used = usedRefs(def);
   // Layout order: the parts Acomodar placed, in its order, then the rest in board order.
   const ordered = [
