@@ -26,6 +26,7 @@ import { useEditor } from './context.ts';
 import { FieldExtras } from './cover.tsx';
 import {
   addChoice,
+  isGroupMember,
   type PartPlace,
   removeChoice,
   removePart,
@@ -66,7 +67,13 @@ function reqLabel(e: RowEntry): { text: string; on: boolean } {
       on: true,
     };
   return {
-    text: t(hand.req === 'when' ? 'bs.editor.req.when' : 'bs.editor.req.no'),
+    text: t(
+      hand.req === 'when'
+        ? 'bs.editor.req.when'
+        : hand.fresh
+          ? 'bs.editor.req.no_fresh'
+          : 'bs.editor.req.no',
+    ),
     on: hand.req === 'when',
   };
 }
@@ -368,7 +375,7 @@ function PartEditor({ entry, part }: { entry: RowEntry; part: Part }) {
             <ChipButton
               className="you"
               on={hand.fresh}
-              disabled={hand.req === 'no'}
+              disabled={hand.req === 'no' && !isGroupMember(step, ref)}
               onClick={() => draft.mutate((d) => setFresh(d, step.id, ref, !hand.fresh))}
             >
               {t('bs.editor.part.fresh')}

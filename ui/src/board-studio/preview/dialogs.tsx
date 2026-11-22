@@ -64,7 +64,13 @@ export function PublishDialog({ pair, ...props }: PublishDialogProps) {
   return <SinglePublishDialog {...props} />;
 }
 
-const ADDS = new Set<Change['kind']>(['created', 'step_added', 'hand_added', 'part_added']);
+const ADDS = new Set<Change['kind']>([
+  'created',
+  'step_added',
+  'hand_added',
+  'group_added',
+  'part_added',
+]);
 
 // The board a split names, when it is another board: its name, and whether it is live yet.
 type SplitBoard = { id: string; name: string; live: boolean };

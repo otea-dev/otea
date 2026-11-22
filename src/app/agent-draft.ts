@@ -211,6 +211,7 @@ export function problemWords(problem: Problem): string {
     when_unreadable: 'a "required only when" reads a part that is not a choice',
     group_unnamed: `a group of evidence of step${step} has no name`,
     group_small: `the group${quoted('group')} of step${step} asks for ${problem.params.min} of ${problem.params.of} parts: it must ask for at least one and no more than it has`,
+    group_duplicate: `the group${quoted('group')} of step${step} names${part} twice`,
     group_member: `the group${quoted('group')} of step${step} names${part}, which is not optional evidence the step hands off`,
     way_invalid: `a way out of step${step} leads to itself or to a step the board does not have`,
     back_invalid: `step${step} sends work back to a later step`,

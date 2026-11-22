@@ -108,6 +108,60 @@ describe('changePlan', () => {
   });
 });
 
+describe('changePlan on groups of evidence', () => {
+  const withGroup = () => {
+    const def = creatures();
+    const animate = def.steps[1];
+    if (!animate) throw new Error('fixture');
+    animate.hand.push({ ref: 'eswamp', req: 'no', fresh: false });
+    animate.groups = [{ id: 'gproof', name: 'Prueba', parts: ['ecode', 'eswamp'], min: 1 }];
+    return def;
+  };
+
+  it('counts a change that is only a group, whichever it is', () => {
+    const live = withGroup();
+    const without = structuredClone(live);
+    if (without.steps[1]) delete without.steps[1].groups;
+    expect(changePlan(without, live)).toEqual([
+      {
+        kind: 'group_added',
+        step: 'sanimate',
+        name: 'Animar',
+        group: 'gproof',
+        groupName: 'Prueba',
+        min: 1,
+        parts: ['Cambios de código', 'Barro'],
+      },
+    ]);
+    expect(changePlan(live, without)).toEqual([
+      {
+        kind: 'group_removed',
+        step: 'sanimate',
+        name: 'Animar',
+        group: 'gproof',
+        groupName: 'Prueba',
+      },
+    ]);
+    const edits: ((group: BoardDefinition['steps'][number]['groups'] & object) => void)[] = [
+      ([group]) => {
+        if (group) group.min = 2;
+      },
+      ([group]) => {
+        if (group) group.name = 'Pruebas';
+      },
+      ([group]) => {
+        if (group) group.parts = ['ecode'];
+      },
+    ];
+    for (const edit of edits) {
+      const changed = structuredClone(live);
+      const groups = changed.steps[1]?.groups;
+      if (groups) edit(groups);
+      expect(kinds(live, changed)).toEqual(['group_changed']);
+    }
+  });
+});
+
 describe('itemEffects', () => {
   const items = [
     { id: 'CRI-1', state: 'spolish' },
@@ -138,6 +192,31 @@ describe('itemEffects', () => {
     expect(effects.needs).toEqual([
       { step: 'sanimate', name: 'Animar', items: ['CRI-3'], parts: ['Cambios de código'] },
     ]);
+  });
+
+  // A group of evidence is one more thing the handoff needs: publishing one must say so.
+  it('says which items being worked on a new or stricter group will block', () => {
+    const live = creatures();
+    const draft = creatures();
+    const animate = draft.steps[1];
+    if (!animate) throw new Error('fixture');
+    animate.hand.push({ ref: 'eswamp', req: 'no', fresh: false });
+    animate.groups = [{ id: 'gproof', name: 'Prueba', parts: ['ecode', 'eswamp'], min: 1 }];
+    expect(itemEffects(live, draft, items).needs).toEqual([
+      { step: 'sanimate', name: 'Animar', items: ['CRI-3'], parts: ['Prueba'] },
+    ]);
+
+    // Already published, asking for more of the same: stricter. Asking for less: nothing new.
+    const published = structuredClone(draft);
+    const stricter = structuredClone(draft);
+    const more = stricter.steps[1]?.groups?.[0];
+    if (more) more.min = 2;
+    expect(itemEffects(published, stricter, items).needs).toHaveLength(1);
+    const looser = structuredClone(draft);
+    const fewer = looser.steps[1]?.groups?.[0];
+    if (fewer) fewer.parts = ['ecode', 'eswamp', 'eart'];
+    expect(itemEffects(published, looser, items).needs).toEqual([]);
+    expect(itemEffects(published, structuredClone(published), items).needs).toEqual([]);
   });
 
   it('says which reviews go back to work when their step stops being reviewed', () => {

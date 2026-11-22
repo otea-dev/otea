@@ -161,8 +161,9 @@ export type Linked = {
 // notes the person left in the round (core/board/notes.ts) the agent has not answered yet.
 export type ItemFacts = {
   fields: Readonly<Record<string, unknown>>;
-  // `size`: the file's bytes; an empty file (0) never counts as evidence a step asks for.
-  evidence: readonly { part: string; at: string; size?: number }[];
+  // `size`: the file's bytes; an empty file (0) never counts as evidence a step asks for. `sha256`:
+  // its content, so one file attached to two parts of a group counts once.
+  evidence: readonly { part: string; at: string; size?: number; sha256?: string }[];
   roundStartedAt?: string;
   note?: string;
   sentBack?: boolean;
@@ -216,35 +217,63 @@ export function groupRef(id: string): string {
   return `${GROUP_PREFIX}${id}`;
 }
 
-// Whether a part has evidence that counts for the step's handoff: a file with bytes, and a new one
-// this round when the step asks for it new in each round.
-function holdsEvidence(step: Step, facts: ItemFacts, ref: string): boolean {
-  const attached = facts.evidence.filter((entry) => entry.part === ref && entry.size !== 0);
-  if (attached.length === 0) return false;
+// The files of a part that count for the step's handoff, by identity (their content, else their
+// place in the item's list): a file with bytes, and a new one this round when the step asks for the
+// part new in each round.
+function countedFiles(step: Step, facts: ItemFacts, ref: string): string[] {
   const fresh = step.hand.find((hand) => hand.ref === ref)?.fresh === true;
   const since = facts.roundStartedAt;
-  return !fresh || since === undefined || attached.some((entry) => entry.at >= since);
+  return facts.evidence.flatMap((entry, index) =>
+    entry.part === ref && entry.size !== 0 && (!fresh || since === undefined || entry.at >= since)
+      ? [entry.sha256 ?? `#${index}`]
+      : [],
+  );
 }
 
-// Every group of the step with where it stands, met or not.
+// How many of the group's parts can each hold a file of their own: a part counts once however many
+// files it holds, and one file attached to two parts counts for only one of them. A matching of
+// parts to distinct files, so the best way of counting is the one used. Returns the parts matched.
+function matchedParts(files: ReadonlyMap<string, string[]>): string[] {
+  const owner = new Map<string, string>();
+  const claim = (ref: string, seen: Set<string>): boolean => {
+    for (const file of files.get(ref) ?? []) {
+      if (seen.has(file)) continue;
+      seen.add(file);
+      const held = owner.get(file);
+      if (held === undefined || claim(held, seen)) {
+        owner.set(file, ref);
+        return true;
+      }
+    }
+    return false;
+  };
+  for (const ref of files.keys()) claim(ref, new Set());
+  // Claiming can move a file from one part to another; the parts that end owning one are matched.
+  return [...new Set(owner.values())];
+}
+
+// Every group of the step with where it stands, met or not. A part named twice in a group counts
+// once.
 export function groupStates(
   def: BoardDefinition,
   step: Step,
   facts: ItemFacts,
 ): { group: Group; state: GroupState }[] {
   return (step.groups ?? []).map((group) => {
-    const parts = group.parts.flatMap((ref) => {
+    const parts = [...new Set(group.parts)].flatMap((ref) => {
       const part = partOf(def, ref);
       return part ? [{ ref, name: part.name }] : [];
     });
-    const held = parts.filter(({ ref }) => holdsEvidence(step, facts, ref));
+    const files = new Map(parts.map(({ ref }) => [ref, countedFiles(step, facts, ref)]));
+    const held = new Set(matchedParts(files));
+    const holding = parts.filter(({ ref }) => held.has(ref));
     return {
       group,
       state: {
         min: group.min,
-        have: held.length,
+        have: holding.length,
         parts: parts.map(({ name }) => name),
-        held: held.map(({ name }) => name),
+        held: holding.map(({ name }) => name),
       },
     };
   });
@@ -584,6 +613,8 @@ export function initialPosition(
   if (!first.skipWhenReady || first.reviewer !== 'none') return { position: start, skipped: false };
   if (leadOf(def, first, facts) !== undefined) return { position: start, skipped: false };
   if (missingOf(def, first, facts).length > 0) return { position: start, skipped: false };
+  // A group not met yet holds the item at the step too: an item is never skipped past it.
+  if (groupsMissing(def, first, facts).length > 0) return { position: start, skipped: false };
   return { position: positionAt(defaultWay(def, first.id)), skipped: true };
 }
 

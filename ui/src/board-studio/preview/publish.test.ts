@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { sequenceIds } from '../../../../src/core/board/ids.ts';
-import type { ItemEffects } from '../../../../src/core/board/plan.ts';
+import { changePlan, type ItemEffects } from '../../../../src/core/board/plan.ts';
 import { instantiate, requireTemplate } from '../../../../src/core/board/templates.ts';
+import { creatures } from '../../../../src/core/board/testing.ts';
 import { setLanguage } from '../../i18n/i18n.ts';
 import type { GateKind, ProjectSettings } from '../../types.ts';
+import { changeText } from '../words.ts';
 import {
   effectLines,
   hookOffer,
@@ -167,6 +169,41 @@ describe('publishRoles', () => {
     expect(publishRoles({ parent: plan(2, 0), child: plan(1, 3) })).toEqual(['child']);
     expect(publishRoles({ parent: null, child: plan(1, 1) })).toEqual(['child']);
     expect(publishRoles({ parent: plan(2, 0), child: null })).toEqual([]);
+  });
+});
+
+// A group-only edit is a change: the dialog does not say «Sin cambios» and a paired board that only
+// changed a group is still sent.
+describe('publishing an edit that is only a group of evidence', () => {
+  const live = creatures();
+  live.steps[1]?.hand.push({ ref: 'eswamp', req: 'no', fresh: false });
+  const draft = structuredClone(live);
+  const animate = draft.steps[1];
+  if (animate)
+    animate.groups = [{ id: 'gone', name: 'Prueba', parts: ['ecode', 'eswamp'], min: 1 }];
+
+  it('counts as a change of the plan', () => {
+    expect(changePlan(live, draft).map(({ kind }) => kind)).toEqual(['group_added']);
+    expect(changePlan(live, live)).toEqual([]);
+  });
+
+  it('is worded in both languages', () => {
+    const [change] = changePlan(live, draft);
+    if (!change) throw new Error('no change');
+    expect(changeText(change)).toBe(
+      'Animar also asks for Prueba: at least 1 of Cambios de código or Barro.',
+    );
+    setLanguage('es');
+    expect(changeText(change)).toBe(
+      'Animar pide también Prueba: al menos 1 de Cambios de código o Barro.',
+    );
+  });
+
+  it('keeps a paired board that only changed a group in the publish', () => {
+    const changes = changePlan(live, draft).length;
+    expect(publishRoles({ parent: { from: 2, changes: 0 }, child: { from: 1, changes } })).toEqual([
+      'child',
+    ]);
   });
 });
 

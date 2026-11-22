@@ -379,7 +379,9 @@ export function itemOnBoard(ctx: Context, item: ItemRecord, def: BoardDefinition
   const history = historyFor(item, def, events);
   const rounds = roundsOf(def, history.initial, history.createdAt, history.moves);
   const evidence = selectEvidence(ctx.db, item.id).flatMap((entry) =>
-    entry.module === null ? [] : [{ part: entry.module, at: entry.createdAt, size: entry.size }],
+    entry.module === null
+      ? []
+      : [{ part: entry.module, at: entry.createdAt, size: entry.size, sha256: entry.sha256 }],
   );
   const step = isClosed(position) ? undefined : position.step;
   const startedAt = step === undefined ? undefined : rounds.startedAt[step];

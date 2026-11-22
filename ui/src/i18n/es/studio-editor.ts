@@ -120,7 +120,6 @@ export const studioEditor = {
   'bs.editor.group.remove': 'Quitar este grupo',
   'bs.editor.group.conseq':
     'El agente adjunta las que encajen con el trabajo. No puede entregar con menos de {min}.',
-  'bs.editor.group.need_two': 'Marca dos o más de lo que entrega como opcional para agruparlas.',
   'bs.editor.ways.to_done': 'termina aquí',
   'bs.editor.ways.to_step': 'salta los pasos de en medio',
   'bs.editor.ways.approve': 'Al aprobar eliges: Aprobar {ways}.',
@@ -172,6 +171,7 @@ export const studioEditor = {
   'bs.editor.req.always_fresh': 'obligatorio · nuevo cada ronda',
   'bs.editor.req.when': 'a veces',
   'bs.editor.req.no': 'opcional',
+  'bs.editor.req.no_fresh': 'opcional · nuevo en cada ronda',
   'bs.editor.req.any': 'en cualquier paso',
   'bs.editor.part.name': 'Nombre',
   'bs.editor.part.hint': 'Qué va aquí',

@@ -36,6 +36,7 @@ export type ProblemCode =
   | 'group_unnamed'
   | 'group_small'
   | 'group_member'
+  | 'group_duplicate'
   | 'way_invalid'
   | 'back_invalid'
   | 'cap_invalid'
@@ -315,16 +316,28 @@ function initialFits(kind: string, options: readonly { id: string }[], value: st
 // What is wrong with the "at least N of" groups of a step: a group with no name, one that asks for
 // more than it has (or for fewer than one), a member that is no evidence the step hands off, or one
 // the step already requires on its own (the group would ask for nothing more of it).
+export type GroupFault = {
+  code: 'group_unnamed' | 'group_small' | 'group_member' | 'group_duplicate';
+  params: ProblemParams;
+};
+
 export function groupFaults(
   def: BoardDefinition,
   step: BoardDefinition['steps'][number],
-): { code: 'group_unnamed' | 'group_small' | 'group_member'; params: ProblemParams }[] {
-  const out: { code: 'group_unnamed' | 'group_small' | 'group_member'; params: ProblemParams }[] =
-    [];
+): GroupFault[] {
+  const out: GroupFault[] = [];
   for (const group of step.groups ?? []) {
     const params = { step: step.name, group: group.name.trim() };
     if (key(group.name) === '') out.push({ code: 'group_unnamed', params });
     const members = new Set(group.parts);
+    // A part named twice would count twice toward the minimum.
+    for (const ref of members) {
+      if (group.parts.filter((other) => other === ref).length > 1)
+        out.push({
+          code: 'group_duplicate',
+          params: { ...params, part: def.parts[ref]?.name ?? ref },
+        });
+    }
     if (!Number.isInteger(group.min) || group.min < 1 || group.min > members.size)
       out.push({ code: 'group_small', params: { ...params, min: group.min, of: members.size } });
     for (const ref of members) {

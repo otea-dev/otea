@@ -130,3 +130,72 @@ describe('"at least N of" groups of evidence', () => {
     expect(attach('trace.log', 'a log in a file part', 'efile').module).toBe('efile');
   });
 });
+
+// A part for any file and a part for logs side by side, the way a mixed-delivery board has them.
+describe('a file in a board with a part for any file and a part made for its kind', () => {
+  let root: string;
+  let project: Project;
+  let id: string;
+
+  const file = (name: string, content: string) => {
+    const path = join(root, name);
+    writeFileSync(path, content);
+    return path;
+  };
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'otea-groups-two-'));
+    const def = creatures();
+    def.parts.eany = { id: 'eany', name: 'Cualquiera', kind: 'file', hint: '', options: [] };
+    def.parts.elog = { id: 'elog', name: 'Salida', kind: 'log', hint: '', options: [] };
+    // The part for any file comes first, on the form and in the step.
+    def.form = [
+      { ref: 'fdesc', required: true },
+      { ref: 'fbiome', required: false },
+      { ref: 'eany', required: false },
+      { ref: 'elog', required: false },
+    ];
+    const animar = def.steps[1];
+    if (!animar) throw new Error('no step');
+    animar.hand = [
+      { ref: 'eany', req: 'no', fresh: false },
+      { ref: 'elog', req: 'no', fresh: false },
+    ];
+    animar.groups = [{ id: 'gtwo', name: 'Dos', parts: ['eany', 'elog'], min: 2 }];
+    const ctx = memoryContext();
+    publishAs(ctx, def, 'btwo', now);
+    project = projectOf(root, ctx);
+    id = createItem(
+      project,
+      { collection: 'Criaturas', title: 'Rana', fields: { fdesc: 'Lenta' }, actor: you },
+      now,
+    ).id;
+    updateItemState(project.db, id, 'sanimate', now());
+  });
+
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('goes to the part made for the kind when the person attaches it with no part', () => {
+    const entry = attachEvidence(
+      project,
+      { id, path: file('salida.log', 'ok'), actor: you, channel: 'ui' },
+      now,
+    );
+    expect(entry.module).toBe('elog');
+  });
+
+  it('counts once toward a group when the same file is attached to two of its members', () => {
+    const path = file('salida.log', 'the same bytes');
+    attachEvidence(project, { id, path, module: 'elog', actor: quill, channel: 'cli' }, now);
+    attachEvidence(project, { id, path, module: 'eany', actor: quill, channel: 'cli' }, now);
+    expect(() => handoffItem(project, { id, actor: quill, channel: 'cli' }, now)).toThrowError(
+      /missing Dos \(at least 2 of Cualquiera, Salida; 1 attached\)/,
+    );
+    attachEvidence(
+      project,
+      { id, path: file('otra.zip', 'other bytes'), module: 'eany', actor: quill, channel: 'cli' },
+      now,
+    );
+    expect(() => handoffItem(project, { id, actor: quill, channel: 'cli' }, now)).not.toThrow();
+  });
+});

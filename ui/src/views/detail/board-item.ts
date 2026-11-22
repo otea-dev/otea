@@ -863,7 +863,9 @@ export function evidenceGaps(
   const facts = {
     fields: item.fields ?? {},
     evidence: item.evidence.flatMap((entry) =>
-      entry.module === null ? [] : [{ part: entry.module, at: entry.createdAt, size: entry.size }],
+      entry.module === null
+        ? []
+        : [{ part: entry.module, at: entry.createdAt, size: entry.size, sha256: entry.sha256 }],
     ),
     ...(since === undefined ? {} : { roundStartedAt: since }),
   };

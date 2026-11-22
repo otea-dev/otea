@@ -36,7 +36,7 @@ import { failedText, plainToast } from './toasts.tsx';
 // with "Solo …" when the board on screen is published.
 
 const ROLES: readonly PairRole[] = ['parent', 'child'];
-const ADDS = new Set(['created', 'step_added', 'hand_added', 'part_added']);
+const ADDS = new Set(['created', 'step_added', 'hand_added', 'group_added', 'part_added']);
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 type Plans = Record<PairRole, PublishPlan | null>;

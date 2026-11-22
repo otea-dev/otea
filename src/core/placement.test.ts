@@ -112,6 +112,42 @@ describe('placeEvidence', () => {
     expect(holderOf(files, { module: 'anything', filename: 'a.png' })).toBe('anything');
   });
 
+  // The boundary: whatever the order the layout lists them in, a part made for a kind takes its
+  // files and the part for any file takes the rest, for an agent's file and for one with no part.
+  it('gives a file to the part made for its kind over the part for any file, in every order', () => {
+    const modules: Record<string, unknown>[] = [
+      { module: 'files', id: 'anything' },
+      { module: 'images', id: 'shot' },
+      { module: 'log', id: 'trace' },
+      { module: 'diff', id: 'changes' },
+    ];
+    const orders = (list: Record<string, unknown>[]): Record<string, unknown>[][] =>
+      list.length <= 1
+        ? [list]
+        : list.flatMap((item, at) =>
+            orders([...list.slice(0, at), ...list.slice(at + 1)]).map((rest) => [item, ...rest]),
+          );
+    const expected: [string, string][] = [
+      ['a.png', 'shot'],
+      ['run.log', 'trace'],
+      ['notes.txt', 'trace'],
+      ['fix.patch', 'changes'],
+      ['scene.blend', 'anything'],
+      ['icon.svg', 'anything'],
+      ['page.html', 'anything'],
+    ];
+    expect(orders(modules)).toHaveLength(24);
+    for (const order of orders(modules)) {
+      for (const slot of ['evidence', 'body', 'side'] as const) {
+        const layout = layoutOf({ [slot]: order });
+        for (const [filename, target] of expected) {
+          expect(place(layout, filename).module, `${filename} in ${slot}`).toBe(target);
+          expect(holderOf(layout, { module: null, filename }), `${filename} held`).toBe(target);
+        }
+      }
+    }
+  });
+
   it('asks which module when two accept the file', () => {
     refused(
       () => place(IMPR, 'home.png'),
