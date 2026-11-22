@@ -93,7 +93,7 @@ npm i -g @otea/cli
 otea --version
 ```
 
-Para actualizar, corre `npm i -g @otea/cli` otra vez. Para quitarlo, `npm uninstall -g @otea/cli`. El escritorio lo abres con `otea serve` (paso 3).
+Para actualizar, corre `npm i -g @otea/cli` otra vez. Para quitarlo, `npm uninstall -g @otea/cli`. Con el comando de npm, el escritorio lo abres con `otea serve` (paso 3).
 
 ### Desde el código
 
@@ -112,19 +112,27 @@ otea --version
 
 ## 2. Crear el proyecto
 
-En la carpeta de tu proyecto:
+Elige la carpeta que quieres seguir, normalmente un repositorio. Nada se escribe en el repositorio, y el proyecto empieza sin tableros.
 
-```sh
-otea init     # crea el proyecto y te dice el paso siguiente
-```
+- **Si usas la app de escritorio:** ábrela. La primera vez te pide abrir un proyecto: **Abrir carpeta** (si la carpeta todavía no es un proyecto, la app te pregunta si lo creas ahí) o **Crear proyecto** (para una carpeta nueva). Si la carpeta está dentro de un repositorio de git, la app te ofrece crear el proyecto para todo el repositorio. No hace falta `otea init`: la app lo hace por ti. Las próximas veces, Otea reabre tu último proyecto; **Cambiar de proyecto…**, en el ícono de la bandeja o de la barra de menús, vuelve a mostrar la lista.
+- **Si usas la terminal (npm o código):** en la carpeta de tu proyecto:
+
+  ```sh
+  otea init     # crea el proyecto y te dice el paso siguiente
+  ```
 
 ## 3. Abrir el escritorio
 
-```sh
-otea serve    # abre el escritorio de Otea en tu navegador
-```
+- **Si usas la app de escritorio:** ya está abierto, en la ventana de la app. No hace falta `otea serve`.
+- **Si usas la terminal (npm o código):**
 
-Déjalo corriendo mientras trabajas. Es tu escritorio: ahí revisas, apruebas y devuelves el trabajo de tus agentes.
+  ```sh
+  otea serve    # abre el escritorio de Otea en tu navegador
+  ```
+
+  Déjalo corriendo mientras trabajas.
+
+Es tu escritorio: ahí revisas, apruebas y devuelves el trabajo de tus agentes.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-agent-loop-dark.gif">
@@ -135,7 +143,9 @@ Déjalo corriendo mientras trabajas. Es tu escritorio: ahí revisas, apruebas y 
 
 ## 4. Pegarle el texto a tu agente
 
-El escritorio vacío te muestra un texto bajo «Esto es para tu agente». Cópialo y pégalo en el chat de tu agente (Claude Code, OpenCode, Codex o cualquier otro con terminal o MCP). `otea prompt` imprime el mismo texto en la terminal.
+El escritorio vacío te muestra un texto bajo «Esto es para tu agente», con el botón **Copiar la instrucción**. Con la app o con la terminal, es el mismo: cópialo y pégalo en el chat de tu agente (Claude Code, OpenCode, Codex o cualquier otro con terminal o MCP). Más tarde, el botón **Conectar un agente** vuelve a mostrarlo, y `otea prompt` imprime el mismo texto en la terminal.
+
+Si usas la app, tu agente tiene que poder ejecutar `otea` en su terminal. Windows y el `.deb` de Linux lo dejan listo al instalar (abre una terminal nueva, o reinicia tu agente, después de instalar). En macOS, haz clic en el ícono de Otea en la barra de menús y elige **Instalar el comando otea**. El AppImage no lo deja: usa el `.deb` o npm.
 
 Con ese texto, el agente se conecta solo, lee el proyecto y te hace unas preguntas para armar contigo sus tableros. Tú los pruebas y los publicas en Studio. Desde ahí, cada pedido pasa por un tablero, y tú revisas los pasos que el tablero te asigna.
 
