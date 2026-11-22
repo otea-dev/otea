@@ -19,7 +19,12 @@ name: Release
 #   npm-publish.yml). Calling it as a reusable workflow from this file would name this file instead.
 #   Because the tag push never fires, a release runs each workflow once.
 # - The release pull request opens with no pull_request event, so the required checks would never
-#   run on it: ci.yml and cla.yml are dispatched on its branch, and the checks attach to its head.
+#   run on it: ci.yml is dispatched on its branch, and its checks attach to the head. cla.yml cannot
+#   be dispatched the same way: GitHub does not associate a dispatched run's check suite with the
+#   pull request, so the required `cla` would never show on it. Instead the last step posts a
+#   commit status named `cla` on the head, which does attach by SHA. That is the one reason for the
+#   `statuses: write` permission, and the step posts only for a pull request on the release branch
+#   that github-actions[bot] opened, which is on the CLA allowlist in cla.yml.
 on:
   push:
     branches: [main]
@@ -43,6 +48,8 @@ jobs:
       issues: write
       # `gh workflow run`.
       actions: write
+      # The `cla` commit status on the release pull request's head (see the last step).
+      statuses: write
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
@@ -61,7 +68,7 @@ jobs:
           gh workflow run npm-publish.yml --ref "$TAG" -f publish=true
           echo "Started desktop.yml and npm-publish.yml on $TAG" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Run the required checks on the release pull request
+      - name: Run the CI checks on the release pull request
         if: steps.release.outputs.prs_created == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -70,5 +77,24 @@ jobs:
         run: |
           branch="$(jq -r '.headBranchName' <<< "$PR")"
           gh workflow run ci.yml --ref "$branch"
-          gh workflow run cla.yml --ref "$branch"
-          echo "Started ci.yml and cla.yml on $branch" >> "$GITHUB_STEP_SUMMARY"
+          echo "Started ci.yml on $branch" >> "$GITHUB_STEP_SUMMARY"
+
+      # Runs every time, not only when release-please changed the pull request: it says "PR remained
+      # the same" and outputs no `pr` then, and a new head commit needs the status again. It looks the
+      # pull request up by its branch instead.
+      - name: Give the release pull request its cla status
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          BRANCH: release-please--branches--main--components--cli
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Open, from this branch of this repository (not a fork), opened by github-actions[bot].
+          sha="$(gh api "repos/$GH_REPO/pulls?state=open&head=$OWNER:$BRANCH" --jq             ".[] | select(.head.ref == \"$BRANCH\" and .head.repo.full_name == \"$GH_REPO\" and .user.login == \"github-actions[bot]\") | .head.sha" | head -n 1)"
+          if [ -z "$sha" ]; then
+            echo "No open release pull request from github-actions[bot] on $BRANCH: no cla status to post" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh api "repos/$GH_REPO/statuses/$sha"             -f state=success             -f context=cla             -f description="Release PR by github-actions[bot]: on the CLA allowlist"             -f target_url="$RUN_URL"
+          echo "Posted the cla status on ${sha:0:7} of $BRANCH" >> "$GITHUB_STEP_SUMMARY"
