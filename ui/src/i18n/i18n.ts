@@ -1,5 +1,6 @@
 import { createElement, Fragment, type ReactNode, useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
+import { LANGUAGE_HEADER } from '../../../src/core/board/template-words.ts';
 import { reducedMotion } from '../motion.ts';
 import { en } from './en.ts';
 import { es } from './es.ts';
@@ -45,6 +46,12 @@ const listeners = new Set<() => void>();
 
 export function language(): Language {
   return current;
+}
+
+// What every request to the server says of the language on screen, so the board it answers about
+// (stored as keys and the person's own words) comes back in that language.
+export function languageHeader(): Record<string, string> {
+  return { [LANGUAGE_HEADER]: current };
 }
 
 function form(message: string | Plural, count: unknown): string {

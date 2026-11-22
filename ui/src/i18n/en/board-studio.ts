@@ -26,7 +26,7 @@ export const boardStudio = {
     'Only you call something done: in {step} an agent would close it. Review it yourself, there or in the step just before (then an agent may land it).',
   'bs.problem.wait_no_split': '{step} waits for its parts, but {board} divides into nothing.',
   'bs.problem.skip_invalid':
-    '“Starts straight at…” only works on the first step, and only when nobody reviews it. Take it off {step}.',
+    '“Start directly at…” only works on the first step, and only when nobody reviews it. Take it off {step}.',
   'bs.problem.step_always_skipped':
     'Every new item skips {step}: the form already asks for everything it hands, so it never runs. Make one of those fields optional or turn off “Start directly at…”.',
   'bs.problem.split_cycle':

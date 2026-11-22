@@ -62,13 +62,20 @@ export function isFieldKind(kind: string): kind is FieldKind {
   return (FIELD_KINDS as readonly string[]).includes(kind);
 }
 
-export type Choice = { id: string; name: string };
+// A word's text per language, and a board's words by place (localize.ts).
+export type Said = Readonly<Record<string, string | readonly string[]>>;
+export type Snapshot = Readonly<Record<string, Said>>;
+
+// `key` is the stable name a template gave it, which agents may use in place of its name (`--way`),
+// and which a rename never changes. A thing the person added has none.
+export type Choice = { id: string; name: string; key?: string };
 
 // A field (something to fill) or a piece of evidence (something to show). Both share the board's
 // one name space. `hint` is "Qué va aquí", the line agents read. `options` hold the choices of a
 // choice, multi or checklist field. `show` is how evidence shows (EVIDENCE_SHOWS).
 export type Part = {
   id: string;
+  key?: string;
   name: string;
   kind: PartKind;
   hint: string;
@@ -147,6 +154,7 @@ export type Lead = { to: Target; when: When };
 
 export type Step = {
   id: string;
+  key?: string;
   name: string;
   doer: Doer;
   reviewer: Reviewer;
@@ -216,8 +224,15 @@ export type BoardDefinition = {
   cap: Cap;
   // Titles of the sample items the previews draw; never items of the board.
   samples: string[];
-  // The template it was copied from, for the record only: nothing stays linked to it.
+  // The template it was copied from, for the record only: nothing reads it, so a later release that
+  // changes or removes the template leaves this board as it is.
   template?: string;
+  // The language the board was made in: what an agent, and any reader with no language of its own,
+  // reads it in.
+  lang?: 'en' | 'es';
+  // The words its template gave it, in every language, by where each lives (localize.ts). A word
+  // the person changed has none: their text stands, in every language.
+  snapshot?: Snapshot;
   split?: Split;
   drop: Drop;
   list: ListView;

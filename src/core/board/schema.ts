@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ICON_NAMES } from '../icons.ts';
 import { KEY } from '../preset.ts';
+import { reconcile, speak } from './localize.ts';
 import {
   BOARD_SCHEMA,
   type BoardDefinition,
@@ -15,6 +16,7 @@ import {
   ZONES,
 } from './model.ts';
 import { placeOf, shapeProblems } from './shape-words.ts';
+import type { Lang } from './template-words.ts';
 
 // The shape of a board definition as it travels (PUT draft) and as it is stored (a version or a
 // draft row): checked whole, so a malformed document never reaches the engine. Problems a person
@@ -46,9 +48,20 @@ const flag = (description: string, example: boolean) =>
 // A motive names a closed state of its own (dropped__<id>), whose name takes no dash.
 const STATE_KEY = /^[a-z][a-z0-9_]*$/;
 
+// What a template made a thing from, kept so its words follow the language on screen; the board
+// publishes them as it reads them, and an agent leaves the key as it finds it.
+const keyOf = (what: string) =>
+  z
+    .string()
+    .meta(
+      about(`The key of the template's ${what} this one was made from; leave it as it is`, 'high'),
+    )
+    .optional();
+
 const choice = z
   .strictObject({
     id: idOf('The hidden id of the choice', 'chigh'),
+    key: keyOf('choice'),
     name: text('What the choice reads', 'High'),
   })
   .meta(about('A choice of the field', { id: 'chigh', name: 'High' }));
@@ -56,6 +69,7 @@ const choice = z
 const part = z
   .strictObject({
     id: idOf('The hidden id of the part: its key in parts', 'fsteps'),
+    key: keyOf('field or evidence'),
     name: text('What the field or evidence is called', 'Steps to reproduce'),
     kind: z
       .enum([...FIELD_KINDS, ...EVIDENCE_KINDS])
@@ -150,6 +164,7 @@ const hand = z
 const step = z
   .strictObject({
     id: idOf('The hidden id of the step', 'sfix'),
+    key: keyOf('step'),
     name: text('What the step is called', 'Fix'),
     doer: z
       .enum(['you', 'any'], { error: 'must be "you" or "any"' })
@@ -292,6 +307,19 @@ export const definitionSchema = z
       .array(z.string())
       .meta(about('Titles of the sample items previews draw', ['Login fails on Safari'], [])),
     template: text('The template it was copied from, for the record', 'bugs').optional(),
+    lang: z
+      .enum(['en', 'es'])
+      .meta(about('The language the board was made in; leave it as it is', 'en'))
+      .optional(),
+    snapshot: z
+      .record(z.string(), z.record(z.string(), z.union([z.string(), z.array(z.string())])))
+      .meta(
+        about(
+          'The words a template gave the board, in every language, by place: leave it as it is. When you change a word that is here, the board keeps your text in every language',
+          { 'steps.sfix.name': { en: 'Fix', es: 'Arreglar' } },
+        ),
+      )
+      .optional(),
     split: z
       .strictObject({
         board: idOf('The board (hidden id) its items divide into, or same', 'same'),
@@ -344,6 +372,7 @@ export const definitionSchema = z
                     'is not a motive id: lowercase letters, digits and _, starting with a letter',
                   )
                   .meta(about('The hidden id of the motive', 'wont_fix')),
+                key: keyOf('motive'),
                 name: text('What the motive reads', "Won't fix"),
               })
               .meta(about('A motive a drop names', { id: 'wont_fix', name: "Won't fix" })),
@@ -385,6 +414,17 @@ export type DefinitionReading =
   | { ok: true; definition: BoardDefinition; notes?: string[] }
   | { ok: false; problems: string[] };
 
+// The language the reader of a board uses: the desk says it for the request it is answering
+// (app/reading-lang.ts); a command with no desk says none, and reads each board in the language it
+// was made in.
+let readerLang: () => Lang | undefined = () => undefined;
+
+export function readsIn(language: () => Lang | undefined): void {
+  readerLang = language;
+}
+
+// Checks a definition as it was handed in (a PUT draft, an agent's board.json) or stored. It
+// changes no word: speaking it in a language is readDefinition's.
 export function parseDefinition(input: unknown): DefinitionReading {
   const { raw, notes } = anyAgent(input);
   const result = definitionSchema.safeParse(raw);
@@ -475,9 +515,19 @@ function idClashes(raw: unknown, definition: BoardDefinition): string[] {
   return problems;
 }
 
-// Reads a stored definition, which was checked when written: a failure here is a corrupt row.
-export function readDefinition(json: string): BoardDefinition {
+// Reads a stored definition, which was checked when written: a failure here is a corrupt row. The
+// words its template gave it come in `lang`; else the language of the reader (readsIn); else the
+// language the board was made in.
+export function readDefinition(json: string, lang?: Lang): BoardDefinition {
   const reading = parseDefinition(JSON.parse(json));
   if (!reading.ok) throw new Error(`Corrupt board definition: ${reading.problems.join('; ')}`);
-  return reading.definition;
+  return speak(reading.definition, lang ?? readerLang());
+}
+
+// A definition as it is written to a version or a draft row. `reading` is the language it was read
+// in (the reader's, else the one it was made in): a word its template gave it that no longer says
+// what the snapshot says in that language was changed by the person, and their text stands in
+// every language (localize.ts reconcile).
+export function storedDefinition(definition: BoardDefinition, reading?: Lang): string {
+  return JSON.stringify(reconcile(definition, reading ?? readerLang()));
 }

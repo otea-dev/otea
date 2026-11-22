@@ -10,7 +10,7 @@ import {
   usedRefs,
 } from '../core/board/model.ts';
 import type { Problem } from '../core/board/problems.ts';
-import { parseDefinition } from '../core/board/schema.ts';
+import { parseDefinition, storedDefinition } from '../core/board/schema.ts';
 import { boardLang, isSetKey, type Lang } from '../core/board/templates.ts';
 import { OteaError } from '../core/errors.ts';
 import type { Actor } from '../core/item.ts';
@@ -465,7 +465,7 @@ export function proposeBoardChange(
     );
     upsertDraft(project.db, {
       boardId: live.id,
-      definition: kept?.definition ?? JSON.stringify(live.def),
+      definition: kept?.definition ?? storedDefinition(live.def),
       baseVersion: kept ? kept.baseVersion : live.version,
       updatedAt: at,
       requestItem: item,

@@ -1,3 +1,4 @@
+import { LANGUAGE_HEADER } from '../../../src/core/board/template-words.ts';
 import { CLOSED, FROM_CACHE, PROJECT, SAVED_AT, SHELL_KEY } from './sw-routes.ts';
 
 // How the service worker answers each route (sw-routes.ts), over the few calls of the Cache API it
@@ -119,6 +120,17 @@ function withHeaders(response: Response, extra: Record<string, string>): Respons
   });
 }
 
+// Where an answer is kept: its URL, and the language it was asked in when the desk said one
+// (x-otea-lang), since a board reads in that language: the offline copy a desk gets is in the
+// language it asked in, never another's.
+export function cacheKey(request: Request): string {
+  const lang = request.headers.get(LANGUAGE_HEADER);
+  if (!lang) return request.url;
+  const url = new URL(request.url);
+  url.searchParams.set('otea-lang', lang);
+  return url.href;
+}
+
 // The read views' data: the PC's answer, kept as the last good one; when the PC does not answer,
 // that last one, marked as coming from the cache and why (FROM_CACHE). A refusal (401 unpaired,
 // 404) goes through as it came and keeps nothing.
@@ -141,7 +153,7 @@ export async function networkFirst(
     background?: Background;
   },
 ): Promise<Response> {
-  const key = request.url;
+  const key = cacheKey(request);
   // A good answer is kept whenever it comes: one that comes after the cache answered still
   // updates it for the next read.
   const live = ask(net, request, link, async (response) => {

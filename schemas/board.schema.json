@@ -51,6 +51,11 @@
             "description": "The hidden id of the part: its key in parts",
             "examples": ["fsteps"]
           },
+          "key": {
+            "type": "string",
+            "description": "The key of the template's field or evidence this one was made from; leave it as it is",
+            "examples": ["high"]
+          },
           "name": {
             "type": "string",
             "description": "What the field or evidence is called",
@@ -96,6 +101,11 @@
                   "pattern": "^[a-z][a-z0-9_]*$",
                   "description": "The hidden id of the choice",
                   "examples": ["chigh"]
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key of the template's choice this one was made from; leave it as it is",
+                  "examples": ["high"]
                 },
                 "name": {
                   "type": "string",
@@ -248,6 +258,11 @@
             "pattern": "^[a-z][a-z0-9_]*$",
             "description": "The hidden id of the step",
             "examples": ["sfix"]
+          },
+          "key": {
+            "type": "string",
+            "description": "The key of the template's step this one was made from; leave it as it is",
+            "examples": ["high"]
           },
           "name": {
             "type": "string",
@@ -572,6 +587,46 @@
       "description": "The template it was copied from, for the record",
       "examples": ["bugs"]
     },
+    "lang": {
+      "type": "string",
+      "enum": ["en", "es"],
+      "description": "The language the board was made in; leave it as it is",
+      "examples": ["en"]
+    },
+    "snapshot": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      "description": "The words a template gave the board, in every language, by place: leave it as it is. When you change a word that is here, the board keeps your text in every language",
+      "examples": [
+        {
+          "steps.sfix.name": {
+            "en": "Fix",
+            "es": "Arreglar"
+          }
+        }
+      ]
+    },
     "split": {
       "type": "object",
       "properties": {
@@ -680,6 +735,11 @@
                 "pattern": "^[a-z][a-z0-9_]*$",
                 "description": "The hidden id of the motive",
                 "examples": ["wont_fix"]
+              },
+              "key": {
+                "type": "string",
+                "description": "The key of the template's motive this one was made from; leave it as it is",
+                "examples": ["high"]
               },
               "name": {
                 "type": "string",

@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { inLanguage } from '../app/reading-lang.ts';
 import { dataVersion } from '../store/database.ts';
 
 export type Listener = () => void;
@@ -14,9 +15,12 @@ export function createChangeFeed(db: DatabaseSync, intervalMs = 250): ChangeFeed
   let timer: ReturnType<typeof setInterval> | undefined;
   let version = 0;
 
-  const notify = () => {
-    for (const listener of listeners) listener();
-  };
+  // A listener hears of a change, not of a request: it runs with no reading language, whether the
+  // poll or a desk's write woke it.
+  const notify = () =>
+    inLanguage(undefined, () => {
+      for (const listener of listeners) listener();
+    });
 
   const poll = () => {
     const current = dataVersion(db);

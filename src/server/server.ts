@@ -22,7 +22,7 @@ import {
   showItem,
   updateItem,
 } from '../app/items.ts';
-import { rememberLanguage, resolveLang, storedLanguage } from '../app/language.ts';
+import { isLang, rememberLanguage, resolveLang, storedLanguage } from '../app/language.ts';
 import type { Launcher } from '../app/launcher.ts';
 import { memoryMachine } from '../app/machine.ts';
 import { boardRoundOf, liveBoards, rowFactsOf } from '../app/next.ts';
@@ -47,6 +47,7 @@ import { listPresetViews } from '../app/preset-views.ts';
 import { estimatesOfItems, pinItems, priorityOf, setOrder } from '../app/priority.ts';
 import { type Env, type Project, projectView } from '../app/project.ts';
 import { answerQuestion } from '../app/questions.ts';
+import { inLanguage } from '../app/reading-lang.ts';
 import { linkItems, unlinkItems } from '../app/relations.ts';
 import { reassignItem, restartItem, resumeItem, undoRelease } from '../app/restart.ts';
 import { setAsideOf } from '../app/set-aside.ts';
@@ -75,7 +76,7 @@ import { undoMove } from '../app/undo.ts';
 import { mergedOutside } from '../cli/merged-outside.ts';
 import { agentPrompt, isPromptKind, PROMPT_KINDS } from '../core/agent-prompts.ts';
 import { PERIOD_HINT, parsePeriod } from '../core/board/performance.ts';
-import { LANGS, type Lang } from '../core/board/template-words.ts';
+import { LANGS, LANGUAGE_HEADER, type Lang } from '../core/board/template-words.ts';
 import { OteaError } from '../core/errors.ts';
 import { MAX_EVIDENCE_MB } from '../core/evidence.ts';
 import { TURNS, type Turn } from '../core/workflow.ts';
@@ -473,9 +474,17 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
     new Hono<OteaEnv>()
       // A board published from another process (the CLI, another server) joins the catalog before
       // anything reads items; it costs one query when nothing was published.
-      .use(async (_c, next) => {
-        syncBoardPresets(project);
-        await next();
+      .use(async (c, next) => {
+        // The desk reads every board in the language on its screen (it says so in x-otea-lang), else
+        // the one it last told the server, else each board in the language it was made in.
+        const said = c.req.header(LANGUAGE_HEADER);
+        const lang = isLang(said) ? said : storedLanguage(machine);
+        // An answer depends on the language asked: a cache keeps one per language.
+        c.header('Vary', LANGUAGE_HEADER, { append: true });
+        await inLanguage(lang, async () => {
+          syncBoardPresets(project);
+          await next();
+        });
       })
       .route('/', machineApi(doors))
       .get('/project', (c) => c.json(projectView(project)))
