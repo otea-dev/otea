@@ -116,14 +116,14 @@ export function saveDraft(
   id: string,
   definition: BoardDefinition,
   baseVersion: number | null,
-  draftStamp?: string | null,
-  readIn?: Language,
+  draftStamp: string | null | undefined,
+  readIn: Language,
 ): Promise<{ record: BoardRecord; problems: Problem[] }> {
   const stamp = draftStamp === undefined ? {} : { draftStamp };
-  // `readIn`: the language `definition` was read in, which its words are in (the editor says it, so
-  // a language switched since never makes the server take its words for the person's edits).
-  const said = readIn === undefined ? {} : { readIn };
-  return call('PUT', `${board(id)}/draft`, { definition, baseVersion, ...stamp, ...said });
+  // `readIn`: the language `definition` was read in, which its words are in. The server needs it
+  // (a draft without it is a 400): a language switched since must never make it take the words it
+  // holds for the person's edits.
+  return call('PUT', `${board(id)}/draft`, { definition, baseVersion, ...stamp, readIn });
 }
 
 export function discardDraft(id: string): Promise<{ deleted: boolean }> {
