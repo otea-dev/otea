@@ -5,7 +5,9 @@ import {
   backTarget,
   backWaysOf,
   type GateAction,
+  type GroupState,
   gateAt,
+  groupRef,
   type ItemFacts,
   isClosed,
   isLandStep,
@@ -33,6 +35,7 @@ import { choiceLines, type ItemChoice } from './choices.ts';
 import {
   type BoardDefinition,
   DONE,
+  type Group,
   guardedBranch,
   type Hand,
   isEvidence,
@@ -82,6 +85,8 @@ export type NextInput = {
   evidence: Readonly<Record<string, number>>;
   // What the handoff still lacks (handoffCheck), for the ✗ marks.
   missing: readonly Missing[];
+  // Where each "at least N of" group of the step stands, by the group's id (groupStates).
+  groups?: Readonly<Record<string, GroupState>>;
   // The agent asking, when known.
   me?: string;
   // What the item's waits read: its parts and what blocks it (names as people read them).
@@ -237,6 +242,7 @@ function valueText(part: Part, input: NextInput): string {
 const VALUE_BRIEF = 500;
 
 const REASON: Readonly<Record<Missing['reason'], string>> = {
+  group: 'not enough attached',
   missing: 'missing',
   not_new: 'not new this round',
   unchecked: 'boxes still open',
@@ -555,10 +561,49 @@ function whenWords(def: BoardDefinition, when: NonNullable<Hand['when']>): strin
   return `${read?.name ?? '…'} is ${value}`;
 }
 
+// "at least 1 of Screenshot, GIF, Video, Log": what a group asks of the handoff.
+function groupWords(group: Group, def: BoardDefinition): string {
+  const names = group.parts.map((ref) => partOf(def, ref)?.name ?? ref);
+  return `at least ${group.min} of ${names.join(', ')}`;
+}
+
+// Where a group stands: its state from the engine, or from what the handoff lacks.
+function groupStateOf(group: Group, input: NextInput): GroupState | undefined {
+  return (
+    input.groups?.[group.id] ?? input.missing.find(({ ref }) => ref === groupRef(group.id))?.group
+  );
+}
+
+// A group's line, with its state as one compact JSON object under it, for a reader that parses.
+function groupLines(def: BoardDefinition, step: Step, input: NextInput): string[] {
+  return (step.groups ?? []).flatMap((group) => {
+    const state = groupStateOf(group, input);
+    const met = !input.missing.some(({ ref }) => ref === groupRef(group.id));
+    const have = state
+      ? ` (${state.have} attached${state.held.length ? `: ${state.held.join(', ')}` : ''})`
+      : '';
+    const json = state
+      ? [
+          `      ${JSON.stringify({ group: group.name, min: state.min, have: state.have, of: state.parts, held: state.held })}`,
+        ]
+      : [];
+    return [`  ${met ? '✓' : '✗'} ${group.name}: ${groupWords(group, def)}${have}`, ...json];
+  });
+}
+
+// What the step's "at least N of" groups mean for the one handing off, said once: pick what fits.
+function groupRules(def: BoardDefinition, step: Step): string[] {
+  return (step.groups ?? []).map(
+    (group) =>
+      `  ${group.name}: attach ${groupWords(group, def)} (the ones that fit this item; each with real content). Each one you attach counts once, and the handoff is refused while fewer than ${group.min} are attached.`,
+  );
+}
+
 function handLines(def: BoardDefinition, step: Step, input: NextInput): string[] {
   const lines = [
     ...noteLine(step, input),
     ...partLines(def, step.hand, input),
+    ...groupLines(def, step, input),
     ...notesHandLine(input.notes ?? []),
     ...waitLines(step, input),
   ];
@@ -782,7 +827,10 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
   lines.push(...section('Branch', branchLines(def, step, position, input)));
   if (!reviewing && !input.brief)
     lines.push(
-      ...section('Before you hand it off', indent(mentionText(def, step.instructions.before))),
+      ...section('Before you hand it off', [
+        ...indent(mentionText(def, step.instructions.before)),
+        ...groupRules(def, step),
+      ]),
     );
 
   let after: string;
@@ -844,6 +892,7 @@ function briefPointer(def: BoardDefinition): string {
 }
 
 const MISSING_NOTE: Readonly<Record<Missing['reason'], string>> = {
+  group: '',
   missing: '',
   not_new: 'new this round',
   unchecked: 'every box ticked',
@@ -908,13 +957,15 @@ function lackingText(id: string, missing: readonly Missing[]): string {
   const flag = note ? ` with ${noteArg(hint)}` : '';
   const parts = missing.filter(({ reason, ref }) => reason !== 'open' && ref !== NOTE_REF);
   if (parts.length > 0 || note) {
-    const what = parts.map(({ name, reason, fresh, points }) => {
+    const what = parts.map(({ name, reason, fresh, points, group }) => {
       const said =
-        reason === 'missing' && fresh
-          ? 'new this round'
-          : reason === 'unproved' && points?.length
-            ? `a proof for ${and(points)}`
-            : MISSING_NOTE[reason];
+        reason === 'group' && group
+          ? `at least ${group.min} of ${group.parts.join(', ')}; ${group.have} attached`
+          : reason === 'missing' && fresh
+            ? 'new this round'
+            : reason === 'unproved' && points?.length
+              ? `a proof for ${and(points)}`
+              : MISSING_NOTE[reason];
       return said ? `${name} (${said})` : name;
     });
     if (note)

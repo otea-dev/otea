@@ -168,6 +168,22 @@ function diffPartOf(layout: Layout, file: Pick<EvidenceFile, 'filename' | 'bytes
   return diffPartFor(layout, file.filename, file.bytes.subarray(0, 64 * 1024).toString('utf8'));
 }
 
+// Whether the item's step asks for what goes in a part: the part is required by its handoff (or by
+// the layout), or a member of one of its "at least N of" groups. A file with no bytes would pass
+// for it, so it is refused there (P7-F2).
+function asksFor(project: Project, item: ItemRecord, layout: Layout, module: string): boolean {
+  if (evidenceModules(layout).find(({ id }) => id === module)?.required) return true;
+  const board = liveBoardOf(project, item.collection);
+  const position = positionOf(item.state);
+  if (!board || isClosed(position)) return false;
+  const step = stepById(board.def, position.step);
+  if (!step) return false;
+  return (
+    step.hand.some((hand) => hand.ref === module && hand.req !== 'no') ||
+    (step.groups ?? []).some((group) => group.parts.includes(module))
+  );
+}
+
 export function placeFile(
   project: Project,
   item: ItemRecord,
@@ -211,6 +227,15 @@ export function placeFile(
       `${error.message}. ${diffPartText(item.id, filename, diff)}`,
       error.details,
     );
+  }
+  if (bytes.length === 0 && placement.module !== null) {
+    if (asksFor(project, item, type.layout, placement.module)) {
+      const part = evidenceModules(type.layout).find(({ id }) => id === placement.module);
+      throw new OteaError(
+        'evidence_not_accepted',
+        `${filename} is empty (0 bytes), so it cannot be ${part?.label ?? placement.module} for ${item.id}: attach a file with content`,
+      );
+    }
   }
   return { filename, bytes, ...(caption === undefined ? {} : { caption }), ...placement };
 }

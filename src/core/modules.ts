@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { type EvidenceKind, evidenceTypeOf } from './evidence.ts';
+import { EVIDENCE_FILE_KINDS, type EvidenceKind, evidenceTypeOf } from './evidence.ts';
 import type { FieldSpec } from './preset.ts';
 
 export const FIELD_MODULES = ['text', 'markdown', 'enum', 'severity'] as const;
@@ -9,7 +9,8 @@ export const SEVERITY_SCALE = ['low', 'medium', 'high', 'critical'] as const;
 
 export type FieldModule = (typeof FIELD_MODULES)[number];
 
-// `files` takes what no other module draws (audio, and any other file), offered for download.
+// `files` takes any file (a log, a diff, audio, anything), offered for download; where another
+// module of the layout draws the kind, the file goes there instead.
 export const EVIDENCE_MODULES = ['images', 'recording', 'diff', 'log', 'diagram', 'files'] as const;
 
 export type EvidenceModule = (typeof EVIDENCE_MODULES)[number];
@@ -138,7 +139,9 @@ export const MODULE_REGISTRY: Readonly<Record<ModuleKind, ModuleSpec>> = {
   score: reserved('header', 'side', 'row'),
   options: reserved('body', 'phone'),
   diagram: evidence(['diagram']),
-  files: evidence(['audio', 'file']),
+  // Any file: the module a specific one (images, log...) never takes the place of, since a file
+  // goes to the module that draws it when one fits (core/placement.ts).
+  files: evidence(EVIDENCE_FILE_KINDS),
 };
 
 function isModule(name: string): name is ModuleKind {

@@ -112,6 +112,16 @@ export const studioEditor = {
   'bs.editor.lead.is': 'is',
   'bs.editor.lead.to': 'it goes to',
   'bs.editor.lead.remove': 'Remove this lead',
+  // "At least N of": a group of optional evidence the agent picks from (Step.groups).
+  'bs.editor.group.add': 'Ask for at least one of several',
+  'bs.editor.group.default_name': 'Proof',
+  'bs.editor.group.name': 'Group name',
+  'bs.editor.group.min': 'At least',
+  'bs.editor.group.from': 'of these, whichever fits',
+  'bs.editor.group.remove': 'Remove this group',
+  'bs.editor.group.conseq':
+    'The agent attaches whichever of these fit the work. It cannot hand off with fewer than {min}.',
+  'bs.editor.group.need_two': 'Mark two or more of what it hands off as optional to group them.',
   'bs.editor.ways.to_done': 'ends here',
   'bs.editor.ways.to_step': 'skips the steps in between',
   'bs.editor.ways.approve': 'When you approve it you choose: Approve {ways}.',

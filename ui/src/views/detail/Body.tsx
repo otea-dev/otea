@@ -2,11 +2,12 @@ import { type ReactNode, useLayoutEffect, useRef } from 'react';
 import type { ItemChoice } from '../../../../src/core/board/choices.ts';
 import { attachFiles } from '../../api.ts';
 import { EvidenceList } from '../../components/EvidenceList.tsx';
+import { EvidenceGaps } from '../../components/evidence/EvidenceGaps.tsx';
 import { EvidenceModule } from '../../components/evidence/EvidenceModule.tsx';
 import { OptionsModule } from '../../components/OptionsModule.tsx';
 import { RoundsModule } from '../../components/RoundsModule.tsx';
 import { agoText } from '../../derive/when.ts';
-import { latestFirst, leftovers } from '../../evidence.ts';
+import { evidenceOf, latestFirst, leftovers } from '../../evidence.ts';
 import { useFileUrl } from '../../evidence-files.ts';
 import { t } from '../../i18n/i18n.ts';
 import { type DetailBlock, detailBlocks, slotData } from '../../item-types.ts';
@@ -16,6 +17,7 @@ import { C } from '../../motion/curves.ts';
 import { reduced } from '../../motion/reduced.ts';
 import type { BoardRounds } from '../../rounds.ts';
 import type { Evidence, ItemView, TypeView } from '../../types.ts';
+import type { EvidenceGaps as Gaps } from './board-item.ts';
 import type { Facts } from './facts.ts';
 import { Structure } from './Structure.tsx';
 
@@ -104,6 +106,9 @@ export function bodySections(o: {
         railName?: string | undefined;
         // How many of the person's notes are on each piece of evidence, by its id.
         noted?: ReadonlyMap<number, number> | undefined;
+        // What the step asks of its evidence: only the parts with content are drawn, a required
+        // one still empty in red, and one quiet line says which optional ones are not provided.
+        gaps?: Gaps | undefined;
       }
     | undefined;
 }): Sec[] {
@@ -278,11 +283,16 @@ export function bodySections(o: {
       return [];
     }
     if (block.kind === 'module') {
+      const gaps = board?.gaps;
+      const empty = evidenceOf(item.evidence, block.entry).length === 0;
+      const asked = gaps?.required.some(({ ref }) => ref === block.entry.id) === true;
+      // On a board, a part nothing was attached to is drawn only when the step requires it.
+      if (gaps && empty && !asked) return [];
       evidence.push(
         <EvidenceModule
           key={`m:${block.entry.id}`}
           slot={slotData(block.at)}
-          entry={block.entry}
+          entry={asked ? { ...block.entry, required: true } : block.entry}
           evidence={item.evidence}
           canWrite={canWrite}
           {...(board?.noted ? { noted: board.noted } : {})}
@@ -336,6 +346,7 @@ export function bodySections(o: {
         ) : (
           <p className="noev">{t('sheet.noEvidence')}</p>
         )}
+        {board?.gaps ? <EvidenceGaps gaps={board.gaps} /> : null}
       </section>
     ),
   });

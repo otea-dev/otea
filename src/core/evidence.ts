@@ -35,6 +35,25 @@ const TYPES: Readonly<Record<string, EvidenceType>> = {
   svg: { kind: 'file', contentType: 'image/svg+xml' },
 };
 
+export const EVIDENCE_FILE_KINDS: readonly EvidenceKind[] = [
+  'image',
+  'video',
+  'audio',
+  'diff',
+  'log',
+  'diagram',
+  'file',
+];
+
+// The extensions Otea reads as a kind, in the order it lists them to someone attaching. The opaque
+// kind (`file`) names none: it is any other extension.
+export function extensionsOf(kind: EvidenceKind): string[] {
+  if (kind === 'file') return [];
+  return Object.entries(TYPES).flatMap(([extension, type]) =>
+    type.kind === kind ? [extension] : [],
+  );
+}
+
 const OPAQUE: EvidenceType = { kind: 'file', contentType: 'application/octet-stream' };
 
 export function evidenceTypeOf(filename: string): EvidenceType {

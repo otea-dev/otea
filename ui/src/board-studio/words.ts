@@ -111,6 +111,21 @@ export function problemText(problem: Problem): string {
         part: str(p.part) as string,
         step: str(p.step) as string,
       });
+    case 'group_unnamed':
+      return t('bs.problem.group_unnamed', { step: str(p.step) as string });
+    case 'group_small':
+      return t('bs.problem.group_small', {
+        group: str(p.group) as string,
+        step: str(p.step) as string,
+        min: Number(p.min),
+        of: Number(p.of),
+      });
+    case 'group_member':
+      return t('bs.problem.group_member', {
+        group: str(p.group) as string,
+        step: str(p.step) as string,
+        part: str(p.part) as string,
+      });
     case 'way_invalid':
       return t('bs.problem.way_invalid', { step: str(p.step) as string });
     case 'back_invalid':

@@ -17,6 +17,11 @@ export const boardStudio = {
   'bs.problem.reserved_name': '«{name}» ya es una palabra de Otea. ¿Llamas al paso de otra forma?',
   'bs.problem.when_unreadable':
     '{part} en {step} es obligatorio solo cuando…, pero no lee nada que el ítem ya traiga. Elige un campo de opción, nivel o sí o no que se pida antes.',
+  'bs.problem.group_unnamed': 'Un grupo de evidencias de {step} no tiene nombre.',
+  'bs.problem.group_small':
+    'El grupo «{group}» de {step} pide {min} de {of}. Necesita al menos una, y no más de las que tiene.',
+  'bs.problem.group_member':
+    '«{part}» en el grupo «{group}» de {step} no es una evidencia opcional de ese paso. Sácala del grupo.',
   'bs.problem.way_invalid':
     'Un camino de {step} lleva al mismo paso o a un paso que ya no existe. Elige otro paso o Hecho.',
   'bs.problem.back_invalid':

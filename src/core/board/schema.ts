@@ -161,6 +161,26 @@ const hand = z
   })
   .meta(about('One thing the step hands off', { ref: 'fsteps', req: 'always', fresh: false }));
 
+const group = z
+  .strictObject({
+    id: idOf('The hidden id of the group', 'gproof'),
+    name: text('What the group is called', 'Proof'),
+    parts: ids('The evidence parts (ids) it picks from, all handed by the step', ['fshot', 'flog']),
+    min: z
+      .number({ error: 'must be a whole number, 1 or more' })
+      .int({ error: 'must be a whole number, 1 or more' })
+      .min(1, { error: 'must be a whole number, 1 or more' })
+      .meta(about('How many of its parts the handoff needs at least', 1)),
+  })
+  .meta(
+    about('"At least N of" some evidence: the agent attaches what fits', {
+      id: 'gproof',
+      name: 'Proof',
+      parts: ['fshot', 'flog'],
+      min: 1,
+    }),
+  );
+
 const step = z
   .strictObject({
     id: idOf('The hidden id of the step', 'sfix'),
@@ -181,6 +201,15 @@ const step = z
     hand: z
       .array(hand)
       .meta(about('What the step hands off', [{ ref: 'fsteps', req: 'always', fresh: false }])),
+    groups: z
+      .array(group)
+      .meta(
+        about(
+          'Groups of evidence the handoff needs "at least N of": each member is an optional evidence part of hand',
+          [{ id: 'gproof', name: 'Proof', parts: ['fshot', 'flog'], min: 1 }],
+        ),
+      )
+      .optional(),
     ways: ids(
       'Ways out besides the next step: a later step (id) or done, or an earlier step to take the item back to',
       ['done'],

@@ -102,7 +102,7 @@ describe('names in, names out', () => {
       writeFileSync(join(repo.dir, 'notes.txt'), 'x');
       const { err } = await otea('attach', 'BUG-1', 'notes.txt');
       expect(err).toContain(
-        'It takes: "Cambios de código" (diff): diff; "Vídeo del arreglo" (recording, frames): video',
+        'It takes: "Cambios de código" (diff): .diff .patch; "Vídeo del arreglo" (recording, frames): .mp4 .webm .mov',
       );
     });
 

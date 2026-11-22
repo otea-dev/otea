@@ -134,6 +134,7 @@ export const common = {
   'refusal.why.fresh': 'new this round',
   'refusal.why.unchecked': 'every box ticked',
   'refusal.why.unproved': 'a proof for {list}',
+  'refusal.why.group': 'at least {min} of {list}; {have} attached',
   'refusal.why.note': 'a note',
   'refusal.why.part': 'its part {list} is not finished',
   'refusal.why.partsUnmerged': {

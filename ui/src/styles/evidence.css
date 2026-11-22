@@ -22,11 +22,40 @@
   border-radius: 7px;
 }
 
+/* A required part still empty is the one thing a review must not pass over: red, dashed. */
 .ev-empty[data-required="true"] {
-  background: transparent;
+  background: color-mix(in oklch, var(--warn) 5%, transparent);
   box-shadow: none;
-  outline: 1.5px dashed var(--lane);
+  outline: 1.5px dashed var(--warn);
   outline-offset: -1.5px;
+}
+
+.sheet .ev-empty[data-required="true"],
+.ev-empty[data-required="true"] .t-ui {
+  color: var(--warn);
+}
+
+/* What the review leaves out, said once: a group short of its minimum and a required part still
+   missing in red, then the optional parts nothing was attached to, as one quiet line. */
+.ev-gaps {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  min-width: 0;
+}
+
+.ev-gap {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ev-gap.miss {
+  font: 500 13px / 1.4 var(--sans);
+  color: var(--warn);
+}
+
+.ev-gap.quiet {
+  color: var(--ink-3);
 }
 
 /* ---- a file: a well with the media, the file's name and caption under it ---- */

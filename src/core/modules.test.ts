@@ -23,16 +23,23 @@ function problemsOf(raw: unknown): string[] {
 }
 
 describe('the module registry', () => {
-  it('lets the files module take audio and any other file, and nothing the others draw', () => {
+  it('lets the files module take any file, a log and a screenshot included', () => {
     const files = { module: 'files' as const, id: 'efile' };
 
     expect(moduleFamily('files')).toBe('evidence');
     expect(
-      ['take.mp3', 'take.wav', 'take.ogg', 'scene.blend', 'icon.svg'].map((name) =>
-        moduleAccepts(files, name),
-      ),
-    ).toEqual([true, true, true, true, true]);
-    expect(moduleAccepts(files, 'shot.png')).toBe(false);
+      [
+        'take.mp3',
+        'take.wav',
+        'take.ogg',
+        'scene.blend',
+        'icon.svg',
+        'run.log',
+        'notes.txt',
+        'shot.png',
+      ].map((name) => moduleAccepts(files, name)),
+    ).toEqual([true, true, true, true, true, true, true, true]);
+    // The modules that draw one kind still take only that kind.
     expect(moduleAccepts({ module: 'log', id: 'log' }, 'scene.blend')).toBe(false);
   });
 

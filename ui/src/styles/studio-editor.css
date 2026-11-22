@@ -764,6 +764,43 @@ input.se-stepname:focus {
 .se-lead .se-x {
   margin-bottom: 7px;
 }
+/* «Al menos N de»: a group of optional evidence (Step.groups), set apart from the hand's list by a
+   hairline and a well, so it reads as one thing asked of several parts. */
+.se-group {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px 14px 12px;
+  border-radius: 8px;
+  background: var(--well);
+}
+.se-group-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px auto;
+  align-items: end;
+  gap: 10px;
+}
+.se-group-head .se-x {
+  margin: 0 0 5px;
+}
+.se-group .se-tx {
+  background: var(--sheet);
+}
+.se-group-from {
+  min-width: 0;
+}
+.se-group .se-conseq {
+  margin: 0;
+}
+@media (max-width: 560px) {
+  .se-group-head {
+    grid-template-columns: 76px auto;
+    justify-content: space-between;
+  }
+  .se-group-name {
+    grid-column: 1 / -1;
+  }
+}
 .se-flab {
   display: block;
   margin-bottom: 6px;
