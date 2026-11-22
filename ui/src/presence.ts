@@ -1,4 +1,4 @@
-import type { AgentStatus } from '../../src/core/agent-status.ts';
+import { AGENT_STATUSES, type AgentStatus } from '../../src/core/agent-status.ts';
 import type { ItemEvent } from './types.ts';
 
 // An agent the server has seen in this project: its name (the actor of its claims, leases and
@@ -113,6 +113,9 @@ export function parseAgents(body: unknown): Agent[] {
           : {}),
         ...('actedAt' in each ? { actedAt: textOr(each.actedAt) } : {}),
         ...('sessionEnded' in each ? { sessionEnded: each.sessionEnded === true } : {}),
+        ...(AGENT_STATUSES.includes(each.status as AgentStatus)
+          ? { status: each.status as AgentStatus }
+          : {}),
       },
     ];
   });
