@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { DEFAULT_QUIET, type NotifyPrefs } from '../../../src/core/notify/planner.ts';
 import type { NotifyKind } from '../../../src/core/notify/signals.ts';
 import { fetchNotify, fetchProjects, postNotifyPrefs, postTestPush } from '../api.ts';
+import { PageSection } from '../components/PageSection.tsx';
 import type { Platform } from '../home-screen.ts';
 import { language, type PlainKey, t } from '../i18n/i18n.ts';
 import { Icon } from '../kit/Icon.tsx';
@@ -172,9 +173,6 @@ export type NotifyBodyProps = {
   onRecheck?: () => void;
   // This browser lost its subscription and the server dropped it (TS-3): turn them on again.
   lost?: boolean;
-  // In the desktop app: bring Otea to the front when an agent asks. Null until the app answers.
-  front?: boolean | null;
-  onFront?: (on: boolean) => void;
 };
 
 // Where to allow them again, with a way to read it again once allowed.
@@ -221,8 +219,6 @@ export function NotifyBody({
   onTest,
   onRecheck,
   lost = false,
-  front = null,
-  onFront,
 }: NotifyBodyProps) {
   if (offer === 'blocked')
     return <Blocked platform={platform} lost={false} onRecheck={onRecheck} />;
@@ -257,14 +253,6 @@ export function NotifyBody({
       ) : null}
       <NotifyChoices prefs={view.prefs} projects={projects} onChange={onPrefs} />
       {offer === 'desktop' ? <p className="gnote">{t('notify.desktopNote')}</p> : null}
-      {offer === 'desktop' && front !== null && onFront ? (
-        <div className="nchoices">
-          <Toggle on={front} onChange={onFront}>
-            {t('notify.front')}
-            <small>{t('notify.frontHint')}</small>
-          </Toggle>
-        </div>
-      ) : null}
       {failed}
       {offer === 'push' ? (
         <>
@@ -289,16 +277,37 @@ export function NotifyBody({
   );
 }
 
+// In the desktop app: bring Otea to the front when an agent asks (the app's own choice, its Window
+// section). Null until the app answers: then there is nothing to show.
+export function windowShown(offer: NotifyOffer, front: boolean | null): front is boolean {
+  return offer === 'desktop' && front !== null;
+}
+
+export function FrontChoice({
+  front,
+  onFront,
+}: {
+  front: boolean | null;
+  onFront: (on: boolean) => void;
+}) {
+  if (front === null) return null;
+  return (
+    <div className="nchoices">
+      <Toggle on={front} onChange={onFront}>
+        {t('notify.front')}
+        <small>{t('notify.frontHint')}</small>
+      </Toggle>
+    </div>
+  );
+}
+
 // Without the computer, before its answer ever came: the section still shows, and says why it is
 // empty (TS-24).
 export function NotifyOffline() {
   return (
-    <div className="pgroup" data-i="">
-      <span className="gl">{t('notify.title')}</span>
-      <div className="gb">
-        <p className="gnote">{t('notify.needsConnection')}</p>
-      </div>
-    </div>
+    <PageSection name={t('prefs.sec.notify')} stack>
+      <p className="gnote">{t('notify.needsConnection')}</p>
+    </PageSection>
   );
 }
 
@@ -314,6 +323,7 @@ export function NotifyGroup() {
   const [tested, setTested] = useState<string | null>(null);
   // The desktop app's own preference: bring Otea to the front when an agent asks.
   const [front, setFront] = useState<boolean | null>(null);
+  const [frontFailed, setFrontFailed] = useState(false);
   // The server dropped a subscription this browser had lost (TS-3): it says so until turned on.
   const [lost, setLost] = useState(() => lostPrefs() !== null);
   // What this browser holds: its permission, and whether it still has a push subscription. Read as
@@ -410,9 +420,8 @@ export function NotifyGroup() {
     }
   };
   return (
-    <div className="pgroup" data-i="">
-      <span className="gl">{t('notify.title')}</span>
-      <div className="gb">
+    <>
+      <PageSection name={t('prefs.sec.notify')} stack>
         <NotifyBody
           offer={offer}
           view={view}
@@ -455,17 +464,6 @@ export function NotifyGroup() {
               .finally(() => setTesting(false));
           }}
           onRecheck={() => setChecks((n) => n + 1)}
-          front={front}
-          onFront={(next) => {
-            setFront(next);
-            void desktopPrefs()
-              ?.setBringToFront(next)
-              .then(setFront)
-              .catch(() => {
-                setFront(!next);
-                setProblem('notify.saveFailed');
-              });
-          }}
           onPrefs={(prefs) => {
             const before = view;
             setView({ ...view, prefs });
@@ -477,7 +475,30 @@ export function NotifyGroup() {
               });
           }}
         />
-      </div>
-    </div>
+      </PageSection>
+      {windowShown(offer, front) ? (
+        <PageSection name={t('prefs.sec.window')} stack>
+          <FrontChoice
+            front={front}
+            onFront={(next) => {
+              setFront(next);
+              setFrontFailed(false);
+              void desktopPrefs()
+                ?.setBringToFront(next)
+                .then(setFront)
+                .catch(() => {
+                  setFront(!next);
+                  setFrontFailed(true);
+                });
+            }}
+          />
+          {frontFailed ? (
+            <p className="gnote nproblem" role="status">
+              {t('notify.saveFailed')}
+            </p>
+          ) : null}
+        </PageSection>
+      ) : null}
+    </>
   );
 }

@@ -86,10 +86,19 @@ export const shell = {
   'prefs.onlyInterface': 'Solo se traduce la interfaz.',
   'prefs.translated':
     '{only} El contenido de los ítems, sus campos y lo que escriben los agentes se quedan como están.',
-  'prefs.session': 'sesión',
   'prefs.phone': 'Teléfono, en Configuración…',
-  'prefs.about': 'acerca de',
   'prefs.server': 'servidor',
+  'prefs.all': 'Todas las preferencias…',
+  // La página Preferencias: lo tuyo, frente a la Configuración del proyecto
+  'prefs.kicker': 'Tú',
+  'prefs.dek':
+    'Lo tuyo, no del proyecto: cómo se ve y habla Otea para ti, qué te avisa y tu sesión. Lo del proyecto está en Configuración.',
+  'prefs.sec.appearance': 'Apariencia',
+  'prefs.sec.notify': 'Avisos',
+  'prefs.sec.window': 'Ventana',
+  'prefs.sec.app': 'Aplicación',
+  'prefs.sec.session': 'Sesión',
+  'prefs.sec.about': 'Acerca de',
 
   // La nota de la primera vez, cuando el navegador eligió un idioma que no es el inglés
   'languageNote.label': 'Idioma',

@@ -256,7 +256,6 @@ export const phone = {
   'offline.queue.waiting': 'en cola',
   'offline.queue.refused': 'no se envió: {message}',
   'offline.queue.discard': 'Descartar',
-  'offline.install.title': 'aplicación',
   'offline.install.add': 'Agregar a la pantalla de inicio',
   'offline.install.ios': 'En Safari: Compartir › Agregar a inicio.',
   'offline.install.android': 'En Chrome: menú (⋮) › Agregar a la pantalla principal.',
@@ -279,7 +278,6 @@ export const phone = {
   'phone.transport.offline':
     'Instalada en el teléfono, Otea se abre aunque este equipo esté apagado: muestra lo último que vio, y lo que apuntes espera en cola hasta que este equipo responda.',
   // Preferencias › Avisos: avisos en el teléfono (Web Push) y en la app de escritorio (notify/)
-  'notify.title': 'avisos',
   'notify.turn': 'Te toca',
   'notify.turnHint': 'una revisión o una aprobación',
   'notify.replied': 'Un agente contestó tu nota',

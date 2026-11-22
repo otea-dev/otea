@@ -251,7 +251,6 @@ export const phone = {
   'offline.queue.waiting': 'queued',
   'offline.queue.refused': 'not sent: {message}',
   'offline.queue.discard': 'Discard',
-  'offline.install.title': 'app',
   'offline.install.add': 'Add to Home Screen',
   'offline.install.ios': 'In Safari: Share › Add to Home Screen.',
   'offline.install.android': 'In Chrome: menu (⋮) › Add to Home screen.',
@@ -273,7 +272,6 @@ export const phone = {
   'phone.transport.offline':
     'Installed on the phone, Otea opens even with this computer off: it shows the last it saw, and what you capture waits in a queue until this computer answers.',
   // Preferencias › Avisos: notifications on the phone (Web Push) and in the desktop app (notify/)
-  'notify.title': 'notifications',
   'notify.turn': 'It is your turn',
   'notify.turnHint': 'a review or an approval',
   'notify.replied': 'An agent answered your note',

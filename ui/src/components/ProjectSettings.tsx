@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import {
   addProjectPath,
   fetchProjectSettings,
@@ -14,24 +14,11 @@ import { sizeLabel } from '../projects.ts';
 import type { RepoSettings, ProjectSettings as Settings } from '../types.ts';
 import { TopicsSetting } from '../views/topics/TopicsSetting.tsx';
 import { CopyGlyph } from './CopyCommand.tsx';
+import { PageSection as Section } from './PageSection.tsx';
 import { PhoneTransport } from './PhoneTransport.tsx';
 import { settingsSectionId, takeSettingsFocus } from './settings-focus.ts';
 
 type PathSettings = Settings['paths'][number];
-
-type SectionProps = { name: string; sub?: string; id?: string; children: ReactNode };
-
-function Section({ name, sub, id, children }: SectionProps) {
-  return (
-    <section className="pj-sec" id={id}>
-      <div className="pj-sec-label">
-        <h2>{name}</h2>
-        {sub ? <span className="margin-label">{sub}</span> : null}
-      </div>
-      <div className="pj-sec-body">{children}</div>
-    </section>
-  );
-}
 
 function Gate({ repo }: { repo: RepoSettings }) {
   // An older Otea wrote the hook: it lets a push through when Otea cannot check it.

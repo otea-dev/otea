@@ -3,7 +3,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_PREFS } from '../../../src/core/notify/planner.ts';
 import { setLanguage } from '../i18n/i18n.ts';
-import { NotifyBody, type NotifyBodyProps, NotifyOffline, toggleMuted } from './NotifyGroup.tsx';
+import {
+  FrontChoice,
+  NotifyBody,
+  type NotifyBodyProps,
+  NotifyOffline,
+  toggleMuted,
+  windowShown,
+} from './NotifyGroup.tsx';
 import { blockedHereOf, dropIfStale, keyBytes, staleSubscription } from './push-client.ts';
 import { APP_NAME, testPushWords } from './test-push.ts';
 
@@ -117,14 +124,12 @@ describe('Preferencias › Avisos', () => {
     expect(html).not.toContain('Turn off on this phone');
   });
 
-  describe('bring Otea to the front when an agent asks', () => {
-    const desktop = {
-      offer: 'desktop',
-      view: { ...view, target: 'desktop', subscribed: true },
-    } as const;
+  describe('bring Otea to the front when an agent asks (the Window section)', () => {
+    const choice = (front: boolean | null) =>
+      renderToStaticMarkup(createElement(FrontChoice, { front, onFront: () => {} }));
 
     it('is a switch of the desktop app, off as the app starts, with what it does either way', () => {
-      const html = render({ ...desktop, front: false, onFront: () => {} });
+      const html = choice(false);
       expect(html).toContain('Bring Otea to the front when an agent asks');
       expect(html).toContain('a notification and the count on the taskbar or Dock');
       expect(html).toMatch(/aria-checked="false"[^>]*>(?:(?!<button).)*Bring Otea to the front/s);
@@ -132,7 +137,7 @@ describe('Preferencias › Avisos', () => {
 
     it('shows it on when chosen, and in Spanish', () => {
       setLanguage('es');
-      const html = render({ ...desktop, front: true, onFront: () => {} });
+      const html = choice(true);
       expect(html).toMatch(
         /aria-checked="true"[^>]*>(?:(?!<button).)*Traer Otea al frente cuando un agente pregunta/s,
       );
@@ -140,11 +145,19 @@ describe('Preferencias › Avisos', () => {
     });
 
     it('waits for the app to answer, and is not in a browser or on a phone', () => {
-      expect(render({ ...desktop, front: null, onFront: () => {} })).not.toContain('to the front');
-      expect(render({ ...desktop })).not.toContain('to the front');
-      expect(
-        render({ view: { ...view, subscribed: true }, front: false, onFront: () => {} }),
-      ).not.toContain('to the front');
+      expect(choice(null)).toBe('');
+      expect(windowShown('desktop', null)).toBe(false);
+      expect(windowShown('desktop', false)).toBe(true);
+      expect(windowShown('push', false)).toBe(false);
+      expect(windowShown('needs-https', true)).toBe(false);
+    });
+
+    it('is not among the notification choices', () => {
+      const html = render({
+        offer: 'desktop',
+        view: { ...view, target: 'desktop', subscribed: true },
+      });
+      expect(html).not.toContain('to the front');
     });
   });
 

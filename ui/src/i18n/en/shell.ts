@@ -83,10 +83,19 @@ export const shell = {
   'prefs.spanish': 'Español',
   'prefs.onlyInterface': 'Only the interface is translated.',
   'prefs.translated': '{only} Item content, their fields and what agents write stay as they are.',
-  'prefs.session': 'session',
   'prefs.phone': 'Phone, in Settings…',
-  'prefs.about': 'about',
   'prefs.server': 'server',
+  'prefs.all': 'All preferences…',
+  // The Preferences page: yours, as against the project's Settings
+  'prefs.kicker': 'You',
+  'prefs.dek':
+    'Yours, not the project’s: how Otea looks and speaks for you, what it tells you and your session. The project’s own are under Settings.',
+  'prefs.sec.appearance': 'Appearance',
+  'prefs.sec.notify': 'Notifications',
+  'prefs.sec.window': 'Window',
+  'prefs.sec.app': 'App',
+  'prefs.sec.session': 'Session',
+  'prefs.sec.about': 'About',
 
   // The note of the first run, when the browser picked a language other than English
   'languageNote.label': 'Language',
