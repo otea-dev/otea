@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { OteaError } from '../core/errors.ts';
 import type { Launcher } from './launcher.ts';
@@ -70,7 +70,10 @@ function occurrences(text: string, word: string): number[] {
 export function removeAgentsMd(root: string, dryRun = false): AgentsMdRemoval {
   const path = join(root, 'AGENTS.md');
   if (!existsSync(path)) return { path, action: 'absent' };
-  const current = readFileSync(path, 'utf8');
+  // The file the block is in: the target of a link, which is written, never the link itself.
+  const linked = lstatSync(path).isSymbolicLink();
+  const real = linked ? realpathSync(path) : path;
+  const current = readFileSync(real, 'utf8');
   const begins = occurrences(current, BEGIN);
   const ends = occurrences(current, END);
   if (begins.length === 0 && ends.length === 0) return { path, action: 'absent' };
@@ -106,9 +109,18 @@ export function removeAgentsMd(root: string, dryRun = false): AgentsMdRemoval {
   else if (/\n\r?\n$/.test(before) && /^\r?\n/.test(after)) after = after.replace(/^\r?\n/, '');
   const next = `${before}${after}`;
   const empty = next.trim() === '';
+  // A link is never removed, and a file it points to is never deleted: with the block gone from
+  // the target there would be nothing left, so both stay and the person is told.
+  if (empty && linked) {
+    return {
+      path,
+      action: 'refused',
+      reason: `it is a link to ${real} and nothing but Otea's block is in it, so Otea leaves both; delete them yourself if you want them gone`,
+    };
+  }
   if (!dryRun) {
     if (empty) rmSync(path);
-    else writeFileSync(path, next);
+    else writeFileSync(real, next);
   }
   return { path, action: empty ? 'deleted' : 'removed' };
 }

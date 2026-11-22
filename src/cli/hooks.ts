@@ -41,46 +41,71 @@ const FAILED_LINES = [
 const NOT_FOUND_LINE =
   '  echo "otea: not found, so this push is not checked by Otea (run otea hook install --git to update the hook, or otea hook remove --git)" >&2';
 
-// The lines of every pre-push hook an Otea wrote, whatever its version; the lines that hold the
-// command that runs Otea (its path is the machine's) are told by shape. A hook with any other line
-// is not Otea's alone: it has been edited, or holds the person's own.
-const OWN_LINES: ReadonlySet<string> = new Set([
-  '#!/bin/sh',
-  MARK,
-  '# Written by otea hook install --git; otea hook remove --git removes it.',
-  'while read -r local_ref local_sha remote_ref remote_sha; do',
-  '  case "$remote_ref" in',
-  '    refs/heads/*)',
-  '      branch="${remote_ref#refs/heads/}"',
-  '      code=$?',
-  `      if [ $code -eq ${EXIT_CODES.gate_refused} ]; then exit 1; fi`,
-  `      if [ $code -ne 0 ] && [ $code -ne ${EXIT_CODES.invalid_gate} ]; then`,
-  ...FAILED_LINES.map((line) => `        echo "${line}" >&2`),
-  '        exit 1',
-  '      fi',
-  '      ;;',
-  '  esac',
-  'done',
-  'exit 0',
-  'fi',
-  '  exit 0',
-  NOT_FOUND_LINE,
-  // The hooks before the fail-closed one.
-  '      if [ $? -eq 1 ]; then exit 1; fi',
-  `      if [ $? -eq ${EXIT_CODES.gate_refused} ]; then exit 1; fi`,
-]);
-const OWN_PATTERNS: readonly RegExp[] = [
-  /^# otea-hook-version: \d+$/,
-  /^ {6}.+ check --gate push --branch "(\$branch|\$\{remote_ref#refs\/heads\/\})" --repo( --commits "\$remote_sha\.\.\$local_sha")? < \/dev\/null$/,
-  /^if ! \{ \[ -e .* \]; \}; then$/,
+const HEADER_LINE = '# Written by otea hook install --git; otea hook remove --git removes it.';
+
+// The hooks an Otea wrote before the fail-closed one (no version line): which ref its case reads,
+// whether it passes --commits, and the exit code it refuses on.
+const LEGACY_HOOKS = [
+  { ref: 'local_ref', commits: false, code: 1 },
+  { ref: 'remote_ref', commits: false, code: 1 },
+  { ref: 'remote_ref', commits: false, code: EXIT_CODES.gate_refused },
+  { ref: 'remote_ref', commits: true, code: EXIT_CODES.gate_refused },
 ];
 
-// Whether a pre-push hook holds only lines an Otea wrote (blank lines aside).
-export function isOteaOwnHook(content: string): boolean {
-  return content
+function legacyHook(command: string, { ref, commits, code }: (typeof LEGACY_HOOKS)[number]) {
+  return `${[
+    '#!/bin/sh',
+    MARK,
+    HEADER_LINE,
+    'while read -r local_ref local_sha remote_ref remote_sha; do',
+    `  case "$${ref}" in`,
+    '    refs/heads/*)',
+    `      ${command} check --gate push --branch "\${${ref}#refs/heads/}" --repo${commits ? ' --commits "$remote_sha..$local_sha"' : ''} < /dev/null`,
+    `      if [ $? -eq ${code} ]; then exit 1; fi`,
+    '      ;;',
+    '  esac',
+    'done',
+    'exit 0',
+  ].join('\n')}\n`;
+}
+
+// A word of a command line as `word` writes it: bare, or in double quotes with only ", $, ` and \
+// escaped. The command a hook runs is words (after any NAME=value), never a shell operator, so a
+// prefix of the person's own (`echo hi; otea`) is no launcher.
+const WORD = '(?:(?:--)?[\\w=.-]+|"(?:[^"$`\\\\]|\\\\["$`\\\\])*")';
+const COMMAND = new RegExp(`^(?:[A-Za-z_]\\w*=${WORD} )*${WORD}(?: ${WORD})*$`);
+const MISSING_LINE = new RegExp(
+  `^if ! \\{ \\[ -e ${WORD} \\](?: && \\[ -e ${WORD} \\])*; \\}; then$`,
+);
+
+// The text with line endings and trailing blanks made one.
+const flat = (text: string) =>
+  text
     .split(/\r?\n/)
-    .filter((line) => line.trim() !== '')
-    .every((line) => OWN_LINES.has(line) || OWN_PATTERNS.some((pattern) => pattern.test(line)));
+    .map((line) => line.trimEnd())
+    .join('\n')
+    .trimEnd();
+
+// Whether a pre-push hook is exactly one an Otea wrote, in any of its versions, bar line endings
+// and trailing blanks. Each version is written again with the command (and the lines that say the
+// Otea is gone) the file itself holds, which must be a plain command line, and compared whole: a
+// hook with a line more, a line less or a line changed is the person's, or an edit of it.
+export function isOteaOwnHook(content: string): boolean {
+  const lines = flat(content).split('\n');
+  const found = lines
+    .map((line) => /^ {6}(.+?) check --gate push --branch /.exec(line)?.[1])
+    .find((command) => command !== undefined);
+  if (found === undefined || !COMMAND.test(found)) return false;
+  const missing = lines.findIndex((line) => line.startsWith('if ! {'));
+  const gone = missing < 0 ? [] : lines.slice(missing, missing + 4);
+  if (gone.length > 0 && !MISSING_LINE.test(gone[0] ?? '')) return false;
+  const candidates = [
+    ...LEGACY_HOOKS.map((legacy) => legacyHook(found, legacy)),
+    modernHook(found, '# otea-hook-version: 2', []),
+    modernHook(found, VERSION, gone),
+  ];
+  const given = flat(content);
+  return candidates.some((candidate) => flat(candidate) === given);
 }
 
 // Checks every branch the push writes to or deletes on the remote, not the local branch it sends
@@ -90,14 +115,14 @@ export function isOteaOwnHook(content: string): boolean {
 // go. Tags and other refs are not branches and go unchecked. --commits names what the remote has
 // and what it gets, so a push into a base branch a board protects is checked against the branches
 // it brings in. Otea's language is unknown when it cannot run: the person's line is in both.
-function gitCheckLines(otea: Launcher): string {
+function gitCheckLines(command: string): string {
   const failed = FAILED_LINES;
   return [
     'while read -r local_ref local_sha remote_ref remote_sha; do',
     '  case "$remote_ref" in',
     '    refs/heads/*)',
     '      branch="${remote_ref#refs/heads/}"',
-    `      ${oteaCommand(otea)} check --gate push --branch "$branch" --repo --commits "$remote_sha..$local_sha" < /dev/null`,
+    `      ${command} check --gate push --branch "$branch" --repo --commits "$remote_sha..$local_sha" < /dev/null`,
     '      code=$?',
     `      if [ $code -eq ${EXIT_CODES.gate_refused} ]; then exit 1; fi`,
     `      if [ $code -ne 0 ] && [ $code -ne ${EXIT_CODES.invalid_gate} ]; then`,
@@ -110,14 +135,15 @@ function gitCheckLines(otea: Launcher): string {
   ].join('\n');
 }
 
+// The hook of a version that fails closed, for the command line that runs Otea and the lines that
+// say it is gone (none before version 3).
+function modernHook(command: string, versionLine: string, gone: readonly string[]): string {
+  const header = ['#!/bin/sh', MARK, versionLine, HEADER_LINE];
+  return `${[...header, ...gone, gitCheckLines(command), 'exit 0'].join('\n')}\n`;
+}
+
 function preHook(otea: Launcher): string {
-  const header = [
-    '#!/bin/sh',
-    MARK,
-    VERSION,
-    '# Written by otea hook install --git; otea hook remove --git removes it.',
-  ];
-  return `${[...header, ...missingOteaLines(otea), gitCheckLines(otea), 'exit 0'].join('\n')}\n`;
+  return modernHook(oteaCommand(otea), VERSION, missingOteaLines(otea));
 }
 
 // When the Otea this hook runs is gone (uninstalled, a checkout moved), the push goes through with
@@ -161,7 +187,7 @@ export function installGitHook(cwd: string, otea: Launcher): HookChange {
   if (current !== undefined && !current.includes(MARK)) {
     throw new CommandFailure(
       'already_exists',
-      `${path} is another pre-push hook; Otea leaves it as it is. To gate pushes, add to it:\n\n${gitCheckLines(otea)}`,
+      `${path} is another pre-push hook; Otea leaves it as it is. To gate pushes, add to it:\n\n${gitCheckLines(oteaCommand(otea))}`,
     );
   }
   const note = gitHookNote(path);

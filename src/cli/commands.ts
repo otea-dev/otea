@@ -3737,7 +3737,7 @@ const uninstall: Command = {
     let repos: RepoReport[] = [];
     let missing: string[] = [];
     if (repoScope) {
-      ({ reports: repos, missing } = uninstallRepos(cwd, home, dryRun));
+      ({ reports: repos, missing } = uninstallRepos(cwd, home, dryRun, input.warn));
       // Each repo says what changed, or what Otea left; one that had nothing of Otea's, one line.
       for (const { path, steps: done } of repos) {
         steps.push(...done);

@@ -172,7 +172,11 @@ function leftHook(cwd: string, error: CommandFailure): Step {
 // own AGENTS.md), then every folder the registry links to a project, a repo or a folder over
 // several repos (and the repos and worktrees below it): the projects Otea was set up in. Each once.
 // A registered folder that is gone is skipped, and said.
-export function repoTargets(cwd: string, home: string): { targets: string[]; missing: string[] } {
+export function repoTargets(
+  cwd: string,
+  home: string,
+  warn?: (message: string) => void,
+): { targets: string[]; missing: string[] } {
   const seen = new Set<string>();
   const targets: string[] = [];
   const missing: string[] = [];
@@ -187,7 +191,7 @@ export function repoTargets(cwd: string, home: string): { targets: string[]; mis
     for (const tree of worktreesOf(path)) add(tree);
   };
   if (inRepo(cwd)) addRepo(checkoutRoot(cwd) ?? resolve(cwd));
-  for (const { paths } of readRegistry(home)) {
+  for (const { paths } of readRegistry(home, warn)) {
     for (const { path, kind } of paths) {
       if (!existsSync(path)) {
         missing.push(path);
@@ -209,7 +213,10 @@ const REGISTRY_FILE = 'registry.db';
 // created when missing, not migrated, not switched to WAL. Nothing when it cannot be read. A
 // registry no server holds open is read as the file it is (immutable), so no -wal or -shm file
 // appears beside it; one a server has open is read through its WAL, whose files already exist.
-function readRegistry(home: string): ReturnType<typeof listProjects> {
+function readRegistry(
+  home: string,
+  warn?: (message: string) => void,
+): ReturnType<typeof listProjects> {
   const file = join(home, REGISTRY_FILE);
   if (!existsSync(file)) return [];
   const live = existsSync(`${file}-wal`);
@@ -219,7 +226,9 @@ function readRegistry(home: string): ReturnType<typeof listProjects> {
       readOnly: true,
     });
     return listProjects(db);
-  } catch {
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    warn?.(`could not read the registry in ${home} (${reason}); only this repo was checked`);
     return [];
   } finally {
     db?.close();
@@ -252,8 +261,9 @@ export function uninstallRepos(
   cwd: string,
   home: string,
   dryRun: boolean,
+  warn?: (message: string) => void,
 ): { reports: RepoReport[]; missing: string[] } {
-  const { targets, missing } = repoTargets(cwd, home);
+  const { targets, missing } = repoTargets(cwd, home, warn);
   const told = new Set<string>();
   const reports = targets.map((path) => {
     let done: Step[];
@@ -363,26 +373,38 @@ const real = (path: string) => {
 export function unsafeHome(
   folder: string,
   cwd: string,
-  own: string | undefined = userHome(),
+  own: string | undefined,
+  registered: readonly string[] = [],
 ): string | undefined {
   const at = real(folder);
   const key = (path: string) => pathKey(path, process.platform);
   const here = key(at);
   if (here === key(parse(at).root)) return 'a filesystem root';
-  if (own !== undefined && contains(here, key(own))) return 'or holds your home folder';
+  // Without the person's home folder there is no telling whether this holds it: refused.
+  if (own === undefined) return 'a folder that may hold your home folder (it could not be found)';
+  if (contains(here, key(own))) return 'or holds your home folder';
   if (contains(here, key(real(cwd)))) return 'or holds the folder you are in';
+  const inside = registered.find((path) => contains(here, key(real(path))));
+  if (inside !== undefined) return `or holds ${inside}, a folder registered to a project`;
   return undefined;
 }
 
 // What deleting the person's Otea data would remove: the Otea home (every project registered
 // there, its boards and its history) when it holds a registry, and the .otea folder of a local
 // project in the repo at cwd. Only for --purge-data. `home` is resolved against `cwd`. Refuses a
-// folder that is more than Otea's home (unsafeHome), and deletes nothing then.
-export function dataTargets(home: string, cwd: string, repoScope: boolean, own?: string): string[] {
+// folder that is more than Otea's home (unsafeHome), and deletes nothing then. `own` is where the
+// person's home folder is, and fails closed when it cannot be found.
+export function dataTargets(
+  home: string,
+  cwd: string,
+  repoScope: boolean,
+  own: () => string | undefined = userHome,
+): string[] {
   const targets: string[] = [];
   const folder = resolve(cwd, home);
   if (existsSync(join(folder, REGISTRY_FILE))) {
-    const why = unsafeHome(folder, cwd, own);
+    const registered = readRegistry(folder).flatMap(({ paths }) => paths.map(({ path }) => path));
+    const why = unsafeHome(folder, cwd, own(), registered);
     if (why !== undefined) {
       throw new CommandFailure(
         'forbidden',
