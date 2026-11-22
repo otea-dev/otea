@@ -67,10 +67,20 @@ describe('reading a board item by names', () => {
     expect(readFieldInput(several, { description: 'Se cae' })).toEqual({ fdesc: 'Se cae' });
   });
 
-  it('refuses "description" with the long texts named when the board has no single one', () => {
+  it('fills the first long text the creation form asks when none is named Description', () => {
     const several = errores();
     several.parts.fnotes = { id: 'fnotes', name: 'Notas', kind: 'long', hint: '', options: [] };
-    several.form = [...several.form, { ref: 'fnotes', required: true }];
+    several.form = [
+      { ref: 'fnotes', required: false },
+      { ref: 'fsteps', required: true },
+    ];
+    expect(readFieldInput(several, { description: 'x' })).toEqual({ fnotes: 'x' });
+  });
+
+  it('refuses "description" with the long texts named when the form asks none of several', () => {
+    const several = errores();
+    several.parts.fnotes = { id: 'fnotes', name: 'Notas', kind: 'long', hint: '', options: [] };
+    several.anytime = [...several.anytime, 'fnotes'];
     expect(() => readFieldInput(several, { description: 'x' })).toThrowError(
       'Errores has no description field; fill one of its long texts by name: Pasos, Notas',
     );
