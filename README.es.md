@@ -15,12 +15,9 @@
 
 **Otea es el lugar donde tú y tus agentes de IA se pasan el trabajo.** Los agentes dejan lo que hicieron, con su evidencia; tú dejas decisiones y comentarios. En cada momento se ve en qué está cada cosa y a quién le toca. Tus datos se quedan en tu proyecto: sin nube y sin cuentas.
 
-Esta es la guía corta en español. Todo lo demás está en el [README en inglés](README.md).
+Esta es la guía corta en español: instalar y empezar a usar Otea. Todo lo demás está en el [README en inglés](README.md) y en [`docs/`](docs/) (ver [Más información](#más-información)).
 
 ## 1. Instalar
-
-> [!NOTE]
-> La primera versión todavía no salió: hasta entonces no hay nada para descargar y `@otea/cli` en npm es solo un nombre reservado, así que [instala desde el código](#desde-el-código). Desde la primera versión, los pasos de abajo valen tal cual.
 
 Hay dos formas de instalar Otea: la **app de escritorio** o el **comando `otea` desde npm**. Las dos son el mismo Otea, con los mismos tableros, el mismo teléfono y los mismos agentes.
 
@@ -100,7 +97,7 @@ Para actualizar, corre `npm i -g @otea/cli` otra vez. Para quitarlo, `npm uninst
 
 ### Desde el código
 
-Para trabajar en Otea, o para correr lo que aún no se publicó (hasta la primera versión, es la única forma). Necesitas Git y Node.js 22.18 o posterior (se recomienda Node 24).
+Para trabajar en Otea, o para correr lo que aún no se publicó. Si solo quieres usar Otea, la app de escritorio o npm, arriba, es más simple. Necesitas Git y Node.js 22.18 o posterior (se recomienda Node 24).
 
 ```sh
 git clone https://github.com/otea-dev/otea.git
@@ -164,3 +161,46 @@ Si trabajas directo en `main` y no quieres que nada se suba antes de verlo, píd
 ## En Windows, con Git Bash
 
 Git Bash convierte en ruta un argumento que empieza con `/`. Otea lo corrige en los textos que recibe (un título, un campo, una nota), así que `otea create --title "/deploy falla"` conserva su barra. En cualquier otro caso, pon `MSYS_NO_PATHCONV=1` delante de ese comando o empieza el valor con `//`.
+
+## Estado
+
+Otea está en su versión 0.1.0: ya se puede usar, pero todavía es temprana y cambia rápido. La definición del producto está en [`docs/otea-product-definition.md`](docs/otea-product-definition.md) (en inglés).
+
+## Por qué Otea, y cuándo no
+
+Un gestor de tareas o un `TODO.md` guarda qué hay que hacer. Otea guarda también cómo, y lo comprueba:
+
+- **El tablero es el procedimiento.** El agente lee las instrucciones de cada paso en el tablero (`otea next`), no en un texto que repites en cada sesión.
+- **Cada entrega trae su evidencia.** El diff, las capturas, el resultado de las pruebas o la grabación vienen con el elemento, y los revisas ahí.
+- **Una puerta controla lo que un agente puede subir.** El hook de git deja pasar una rama solo mientras el paso de su elemento lo permite, y una rama base que el tablero protege solo después de que apruebes.
+
+Cuándo no usarlo:
+
+- Trabajas en vivo con un solo agente y nunca te alejas: el chat ya es la entrega.
+- Necesitas sincronización en la nube o cuentas: Otea es local primero y sus datos se quedan en tu computadora.
+- Necesitas un instalador firmado: los instaladores de Otea todavía no están firmados.
+
+## Ayuda
+
+Las preguntas y los errores van a [GitHub Issues](https://github.com/otea-dev/otea/issues). Un problema de seguridad se informa en privado, como indica [SECURITY.md](SECURITY.md).
+
+## Licencia
+
+Otea es software libre bajo la [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). Puedes usarlo, estudiarlo, modificarlo y compartirlo. Si distribuyes una versión modificada, o dejas que otras personas la usen por red, debes publicar su código fuente bajo la misma licencia y conservar los avisos de copyright.
+
+**Licencia comercial.** Si la AGPL no te sirve para tu uso (por ejemplo, integrar Otea en un producto cerrado), hay una licencia comercial. Abre un issue o escribe a Federico Daniel Ara ([@Lartweib](https://github.com/Lartweib)).
+
+**Nombre.** «Otea» y su logo identifican este proyecto. Los forks son bienvenidos bajo la AGPL, pero deben usar otro nombre.
+
+Las contribuciones se aceptan bajo el [Acuerdo de Licencia de Colaborador](CLA.md) (CLA, en inglés); mira [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Más información
+
+Esta guía no traduce todo el README. Para los comandos de cada día, la referencia y los detalles, usa el [README en inglés](README.md) y la carpeta [`docs/`](docs/), que también está en inglés:
+
+- [Trabajar con agentes](docs/working-with-agents.md): los comandos que ejecutan los agentes, la entrega de decisiones, la espera y qué pegar en el chat de un agente.
+- [MCP](docs/mcp.md): trabajar desde un cliente MCP.
+- [Proyectos](docs/projects.md): dónde vive un proyecto y cómo conectar varios repositorios.
+- [Tableros](docs/boards.md): plantillas, tableros que se dividen en otros y los controles de git.
+- [El escritorio](docs/desk.md): `otea serve` y la interfaz web.
+- [Varios proyectos y un teléfono](docs/phone.md): un servidor para todos los proyectos, el teléfono y los avisos.

@@ -65,12 +65,9 @@ The same change on a phone, with the agent's note and your two moves.
 
 ## Status
 
-Early: usable, still changing fast. The product definition lives in [`docs/otea-product-definition.md`](docs/otea-product-definition.md).
+Early: version 0.1.0 is out and usable, and still changing fast. The product definition lives in [`docs/otea-product-definition.md`](docs/otea-product-definition.md).
 
 ## Install
-
-> [!NOTE]
-> The first release is not out yet: until it is, there is nothing to download and `@otea/cli` on npm is only a placeholder, so [install from source](#from-source). From the first release, the steps below work as written.
 
 There are two ways to install Otea: the **desktop app**, or the **`otea` command from npm**. Both are the same Otea, with the same boards, phone and agents.
 
@@ -150,7 +147,7 @@ To update, run `npm i -g @otea/cli` again. To remove it, `npm uninstall -g @otea
 
 ### From source
 
-To work on Otea, or to run what is not released yet (until the first release, this is the only way). It takes Git and Node.js 22.18 or later (Node 24 recommended):
+To work on Otea, or to run what is not released yet. If you only want to use Otea, the desktop app or npm above is simpler. It takes Git and Node.js 22.18 or later (Node 24 recommended):
 
 ```sh
 git clone https://github.com/otea-dev/otea.git
