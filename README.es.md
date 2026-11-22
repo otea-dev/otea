@@ -112,7 +112,7 @@ otea --version
 
 ## 2. Crear el proyecto
 
-Elige la carpeta que quieres seguir, normalmente un repositorio. Nada se escribe en el repositorio, y el proyecto empieza sin tableros.
+Elige la carpeta que quieres seguir, normalmente un repositorio. Crear el proyecto no escribe nada en el repositorio, y empieza sin tableros. Cuando tu agente ejecuta `otea connect` (o tú `otea init --agents-md`), Otea añade a `AGENTS.md` un bloque marcado entre `<!-- otea:begin -->` y `<!-- otea:end -->`, que solo apunta a `otea board`; `otea hook install --git` escribe el hook de push. `otea uninstall` lo quita todo (`--dry-run` lista antes cada repo y archivo que tocaría) y no borra tus datos salvo con `--purge-data`.
 
 - **Si usas la app de escritorio:** ábrela. La primera vez te pide abrir un proyecto: **Abrir carpeta** (si la carpeta todavía no es un proyecto, la app te pregunta si lo creas ahí) o **Crear proyecto** (para una carpeta nueva). Si la carpeta está dentro de un repositorio de git, la app te ofrece crear el proyecto para todo el repositorio. No hace falta `otea init`: la app lo hace por ti. Las próximas veces, Otea reabre tu último proyecto; **Cambiar de proyecto…**, en el ícono de la bandeja o de la barra de menús, vuelve a mostrar la lista.
 - **Si usas la terminal (npm o código):** en la carpeta de tu proyecto:
