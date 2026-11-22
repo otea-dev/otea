@@ -97,7 +97,7 @@ describe('open', () => {
     const { code, err } = await otea('open');
 
     expect(code).toBe(11);
-    expect(err).toContain(`No Otea server answers on port ${port}; run "otea serve"`);
+    expect(err).toContain(`No Otea server answers on port ${port}; run "otea serve start"`);
     expect(err).not.toContain(token());
     expect(opened).toEqual([]);
   });

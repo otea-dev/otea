@@ -57,9 +57,9 @@ const DRAFT_ES =
 const LOOP = 'otea wait --turn agent --unclaimed';
 // The desk is the person's to open (P4-R3-9): one an agent starts in its shell closes with it.
 const DESK =
-  'Never start the desk (otea serve) yourself: I run it in a terminal of my own or open the Otea desktop app, since one you start closes with your session. If I ask you to start it anyway, run otea serve --no-open.';
+  'Never start the desk (otea serve) yourself: I run it in a terminal of my own or open the Otea desktop app, since otea serve closes with your session. If I ask you to start it anyway, run otea serve start --no-open: it keeps running on its own, and otea serve stop ends it.';
 const DESK_ES =
-  'Nunca abras tú el escritorio (otea serve): lo abro yo en una terminal mía o con la app de escritorio de Otea, porque el que abres tú se cierra con tu sesión. Si igual te pido que lo abras, ejecuta otea serve --no-open.';
+  'Nunca abras tú el escritorio (otea serve): lo abro yo en una terminal mía o con la app de escritorio de Otea, porque otea serve se cierra con tu sesión. Si igual te pido que lo abras, ejecuta otea serve start --no-open: sigue funcionando solo, y otea serve stop lo cierra.';
 // Topics are off until the person turns them on (P4-R3-10): the interview offers them.
 const TOPICS =
   'Ask me too whether you should keep a record of the side questions I ask you off the work (Topics); if I say yes, turn it on: `otea topic on`.';

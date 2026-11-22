@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { extname, resolve } from 'node:path';
+import { extname, join, resolve } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { renderUnicodeCompact } from 'uqr';
@@ -211,6 +211,14 @@ import {
   type Output,
   UsageError,
 } from './command.ts';
+import {
+  forgetStale,
+  inspectServer,
+  type Launch,
+  SERVE_LOG,
+  startServer,
+  stopServer,
+} from './daemon.ts';
 import { installForge, removeForge } from './forge.ts';
 import {
   columns,
@@ -446,7 +454,7 @@ const TEMPLATE_LIST = (() => {
 // itself and never starts the desk, which would close with its session (P4-R3-9).
 export const INIT_NEXT = [
   "Next: run otea serve in a terminal of your own, or open the Otea desktop app: the desk gives you the text to paste into your agent's chat (otea prompt prints it here).",
-  'An agent setting itself up runs otea connect --as <name> --model <id> --effort <level>; it never starts the desk for the person (if it must, otea serve --no-open).',
+  'An agent setting itself up runs otea connect --as <name> --model <id> --effort <level>; it never starts the desk for the person (if it must, otea serve start --no-open).',
 ];
 
 const init: Command = {
@@ -700,7 +708,7 @@ const migrateCommand: Command = {
     if (server && processAlive(server.pid)) {
       throw new OteaError(
         'in_use',
-        `otea serve (pid ${server.pid}, port ${server.port}) holds the project's database; stop it first`,
+        `otea serve (pid ${server.pid}, port ${server.port}) holds the project's database; stop it first (otea serve stop)`,
       );
     }
     const report = migrateToCommon(cwd);
@@ -2860,23 +2868,10 @@ function pages(url: string, token: string, here: { id: string } | undefined) {
   };
 }
 
-function alive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
-  }
-}
-
 // This computer's otea serve, when one runs and answers with this Otea home's key.
 async function runningServer(home: string): Promise<{ url: string; token: string } | undefined> {
-  const info = readServeFile(home);
-  const token = readUiToken(home);
-  if (!info || !token || !alive(info.pid)) return undefined;
-  const url = `http://127.0.0.1:${info.port}`;
-  const probe = await probeSignIn(`${url}/auth?token=${encodeURIComponent(token)}`);
-  return probe === 'ours' ? { url, token } : undefined;
+  const state = await inspectServer(home);
+  return state.kind === 'running' ? { url: state.url, token: state.token } : undefined;
 }
 
 // How often the server looks for projects registered (or served) since it started, so each one's
@@ -2988,15 +2983,119 @@ function phoneText(phone: PhoneServed): string {
 // Why a server stops once the process that started it ended (P1-R3-5): it stopped saying nothing,
 // and a server started in the background seemed to die at random.
 function ownerGoneText(started: number): string {
-  return `serve stopped: the process that started it (${started}) ended, as when the terminal or the agent session that ran it closes. To keep it running on its own, start it with otea serve --no-owner, and stop it with Ctrl+C or by its process id.`;
+  return `serve stopped: the process that started it (${started}) ended, as when the terminal or the agent session that ran it closes. To keep it running on its own, start it with otea serve start, and stop it with otea serve stop.`;
 }
+
+// What to do after a server answers: sign a browser in on the project's page, or print the link
+// for the person (or the agent that relays it) when --no-open. The link carries the server's key:
+// it is never in --json.
+async function signInLines(
+  { flag, openUrl, warn }: Pick<Input, 'flag' | 'openUrl' | 'warn'>,
+  signInUrl: string,
+): Promise<string[]> {
+  if (flag('no-open')) {
+    return [
+      `Sign a browser in at ${signInUrl} (it holds this computer's Otea key: keep it to yourself)`,
+    ];
+  }
+  await openUrl(signInUrl).catch((error: unknown) => {
+    const reason = error instanceof Error ? error.message : String(error);
+    warn(`Could not open a browser (${reason}); run "otea open" to try again`);
+  });
+  return [];
+}
+
+// How the background server runs Otea again: the node that runs this command (a bare `node` of a
+// launcher may be no command at all on the PATH of a service), or the desktop app's Electron.
+function daemonLaunch(): Launch {
+  const command = OTEA.command === 'node' ? process.execPath : OTEA.command;
+  return { command, args: OTEA.args, ...(OTEA.env ? { env: OTEA.env } : {}) };
+}
+
+const serveStart: Command = {
+  name: 'serve start',
+  summary: `Start this computer's otea serve in the background, on its own: it keeps running after the terminal or the agent's session that started it ends, until otea serve stop. Answers once it serves (default port ${DEFAULT_PORT}), then opens this project's page signed in (--no-open prints the sign-in link instead). One server runs per Otea home: when it runs already, this only opens this project there, and --port and --lan wait for the next start. Its output is in serve.log in the Otea home`,
+  args: [],
+  options: { port: {}, 'no-open': { flag: true }, lan: { flag: true } },
+  execute: async (input) => {
+    const { cwd, option, flag } = input;
+    const here = projectHere(cwd);
+    const home = oteaHome();
+    let state = await inspectServer(home);
+    forgetStale(home, state);
+    const started = state.kind !== 'running';
+    if (state.kind !== 'running') {
+      state = await startServer(home, {
+        port: portFrom(option('port')),
+        lan: flag('lan'),
+        launch: daemonLaunch(),
+      });
+    }
+    if (state.kind !== 'running') throw new Error('otea serve did not start');
+    const { url, signInUrl } = pages(state.url, state.token, here);
+    const signIn = await signInLines(input, signInUrl);
+    const { pid, port } = state;
+    const where = started
+      ? `Otea running in the background at ${url} (pid ${pid}; stop it with otea serve stop; log: ${join(home, SERVE_LOG)})`
+      : `Otea already runs on this computer (pid ${pid}): this project is at ${url}`;
+    return {
+      data: { url, pid, port, ...(started ? {} : { attached: true }) },
+      text: [where, ...signIn].join('\n'),
+    };
+  },
+};
+
+const serveStop: Command = {
+  name: 'serve stop',
+  summary:
+    "Stop this computer's otea serve, however it was started, by its process id. Stops nothing when none runs (the record of one that ended is cleaned up)",
+  args: [],
+  options: {},
+  execute: async () => {
+    const result = await stopServer(oteaHome());
+    if (!result) return { data: { stopped: false }, text: 'No otea serve is running' };
+    if ('stale' in result) {
+      return {
+        data: { stopped: false, stale: result.stale.pid },
+        text: `No otea serve is running: removed the record of ${result.stale.pid}, which is no server of this Otea home`,
+      };
+    }
+    const { pid, port } = result.stopped;
+    return {
+      data: { stopped: true, pid, port },
+      text: `Stopped otea serve (pid ${pid}, port ${port})`,
+    };
+  },
+};
+
+const serveStatus: Command = {
+  name: 'serve status',
+  summary:
+    "Say whether this computer's otea serve runs, with its address and process id; exits 11 (not_running) when none does, and cleans up the record of one that ended",
+  args: [],
+  options: {},
+  execute: async () => {
+    const home = oteaHome();
+    const state = await inspectServer(home);
+    forgetStale(home, state);
+    if (state.kind !== 'running') {
+      throw new CommandFailure('not_running', 'otea serve is not running; run "otea serve start"');
+    }
+    const { url, pid, port } = state;
+    return {
+      data: { running: true, url, pid, port },
+      text: `otea serve is running at ${url} (pid ${pid}, port ${port})`,
+    };
+  },
+};
 
 const serve: Command = {
   name: 'serve',
-  summary: `Serve the live UI of every project on this computer on 127.0.0.1 (default port ${DEFAULT_PORT}) until Ctrl+C, and open this project's page signed in; when this computer's otea serve runs already, it opens this project there instead. It also opens to phones on the same network when that was left open (Settings > Phone, otea phone lan --open), and --lan opens it for this run only; a phone on Tailscale (otea phone tailscale) pairs without it. It stops once the process that started it ends (a terminal closed, an agent's session over), saying so on stderr; --no-owner keeps it running on its own, as when started in the background`,
+  summary: `Serve the live UI of every project on this computer on 127.0.0.1 (default port ${DEFAULT_PORT}) until Ctrl+C, and open this project's page signed in; when this computer's otea serve runs already, it opens this project there instead. It also opens to phones on the same network when that was left open (Settings > Phone, otea phone lan --open), and --lan opens it for this run only; a phone on Tailscale (otea phone tailscale) pairs without it. It stops once the process that started it ends (a terminal closed, an agent's session over), saying so on stderr; otea serve start keeps it running on its own instead (--no-owner is what it runs with), and otea serve stop and otea serve status manage it`,
   args: [],
   options: { port: {}, 'no-open': { flag: true }, 'no-owner': { flag: true }, lan: { flag: true } },
-  execute: async ({ cwd, option, flag, signal, openUrl, warn, tailscale, probe, home }) => {
+  execute: async (input) => {
+    const { cwd, option, flag, signal, warn, tailscale, probe, home } = input;
     // A server whose starter is gone (an agent's session that ran it in the background ended)
     // stops, as it would with the terminal that ran it, and says why; --no-owner keeps it.
     const owner = flag('no-owner') ? undefined : watchOwner(signal);
@@ -3022,18 +3121,8 @@ const serve: Command = {
     if (served.attached) owner?.stop();
     const { url, signInUrl, phone, attached } = served;
     // With --no-open the person signs a browser in by hand, from a terminal or from what an agent
-    // that started the server relays. The link carries the server's key: it is never in --json.
-    const signIn = !flag('no-open')
-      ? []
-      : [
-          `Sign a browser in at ${signInUrl} (it holds this computer's Otea key: keep it to yourself)`,
-        ];
-    if (!flag('no-open')) {
-      await openUrl(signInUrl).catch((error: unknown) => {
-        const reason = error instanceof Error ? error.message : String(error);
-        warn(`Could not open a browser (${reason}); run "otea open" to try again`);
-      });
-    }
+    // that started the server relays.
+    const signIn = await signInLines(input, signInUrl);
     const where = attached
       ? `Otea already runs on this computer: this project is at ${url}`
       : `Otea running at ${url}`;
@@ -3074,7 +3163,7 @@ const devicesRevoke: Command = {
 };
 
 function notRunning(message: string): CommandFailure {
-  return new CommandFailure('not_running', `${message}; run "otea serve" first`);
+  return new CommandFailure('not_running', `${message}; run "otea serve start" first`);
 }
 
 const open: Command = {
@@ -3820,6 +3909,10 @@ export const COMMANDS: readonly Command[] = [
   check,
   hookInstall,
   hookRemove,
+  // The longer names first: a command is the first whose words all match.
+  serveStart,
+  serveStop,
+  serveStatus,
   serve,
   open,
   devicesList,

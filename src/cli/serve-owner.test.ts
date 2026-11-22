@@ -91,7 +91,7 @@ describe('serve started by a process that ends', () => {
     const said = readFileSync(join(logs, 'serve.err'), 'utf8');
     expect(said).toMatch(/^otea: serve stopped: the process that started it \(\d+\) ended/);
     expect(said).toContain(
-      'ended, as when the terminal or the agent session that ran it closes. To keep it running on its own, start it with otea serve --no-owner, and stop it with Ctrl+C or by its process id.',
+      'ended, as when the terminal or the agent session that ran it closes. To keep it running on its own, start it with otea serve start, and stop it with otea serve stop.',
     );
   }, 40_000);
 
