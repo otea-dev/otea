@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it } from 'vitest';
+import { textOf } from '../html-text.ts';
 import { setLanguage } from '../i18n/i18n.ts';
 import { captureTarget, TabBarView, type TabBarViewProps, tabBarFor, tabOn } from './TabBar.tsx';
 
@@ -19,7 +20,7 @@ const props = (o: Partial<TabBarViewProps> = {}): TabBarViewProps => ({
   ...o,
 });
 const render = (p: TabBarViewProps) => renderToStaticMarkup(createElement(TabBarView, p));
-const text = (html: string) => html.replace(/<[^>]+>/g, '');
+const text = textOf;
 
 describe('tabBarFor (mock 1, 4)', () => {
   it('stands on every page of the project', () => {
