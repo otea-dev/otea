@@ -703,6 +703,31 @@ describe('mcp server', () => {
       await other.close();
     });
 
+    // A rename mid-session is told by the agent: whoami or profile under another name. Any other
+    // call under a name says nothing of what the session is called.
+    it('tells the server when an agent says its name with whoami or profile, and on no other call', async () => {
+      const rebound: string[] = [];
+      const server = createMcpServer(COMMANDS, {
+        cwd: repo.dir,
+        agent: 'codex',
+        warn: () => {},
+        rebound: (agent) => rebound.push(agent),
+      });
+      const other = new Client({ name: 'codex-cli', version: '0.9.1' });
+      const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverSide);
+      await other.connect(clientSide);
+      await other.callTool({ name: 'list', arguments: { as: 'codex-b' } });
+      await other.callTool({ name: 'whoami', arguments: { as: 'codex-c' } });
+      await other.callTool({
+        name: 'profile',
+        arguments: { as: 'codex-d', model: 'm', effort: 'low' },
+      });
+
+      expect(rebound).toEqual(['codex-c', 'codex-d']);
+      await other.close();
+    });
+
     it('records the client as the harness of the agent on each tool call', async () => {
       expect(agents()).toEqual([expect.objectContaining({ name: 'claude', harness: 'cli' })]);
 

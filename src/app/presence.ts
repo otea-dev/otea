@@ -40,6 +40,7 @@ import {
   unconfirmProfile,
   upsertAgent,
 } from '../store/queries.ts';
+import { askingItems } from './asking.ts';
 import { type Clock, systemClock } from './items.ts';
 
 // What an agent came through: an MCP client's clientInfo, or `cli` for the command line.
@@ -504,23 +505,24 @@ export function endWaiter(db: DatabaseSync, agent: string, waiter: number): void
 // The agents an MCP server should stop hearing on its beats (`calls`: when each last called through
 // it, in ms): a subagent that has not called within the listening window has ended, though the
 // session's own agent (`own`), idle in its chat with the server open, still listens.
-// The name an MCP session counts as its own after a call as `name`: the first that called, then
-// any name that is not a subagent of it (a rename mid-session, claude to claude-2), so the old one
-// goes quiet and drops out within a listening window instead of staying connected as long as the
-// server runs. Its subagents (own-role) never take it over.
-export function ownName(own: string | undefined, name: string): string {
-  if (own === undefined || own === name) return name;
-  const role = name.startsWith(`${own}-`) ? name.slice(own.length + 1) : null;
-  return role !== null && !/^\d+$/.test(role) ? own : name;
-}
-
+//
+// A rename mid-session is told by the agent, never guessed from names: `named` holds the names that
+// ran whoami or profile through this server other than `own`. Once one of them called after `own`
+// did, and `own` has not called for a listening window, `own` is an old name and goes quiet too.
 export function quietVoices(
   calls: ReadonlyMap<string, number>,
   own: string | undefined,
   now: number,
+  named: ReadonlySet<string> = new Set(),
 ): string[] {
+  const ownAt = own === undefined ? undefined : calls.get(own);
+  const replaced =
+    own !== undefined &&
+    ownAt !== undefined &&
+    now - ownAt > LISTEN_WINDOW_MS &&
+    [...named].some((name) => name !== own && (calls.get(name) ?? -Infinity) > ownAt);
   return [...calls]
-    .filter(([name, at]) => name !== own && now - at > LISTEN_WINDOW_MS)
+    .filter(([name, at]) => (name !== own || replaced) && now - at > LISTEN_WINDOW_MS)
     .map(([name]) => name);
 }
 
@@ -576,6 +578,8 @@ export function listAgents(
   const silenced = (name: string) => listenersEnded(listeners.get(name), alive);
   const records = selectAgents(db);
   const released = selectLastReleases(db);
+  // Whoever has a question of its own waiting for the person: it waits for the answer, not at work.
+  const askers = new Set([...askingItems(db).values()].map(({ by }) => by));
   const names = records.map(({ name }) => name);
   // A subagent that let go of what it held and ran nothing since, for a short while, has finished,
   // whatever wait of it still beats in its parent's shells (P1-R3-8).
@@ -664,6 +668,7 @@ export function listAgents(
         waiting,
         called,
         handedOff,
+        asking: askers.has(name),
         sessionEnded: sessionEnded || ended,
       }),
       sessionEnded,

@@ -70,8 +70,8 @@ export const common = {
     'No agent is connected: this waits here until one connects and takes the next step.',
   'listen.busy': { one: 'queued: {agent} is working', other: 'queued: {count} agents are working' },
   'listen.busyLead': {
-    one: '{agent} is busy with another item; it will see this when it waits again.',
-    other: '{count} agents are busy with other items; they will see this when they wait again.',
+    one: '{agent} is working on another item; it will see this when it waits again.',
+    other: '{count} agents are working on other items; they will see this when they wait again.',
   },
   'listen.activeLead': {
     one: '{agent} is at work and will see it when it waits again.',

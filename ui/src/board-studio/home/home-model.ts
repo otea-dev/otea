@@ -1,4 +1,4 @@
-import type { Agent } from '../../presence.ts';
+import { type Agent, isConnected } from '../../presence.ts';
 import type { Item } from '../../types.ts';
 import type { BoardSummary, TemplateView } from '../api.ts';
 import { madeWithOf, pairOf } from '../pair.ts';
@@ -29,8 +29,11 @@ export function draftersOf(agents: readonly Agent[], now: string): string[] {
   const since = Date.parse(now) - RECENT_MS;
   return agents
     .filter((agent) => agent.profile !== null)
-    .filter((agent) => agent.live || Date.parse(agent.lastSeen) >= since)
-    .toSorted((a, b) => Number(b.live) - Number(a.live) || b.lastSeen.localeCompare(a.lastSeen))
+    .filter((agent) => isConnected(agent) || Date.parse(agent.lastSeen) >= since)
+    .toSorted(
+      (a, b) =>
+        Number(isConnected(b)) - Number(isConnected(a)) || b.lastSeen.localeCompare(a.lastSeen),
+    )
     .slice(0, DRAFTERS)
     .map(({ name }) => name);
 }

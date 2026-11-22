@@ -109,15 +109,18 @@ describe('workingAgents', () => {
     expect(workingAgents([agent('a', beating), agent('b')], items, NOW)).toEqual(['a']);
   });
 
-  it('names an agent that called Otea lately though it holds nothing', () => {
-    expect(workingAgents([agent('a', { actedAt: ago(1) })], items, NOW)).toEqual(['a']);
-    expect(workingAgents([agent('a', { actedAt: ago(10) })], items, NOW)).toEqual([]);
+  // The server says who is at work (status): the desk names exactly those, derives none itself.
+  it('names an agent the server says is working though it holds nothing', () => {
+    const called = { actedAt: ago(1), status: 'working' as const };
+    expect(workingAgents([agent('a', called)], items, NOW)).toEqual(['a']);
+    const idle = { actedAt: ago(10), status: 'connected' as const };
+    expect(workingAgents([agent('a', idle)], items, NOW)).toEqual([]);
   });
 
   // P7-R2-9: between two items its wait had just found work, so it was still heard listening, and
   // the desk read it as idle in its chat: red in 8 of 20 samples.
   it('names an agent between two items whose wait just ended, as it calls Otea', () => {
-    const between = { listening: true, actedAt: ago(0.5) };
+    const between = { listening: true, actedAt: ago(0.5), status: 'working' as const };
     expect(workingAgents([agent('a', between)], items, NOW)).toEqual(['a']);
   });
 
@@ -132,8 +135,9 @@ describe('workingAgents', () => {
   it('names none that only waits for your answer, nor one gone', () => {
     const asks = { question: 1, by: 'a', text: 'Which one?', at: ago(1) };
     const asking = [item({ id: 'TASK-2', lease, asks })];
-    expect(workingAgents([agent('a', { holding: ['TASK-2'] })], asking, NOW)).toEqual([]);
-    const gone = { live: false, holding: ['TASK-2'], actedAt: ago(1) };
+    const waits = { holding: ['TASK-2'], status: 'connected' as const };
+    expect(workingAgents([agent('a', waits)], asking, NOW)).toEqual([]);
+    const gone = { live: false, holding: ['TASK-2'], actedAt: ago(1), status: 'away' as const };
     expect(workingAgents([agent('a', gone)], items, NOW)).toEqual([]);
   });
 });
@@ -145,11 +149,10 @@ describe('hearing', () => {
   });
 
   it('names the agents at work while none waits, else raises the alarm', () => {
-    expect(hearing([agent('a', { actedAt: ago(1) })], [], NOW)).toEqual({
-      kind: 'working',
-      agents: ['a'],
-    });
-    expect(hearing([agent('a', { actedAt: ago(10) })], [], NOW)).toEqual({ kind: 'unheard' });
+    const called = agent('a', { actedAt: ago(1), status: 'working' });
+    expect(hearing([called], [], NOW)).toEqual({ kind: 'working', agents: ['a'] });
+    const idle = agent('a', { actedAt: ago(10), status: 'connected' });
+    expect(hearing([idle], [], NOW)).toEqual({ kind: 'unheard' });
     // Connected and idle in its chat: nobody hears the desk, and that is the alarm.
     expect(hearing([agent('a', { listening: true })], [], NOW)).toEqual({ kind: 'unheard' });
   });
@@ -182,24 +185,49 @@ describe('one status, one count', () => {
       item({ id: 'TASK-2', lease }),
       item({ id: 'TASK-3', lease: { holder: 'c', expiresAt: inMinutes(10) }, asks }),
     ];
+    // The server says what each is: c waits for your answer, so it is connected, not working.
     const agents = [
       agent('a', { holding: ['TASK-2'], status: 'working' }),
       agent('b', { actedAt: ago(0.5), status: 'working' }),
-      agent('c', { holding: ['TASK-3'], status: 'working' }),
+      agent('c', { holding: ['TASK-3'], status: 'connected' }),
       agent('d', { status: 'connected' }),
     ];
     const rows = agentRows(agents, all, NOW);
     expect(workingAgents(agents, all, NOW)).toEqual(['a', 'b']);
     expect(agentCounts(rows).holding).toBe(2);
+    expect(rows.filter((row) => row.working).map((row) => row.name)).toEqual(['a', 'b']);
   });
 
   // An agent working a long step over the command line gave no sign for a while: the desk said
-  // «Ningún agente conectado» over it.
-  it('keeps an agent silent on a live lease out of the empty room', () => {
+  // «Ningún agente conectado» over it, and its menu did not list it at all.
+  describe('an agent silent on a live lease', () => {
     const silent = agent('a', { live: false, holding: ['TASK-2'], status: 'silent' });
-    expect(hearing([silent], [], NOW)).toEqual({ kind: 'unheard' });
-    expect(pillSummary('live', [], 1)).toEqual({ kind: 'silent', count: 1 });
-    expect(pillSummary('live', [], 0)).toEqual({ kind: 'none' });
+
+    it('is listed in the menu as «sin señal», and the pill counts what the menu lists', () => {
+      const rows = agentRows([silent], items, NOW);
+      expect(rows.map((row) => [row.name, row.state, row.silent])).toEqual([['a', 'silent', true]]);
+      expect(agentCounts(rows)).toMatchObject({ live: 0, silent: 1, holding: 0 });
+      expect(pillSummary('live', rows)).toEqual({ kind: 'silent', count: 1 });
+      expect(hearing([silent], [], NOW)).toEqual({ kind: 'unheard' });
+    });
+
+    it('shows beside the agents that are connected, as the pill’s datum', () => {
+      const rows = agentRows(
+        [silent, agent('b', { holding: ['TASK-2'], status: 'working' })],
+        items,
+        NOW,
+      );
+      expect(rows).toHaveLength(2);
+      expect(pillSummary('live', rows)).toEqual({
+        kind: 'working',
+        count: 1,
+        extra: { kind: 'silent', n: 1 },
+      });
+    });
+
+    it('leaves the empty room to a project with no agent at all', () => {
+      expect(pillSummary('live', agentRows([], items, NOW))).toEqual({ kind: 'none' });
+    });
   });
 });
 
@@ -235,7 +263,7 @@ describe('unheardLead', () => {
     setLanguage('es');
     const busy = agent('claude-a', { holding: ['TASK-2'] });
     expect(unheardLead(['claude-a'], [busy], 'TASK-1')).toBe(
-      'claude-a está ocupado con otro ítem; lo verá cuando vuelva a esperar.',
+      'claude-a está trabajando en otro ítem; lo verá cuando vuelva a esperar.',
     );
     const free = agent('claude-a', { holding: [], actedAt: ago(0.5) });
     expect(unheardLead(['claude-a'], [free], 'TASK-1')).toBe(

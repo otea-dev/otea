@@ -212,7 +212,10 @@ describe('the item sheet', () => {
       expect(html).toContain('Mender está trabajando; lo verá cuando vuelva a esperar.');
       expect(html).not.toContain('Nadie está escuchando');
       // kiln holds nothing, and called Otea a minute ago: at work between two items (P7-R2-9).
-      const two = [busy, { ...busy, name: 'kiln', lastSeen: ago(1), actedAt: ago(1), holding: [] }];
+      const two = [
+        busy,
+        { ...busy, name: 'kiln', lastSeen: ago(1), actedAt: ago(1), holding: [] },
+      ].map((each) => ({ ...each, status: 'working' }));
       expect(render(onward, withAgents(two))).toContain(
         '2 agentes están trabajando; lo verán cuando vuelvan a esperar.',
       );
@@ -269,7 +272,13 @@ describe('the item sheet', () => {
     setLanguage('es');
     const queued: ItemView = { ...item, state: 'fixing', turn: 'agent', events: [] };
     const haiku = { name: 'claude-haiku', harness: null, holding: [], live: true, waiting: false };
-    const between = { ...haiku, lastSeen: ago(0.5), actedAt: ago(0.5), listening: true };
+    const between = {
+      ...haiku,
+      lastSeen: ago(0.5),
+      actedAt: ago(0.5),
+      listening: true,
+      status: 'working',
+    };
     const html = render(queued, { ...app, agents: [between] } as App);
     expect(html).toContain('data-unheard="calm"');
     expect(html).toContain('claude-haiku está trabajando; lo verá cuando vuelva a esperar.');

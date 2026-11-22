@@ -1,7 +1,7 @@
 import { activeLease } from '../../active-lease.ts';
 import type { FeedEvent } from '../../activity.ts';
 import { askingAgent, handedNote, isStuck } from '../../derive/toca.ts';
-import type { Agent } from '../../presence.ts';
+import { type Agent, isConnected } from '../../presence.ts';
 import type { Item, Turn } from '../../types.ts';
 
 // The agents column (SPEC §8.2, mock:1918-1985): what each agent is doing, and its last two hours
@@ -183,7 +183,9 @@ export function agentsShown(
 ): string[] {
   const from = now - WINDOW * MIN;
   const names = new Set<string>();
-  for (const a of presence ?? []) if (a.live || Date.parse(a.lastSeen) > from) names.add(a.name);
+  for (const a of presence ?? []) {
+    if (isConnected(a) || Date.parse(a.lastSeen) > from) names.add(a.name);
+  }
   for (const e of feed) {
     if (e.actor.kind === 'agent' && !relayed(e) && Date.parse(e.at) > from) names.add(e.actor.name);
   }

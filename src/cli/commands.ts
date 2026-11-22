@@ -104,7 +104,6 @@ import {
   nameFor,
   noteCall,
   offerName,
-  ownName,
   quietVoices,
   renewLeases,
   seeAgent,
@@ -3200,9 +3199,14 @@ const mcp: Command = {
     const newcomers = new Set<string>();
     // When each agent last called through this server: a subagent that stopped calling has ended,
     // and the beat stops hearing it (P1-11); the session's own agent is the one it was started as,
-    // else the first that called, then the one it renames itself to (ownName).
+    // else the first that called. A rename is told by the agent (whoami or profile under another
+    // name, `rebounded`), never guessed from names: see quietVoices.
     const calls = new Map<string, number>();
+    const rebounded = new Set<string>();
     let own = agent;
+    const rebound = (name: string) => {
+      if (name !== own) rebounded.add(name);
+    };
     const heard = (name: string) => {
       const fresh = !used.has(name);
       used.add(name);
@@ -3211,7 +3215,7 @@ const mcp: Command = {
       heardBy(cwd, name, client, warn, false, fresh, note(name));
       voices.add(name);
       calls.set(name, Date.now());
-      own = ownName(own, name);
+      own ??= name;
     };
     const still = (name: string) => {
       claimedBy(cwd, name, false, client);
@@ -3261,7 +3265,9 @@ const mcp: Command = {
     };
     const beat = setInterval(() => {
       runs();
-      const quiet = quietVoices(calls, own, Date.now()).filter((name) => voices.has(name));
+      const quiet = quietVoices(calls, own, Date.now(), rebounded).filter((name) =>
+        voices.has(name),
+      );
       for (const name of quiet) voices.delete(name);
       endListeningAll(
         cwd,
@@ -3297,6 +3303,7 @@ const mcp: Command = {
           greeted,
           heard,
           still,
+          rebound,
           failed,
           calling,
         }),

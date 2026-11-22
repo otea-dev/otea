@@ -75,10 +75,26 @@ export function actedWith(
   return own?.profile ?? agents?.find((a) => a.name === agent)?.profile ?? null;
 }
 
+// What the agent is doing now: the one word the server says (src/core/agent-status.ts), which no
+// part of the desk works out for itself. A server that sends none (older) leaves only its flags.
+export function statusOf(a: Pick<Agent, 'status' | 'live' | 'holding' | 'waiting'>): AgentStatus {
+  if (a.status !== undefined) return a.status;
+  if (!a.live) return 'away';
+  if (a.holding.length > 0) return 'working';
+  return a.waiting === true ? 'listening' : 'connected';
+}
+
+// Connected: working, listening or connected. One silent on a live lease is not (it is in the menu,
+// said «sin señal»), and neither is one away.
+export function isConnected(a: Pick<Agent, 'status' | 'live' | 'holding' | 'waiting'>): boolean {
+  const status = statusOf(a);
+  return status !== 'away' && status !== 'silent';
+}
+
 // The connected agents, the most recently seen first; a name keeps its place on a tie.
 export function liveAgents(agents: readonly Agent[]): Agent[] {
   return agents
-    .filter((agent) => agent.live)
+    .filter(isConnected)
     .map((agent, index) => ({ agent, index, seen: Date.parse(agent.lastSeen) || 0 }))
     .sort((a, b) => b.seen - a.seen || a.index - b.index)
     .map(({ agent }) => agent);

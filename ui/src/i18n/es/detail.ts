@@ -493,6 +493,7 @@ export const detail = {
   'sheet.stuck.agents': 'dárselo a',
   'sheet.stuck.working': 'trabajando',
   'sheet.stuck.quiet': 'callado',
+  'sheet.stuck.silent': 'sin señal',
   'sheet.stuck.free': 'libre',
   'sheet.stuck.none': 'Todavía no apareció ningún agente.',
   'sheet.aside.resume': 'Retomar',
