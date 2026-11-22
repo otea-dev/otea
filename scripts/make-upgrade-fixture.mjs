@@ -20,8 +20,9 @@ const run = (cmd, args, options) =>
 
 const prefix = join(scratch, 'npm');
 // npm is a .cmd on Windows, which needs a shell; the quoted prefix keeps a path with spaces whole.
-run('npm', ['install', '@otea/cli@0.1.0', '--prefix', `"${prefix}"`, '--silent'], {
-  shell: process.platform === 'win32',
+const shell = process.platform === 'win32';
+run('npm', ['install', '@otea/cli@0.1.0', '--prefix', shell ? `"${prefix}"` : prefix, '--silent'], {
+  shell,
 });
 const bin = join(prefix, 'node_modules', '@otea', 'cli', 'bin', 'otea.mjs');
 
@@ -72,7 +73,11 @@ otea('topic', 'answer', 'TEM-1', '--summary', 'Fixture answer', '--full', 'Full 
 
 // One compact file: checkpoint the WAL into the database, then copy it out vacuumed.
 const dataRoot = join(home, 'data');
-const [projectDir] = readdirSync(dataRoot);
+const projectDirs = readdirSync(dataRoot);
+if (projectDirs.length !== 1) {
+  throw new Error(`expected one project in ${dataRoot}, found ${projectDirs.length}`);
+}
+const [projectDir] = projectDirs;
 const source = new DatabaseSync(join(dataRoot, projectDir, 'otea.db'));
 source.exec('PRAGMA wal_checkpoint(TRUNCATE)');
 const out = resolve(import.meta.dirname, '..', 'src', 'app', 'fixtures', 'otea-0.1.0.db');

@@ -6,7 +6,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { OteaError } from '../core/errors.ts';
 import { longestContaining, pathKey } from '../core/path-key.ts';
 import { compareRepos, type RepoFingerprint, type RepoMatch } from '../core/repo.ts';
-import { openDatabase, transaction } from '../store/database.ts';
+import { openWithSetup, transaction } from '../store/database.ts';
 import {
   deleteProjectPath,
   insertProjectPath,
@@ -33,9 +33,10 @@ function registryPath(env: Env): string {
 
 export function openRegistry(env: Env = process.env): DatabaseSync {
   mkdirSync(oteaHome(env), { recursive: true });
-  const db = openDatabase(registryPath(env));
-  migrateRegistry(db);
-  return db;
+  return openWithSetup(registryPath(env), (db) => {
+    migrateRegistry(db);
+    return db;
+  });
 }
 
 // Runs `use` on the registry, or returns undefined without creating it when there is none yet.

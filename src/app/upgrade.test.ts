@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import { MIGRATIONS } from '../store/migrations.ts';
+import { openRegistry } from './home.ts';
 import { listItems } from './items.ts';
+import { openMachine } from './machine.ts';
 import { databasePath, openProject } from './project.ts';
 import { listTopics } from './topics.ts';
 
@@ -40,7 +42,9 @@ describe('upgrading a database', () => {
 
   it('opens the 0.1.0 database, migrates it and keeps every board, item, evidence and topic', () => {
     const { root, database } = projectWith(FIXTURE);
-    expect(userVersion(database)).toBeLessThanOrEqual(MIGRATIONS.length);
+    // The schema version 0.1.0 shipped. A fixture regenerated from a later release would pass
+    // without migrating anything, so the pin makes that a visible change.
+    expect(userVersion(database)).toBe(41);
 
     const project = openProject(root, { OTEA_HOME: process.env.OTEA_HOME });
     try {
@@ -93,5 +97,23 @@ describe('upgrading a database', () => {
 
     expect(readFileSync(newer.database).equals(before)).toBe(true);
     expect(userVersion(newer.database)).toBe(MIGRATIONS.length + 1);
+    // The refused open must not keep the file: Windows cannot delete a file a connection holds.
+    expect(() => rmSync(newer.database)).not.toThrow();
+  });
+
+  it.each([
+    ['registry.db', openRegistry],
+    ['machine.db', openMachine],
+  ])('refuses a newer %s and releases the file', (name, open) => {
+    const home = realpathSync.native(mkdtempSync(join(tmpdir(), 'otea-home-')));
+    dirs.push(home);
+    const db = new DatabaseSync(join(home, name));
+    db.exec('PRAGMA journal_mode = WAL');
+    db.exec('PRAGMA user_version = 9999');
+    db.close();
+
+    expect(() => open({ OTEA_HOME: home })).toThrow(/newer Otea/);
+
+    expect(() => rmSync(join(home, name))).not.toThrow();
   });
 });
