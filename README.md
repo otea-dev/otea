@@ -4,6 +4,8 @@
 <img src="docs/images/otea-logo-light.svg" alt="Otea" width="116" height="161">
 </picture><ruby><rp>Otea</rp></ruby>
 <br>
+<a href="https://www.npmjs.com/package/@otea/cli"><img src="https://img.shields.io/npm/v/@otea/cli?label=npm&color=2d54d3" alt="npm version"></a>
+<a href="https://github.com/otea-dev/otea/releases/latest"><img src="https://img.shields.io/github/v/release/otea-dev/otea?label=download&color=2d54d3" alt="Latest release"></a>
 <a href="https://github.com/otea-dev/otea/actions/workflows/ci.yml"><img src="https://github.com/otea-dev/otea/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License: AGPL-3.0"></a>
 <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-%3E%3D22.18-339933" alt="Node &gt;=22.18"></a>
