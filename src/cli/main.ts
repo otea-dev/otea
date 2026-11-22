@@ -35,5 +35,6 @@ process.exitCode = await run(process.argv.slice(2), {
   probe: fetchProbe,
   gh: 'gh',
   forge: ghForge('gh'),
+  fetch: globalThis.fetch,
   ...(process.stdin.isTTY ? { ask } : { stdin }),
 });

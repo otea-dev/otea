@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { type ParseArgsOptionsConfig, parseArgs } from 'node:util';
+import { oteaHome } from '../app/home.ts';
 import { findOnPath, installRoot } from '../app/launcher.ts';
 import type { Probe } from '../app/phone.ts';
 import { CLI_HARNESS } from '../app/presence.ts';
@@ -18,6 +19,7 @@ import { EXIT_CODES } from './exit-codes.ts';
 import { type ForgeCli, NO_FORGE } from './forge.ts';
 import { commandHelp, generalHelp, groupHelp, HELP_ALL, HELP_HINT, shortHelp } from './help.ts';
 import type { Opener } from './opener.ts';
+import { startUpdateCheck, updateLine } from './update-notice.ts';
 import { OTEA_VERSION } from './version.ts';
 
 type Writer = { write(chunk: string): unknown; isTTY?: boolean };
@@ -38,6 +40,9 @@ export type Io = {
   // The forge otea hook install --forge sets rules on: gh where otea runs for a person, a fake in
   // tests; none elsewhere, so no test ever reaches GitHub.
   forge?: ForgeCli;
+  // The fetch the once-a-day check for a newer @otea/cli asks the npm registry with, only where
+  // otea runs for a person (main.ts); none elsewhere, so no test reaches the network.
+  fetch?: typeof fetch;
   // Present only when a person can answer at the terminal.
   ask?: (question: string) => Promise<string>;
   // Present only when something is piped in.
@@ -292,9 +297,25 @@ function report(error: unknown, argv: string[], io: Io, json: boolean): number {
 
 export async function run(argv: string[], io: Io): Promise<number> {
   const json = argv.includes('--json');
+  // Asked while the command runs; the notice is told after its own output, on stderr.
+  const notice = io.fetch
+    ? startUpdateCheck({
+        home: oteaHome(io.env),
+        env: io.env,
+        version: OTEA_VERSION,
+        fetch: io.fetch,
+        command: findCommand(argv.filter((token) => !token.startsWith('-')))?.name,
+        json,
+        terminal: io.stdout.isTTY === true,
+      })
+    : undefined;
+  let code: number;
   try {
-    return await dispatch(argv, io, json);
+    code = await dispatch(argv, io, json);
   } catch (error) {
-    return report(error, argv, io, json);
+    code = report(error, argv, io, json);
   }
+  const line = notice && (await updateLine(notice));
+  if (line) io.stderr.write(`otea: ${line}\n`);
+  return code;
 }
