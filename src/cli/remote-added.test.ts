@@ -5,17 +5,21 @@ import { repoNameAt, UnknownRepo } from '../app/repos.ts';
 import { type Cli, cliAt, tempGitRepo } from './testing.ts';
 
 // A repo is known by its origin URL, or by its root commit while it has no origin. A remote added
-// after `otea init` changes what the repo is known by, and the pre-push gate must not turn into a
-// wall that names no way out (persona P3).
+// after `otea init` changes what the repo is known by. Its root commit is shared by every fork, so
+// Otea never takes a checkout with an origin for a repo it only knew by that commit: the gate
+// refuses it, naming the command that says it is that repo (persona P3).
 describe('a remote added after init', () => {
   let repo: ReturnType<typeof tempGitRepo>;
   let otea: Cli;
-  const git = (...args: string[]) =>
+  let name: string;
+  const run = (dir: string, ...args: string[]) =>
     execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
-      cwd: repo.dir,
+      cwd: dir,
       stdio: 'pipe',
       encoding: 'utf8',
     });
+  const git = (...args: string[]) => run(repo.dir, ...args);
+  const gate = () => otea('check', '--gate', 'push', '--branch', 'feature', '--repo');
 
   // The name the project gives the checkout at `dir`.
   const nameAt = (dir: string) => {
@@ -27,60 +31,88 @@ describe('a remote added after init', () => {
     }
   };
 
+  // A copy of the repo's history under another origin: a fork.
+  const fork = (origin: string | undefined) => {
+    const copy = tempGitRepo();
+    run(copy.dir, 'fetch', '--quiet', repo.dir, 'HEAD');
+    run(copy.dir, 'checkout', '--quiet', '-B', 'main', 'FETCH_HEAD');
+    if (origin) run(copy.dir, 'remote', 'add', 'origin', origin);
+    return copy;
+  };
+
   beforeEach(async () => {
     repo = tempGitRepo();
     otea = cliAt(repo.dir, { OTEA_AGENT: 'claude' });
     git('commit', '--quiet', '--allow-empty', '-m', 'one');
     expect((await otea('init', '--local', '--template', 'none')).code).toBe(0);
-    expect((await otea('repos', 'list')).out).toContain('root:');
+    name = nameAt(repo.dir);
+    expect((await otea('repos', 'list')).out).toContain(`${name}  root:`);
   });
 
   afterEach(() => repo.remove());
 
-  it('still tells which repo this is, so the push gate does not refuse it', async () => {
-    const name = nameAt(repo.dir);
+  it('is refused by the gate, with the command that says it is the same repo', async () => {
     git('remote', 'add', 'origin', 'https://github.com/acme/keys.git');
 
-    const gate = await otea('check', '--gate', 'push', '--branch', 'feature', '--repo');
+    const refused = await gate();
 
-    expect(gate.err).not.toContain('refused');
-    expect(gate.code).not.toBe(19);
+    expect(refused.code).toBe(19);
+    expect(refused.err).toContain(
+      `If this is ${name}, run in ${repo.dir}: otea repos add --name ${name}`,
+    );
+    expect(() => nameAt(repo.dir)).toThrow(UnknownRepo);
+  });
+
+  it('is the same repo once that command ran: the repo then goes by its origin, and the push passes', async () => {
+    git('remote', 'add', 'origin', 'https://github.com/acme/keys.git');
+
+    const adopted = await otea('repos', 'add', '--name', name);
+
+    expect(adopted.code).toBe(0);
+    expect(adopted.out.trim()).toBe(`${name}  remote:github.com/acme/keys`);
+    expect((await otea('repos', 'list')).out.trim()).toBe(`${name}  remote:github.com/acme/keys`);
     expect(nameAt(repo.dir)).toBe(name);
+    const passed = await gate();
+    expect(passed.err).not.toContain('refused');
+    expect(passed.code).not.toBe(19);
   });
 
-  it('keeps one repo when it is named again, and the repo then goes by its origin', async () => {
+  it('refuses a fork, whether it is looked at before or after the repo took its origin', async () => {
     git('remote', 'add', 'origin', 'https://github.com/acme/keys.git');
-
-    const named = await otea('repos', 'add', '--name', 'keys');
-    const listed = (await otea('repos', 'list')).out.trim().split('\n');
-
-    expect(named.code).toBe(0);
-    expect(listed).toEqual(['keys  remote:github.com/acme/keys']);
-    expect(nameAt(repo.dir)).toBe('keys');
-  });
-
-  it('refuses a fork: the same root commits under another origin is another repo', async () => {
-    const name = nameAt(repo.dir);
-    git('remote', 'add', 'origin', 'https://github.com/acme/keys.git');
-    const fork = tempGitRepo();
+    const copy = fork('https://github.com/someone/keys.git');
     try {
-      execFileSync('git', ['fetch', '--quiet', repo.dir, 'HEAD'], { cwd: fork.dir, stdio: 'pipe' });
-      execFileSync('git', ['checkout', '--quiet', '-B', 'main', 'FETCH_HEAD'], {
-        cwd: fork.dir,
-        stdio: 'pipe',
-      });
-      execFileSync('git', ['remote', 'add', 'origin', 'https://github.com/someone/keys.git'], {
-        cwd: fork.dir,
-        stdio: 'pipe',
-      });
-      // The first match by root commit gives the repo its origin.
-      expect(nameAt(repo.dir)).toBe(name);
+      expect(() => nameAt(copy.dir)).toThrow(UnknownRepo);
 
-      expect(() => nameAt(fork.dir)).toThrow(UnknownRepo);
+      expect((await otea('repos', 'add', '--name', name)).code).toBe(0);
+
+      expect(() => nameAt(copy.dir)).toThrow(UnknownRepo);
       expect(nameAt(repo.dir)).toBe(name);
-      expect((await otea('repos', 'list')).out.trim()).toBe(`${name}  remote:github.com/acme/keys`);
     } finally {
-      fork.remove();
+      copy.remove();
+    }
+  });
+
+  it('does not take a name that is another repo’s for a checkout that is not its first-commit twin', async () => {
+    const other = tempGitRepo();
+    try {
+      run(other.dir, 'commit', '--quiet', '--allow-empty', '-m', 'unrelated');
+      run(other.dir, 'remote', 'add', 'origin', 'https://github.com/acme/other.git');
+
+      const refused = await otea('repos', 'add', other.dir, '--name', name);
+
+      expect(refused.code).toBe(5);
+      expect((await otea('repos', 'list')).out.trim()).toMatch(new RegExp(`^${name}  root:`));
+    } finally {
+      other.remove();
+    }
+  });
+
+  it('still matches a checkout with no origin by the first commit, as before', () => {
+    const copy = fork(undefined);
+    try {
+      expect(nameAt(copy.dir)).toBe(name);
+    } finally {
+      copy.remove();
     }
   });
 });

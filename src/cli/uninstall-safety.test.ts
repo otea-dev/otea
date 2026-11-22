@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -51,6 +52,15 @@ function snapshot(dir: string): Record<string, string> {
   return files;
 }
 
+// Every test has a person's home folder of its own, which exists and holds nothing of Otea's.
+beforeEach(() => {
+  own.home = temp('otea-user-home-');
+});
+afterEach(() => {
+  if (own.home !== undefined) rmSync(own.home, { recursive: true, force: true });
+  own.home = undefined;
+});
+
 describe('AGENTS.md block removal', () => {
   let dir: string;
   const path = () => join(dir, 'AGENTS.md');
@@ -93,6 +103,41 @@ describe('AGENTS.md block removal', () => {
     writeAgentsMd(dir);
     expect(removeAgentsMd(dir).action).toBe('removed');
     expect(text()).toBe(crlf('# Mine\n\nrules\n'));
+  });
+
+  describe('when AGENTS.md is a link', () => {
+    let target: string;
+    const link = (to: string) => {
+      target = join(dir, to);
+      try {
+        symlinkSync(target, path(), 'file');
+        return true;
+      } catch {
+        return false; // A computer that lets this user make no link has nothing to try.
+      }
+    };
+
+    it('takes the block out of the file it points to, and leaves the link a link', () => {
+      writeFileSync(join(dir, 'real.md'), `# Mine\n\n${AGENTS_BLOCK}\n`);
+      if (!link('real.md')) return;
+
+      expect(removeAgentsMd(dir).action).toBe('removed');
+
+      expect(lstatSync(path()).isSymbolicLink()).toBe(true);
+      expect(readFileSync(target, 'utf8')).toBe('# Mine\n');
+    });
+
+    it('leaves the link and its file when only Otea’s block would be left, and says so', () => {
+      writeFileSync(join(dir, 'real.md'), `${AGENTS_BLOCK}\n`);
+      if (!link('real.md')) return;
+
+      const result = removeAgentsMd(dir);
+
+      expect(result.action).toBe('refused');
+      expect(result.action === 'refused' && result.reason).toContain('it is a link to');
+      expect(lstatSync(path()).isSymbolicLink()).toBe(true);
+      expect(readFileSync(target, 'utf8')).toBe(`${AGENTS_BLOCK}\n`);
+    });
   });
 
   it.each([
@@ -157,6 +202,15 @@ describe('what uninstall leaves alone', () => {
         ].join('\n'),
       ),
     ).toBe(true);
+    // The version before the lines that say Otea is gone, and a file with trailing blanks.
+    const gone = written.split('\n');
+    const at = gone.findIndex((line) => line.startsWith('if ! {'));
+    const second = [...gone.slice(0, at), ...gone.slice(at + 4)]
+      .join('\n')
+      .replace('version: 3', 'version: 2');
+    expect(second).not.toBe(written);
+    expect(isOteaOwnHook(second)).toBe(true);
+    expect(isOteaOwnHook(written.replaceAll('\n', '  \r\n'))).toBe(true);
     expect(isOteaOwnHook(`${written}npm test\n`)).toBe(false);
     expect(isOteaOwnHook(`npm test\n${written}`)).toBe(false);
     expect(isOteaOwnHook(written.replace('exit 1', 'exit 0'))).toBe(false);
@@ -181,6 +235,43 @@ describe('what uninstall leaves alone', () => {
       expect(readFileSync(hook(), 'utf8')).toBe(edited);
       expect(result.out).toContain('Left the pre-push hook');
       expect(result.out).toContain('not what Otea writes');
+    }
+  });
+
+  it('leaves a hook that keeps Otea’s mark but runs another command first, or none of Otea’s', async () => {
+    installGitHook(repo.dir, launcher());
+    const written = readFileSync(hook(), 'utf8');
+
+    for (const edited of [
+      written.replace(/^( {6})(node )/m, '$1echo hi; $2'),
+      written.replace(/^( {6})(node )/m, '$1true && $2'),
+      written.replace(/^( {6})(node )/m, '$1$(id) $2'),
+    ]) {
+      expect(edited).not.toBe(written);
+      writeFileSync(hook(), edited);
+
+      const result = await otea('uninstall', '--only', 'repos');
+
+      expect(result.code).toBe(0);
+      expect(readFileSync(hook(), 'utf8')).toBe(edited);
+      expect(result.out).toContain('Left the pre-push hook');
+    }
+  });
+
+  it('warns, and still cleans this repo, when the registry cannot be read', async () => {
+    const broken = temp('otea-broken-home-');
+    try {
+      writeFileSync(join(broken, 'registry.db'), 'this is not a database '.repeat(40));
+      installGitHook(repo.dir, launcher());
+
+      const result = await cliAt(repo.dir, { OTEA_HOME: broken })('uninstall', '--only', 'repos');
+
+      expect(result.code).toBe(0);
+      expect(result.err).toContain('could not read the registry');
+      expect(result.err).toContain('only this repo was checked');
+      expect(existsSync(hook())).toBe(false);
+    } finally {
+      rmSync(broken, { recursive: true, force: true });
     }
   });
 
@@ -268,25 +359,53 @@ describe('the data purge', () => {
   beforeEach(() => {
     home = temp('otea-purge-home-');
     work = temp('otea-purge-work-');
-    own.home = undefined;
     writeFileSync(join(home, 'registry.db'), '');
   });
   afterEach(() => {
-    own.home = undefined;
     vi.unstubAllEnvs();
     rmSync(home, { recursive: true, force: true });
     rmSync(work, { recursive: true, force: true });
   });
 
   it('never takes a filesystem root, the person’s home folder or a folder holding where it runs', () => {
-    expect(unsafeHome(parse(home).root, work, undefined)).toBe('a filesystem root');
+    const person = join(work, 'me');
+    expect(unsafeHome(parse(home).root, work, person)).toBe('a filesystem root');
     expect(unsafeHome(home, work, home)).toBe('or holds your home folder');
     expect(unsafeHome(home, work, join(home, 'me'))).toBe('or holds your home folder');
-    expect(unsafeHome(home, join(home, 'repo'), undefined)).toBe('or holds the folder you are in');
-    expect(unsafeHome(home, home, undefined)).toBe('or holds the folder you are in');
+    expect(unsafeHome(home, join(home, 'repo'), person)).toBe('or holds the folder you are in');
+    expect(unsafeHome(home, home, person)).toBe('or holds the folder you are in');
     // A neighbour whose name starts the same is no container.
-    expect(unsafeHome(home, `${home}-next`, undefined)).toBeUndefined();
-    expect(unsafeHome(home, work, join(work, 'me'))).toBeUndefined();
+    expect(unsafeHome(home, `${home}-next`, person)).toBeUndefined();
+    expect(unsafeHome(home, work, person)).toBeUndefined();
+  });
+
+  it('refuses when the person’s home folder cannot be found, and when it holds a registered folder', () => {
+    expect(unsafeHome(home, work, undefined)).toContain('could not be found');
+    own.home = undefined;
+    expect(() => dataTargets(home, work, false)).toThrow('could not be found');
+    expect(dataTargets(home, work, false, () => join(work, 'me'))).toEqual([home]);
+    expect(unsafeHome(home, work, join(work, 'me'), [join(home, 'proj')])).toContain(
+      `${join(home, 'proj')}, a folder registered to a project`,
+    );
+    expect(unsafeHome(home, work, join(work, 'me'), [join(work, 'proj')])).toBeUndefined();
+  });
+
+  it('never deletes a home that holds a folder its registry links to a project', async () => {
+    vi.stubEnv('OTEA_HOME', home);
+    rmSync(join(home, 'registry.db'));
+    const project = join(home, 'proj');
+    mkdirSync(project);
+    execFileSync('git', ['init', '--quiet'], { cwd: project });
+    execFileSync('git', [...AUTHOR, 'commit', '--quiet', '--allow-empty', '-m', 'one'], {
+      cwd: project,
+    });
+    expect((await cliAt(project)('init', '--template', 'none')).code).toBe(0);
+
+    const result = await cliAt(work)('uninstall', '--only', 'machine', '--purge-data', '--yes');
+
+    expect(result.code).toBe(7);
+    expect(result.err).toContain('a folder registered to a project');
+    expect(existsSync(join(home, 'registry.db'))).toBe(true);
   });
 
   it('asks for a registry as the mark of an Otea home, not a data folder or a serve record', () => {

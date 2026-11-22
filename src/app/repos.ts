@@ -69,36 +69,22 @@ export function identityAt(path: string): string | null {
   return repoIdentity(repoFingerprint(path));
 }
 
-// Everything that can identify the repo checked out at `path`, the best first: its origin URL, then
-// its root commits. A repo is registered under one of them, and a remote added after (or taken off)
-// changes which identityAt gives, so a checkout is the registered repo when any of them is.
-function identitiesAt(path: string): string[] {
-  const { remoteUrl, rootCommit } = repoFingerprint(path);
-  return [
-    repoIdentity({ remoteUrl, rootCommit: null }),
-    repoIdentity({ remoteUrl: null, rootCommit }),
-  ].filter((identity): identity is string => identity !== null);
-}
-
-// The repo of `repos` that the checkout at `path` is, by any of its identities.
+// The repo of `repos` that the checkout at `path` is, by what identityAt gives it: its origin, or
+// its root commits while it has no origin. A checkout that has an origin is never matched by its
+// root commits (a fork shares them): a remote added after the repo was registered by its root
+// commits makes it unknown until repos add --name adopts that origin (adoptOrigin).
 function repoAt(repos: readonly Repo[], path: string): Repo | undefined {
-  for (const identity of identitiesAt(path)) {
-    const found = repos.find((each) => each.identity === identity);
-    if (found) return found;
-  }
-  return undefined;
+  const identity = identityAt(path);
+  return identity === null ? undefined : repos.find((each) => each.identity === identity);
 }
 
-// A repo registered by its root commits (it had no origin then) that a checkout with an origin
-// remote matches takes that origin as its identity. From then on a checkout is the repo by that
-// origin, or by root commits only while it has none: a fork, which shares the root commits under
-// another origin, is not the repo.
-function adoptOrigin(project: Project, repos: readonly Repo[], repo: Repo, path: string): Repo {
-  const [origin] = identitiesAt(path);
-  if (!repo.identity.startsWith('root:') || !origin?.startsWith('remote:')) return repo;
-  if (repos.some((each) => each.identity === origin)) return repo;
-  changeRepoIdentity(project.db, repo.identity, origin);
-  return { name: repo.name, identity: origin };
+// The repo registered by the root commits of the checkout at `path`, when the checkout has an
+// origin that no repo goes by yet: the repo a remote was added to after it was registered.
+function repoByRootOf(repos: readonly Repo[], path: string): Repo | undefined {
+  const { remoteUrl, rootCommit } = repoFingerprint(path);
+  if (!remoteUrl) return undefined;
+  const root = repoIdentity({ remoteUrl: null, rootCommit });
+  return root === null ? undefined : repos.find((each) => each.identity === root);
 }
 
 // The folders that lead to the project, as linked in the registry, or its own folder.
@@ -185,13 +171,22 @@ export function repoNameAt(project: Project, cwd: string, env: Env = process.env
   const identity = identityAt(top);
   const repos = listRepos(project, env);
   const repo = repoAt(repos, top);
-  if (repo) return adoptOrigin(project, repos, repo, top).name;
-  const why =
-    identity === null
-      ? 'it has no origin remote and no commit to tell it by'
-      : `it is not one of the repos of ${project.identity.name}`;
+  if (repo) return repo.name;
+  if (identity === null) {
+    throw new UnknownRepo(
+      `cannot tell which repo ${top} is (it has no origin remote and no commit to tell it by); name it with otea repos add --name <repo>`,
+    );
+  }
+  // A remote added after the repo was registered by its first commit: the one way back is the
+  // person's word that this checkout is that repo, since a fork shares the first commit too.
+  const before = repoByRootOf(repos, top);
+  if (before) {
+    throw new UnknownRepo(
+      `cannot tell which repo ${top} is: it has an origin remote now, and ${project.identity.name} knows ${before.name} only by its first commit, which a fork shares. If this is ${before.name}, run in ${top}: otea repos add --name ${before.name}`,
+    );
+  }
   throw new UnknownRepo(
-    `cannot tell which repo ${top} is (${why}); name it with otea repos add --name <repo>`,
+    `cannot tell which repo ${top} is (it is not one of the repos of ${project.identity.name}); name it with otea repos add --name <repo>`,
   );
 }
 
@@ -216,15 +211,20 @@ export function addRepo(
   if (name !== undefined && label === '')
     throw new OteaError('invalid_name', 'Give the repo a name');
   const repos = listRepos(project, env);
-  // The repo this checkout already is, by its origin or its root commits: one registered before a
-  // remote was added is the same repo, and keeps the identity it was registered under.
-  const found = repoAt(repos, top);
-  const existing = found && adoptOrigin(project, repos, found, top);
+  const existing = repoAt(repos, top);
+  // A repo registered by its first commit, which this checkout shares and now also has an origin:
+  // named by its own name, it is the person's word that this is that repo, and it takes the origin
+  // as its identity (all or nothing). A checkout is never taken for it without that word.
+  const named = label === '' ? undefined : repos.find((repo) => sameRepo(repo.name, label));
+  if (!existing && named && named === repoByRootOf(repos, top)) {
+    transaction(project.db, () => changeRepoIdentity(project.db, named.identity, identity));
+    return { name: named.name, identity };
+  }
   const wanted = label || existing?.name || basename(top);
   if (existing?.name === wanted) return existing;
   // A gate check matches repo names whatever their case, so a case apart is the same name.
   const holder = repos.find(
-    (repo) => repo.identity !== found?.identity && sameRepo(repo.name, wanted),
+    (repo) => repo.identity !== existing?.identity && sameRepo(repo.name, wanted),
   );
   if (holder) {
     throw new OteaError(

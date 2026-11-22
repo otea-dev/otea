@@ -7,6 +7,16 @@ import { processAlive } from '../app/presence.ts';
 import { readServeFile } from './serve-file.ts';
 import { type Cli, cliAt, spawnCli, tempGitRepo, until } from './testing.ts';
 
+// A person's home folder that exists, since the purge refuses when it cannot find the real one.
+vi.mock('node:os', async (importOriginal) => {
+  const os = await importOriginal<typeof import('node:os')>();
+  const { mkdtempSync: make } = await import('node:fs');
+  const { join: at } = await import('node:path');
+  const fake = make(at(os.tmpdir(), 'otea-user-home-'));
+  const homedir = () => fake;
+  return { ...os, homedir, default: { ...os, homedir } };
+});
+
 const AUTHOR = ['-c', 'user.name=t', '-c', 'user.email=t@t'];
 
 describe('uninstall', () => {
@@ -93,7 +103,25 @@ describe('uninstall', () => {
   });
 
   it('takes out an outdated Otea hook too, whatever its version', async () => {
-    repo.write('.git/hooks/pre-push', '#!/bin/sh\n# otea-hook: pre-push\nexit 0\n');
+    // The hook of the version before the fail-closed one, exactly as it was written.
+    repo.write(
+      '.git/hooks/pre-push',
+      [
+        '#!/bin/sh',
+        '# otea-hook: pre-push',
+        '# Written by otea hook install --git; otea hook remove --git removes it.',
+        'while read -r local_ref local_sha remote_ref remote_sha; do',
+        '  case "$remote_ref" in',
+        '    refs/heads/*)',
+        '      otea check --gate push --branch "${remote_ref#refs/heads/}" --repo --commits "$remote_sha..$local_sha" < /dev/null',
+        '      if [ $? -eq 19 ]; then exit 1; fi',
+        '      ;;',
+        '  esac',
+        'done',
+        'exit 0',
+        '',
+      ].join('\n'),
+    );
 
     await otea('uninstall', '--only', 'repos');
 
