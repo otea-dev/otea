@@ -127,11 +127,14 @@ export type NextInput = {
   handIn?: { after: string; command: string };
   // The line saying the person took the item up again after an agent set it aside (P5-R3-8).
   retaken?: string;
-  // Without what the agent read when it took the item and every call of the step repeats: the
-  // board's words, the step's "Before you hand it off" and the checklist lines that are met or
-  // not asked (otea board gives the whole). `fields: false` when the reader sees the item's fields
-  // elsewhere (show prints them below), so Starts with is left out too.
-  brief?: { fields: boolean };
+  // Without what an agent that read the item already knows: the board's words, the step's "Before
+  // you hand it off" and the checklist lines that are met or not asked (otea board gives the
+  // whole). Only when the reader asks for it (--brief): the whole is what every reading gives.
+  brief?: true;
+  // How Starts with gives the item's fields: one line each (the default), as one JSON object line
+  // (what an MCP agent parses without reading `name: value` lines), or not at all when the reader
+  // sees the item's fields elsewhere (show prints them below).
+  startsAs?: 'json' | 'none';
 };
 
 // Another agent's say on the item keeps the asking agent off it: a live lease it does not hold, or
@@ -736,20 +739,26 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
         input.implements.map((it) => `  ${parentLine(it)}`),
       ),
     );
-  if (input.brief?.fields !== false) {
-    lines.push(
-      ...section(
-        'Starts with',
-        startsWith(def, step.id).flatMap(({ ref, from }) => {
-          const part = partOf(def, ref);
-          if (!part) return [];
-          // What an earlier step left empty (a deliverable asked only sometimes) is not there to read.
-          if (from && isEmpty(part, input)) return [];
-          const origin = from ? ` (from ${stepById(def, from)?.name ?? from})` : '';
-          return [`  ${part.name}${origin}: ${valueText(part, input)}`];
-        }),
-      ),
-    );
+  if (input.startsAs !== 'none') {
+    const starts = startsWith(def, step.id).flatMap(({ ref, from }) => {
+      const part = partOf(def, ref);
+      if (!part) return [];
+      // What an earlier step left empty (a deliverable asked only sometimes) is not there to read.
+      if (from && isEmpty(part, input)) return [];
+      return [{ part, from }];
+    });
+    const given =
+      input.startsAs === 'json'
+        ? starts.length === 0
+          ? []
+          : [
+              `  fields: ${JSON.stringify(Object.fromEntries(starts.map(({ part }) => [part.name, valueText(part, input)])))}`,
+            ]
+        : starts.map(({ part, from }) => {
+            const origin = from ? ` (from ${stepById(def, from)?.name ?? from})` : '';
+            return `  ${part.name}${origin}: ${valueText(part, input)}`;
+          });
+    lines.push(...section('Starts with', given));
   }
   if (def.split) lines.push(...section('Parts', partsLines(def, input)));
   const instruction = reviewing ? step.instructions.review : step.instructions.take;
@@ -823,7 +832,7 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
 
 // What a brief text ends with: where the words it left out are.
 function briefPointer(def: BoardDefinition): string {
-  return `Brief: the board's and the step's whole instructions are in otea board "${def.name}" (or --full on otea next and show).`;
+  return `Brief: the board's and the step's whole instructions are in otea board "${def.name}", or leave out --brief.`;
 }
 
 const MISSING_NOTE: Readonly<Record<Missing['reason'], string>> = {

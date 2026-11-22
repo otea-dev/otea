@@ -3,7 +3,7 @@ import { OteaError } from '../core/errors.ts';
 import { listCollections } from '../store/queries.ts';
 import { getCollection, idleRequests } from './collections.ts';
 import type { ItemView } from './items.ts';
-import { itemNextText, liveBoardOf } from './next.ts';
+import { itemNextText, type Look, liveBoardOf } from './next.ts';
 import type { Project } from './project.ts';
 
 // What agents read about a board before acting (`otea board`): a published board's own words for
@@ -21,12 +21,12 @@ export type GuideEntry = {
 };
 
 // What `otea show` says to do now with the item: next's text on its board.
-// `brief`: without what the agent read when it took the item (nextText's brief); show prints the
-// item's fields itself, so its hint leaves them out too.
-export function hintFor(project: Project, item: ItemView, me: string, brief = false): string {
+// `look`: brief when the reader asked for it (nextText's brief); show prints the item's fields
+// itself, so its hint may leave them out (fields: 'none').
+export function hintFor(project: Project, item: ItemView, me: string, look?: Look): string {
   if (item.archived)
     return `${item.id} is on ${item.archived.board}, an archived board: it is read-only. Pick another item with otea next.`;
-  return itemNextText(project, item, me, undefined, brief ? { fields: false } : undefined) ?? '';
+  return itemNextText(project, item, me, undefined, look) ?? '';
 }
 
 export function guideCommand(collection: string): string {

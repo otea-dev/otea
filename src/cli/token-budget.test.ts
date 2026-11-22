@@ -29,16 +29,17 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // Raised when --json and MCP gave each field as { id, name, value } and each step its name.
   // Raised when each file got a path an agent can open: one per file in --json and MCP, one line
   // with the first as the example in the text (P5-R2-4; measured at 584, 1174 and 1179).
-  // Lowered when next and show read an item the agent holds brief, without the board's words and
-  // the step's "Before you hand it off" it read on taking it (measured at 420, 1016 and 422 with
-  // the structured content: show gives the item's fields as an object beside the text, 562).
-  show: { text: 460, json: 1120, mcp: 620 },
-  // The same item read whole (--whole), which is what the agent got on taking it (603, 1197, 747).
-  'show whole': { text: 660, json: 1320, mcp: 820 },
-  // next on an item the agent holds, brief, and whole (--whole, as on claiming it); measured at 237
-  // and 346 in the text. The structured content is the offer's id and the item's fields by name.
-  next: { text: 260, json: 455, mcp: 450 },
-  'next whole': { text: 380, json: 575, mcp: 570 },
+  // Over MCP the item's fields come as one JSON line (measured at 603 in the text, 1197 in --json
+  // and 507 in MCP).
+  show: { text: 640, json: 1290, mcp: 560 },
+  // The same item read with --brief, for the repeat read of an item the agent holds and already
+  // read: without the board's words, the step's "Before you hand it off" and the checklist lines
+  // met (measured at 417 in the text, 1013 in --json and 428 in MCP).
+  'show brief': { text: 460, json: 1120, mcp: 470 },
+  // next on that item, whole as on claiming it, and with --brief (measured at 346, 405 and 366;
+  // 234, 295 and 251).
+  next: { text: 380, json: 450, mcp: 400 },
+  'next brief': { text: 260, json: 325, mcp: 280 },
   // One row per item; measured with that bug alone. Raised with show, for the same names.
   list: { text: 25, json: 285, mcp: 30 },
   // Raised when otea board began with Otea's agent guide (instructions below): read once a session.
@@ -64,9 +65,10 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // a Pedido with otea create and board draft --change made a second one (P8-R3-3; measured at 746).
   // Over MCP too, from when AGENTS.md stopped copying the guide: there it sends an agent whose
   // client shows no instructions (measured at 756).
-  // Raised to 790 with rule 3 saying what next offers first and that an item you hold reads brief
-  // (measured at 781 and 791).
-  'board index': { text: 790, json: 53, mcp: 840 },
+  // Raised to 830 with rule 3 listing the real order next offers in (what you hold, what the
+  // person left you, sent-back, merges first, on top, approved, new) and --brief for repeat reads
+  // (measured at 815 and 825).
+  'board index': { text: 830, json: 53, mcp: 840 },
   // The bug board's own words and each step's instructions, read once per session; show's Next:
   // block covers the step at hand. Raised when a preset collection read as a board kept its
   // playbook as the board's text: what agents read on the preset, as before.
@@ -113,9 +115,8 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // release's quote: only the person's newer words, relayed, set aside again an item they took up
   // again, as an agent set one aside right after Retomar with their note unanswered (P7-R3-8;
   // measured at 5314).
-  // Raised for --brief and --whole on next and show, and the output schemas of show, next and wait
-  // (measured at 5644).
-  tools: { mcp: 5700 },
+  // Raised for --brief on next and show (measured at 5408).
+  tools: { mcp: 5450 },
   // Otea's agent guide, the server's instructions: in every MCP agent's context from the start, so
   // it buys only what agents keep getting wrong. Measured at 203. Raised to 270 for the line on
   // declaring the profile every agent and subagent must keep current (measured at 246). Raised to
@@ -146,9 +147,10 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // to 735 for rule 4: a new board or a change to one goes through board draft, never otea create,
   // as an agent made a Pedido with otea create and board draft --change made a second (P8-R3-3;
   // measured at 727).
-  // Raised to 775 for rule 3: next offers sent-back items, then approved work, then new, and an
-  // item you hold reads brief (measured at 762).
-  instructions: { mcp: 775 },
+  // Raised to 810 for rule 3: the real order next offers in, and --brief for repeat reads, which
+  // a new session or a compacted agent would otherwise be handed without the step (measured at
+  // 796).
+  instructions: { mcp: 810 },
   // The AGENTS.md block, in the context of every agent whose harness reads AGENTS.md: it says where
   // the guide is and holds no copy of it, which the instructions or otea board's index give
   // (MCP-TOKENS: the guide was in context two or three times; measured at 874 with the copy, 107).
@@ -195,14 +197,10 @@ describe('token budget', () => {
     const reply = (await client.callTool({ name, arguments: args })) as {
       isError?: boolean;
       content: { text: string }[];
-      structuredContent?: unknown;
     };
     const text = reply.content[0]?.text ?? '';
     if (reply.isError) throw new Error(`${name}: ${text}`);
-    // What a client that shows both reads: the text and the structured content.
-    return reply.structuredContent === undefined
-      ? text
-      : `${text}${JSON.stringify(reply.structuredContent)}`;
+    return text;
   };
 
   // Runs the operation as text, as --json and as an MCP tool. A write gets a fresh call (a fresh
@@ -260,14 +258,14 @@ describe('token budget', () => {
     await ok('attach', id, 'test.log', '--caption', '12 tests pass');
 
     await measure('show', 'show', same({ cli: ['show', id], mcp: { id } }));
-    // What an agent reads again of an item it holds is brief; the whole, as on taking it, costs more.
+    // What an agent that read the item asks for again with --brief costs a part less.
     await measure(
-      'show whole',
+      'show brief',
       'show',
-      same({ cli: ['show', id, '--whole'], mcp: { id, whole: true } }),
+      same({ cli: ['show', id, '--brief'], mcp: { id, brief: true } }),
     );
     await measure('next', 'next', same({ cli: ['next'], mcp: {} }));
-    await measure('next whole', 'next', same({ cli: ['next', '--whole'], mcp: { whole: true } }));
+    await measure('next brief', 'next', same({ cli: ['next', '--brief'], mcp: { brief: true } }));
     await measure('list', 'list', same({ cli: ['list'], mcp: {} }));
     await measure(
       'wait',
@@ -325,12 +323,12 @@ describe('token budget', () => {
     });
   }
 
-  // The point of reading brief: an item the agent holds costs a clear part less than the whole in
-  // the text, and less on every surface (--json and the MCP data carry the fields either way).
-  it('reads an item the agent holds at most 75% of the whole in the text, and less elsewhere', () => {
+  // The point of --brief: a repeat read costs a clear part less than the whole in the text, and
+  // less on every surface (--json and the MCP text carry the fields either way).
+  it('reads brief at most 75% of the whole in the text, and less elsewhere', () => {
     for (const name of ['show', 'next']) {
-      const brief = sizes[name];
-      const whole = sizes[`${name} whole`];
+      const whole = sizes[name];
+      const brief = sizes[`${name} brief`];
       expect(brief?.text ?? Number.POSITIVE_INFINITY, `${name} text`).toBeLessThanOrEqual(
         (whole?.text ?? 0) * 0.75,
       );
@@ -348,9 +346,7 @@ describe('token budget', () => {
 // harness writes it (a Bash command for the CLI, a tool call for MCP) and what comes back; the
 // person's answer and note are off the meter. Measured at 2,122 over the CLI and 3,267 over MCP,
 // which returned the whole item as JSON; with the CLI's text, at 2,122 and 2,244.
-// Lowered to measured 1904 and 2271 once next and show read what the agent holds brief; the MCP
-// count adds the structured content of show and next, for a client that shows both.
-const CYCLE_BUDGET = { cli: 2090, mcp: 2470 };
+const CYCLE_BUDGET = { cli: 2340, mcp: 2470 };
 
 describe('token budget of a work cycle', () => {
   let repo: ReturnType<typeof tempGitRepo>;
@@ -443,15 +439,10 @@ describe('token budget of a work cycle', () => {
       const reply = (await client.callTool({ name, arguments: input })) as {
         isError?: boolean;
         content: { text: string }[];
-        structuredContent?: unknown;
       };
       const text = reply.content.map((part) => part.text).join('\n');
       if (reply.isError) throw new Error(`${name}: ${text}`);
-      // A client that puts the structured content in context beside the text pays for both.
-      const data =
-        reply.structuredContent === undefined ? '' : JSON.stringify(reply.structuredContent);
-      spent.mcp +=
-        tokens(JSON.stringify({ name: `mcp__otea__${name}`, input })) + tokens(text) + tokens(data);
+      spent.mcp += tokens(JSON.stringify({ name: `mcp__otea__${name}`, input })) + tokens(text);
       return text;
     };
     // A session declares its profile once, before the cycle (MCP-TOKENS counts it as fixed).

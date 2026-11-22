@@ -127,21 +127,33 @@ describe('next and the board moves', () => {
     expect((await json('next', '--as', 'scout')).item).toBeNull();
   });
 
-  // What an agent reads once, on taking an item, is not repeated on every call: the board's words
-  // and the step's "Before you hand it off".
+  // --brief leaves out the board's words and the step's "Before you hand it off", for the repeat
+  // read of an item the agent holds and already read. Every reading is whole without it: only the
+  // agent knows what it read (a new session, a compacted context, a step edited since).
   describe('brief', () => {
     const board = 'Cada criatura del pantano.';
     const before = 'Adjunta el';
     const bytes = (text: string) => Buffer.byteLength(text);
 
-    it('gives a first contact the whole, and brief what the agent holds', async () => {
-      const offered = (await otea('next', '--as', 'quill')).out;
-      expect(offered).toContain(board);
-      expect(offered).toContain(before);
-
+    it('reads whole, held or not, unless asked for brief', async () => {
       await otea('claim', 'CRI-1', '--as', 'quill');
-      const held = (await otea('next', '--as', 'quill')).out;
-      const shown = (await otea('show', 'CRI-1', '--as', 'quill')).out;
+
+      for (const argv of [['next'], ['show', 'CRI-1'], ['next', '--claim']]) {
+        const { out } = await otea(...argv, '--as', 'quill');
+        expect(out, argv.join(' ')).toContain(board);
+        expect(out, argv.join(' ')).toContain(before);
+      }
+    });
+
+    it('leaves the person’s reading whole', async () => {
+      expect((await otea('show', 'CRI-1')).out).toContain(before);
+    });
+
+    it('gives only what the agent still needs with --brief, and says where the rest is', async () => {
+      await otea('claim', 'CRI-1', '--as', 'quill');
+      const whole = (await otea('next', '--as', 'quill')).out;
+      const held = (await otea('next', '--brief', '--as', 'quill')).out;
+      const shown = (await otea('show', 'CRI-1', '--brief', '--as', 'quill')).out;
 
       for (const text of [held, shown]) {
         expect(text).not.toContain(board);
@@ -150,37 +162,21 @@ describe('next and the board moves', () => {
         expect(text).toContain('Pinta desde la');
         expect(text).toContain('✗ Arte conceptual');
         expect(text).toContain('otea handoff CRI-1');
-        expect(text).toContain('otea board "Criaturas"');
+        // The exact pointer: no flag that does not exist.
+        expect(text).toContain(
+          'Brief: the board\'s and the step\'s whole instructions are in otea board "Criaturas", or leave out --brief.',
+        );
+        expect(text).not.toContain('--full');
+        expect(text).not.toContain('--whole');
       }
-      expect(bytes(held)).toBeLessThan(bytes(offered) * 0.8);
+      expect(bytes(held)).toBeLessThan(bytes(whole) * 0.8);
     });
 
-    it('claims with the whole text: what it takes now it has not read', async () => {
-      const claimed = (await otea('next', '--claim', '--as', 'quill')).out;
+    it('takes --brief on a claim too, as the agent asks for it', async () => {
+      const claimed = (await otea('next', '--claim', '--brief', '--as', 'quill')).out;
 
-      expect(claimed).toContain(board);
-      expect(claimed).toContain(before);
-    });
-
-    it('is asked for with --brief, and the whole again with --whole', async () => {
-      const brief = (await otea('next', '--brief', '--as', 'quill')).out;
-      const showBrief = (await otea('show', 'CRI-1', '--brief', '--as', 'quill')).out;
-      await otea('claim', 'CRI-1', '--as', 'quill');
-      const whole = (await otea('next', '--whole', '--as', 'quill')).out;
-      const showWhole = (await otea('show', 'CRI-1', '--whole', '--as', 'quill')).out;
-
-      expect(brief).not.toContain(board);
-      expect(showBrief).not.toContain(before);
-      expect(whole).toContain(board);
-      expect(showWhole).toContain(before);
-      expect(bytes(showBrief)).toBeLessThan(bytes(showWhole));
-      const both = await otea('next', '--brief', '--whole', '--as', 'quill');
-      expect(both.code).toBe(2);
-      expect(both.err).toContain('--brief and --whole say opposite things');
-    });
-
-    it('leaves the person’s reading whole', async () => {
-      expect((await otea('show', 'CRI-1')).out).toContain(before);
+      expect(claimed).not.toContain(before);
+      expect((await json('show', 'CRI-1')).lease).toMatchObject({ holder: 'quill' });
     });
   });
 

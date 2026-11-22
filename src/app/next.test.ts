@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { stateOf } from '../core/board/engine.ts';
+import { positionOf, stateOf } from '../core/board/engine.ts';
 import { sequenceIds } from '../core/board/ids.ts';
 import type { BoardDefinition } from '../core/board/model.ts';
 import { handedText, idleText, nextText, noWayText, refusalText } from '../core/board/next.ts';
-import { creatures } from '../core/board/testing.ts';
+import { creatures, errores } from '../core/board/testing.ts';
 import { timeText } from '../core/time.ts';
 import { insertEvidence, selectEvents } from '../store/queries.ts';
 import { createBoard, publishBoard, saveDraft } from './boards.ts';
@@ -390,6 +390,25 @@ describe('the order next offers work in', () => {
       pinItems(ctx, { ids: [fresh.id], pinned: true, actor: you }, now);
 
       expect(nextFor(ctx, 'kiln', {}, now).item).toBe(fresh.id);
+    });
+
+    // On Errores the first step is the agent's but Triar is the person's: a bug the person triaged
+    // reaches Arreglar as new work for the agent, not as work a review approved.
+    describe('on a board whose second step is the person’s', () => {
+      const bug = (ctx: Context, title: string, fields: Record<string, string>) =>
+        createItem(ctx, { collection: 'Errores', title, fields, actor: you, channel: 'ui' }, now);
+
+      it('does not count a bug the person triaged as approved work', () => {
+        const ctx = memoryContext();
+        board(ctx, errores());
+        const triaged = bug(ctx, 'Triada', { fsteps: '1. abrir', fcat: 'cgame' });
+        handoffItem(ctx, { id: triaged.id, actor: you, channel: 'ui' }, now);
+        const fresh = bug(ctx, 'Nueva', {});
+        setOrder(ctx, { collection: 'Errores', ids: [fresh.id], actor: you }, now);
+
+        expect(positionOf(getItem(ctx, triaged.id).state)).toMatchObject({ step: 'sfix' });
+        expect(nextFor(ctx, 'quill', {}, now).item).toBe(fresh.id);
+      });
     });
   });
 
