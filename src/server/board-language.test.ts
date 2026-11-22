@@ -113,6 +113,39 @@ describe('a board read by desks in two languages', () => {
     expect(await stepsIn('es')).toEqual(['Completar', 'Mirar a ojo', 'Arreglar', 'Integrar']);
   });
 
+  // A save that does not say the language it was read in would be reconciled against the desk's
+  // today, which strips the snapshot after a switch: it is refused, never guessed.
+  it('refuses a draft save that does not say the language it was read in', async () => {
+    const made = await call('POST', '/boards', {
+      name: 'Errores',
+      lang: 'es',
+      template: 'bug-reports',
+    });
+    const { id } = made.body;
+    const draft = made.body.draft?.definition;
+    if (!draft) throw new Error('the board has no draft');
+
+    const refused = await call(
+      'PUT',
+      `/boards/${id}/draft`,
+      { definition: draft, baseVersion: null },
+      'en',
+    );
+    expect(refused.status).toBe(400);
+    const wrong = await call(
+      'PUT',
+      `/boards/${id}/draft`,
+      { definition: draft, baseVersion: null, readIn: 'xx' },
+      'en',
+    );
+    expect(wrong.status).toBe(400);
+    // Nothing was saved over the draft.
+    expect(
+      (await call('GET', `/boards/${id}`, undefined, 'es')).body.record.draft?.definition.steps[0]
+        ?.name,
+    ).toBe('Completar');
+  });
+
   it('keeps the words a person wrote when the desk switches language', async () => {
     const made = await call('POST', '/boards', {
       name: 'Errores',
@@ -128,7 +161,7 @@ describe('a board read by desks in two languages', () => {
     const saved = await call(
       'PUT',
       `/boards/${id}/draft`,
-      { definition: draft, baseVersion: null },
+      { definition: draft, baseVersion: null, readIn: 'es' },
       'es',
     );
     expect(saved.status).toBe(200);

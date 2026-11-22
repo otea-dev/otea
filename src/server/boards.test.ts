@@ -163,6 +163,7 @@ describe('the boards API', () => {
     const saved = await call('PUT', `/boards/${id}/draft`, {
       definition: { ...creatures(), name: 'Tareas Ñandú' },
       baseVersion: null,
+      readIn: 'es',
     });
     expect(saved.status).toBe(200);
     expect(saved.body.problems).toEqual([]);
@@ -176,6 +177,7 @@ describe('the boards API', () => {
         steps: [concept, { ...animate, doer: { agent: 'kiln' } }, polish],
       },
       baseVersion: null,
+      readIn: 'es',
     });
     expect(older.status).toBe(200);
     expect(older.body.notes).toEqual([

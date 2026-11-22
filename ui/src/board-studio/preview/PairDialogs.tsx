@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { type BoardDefinition, DONE, type Target } from '../../../../src/core/board/model.ts';
-import { language, listOf, t, tx } from '../../i18n/i18n.ts';
+import { type Language, language, listOf, t, tx } from '../../i18n/i18n.ts';
 import { Dialog } from '../../kit/pop/Dialog.tsx';
 import { RowIcon } from '../../shell/Rail.tsx';
 import { boardIcon } from '../../shell/rail-model.ts';
@@ -491,7 +491,14 @@ export function Effects({
   );
 }
 
-type Kept = { role: PairRole; id: string; def: BoardDefinition; base: number | null };
+// `readIn`: the language the draft was read in, which `def`'s words are in.
+type Kept = {
+  role: PairRole;
+  id: string;
+  def: BoardDefinition;
+  base: number | null;
+  readIn: Language;
+};
 
 export type PairDiscardDialogProps = {
   pair: PairWorkspace;
@@ -528,6 +535,7 @@ export function PairDiscardDialog({ pair, open, onClose, onDiscarded }: PairDisc
         id: draft.record.id,
         def: structuredClone(draft.def),
         base: draft.baseVersion,
+        readIn: draft.readIn,
       };
     });
     setBusy(true);
@@ -572,7 +580,7 @@ export function PairDiscardDialog({ pair, open, onClose, onDiscarded }: PairDisc
     const ids: Partial<Record<PairRole, string>> = {};
     for (const k of [...kept].sort((a, b) => ROLES.indexOf(b.role) - ROLES.indexOf(a.role))) {
       if (!gone.has(k.role)) {
-        await saveDraft(k.id, k.def, k.base);
+        await saveDraft(k.id, k.def, k.base, undefined, k.readIn);
         ids[k.role] = k.id;
         continue;
       }
@@ -580,7 +588,7 @@ export function PairDiscardDialog({ pair, open, onClose, onDiscarded }: PairDisc
       if (k.role === 'parent' && def.split && ids.child)
         def.split = { ...def.split, board: ids.child };
       const record = await createBoard({ name: def.name, item: def.item, lang: language() });
-      await saveDraft(record.id, def, null);
+      await saveDraft(record.id, def, null, undefined, k.readIn);
       ids[k.role] = record.id;
     }
     if (gone.size > 0) {
