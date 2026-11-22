@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { OteaError } from '../core/errors.ts';
 import type { Launcher } from './launcher.ts';
@@ -46,6 +46,31 @@ export function writeAgentsMd(root: string): AgentsMdResult {
   if (next === current) return { path, action: 'unchanged' };
   writeFileSync(path, next);
   return { path, action: current.includes(BEGIN) ? 'updated' : 'added' };
+}
+
+export type AgentsMdRemoval = { path: string; action: 'removed' | 'deleted' | 'absent' };
+
+// Takes Otea's block out of AGENTS.md at the project root, with the blank line writeAgentsMd put
+// before it, and deletes the file when nothing else is left (Otea made it). Text outside the
+// markers is never touched. `dryRun` says what would happen and writes nothing.
+export function removeAgentsMd(root: string, dryRun = false): AgentsMdRemoval {
+  const path = join(root, 'AGENTS.md');
+  if (!existsSync(path)) return { path, action: 'absent' };
+  const current = readFileSync(path, 'utf8');
+  const begin = current.indexOf(BEGIN);
+  const end = begin < 0 ? -1 : current.indexOf(END, begin);
+  if (begin < 0 || end < 0) return { path, action: 'absent' };
+  let before = current.slice(0, begin);
+  const after = current.slice(end + END.length).replace(/^\r?\n/, '');
+  // The block went at the end after a blank line: take that line with it.
+  if (after === '') before = before.replace(/\n\n$/, '\n');
+  const next = `${before}${after}`;
+  const empty = next.trim() === '';
+  if (!dryRun) {
+    if (empty) rmSync(path);
+    else writeFileSync(path, next);
+  }
+  return { path, action: empty ? 'deleted' : 'removed' };
 }
 
 export const MCP_SERVER = 'otea';
