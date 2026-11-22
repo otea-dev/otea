@@ -36,7 +36,7 @@ export const shell = {
   'shell.row.wait': 'waits for your answer ·',
   'shell.row.idle': 'listening · free since {time}',
   'shell.row.connected': 'connected · not listening: not in otea wait',
-  'shell.row.silent': 'no signal · holds an item, gave no sign for a while',
+  'shell.row.silent': 'no signal on',
   'shell.row.noProfile': 'takes no step until it declares model and effort',
   'shell.flag.noProfile': 'no profile',
   'shell.flag.unconfirmed': 'unconfirmed',

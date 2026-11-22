@@ -338,6 +338,7 @@ function RowDoing({ row, now }: { row: AgentRow; now: number }) {
         {held ? <NodeGlyph look={held.look} size={14} /> : null}
         <span className="verb">{t('shell.row.silent')}</span>
         {held ? <span className="id">{held.id}</span> : null}
+        {held ? <span className="tx">{held.title}</span> : null}
       </span>
     );
   }

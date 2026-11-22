@@ -38,7 +38,7 @@ export const shell = {
   'shell.row.wait': 'espera tu respuesta ·',
   'shell.row.idle': 'escuchando · libre desde {time}',
   'shell.row.connected': 'conectado · no escucha: no está en otea wait',
-  'shell.row.silent': 'sin señal · tiene un ítem y hace un rato que no da señales',
+  'shell.row.silent': 'sin señal en',
   'shell.row.noProfile': 'no toma pasos hasta declarar modelo y esfuerzo',
   'shell.flag.noProfile': 'sin perfil',
   'shell.flag.unconfirmed': 'sin confirmar',
