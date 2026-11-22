@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { type AgentStatus, agentStatus } from '../core/agent-status.ts';
 import type { AgentChannel } from '../core/authority.ts';
 import { OteaError } from '../core/errors.ts';
 import { isAgentName } from '../core/item.ts';
@@ -104,6 +105,8 @@ export type AgentPresence = {
   actedAt: string | null;
   // Connected: it listens, or ran an otea command within LISTEN_WINDOW_MS; never for a lease alone.
   live: boolean;
+  // What it is doing now, the one word every surface uses (core/agent-status.ts).
+  status: AgentStatus;
   // Every process it was heard listening through (its MCP server, its wait) has ended: Otea knows
   // its session ended. Never for one heard through none, such as one at the command line.
   sessionEnded: boolean;
@@ -501,6 +504,16 @@ export function endWaiter(db: DatabaseSync, agent: string, waiter: number): void
 // The agents an MCP server should stop hearing on its beats (`calls`: when each last called through
 // it, in ms): a subagent that has not called within the listening window has ended, though the
 // session's own agent (`own`), idle in its chat with the server open, still listens.
+// The name an MCP session counts as its own after a call as `name`: the first that called, then
+// any name that is not a subagent of it (a rename mid-session, claude to claude-2), so the old one
+// goes quiet and drops out within a listening window instead of staying connected as long as the
+// server runs. Its subagents (own-role) never take it over.
+export function ownName(own: string | undefined, name: string): string {
+  if (own === undefined || own === name) return name;
+  const role = name.startsWith(`${own}-`) ? name.slice(own.length + 1) : null;
+  return role !== null && !/^\d+$/.test(role) ? own : name;
+}
+
 export function quietVoices(
   calls: ReadonlyMap<string, number>,
   own: string | undefined,
@@ -627,6 +640,15 @@ export function listAgents(
     const called = calledLately(record.actedAt, at);
     const declared = declaredOf.get(name);
     const mcp = mcpOf(record);
+    const live = !ended && (listening || active || called);
+    const waiting = within(waits.get(name)) && !gone;
+    const release = released.get(name);
+    // Its last act was to let go: between two items, not at work, until it calls again.
+    const handedOff =
+      release !== undefined &&
+      held.length === 0 &&
+      Date.parse(record.actedAt ?? record.lastSeen) <= Date.parse(release);
+    const sessionEnded = silenced(name);
     return {
       name,
       harness,
@@ -635,10 +657,18 @@ export function listAgents(
       holding: held,
       lastSeen,
       actedAt: record.actedAt ?? null,
-      live: !ended && (listening || active || called),
-      sessionEnded: silenced(name),
+      live,
+      status: agentStatus({
+        live,
+        holding: held.length,
+        waiting,
+        called,
+        handedOff,
+        sessionEnded: sessionEnded || ended,
+      }),
+      sessionEnded,
       listening,
-      waiting: within(waits.get(name)) && !gone,
+      waiting,
       profile: declared ? profileView(declared.profile) : null,
       profileConfirmed: declared?.confirmed ?? false,
       profileChangedAt: profileChangedAt(db, name),

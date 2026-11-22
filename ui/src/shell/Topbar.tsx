@@ -293,6 +293,9 @@ export function PillWords({ summary }: { summary: PillSummary }) {
         ) : null}
       </>
     );
+  if (summary.kind === 'silent') {
+    return <span>{t('shell.pill.silent', { count: summary.count })}</span>;
+  }
   const { extra } = summary;
   return (
     <>
@@ -514,7 +517,7 @@ function AgentsPill() {
   // One source for the pill and its menu: the menu's rows.
   const rows = agentRows(agents, app.all, app.now, app.feed);
   const mark = pillMark(connection, rows);
-  const summary = pillSummary(connection, rows);
+  const summary = pillSummary(connection, rows, agents.filter((a) => a.status === 'silent').length);
   const offline = mark === 'offline';
   const counts = agentCounts(rows);
   const close = () => setOpen(false);

@@ -25,6 +25,7 @@ export const shell = {
   'shell.pill.working': { one: '{count} working', other: '{count} working' },
   'shell.pill.waiting': { one: '{count} listening', other: '{count} listening' },
   'shell.pill.connected': { one: '{count} connected', other: '{count} connected' },
+  'shell.pill.silent': { one: '{count} no signal', other: '{count} no signal' },
   'shell.pill.quiet': { one: '{count} quiet', other: '{count} quiet' },
   'shell.pill.noProfile': { one: '{count} without a profile', other: '{count} without a profile' },
   'shell.pill.of': 'of {count}',

@@ -1,3 +1,4 @@
+import type { AgentStatus } from '../../src/core/agent-status.ts';
 import type { ItemEvent } from './types.ts';
 
 // An agent the server has seen in this project: its name (the actor of its claims, leases and
@@ -32,6 +33,9 @@ export type Agent = {
   // older server.
   actedAt?: string | null;
   sessionEnded?: boolean;
+  // What it is doing now, as the server words it for every surface (src/core/agent-status.ts).
+  // Absent from an older server.
+  status?: AgentStatus;
 };
 
 // What an agent declares it runs as, as declared, with the family its model groups under.

@@ -69,9 +69,13 @@ export const common = {
   'listen.none': 'nadie está escuchando',
   'listen.setAside': 'apartado por {agent}',
   'listen.lead': 'Nadie está escuchando.',
+  'listen.noAgents': 'ningún agente conectado',
+  'listen.noAgentsLead': 'Ningún agente conectado.',
+  'listen.noAgentsNotice':
+    'Ningún agente conectado: esto espera aquí hasta que uno se conecte y tome el siguiente paso.',
   'listen.busy': {
-    one: 'en cola: {agent} está ocupado',
-    other: 'en cola: {count} agentes ocupados',
+    one: 'en cola: {agent} está trabajando',
+    other: 'en cola: {count} agentes trabajando',
   },
   'listen.busyLead': {
     one: '{agent} está ocupado con otro ítem; lo verá cuando vuelva a esperar.',

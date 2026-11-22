@@ -65,7 +65,11 @@ export const common = {
   'listen.none': 'nobody is listening',
   'listen.setAside': 'set aside by {agent}',
   'listen.lead': 'Nobody is listening.',
-  'listen.busy': { one: 'queued: {agent} is busy', other: 'queued: {count} agents are busy' },
+  'listen.noAgents': 'no agent is connected',
+  'listen.noAgentsLead': 'No agent is connected.',
+  'listen.noAgentsNotice':
+    'No agent is connected: this waits here until one connects and takes the next step.',
+  'listen.busy': { one: 'queued: {agent} is working', other: 'queued: {count} agents are working' },
   'listen.busyLead': {
     one: '{agent} is busy with another item; it will see this when it waits again.',
     other: '{count} agents are busy with other items; they will see this when they wait again.',

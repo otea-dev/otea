@@ -9,7 +9,7 @@ import { AgentMark, Checkbox, EnumChip, SeverityBars, StepPill } from '../../kit
 import { laneOf } from '../../lanes/geometry.ts';
 import type { LaneBlock } from '../../lanes/LaneList.tsx';
 import { lookOf } from '../../lanes/looks.ts';
-import { unheard } from '../../listening.ts';
+import { noAgents, unheard } from '../../listening.ts';
 import { parentOf } from '../../nesting.ts';
 import type { Agent } from '../../presence.ts';
 import { stateWordIn, typeWord, valueWordIn } from '../../preset-words.ts';
@@ -211,7 +211,9 @@ export function listaBlocks(entries: readonly Entry[], ctx: RowCtx): LaneBlock[]
                 </span>
               ))}
               {it.setAside ? <SetAsideMark by={it.setAside.by} /> : null}
-              {unheard(it, ctx.agents, ctx.now) ? <UnheardMark busy={ctx.busy ?? []} /> : null}
+              {unheard(it, ctx.agents, ctx.now) ? (
+                <UnheardMark busy={ctx.busy ?? []} nobody={noAgents(ctx.agents)} />
+              ) : null}
             </div>
           </div>
           <span className="sev" data-leaf="">

@@ -15,6 +15,12 @@ export function Unheard({
   className?: string;
   hearing?: Hearing;
 }) {
+  if (hearing.kind === 'nobody')
+    return (
+      <p className={className} role="status" data-unheard="calm">
+        {t('listen.noAgentsNotice')}
+      </p>
+    );
   if (hearing.kind === 'working')
     return (
       <p className={className} role="status" data-unheard="calm">
@@ -34,8 +40,14 @@ export function Unheard({
 // The mark on a row nobody hears: «nadie está escuchando» as a warning, or, while an agent is at
 // work on another item (`busy`), that it waits in the queue, in grey (P7-R2-12). It never gives
 // way with an ellipsis, as the board name does (P8-R2-7).
-export function UnheardMark({ busy }: { busy: readonly string[] }) {
-  const { text, calm } = unheardWords(busy);
+export function UnheardMark({
+  busy,
+  nobody = false,
+}: {
+  busy: readonly string[];
+  nobody?: boolean;
+}) {
+  const { text, calm } = unheardWords(busy, nobody);
   return (
     <span className="mpt" data-unheard={calm ? 'calm' : ''}>
       <span className="sep">·</span>
