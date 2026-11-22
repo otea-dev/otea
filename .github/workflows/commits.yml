@@ -1,0 +1,27 @@
+name: Commits
+
+# Every commit of a pull request must be a conventional commit with a type release-please
+# understands (the types of release-please-config.json), not only the title: pull requests merge by
+# rebase, so each commit lands on main as it is and release-please reads its subject. The rules are
+# in .github/scripts/check-commits.mjs, with no dependency. The job is named `commits`; it is not a
+# required check unless the protect-main ruleset says so.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  commits:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The commits of the branch, back to where it left main.
+          fetch-depth: 0
+      - name: Check the commit messages
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: node .github/scripts/check-commits.mjs "$BASE" "$HEAD"
