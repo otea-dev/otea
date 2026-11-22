@@ -62,7 +62,7 @@ import {
 } from '../app/items.ts';
 import { keepWaitingCommand, keepWaitingLine, waitAgainLine } from '../app/keep-waiting.ts';
 import { defaultLang } from '../app/language.ts';
-import { type Launcher, oteaLauncher, withHome } from '../app/launcher.ts';
+import { type Launcher, oteaLauncher, runningRoot, withHome } from '../app/launcher.ts';
 import { claimItem, heartbeatItem, releaseItem } from '../app/leases.ts';
 import { openMachine, rememberLocalProject, withMachine } from '../app/machine.ts';
 import { markMerged, reopenItem } from '../app/merged.ts';
@@ -710,14 +710,12 @@ const migrateCommand: Command = {
 
 // How what Otea writes (hooks, the MCP server connect prints) runs this Otea again: Node on
 // main.ts in a checkout, main.js in the published package; the desktop app on its own
-// Electron. connect names this one, never an otea that happens to be on $PATH.
-const OTEA = oteaLauncher(
-  fileURLToPath(new URL(`./main${extname(import.meta.url)}`, import.meta.url)),
-  {
-    execPath: process.execPath,
-    electron: process.versions.electron,
-  },
-);
+// Electron. connect prefers the otea command on $PATH when it is this same install.
+const OTEA_MAIN = fileURLToPath(new URL(`./main${extname(import.meta.url)}`, import.meta.url));
+const OTEA = oteaLauncher(OTEA_MAIN, {
+  execPath: process.execPath,
+  electron: process.versions.electron,
+});
 
 // The MCP server as an agent adds it to its own harness's config: every harness keeps that config
 // its own way, so Otea gives one instruction and writes none of them.
@@ -842,13 +840,29 @@ const connect: Command = {
     // read it there.
     const here = checkoutRoot(cwd) ?? root;
     const agentsMd = writeAgentsMd(here);
-    const entry = mcpEntry(withHome(OTEA, input.home), id);
+    // The otea on PATH only when it is this same install: another one would run other code.
+    const onPath = input.oteaOnPath?.();
+    const running = runningRoot(OTEA_MAIN);
+    const same = (a: string, b: string) =>
+      process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+    const usePath =
+      onPath?.root !== undefined && running !== undefined && same(onPath.root, running);
+    const entry = mcpEntry(withHome(usePath && onPath ? onPath.launcher : OTEA, input.home), id);
     const mcp = { name: MCP_SERVER, ...entry };
     const old = oldMcpEntry(here);
     const text = [
       `${AGENTS_MD_TEXT[agentsMd.action](agentsMd.path)}: every agent that reads AGENTS.md finds Otea there (if your harness doesn't read AGENTS.md, import it from the file it reads)`,
       // A harness's permission mode blocked git push and git worktree add mid-flow (p6).
       HARNESS_PERMISSIONS,
+      ...(usePath
+        ? []
+        : [
+            `Warning: ${
+              onPath === undefined
+                ? 'no otea is on your PATH'
+                : `the otea on your PATH (${onPath.file}) is not this install`
+            }, so the entry below runs the otea running now (${OTEA_MAIN}) by its absolute path.`,
+          ]),
       ...mcpInstructionText(entry),
       ...(old
         ? [

@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { type ParseArgsOptionsConfig, parseArgs } from 'node:util';
+import { findOnPath, installRoot } from '../app/launcher.ts';
 import type { Probe } from '../app/phone.ts';
 import { CLI_HARNESS } from '../app/presence.ts';
 import { NO_TAILSCALE, type TailscaleCli } from '../app/tailscale.ts';
@@ -185,6 +186,10 @@ function inputFor(command: Command, values: Values, args: string[], io: Io, json
     ...(io.gh === undefined ? {} : { gh: io.gh }),
     forge: io.forge ?? NO_FORGE,
     ...(io.env.OTEA_HOME ? { home: resolve(io.cwd, io.env.OTEA_HOME) } : {}),
+    oteaOnPath: () => {
+      const found = findOnPath(io.env);
+      return found && { ...found, root: installRoot(found.file) };
+    },
     ...(io.env.OTEA_PROJECT_ID ? { pin: io.env.OTEA_PROJECT_ID } : {}),
     terminal: io.stdout.isTTY === true,
     warn: (message) =>

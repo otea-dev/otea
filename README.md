@@ -216,7 +216,7 @@ Both paths meet here. Paste the text into your agent's chat (Claude Code, OpenCo
 
 ### MCP config for your harness
 
-An agent over MCP adds Otea's server to its own harness, for this project only. `otea connect` prints the exact `command`, `args` and `env` to use, as absolute paths to the Otea that ran it (never an `otea` that happens to be first on `PATH`). The same entry in the config shape of three harnesses, with the values `otea connect` printed in place of the `<...>` ones (`env` only when it printed one):
+An agent over MCP adds Otea's server to its own harness, for this project only. `otea connect` prints the exact `command`, `args` and `env` to use. Copy them as printed: the `otea` on your `PATH` when it is the same install as the one running `connect`, otherwise the absolute paths of the running one, with a warning line saying which `otea` is on `PATH`. The same entry in the config shape of three harnesses, shown for the desktop app (one leading arg, and the `env` that makes its Electron run as Node; without it the app opens its window instead of the server). From npm or a checkout `connect` prints `--disable-warning=ExperimentalWarning` before the main path, and prints `env` only when you set `OTEA_HOME`; with `otea` on `PATH`, the command is `otea` and the args are `mcp --project <id>`.
 
 - Cursor, in `.cursor/mcp.json` of the project:
 
@@ -225,7 +225,8 @@ An agent over MCP adds Otea's server to its own harness, for this project only. 
     "mcpServers": {
       "otea": {
         "command": "<command>",
-        "args": ["<arg>", "<arg>", "mcp", "--project", "<project-id>"]
+        "args": ["<main>", "mcp", "--project", "<project-id>"],
+        "env": { "<NAME>": "<value>" }
       }
     }
   }
@@ -239,20 +240,22 @@ An agent over MCP adds Otea's server to its own harness, for this project only. 
       "otea": {
         "type": "stdio",
         "command": "<command>",
-        "args": ["<arg>", "<arg>", "mcp", "--project", "<project-id>"]
+        "args": ["<main>", "mcp", "--project", "<project-id>"],
+        "env": { "<NAME>": "<value>" }
       }
     }
   }
   ```
 
-- Antigravity, in its raw MCP config (Manage MCP servers, then View raw config). That file is the user's, not the project's, so the server named `otea` there points at one project: use the project's id and rename the entry (`otea-shop`) if you work on more than one.
+- Antigravity, in `.agents/mcp_config.json` of the workspace (its [MCP docs](https://antigravity.google/docs/mcp/)); the global `~/.gemini/config/mcp_config.json` applies to every project, so the server there would point at one project only. The IDE opens the file from its MCP settings, View raw config.
 
   ```json
   {
     "mcpServers": {
       "otea": {
         "command": "<command>",
-        "args": ["<arg>", "<arg>", "mcp", "--project", "<project-id>"]
+        "args": ["<main>", "mcp", "--project", "<project-id>"],
+        "env": { "<NAME>": "<value>" }
       }
     }
   }

@@ -1,6 +1,14 @@
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -94,7 +102,7 @@ describe('setup for agents', () => {
 
     // The server an agent adds to its own harness: pinned to the project, naming no agent.
     const entry = () => ({
-      command: process.execPath,
+      command: 'node',
       args: ['--disable-warning=ExperimentalWarning', MAIN, 'mcp', '--project', id],
     });
 
@@ -155,7 +163,7 @@ describe('setup for agents', () => {
       );
       expect(out).toContain('Never edit your user or global config');
       expect(out).toMatch(/^ {2}name {5}otea$/m);
-      expect(out).toContain(`  command  ${process.execPath}\n`);
+      expect(out).toMatch(/^ {2}command {2}node$/m);
       expect(out).toContain(`As JSON: ${JSON.stringify({ otea: entry() })}`);
       // The JSON is one shape among many: the agent translates it or uses its harness's own command,
       // and the usual project files are named as examples only.
@@ -192,27 +200,79 @@ describe('setup for agents', () => {
 
       expect(mcp).toEqual({
         name: 'otea',
-        command: process.execPath,
+        command: 'node',
         args: ['--disable-warning=ExperimentalWarning', MAIN, 'mcp', '--project', own],
         env: { OTEA_HOME: home },
       });
     });
 
-    it('names the otea that runs, by absolute path, even when another otea is first on PATH', async () => {
+    it('ignores an otea on PATH that is another install: the absolute form, and a warning naming it', async () => {
       const bin = join(repo.dir, 'bin');
       mkdirSync(bin);
-      writeFileSync(join(bin, 'otea'), '#!/bin/sh\n');
-      chmodSync(join(bin, 'otea'), 0o755);
-      writeFileSync(join(bin, 'otea.cmd'), '@echo off\r\n');
+      const decoy = join(bin, process.platform === 'win32' ? 'otea.cmd' : 'otea');
+      writeFileSync(decoy, '#!/bin/sh\n');
+      chmodSync(decoy, 0o755);
       const onPath = cliAt(repo.dir, { PATH: bin });
 
       const { mcp } = JSON.parse((await onPath('connect', '--json')).out);
       const { out } = await onPath('connect');
 
       expect(mcp).toEqual({ name: 'otea', ...entry() });
-      expect(isAbsolute(mcp.command)).toBe(true);
+      expect(mcp.command).not.toBe('otea');
+      expect(mcp.command).not.toBe('cmd');
       expect(isAbsolute(mcp.args.at(-4))).toBe(true);
+      // Windows spells the ending as PATHEXT does, in capitals.
+      expect(out.toLowerCase()).toContain(
+        `warning: the otea on your path (${decoy}) is not this install`.toLowerCase(),
+      );
+      expect(out).toContain(MAIN);
+    });
+
+    it('says no otea is on PATH when none is, and gives the absolute form', async () => {
+      const { out } = await cliAt(repo.dir, { PATH: join(repo.dir, 'nothing') })('connect');
+
+      expect(out).toContain('Warning: no otea is on your PATH');
       expect(out).toContain(`As JSON: ${JSON.stringify({ otea: entry() })}`);
+    });
+
+    it('prints the otea command when the otea on PATH is this same install, so the config survives a moved checkout', async () => {
+      const root = dirname(dirname(dirname(MAIN)));
+      const bin = join(repo.dir, 'bin');
+      mkdirSync(bin);
+      const restore: (() => void)[] = [];
+      if (process.platform === 'win32') {
+        // npm's shim: a .cmd that runs the package it keeps beside it.
+        mkdirSync(join(bin, 'node_modules', '@otea'), { recursive: true });
+        symlinkSync(root, join(bin, 'node_modules', '@otea', 'cli'), 'junction');
+        writeFileSync(
+          join(bin, 'otea.cmd'),
+          '@echo off\r\n"%dp0%\\node_modules\\@otea\\cli\\bin\\otea.mjs" %*\r\n',
+        );
+      } else {
+        // npm's link: a symlink to the package's bin, which must be executable to be found.
+        const script = join(root, 'bin', 'otea.mjs');
+        const mode = statSync(script).mode;
+        chmodSync(script, 0o755);
+        restore.push(() => chmodSync(script, mode));
+        symlinkSync(script, join(bin, 'otea'));
+      }
+      try {
+        const onPath = cliAt(repo.dir, { PATH: bin });
+
+        const { mcp } = JSON.parse((await onPath('connect', '--json')).out);
+        const { out } = await onPath('connect');
+
+        // A harness on Windows starts no .cmd shim by itself: cmd /c runs it.
+        const command =
+          process.platform === 'win32'
+            ? { command: 'cmd', args: ['/c', 'otea', 'mcp', '--project', id] }
+            : { command: 'otea', args: ['mcp', '--project', id] };
+        expect(mcp).toEqual({ name: 'otea', ...command });
+        expect(out).toContain(`As JSON: ${JSON.stringify({ otea: command })}`);
+        expect(out).not.toContain('Warning:');
+      } finally {
+        for (const undo of restore) undo();
+      }
     });
 
     it('writes AGENTS.md in the worktree it runs in, not in the main checkout', async () => {
