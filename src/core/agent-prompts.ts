@@ -15,7 +15,13 @@ export function isPromptKind(kind: string): kind is PromptKind {
 }
 
 // A board as the join prompt names it: its agent steps and how many items wait for an agent.
-export type JoinBoard = { name: string; agentSteps: readonly string[]; waiting: number };
+// `code`: the board guards a branch, so its work is code that reaches the repository.
+export type JoinBoard = {
+  name: string;
+  agentSteps: readonly string[];
+  waiting: number;
+  code?: boolean;
+};
 
 // The project as an agent joining it needs to know it: `working`, the agents listening now or
 // holding an item. `first`: no agent works there now, so the one joining has nobody to join.
@@ -183,6 +189,23 @@ export function joinPrompt(lang: Lang, facts: JoinFacts): string {
       : [words.none]),
     words.loop,
   ].join('\n');
+}
+
+// What the person reads beside the prompt, in plain words: whether the work is code (a board that
+// guards a branch, or, with no board yet, a git repository) and the boards the agent will work, by
+// the names the screen's language gives them. The words themselves are the desk's (connect.*).
+export type ConnectFacts = {
+  code: boolean;
+  boards: readonly { name: string; steps: readonly string[] }[];
+};
+
+export function connectFacts(moment: PromptKind, facts: JoinFacts): ConnectFacts {
+  const boards = facts.boards
+    .filter(({ agentSteps }) => agentSteps.length > 0)
+    .map(({ name, agentSteps }) => ({ name, steps: agentSteps }));
+  const code =
+    moment === 'join' ? facts.boards.some((board) => board.code === true) : facts.repo !== false;
+  return { code, boards };
 }
 
 // The prompt for a moment, `join` built from the project's facts.

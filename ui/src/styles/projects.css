@@ -794,13 +794,8 @@
   color: var(--ink-2);
   margin-bottom: 14px;
 }
-.pj-empty-agents {
-  font: 400 11.5px / 1.5 var(--mono);
-  color: var(--ink-3);
-  margin-top: 10px;
-}
-.pj-empty-agents code {
-  color: var(--ink);
+.pj-empty-body > .tech {
+  margin-top: 14px;
 }
 .pj-facts {
   display: grid;

@@ -74,7 +74,7 @@ import {
 import { topicsEverywhere } from '../app/topics-everywhere.ts';
 import { undoMove } from '../app/undo.ts';
 import { mergedOutside } from '../cli/merged-outside.ts';
-import { agentPrompt, isPromptKind, PROMPT_KINDS } from '../core/agent-prompts.ts';
+import { agentPrompt, connectFacts, isPromptKind, PROMPT_KINDS } from '../core/agent-prompts.ts';
 import { PERIOD_HINT, parsePeriod } from '../core/board/performance.ts';
 import { LANGS, LANGUAGE_HEADER, type Lang } from '../core/board/template-words.ts';
 import { OteaError } from '../core/errors.ts';
@@ -530,9 +530,15 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         const lang =
           asked === 'es' || asked === 'en' ? asked : resolveLang(storedLanguage(machine), env);
         const moment = kind ?? promptKindOf(project);
-        const facts = promptFacts(project, moment);
+        // The boards are named in the language the prompt is written in (their snapshot's words).
+        const facts = inLanguage(lang, () => promptFacts(project, moment));
         const first = 'first' in facts && facts.first === true ? { first: true } : {};
-        return c.json({ kind: moment, prompt: agentPrompt(moment, lang, facts), ...first });
+        return c.json({
+          kind: moment,
+          prompt: agentPrompt(moment, lang, facts),
+          ...connectFacts(moment, facts),
+          ...first,
+        });
       })
       // How each model performs (Rendimiento): per model family and effort, for a board and a period.
       .get('/performance', (c) => {

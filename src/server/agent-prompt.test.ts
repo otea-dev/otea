@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { addBoard } from '../app/boards.ts';
 import { initBoards } from '../app/init-boards.ts';
 import { createItem } from '../app/items.ts';
 import { claimItem } from '../app/leases.ts';
@@ -35,9 +36,28 @@ describe('GET /api/agent-prompt', () => {
   it('gives the first contact while the project has no board of its own', async () => {
     expect(await get('?lang=es')).toEqual({
       status: 200,
-      body: { kind: 'start', prompt: startPrompt('es', false) },
+      // A folder with no git repository: its first contact is written for files, not for code.
+      body: { kind: 'start', prompt: startPrompt('es', false), code: false, boards: [] },
     });
     expect((await get('?lang=en')).body.prompt).toBe(startPrompt('en', false));
+  });
+
+  // Conectar un agente writes its plain words for the work: a board that guards a branch is code,
+  // one that does not is files, and the steps come in the screen's language (the board snapshot).
+  it('says whether the boards are code, and names their agent steps in the language asked', async () => {
+    initBoards(project, 'todos', 'en');
+    const files = (await get('?lang=es')).body;
+    expect(files).toMatchObject({ kind: 'join', code: false });
+    expect(files.boards).toEqual([{ name: 'To-dos', steps: ['Hacerlo'] }]);
+    expect((await get('?lang=en')).body.boards).toEqual([{ name: 'To-dos', steps: ['Do it'] }]);
+
+    addBoard(project, {
+      name: 'Changes',
+      template: 'changes',
+      lang: 'en',
+      by: { kind: 'human', name: 'otea' },
+    });
+    expect((await get('?lang=en')).body.code).toBe(true);
   });
 
   it('gives the join prompt once there are boards, naming who listens and what waits', async () => {
@@ -58,7 +78,7 @@ describe('GET /api/agent-prompt', () => {
     expect(body.prompt).toContain(
       '- Cambios: Aclarar, Hacerlo, Integrar (1 espera a un agente ahora)',
     );
-    expect((await get('?kind=design&lang=es')).body).toEqual({
+    expect((await get('?kind=design&lang=es')).body).toMatchObject({
       kind: 'design',
       prompt: designPrompt('es'),
     });

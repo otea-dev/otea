@@ -494,6 +494,10 @@ export type AgentPromptView = {
   kind: 'start' | 'join' | 'design';
   prompt: string;
   first?: boolean;
+  // For the plain words beside the prompt (core/agent-prompts.ts connectFacts): whether the work is
+  // code, and the boards the agent will work, in the screen's language.
+  code?: boolean;
+  boards?: { name: string; steps: string[] }[];
 };
 
 export async function fetchAgentPrompt(
