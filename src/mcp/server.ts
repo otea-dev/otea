@@ -17,6 +17,7 @@ import { OteaError } from '../core/errors.ts';
 import { type Actor, agentActor, assertAgentName, PERSON_READER } from '../core/item.ts';
 import { parseDuration } from '../core/lease.ts';
 import { AGENT_COMMANDS, NAMELESS_READS, READ_ONLY, toolName } from './commands.ts';
+import { OUTPUT_SCHEMAS, structuredOf, timedOut } from './structured.ts';
 import { mcpWords } from './words.ts';
 
 export { AGENT_COMMANDS, CLI_ONLY_COMMANDS, toolName } from './commands.ts';
@@ -41,7 +42,7 @@ const NOTES: Readonly<Record<string, string>> = {
     'Pass id (the Pedido) or new (the name of a board the person asked you for, with why); not both. file is a path on this machine, which the server reads; a relative one is resolved against the directory otea mcp runs in.',
   events:
     'Returns the events after the event id given to since, one a line with its id first; call it again with the last id to read newer ones.',
-  wait: `Gives up with the timeout error after timeout (default ${WAIT_TIMEOUT}, at most ${WAIT_MAX.text}); call it again to keep waiting.`,
+  wait: `Gives up after timeout (default ${WAIT_TIMEOUT}, at most ${WAIT_MAX.text}) with a result, not an error, that says nothing arrived (timedOut: true); call it again to keep waiting.`,
 };
 
 // `agent`: the name the server was started as (otea mcp --as), which a call that names nobody acts
@@ -208,14 +209,25 @@ function inputFor(
   };
 }
 
-function reply(text: string, isError: boolean): CallToolResult {
-  return { content: [{ type: 'text', text }], isError };
+function reply(
+  text: string,
+  isError: boolean,
+  structured?: Record<string, unknown>,
+): CallToolResult {
+  return {
+    content: [{ type: 'text', text }],
+    isError,
+    ...(structured === undefined ? {} : { structuredContent: structured }),
+  };
 }
 
-// Runs the command as the CLI would: the text it prints, in the words of the tools, as the only
-// content (no structuredContent, which some clients put in context next to it); a failure, its
-// message. Under otea mcp --json: its data, or the records it printed one by one, and a failure as
-// the same {"error":{"code","message"}} the CLI prints.
+// Runs the command as the CLI would: the text it prints, in the words of the tools, as the content,
+// and, for the tools that read an item or an offer (show, next, wait: the ones with an output
+// schema), its compact data as structuredContent (see structured.ts). A write's answer is a line, so
+// it has none: clients that show both pay for the data twice, and a work cycle costs 30% more with
+// it on every call. A failure, its message. Under otea mcp
+// --json: its data, or the records it printed one by one, and a failure as the same
+// {"error":{"code","message"}} the CLI prints. A wait that gave up is no failure: nothing arrived.
 async function callCommand(
   command: Command,
   values: Values,
@@ -232,15 +244,21 @@ async function callCommand(
     const given = command.name === 'wait' ? waitValues(values) : values;
     input = inputFor(command, given, context, signal, records, harness, seen);
     const output = await command.execute(input);
+    // A tool with an output schema always answers with data that fits it.
+    const structured = (data: unknown, text: string) =>
+      OUTPUT_SCHEMAS[command.name]
+        ? (structuredOf(command.name, data) ?? { message: text })
+        : undefined;
     if (context.json) {
       const data =
         output === undefined ? records.map(({ data }) => data) : inMcpWords(output.data, commands);
-      return reply(JSON.stringify(data), false);
+      return reply(JSON.stringify(data), false, structured(data, JSON.stringify(data)));
     }
     const text = output === undefined ? records.map(({ text }) => text).join('\n') : output.text;
     // A command with nothing to say (no events yet) still answers: with its data.
     if (text === '') return reply(JSON.stringify(output === undefined ? [] : output.data), false);
-    return reply(mcpWords(text, commands), false);
+    const said = mcpWords(text, commands);
+    return reply(said, false, structured(output?.data, said));
   } catch (error) {
     // A first call that failed starts no session: the next call is its first again (P2S-R2-3).
     if (input?.newSession && input.agent !== undefined) {
@@ -250,6 +268,12 @@ async function callCommand(
     const { error: data } = errorData(error);
     const message =
       typeof data.message === 'string' ? mcpWords(data.message, commands) : data.message;
+    // A wait that timed out found nothing: a result that says so, which the agent answers by
+    // waiting again, not an error (the CLI's exit 13 stays: a shell tells it by the code).
+    if (command.name === 'wait' && data.code === 'timeout') {
+      const nothing = timedOut(String(message));
+      return reply(context.json ? JSON.stringify(nothing) : String(message), false, nothing);
+    }
     if (!context.json) return reply(String(message), true);
     return reply(JSON.stringify({ error: { ...data, message } }), true);
   } finally {
@@ -295,6 +319,7 @@ export function createMcpServer(commands: readonly Command[], context: McpContex
       {
         description: note ? `${command.summary}. ${note}` : command.summary,
         inputSchema: inputSchema(command),
+        ...(OUTPUT_SCHEMAS[name] ? { outputSchema: OUTPUT_SCHEMAS[name] } : {}),
         annotations: { readOnlyHint: READ_ONLY.has(name) },
       },
       (values: Values, { mcpReq }) =>
