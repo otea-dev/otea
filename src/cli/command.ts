@@ -1,3 +1,4 @@
+import type { Launcher } from '../app/launcher.ts';
 import type { Probe } from '../app/phone.ts';
 import type { Harness } from '../app/presence.ts';
 import type { TailscaleCli } from '../app/tailscale.ts';
@@ -50,6 +51,9 @@ export type Input = {
   forge: ForgeCli;
   // The Otea home the person set apart ($OTEA_HOME), as an absolute path; none for the default.
   home?: string;
+  // The otea command on $PATH: how a harness starts it, the file it is, and the install that file
+  // belongs to (undefined when that cannot be told); none over MCP, or when otea is not there.
+  oteaOnPath?: () => { launcher: Launcher; file: string; root: string | undefined } | undefined;
   // The project the agent is pinned to ($OTEA_PROJECT_ID, written by otea connect): its writes to
   // any other project are refused.
   pin?: string | undefined;
