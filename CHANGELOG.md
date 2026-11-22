@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.3.0](https://github.com/otea-dev/otea/compare/v0.2.0...v0.3.0) (2026-11-22)
+
+
+### Features
+
+* **agents:** brief next and show, structured MCP results, normal wait timeout ([cf8c9fa](https://github.com/otea-dev/otea/commit/cf8c9faa182be749cd4cc3dc14c615f2bb765468))
+* **boards:** ask for at least N of a group of evidence, hide empty optional evidence in review, refuse empty files, and list accepted extensions ([6faaf48](https://github.com/otea-dev/otea/commit/6faaf48ac59b71cff0aa368f260f4ef90b8ba0d4))
+* **boards:** keep a template's words on the board in every language, and read them in the language on screen ([ab0ee1d](https://github.com/otea-dev/otea/commit/ab0ee1d4acf32eb7f50b810bbbdb27e682d83f97))
+* **cli:** add otea uninstall, which takes Otea's footprint off every repo and the machine ([de99e42](https://github.com/otea-dev/otea/commit/de99e427b1e32d5a56628ced5a9f043e75881ced))
+* **cli:** tell once a day when npm has a newer @otea/cli ([c8c3c81](https://github.com/otea-dev/otea/commit/c8c3c81eececf6b9d3d312182db383b384821b6a))
+* **ui:** show a group's row in the hand checklists and Studio's preview, and keep the review's gaps in the evidence column ([53b23bd](https://github.com/otea-dev/otea/commit/53b23bd8a44bec99f7bd71311d1dc725f4693f2a))
+
+
+### Bug fixes
+
+* **agents:** brief is opt-in, no structuredContent, next orders by approvals ([65f624a](https://github.com/otea-dev/otea/commit/65f624a94474cdf7a274194127336a8b7fbf6c96))
+* **boards:** count groups when publishing, never skip past an unmet group, count a file once, let a group member be new each round, and pin the file part's placement and headers ([333c903](https://github.com/otea-dev/otea/commit/333c9033cabb8eef6868630d3a725249653668a7))
+* **boards:** keep the snapshot through a language switch under an open editor, an agent's merge, and a re-read ([0402301](https://github.com/otea-dev/otea/commit/040230166028da5e6fe8c9af6d51c003ddd9c8d1))
+* **boards:** require readIn on every draft save, and send it from the pair undo-discard ([2bfbf91](https://github.com/otea-dev/otea/commit/2bfbf91fc265c0ec8dafaedad48a871c58af1901))
+* **cli:** keep a repo the same repo when a remote is added after init ([4802099](https://github.com/otea-dev/otea/commit/48020990f0b556d02941e2dfdc6d9bf8d0c991a2))
+* **cli:** make uninstall delete only what is exactly Otea's, and never write to the home it removes ([8ff2b5a](https://github.com/otea-dev/otea/commit/8ff2b5a68f3a42deb8f5b00e5ea5e0fe17c46c8c))
+* **cli:** match a repo by root commit only while it has no origin, delete only a hook that is exactly Otea's, and harden the purge guard ([1c2e121](https://github.com/otea-dev/otea/commit/1c2e1213ade52150b29ec8bf74ad94c6d4d18000))
+* **cli:** refuse to purge a home whose registry cannot be read, and tell an agent to ask first ([6d7c971](https://github.com/otea-dev/otea/commit/6d7c971ce712da691ac508eb7b67ab12d23128e1))
+* **mcp:** list uninstall among the CLI-only commands ([95ffddc](https://github.com/otea-dev/otea/commit/95ffddccad1b50132be01ef2a640d2dcd9b50bbf))
+* **presence:** one agent status for the desk, the CLI and MCP ([8fce2db](https://github.com/otea-dev/otea/commit/8fce2dbd34c48a0e794c776bd4ea70d3ea337939))
+* **presence:** one status for every consumer, rename told by the agent ([fc97914](https://github.com/otea-dev/otea/commit/fc97914c9b19d009512338918618f1a8f934caf5))
+* **presence:** only whoami tells a rename; heartbeat every 90 seconds ([06cb884](https://github.com/otea-dev/otea/commit/06cb8844015502fdbb6c262a6cbdc8cbc7c5c2cb))
+* **templates:** --description fills the first long text the form asks, and To add one offers no attachment as a field ([4581c49](https://github.com/otea-dev/otea/commit/4581c491375c26104a65073f0d9f545fd074b6ba))
+* **ui:** break a long title in the phone's fold summary, and pin the tab bar height in the phone CSS test ([a60c3ca](https://github.com/otea-dev/otea/commit/a60c3cad782d7cf818944e74d0da87357636896d))
+* **ui:** keep line breaks without doubling hard breaks, align the form's textarea, and harden the update notice ([d47ccba](https://github.com/otea-dev/otea/commit/d47ccba9b58968d06e5375ca94edc74446e7721d))
+* **ui:** keep the agent status the server sends when reading presence ([4b33fbc](https://github.com/otea-dev/otea/commit/4b33fbceacc02373afe7a2f738cd169f47083c38))
+* **ui:** polish the web desk's layout on desktop and phone, and tell the user an update restart is under way ([2a73243](https://github.com/otea-dev/otea/commit/2a73243364e37064f7c54de565fb8d1ebb5a5fb0))
+* **ui:** say a silent agent's item in its menu row ([0981059](https://github.com/otea-dev/otea/commit/098105966b9e9c1ec8c5b29462ad698e2eaf34f8))
+
 ## [0.2.0](https://github.com/otea-dev/otea/compare/v0.1.1...v0.2.0) (2026-11-22)
 
 
