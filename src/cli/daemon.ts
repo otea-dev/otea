@@ -30,10 +30,27 @@ export type ServerState =
   // another program took, or a server of another home or another program on that port): nothing
   // to stop.
   | { kind: 'stale'; info: ServeInfo; ended: boolean }
-  // The process lives but its port did not answer in time, several times over: it may be a busy
-  // server of this home. The record stays; nothing here proves it stale.
-  | { kind: 'unresponsive'; info: ServeInfo }
+  // The process lives but cannot be told from a server of this home: its port did not answer in
+  // time, several times over (it may be busy), or the key to ask it with is missing or unreadable.
+  // The record stays; nothing here proves it stale.
+  | { kind: 'unresponsive'; info: ServeInfo; why: 'timeout' | 'no-key' }
   | { kind: 'none' };
+
+// What a person is told about a server that cannot be confirmed.
+export function unresponsiveText(state: Extract<ServerState, { kind: 'unresponsive' }>): string {
+  const { pid, port } = state.info;
+  return state.why === 'no-key'
+    ? `otea serve (pid ${pid}, port ${port}) is running but this home's key (ui-token) is missing or unreadable, so it cannot be confirmed`
+    : `otea serve (pid ${pid}, port ${port}) is running but did not answer in time`;
+}
+
+function readKey(home: string): string | undefined {
+  try {
+    return readUiToken(home);
+  } catch {
+    return undefined;
+  }
+}
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -46,15 +63,16 @@ const PROBE_TRIES = 3;
 export async function inspectServer(home: string): Promise<ServerState> {
   const info = readServeFile(home);
   if (!info) return { kind: 'none' };
-  const token = readUiToken(home);
+  const token = readKey(home);
   if (!processAlive(info.pid)) return { kind: 'stale', info, ended: true };
-  if (!token) return { kind: 'stale', info, ended: false };
+  // Without the key nothing can be asked of the process: not a proof that it is no server.
+  if (!token) return { kind: 'unresponsive', info, why: 'no-key' };
   const url = `http://127.0.0.1:${info.port}`;
   for (let attempt = 1; ; attempt++) {
     const probe = await probeSignIn(`${url}/auth?token=${encodeURIComponent(token)}`);
     if (probe === 'ours') return { kind: 'running', pid: info.pid, port: info.port, url, token };
     if (probe !== 'slow') return { kind: 'stale', info, ended: false };
-    if (attempt >= PROBE_TRIES) return { kind: 'unresponsive', info };
+    if (attempt >= PROBE_TRIES) return { kind: 'unresponsive', info, why: 'timeout' };
     await pause(300);
   }
 }
@@ -95,9 +113,20 @@ export function processCommand(pid: number): string | undefined {
   }
 }
 
-// Whether a command line is an otea serve: a node (or Electron, or otea) running `serve`.
-export function isServeCommand(line: string): boolean {
-  return /\bserve\b/.test(line) && /node|electron|otea/i.test(line);
+// Whether a command line is this install's background server: its own entry point (`main`, the
+// exact path), then `serve`, with `--daemon` among the options, as `otea serve start` runs it. A
+// `vite serve`, an `npx serve` or another otea does not match: this decides what is killed.
+export function isServeCommand(line: string, main: string): boolean {
+  const flat = (text: string) => {
+    const slashed = text.replaceAll('\\', '/');
+    return process.platform === 'win32' ? slashed.toLowerCase() : slashed;
+  };
+  const text = flat(line);
+  const entry = flat(main);
+  const at = text.indexOf(entry);
+  if (at < 0) return false;
+  const rest = text.slice(at + entry.length);
+  return /^"?\s+serve(\s|$)/.test(rest) && /\s--daemon(\s|"|$)/.test(rest);
 }
 
 // How the background server starts: Node (or the desktop app's Electron) on Otea's own main.
@@ -332,6 +361,7 @@ async function startServer(
 
 const LOCK_WAIT_MS = 90_000;
 const LOCK_STALE_MS = 120_000;
+const LOCK_UNWRITTEN_MS = 5_000;
 
 // Runs `work` as the only start in this home: the lock file is made exclusively (wx), and one left
 // by a process that ended, or by a start that took longer than any start can, is cleared.
@@ -353,7 +383,11 @@ async function withStartLock<T>(home: string, work: () => Promise<T>): Promise<T
       } catch {
         continue; // Released between the two reads.
       }
-      if (!(holder > 0 && processAlive(holder)) || age > LOCK_STALE_MS) {
+      // The file exists a moment before its owner's id is written into it: an empty one that young
+      // is held, not left behind.
+      const unwritten = !(holder > 0) && age < LOCK_UNWRITTEN_MS;
+      const gone = holder > 0 && !processAlive(holder);
+      if (!unwritten && (gone || !(holder > 0) || age > LOCK_STALE_MS)) {
         rmSync(path, { force: true });
         continue;
       }
@@ -377,9 +411,7 @@ export async function ensureServer(
     const state = await inspectServer(home);
     if (state.kind === 'running') return { state, started: false };
     if (state.kind === 'unresponsive') {
-      throw new Error(
-        `otea serve (pid ${state.info.pid}, port ${state.info.port}) is running but did not answer in time; wait, or end it with otea serve stop`,
-      );
+      throw new Error(`${unresponsiveText(state)}; wait, or end it with otea serve stop`);
     }
     forgetStale(home, state);
     return { state: await startServer(home, options), started: true };
@@ -407,10 +439,12 @@ async function kill(pid: number, home: string): Promise<void> {
 // Ends the server by its process id once it is known to be this home's, and forgets its record (a
 // killed server cannot: Windows ends it outright). A record of a process that is no server of this
 // home is only forgotten: that process may be anything now, and is not touched. A process that is
-// alive but did not answer is ended only when its command line is an otea serve; when the system
+// alive but cannot be confirmed is ended only when its command line is this install's background
+// server (`main` serve --daemon, as otea serve start runs it); when the system
 // cannot say, the record stays and nothing is ended.
 export async function stopServer(
   home: string,
+  main: string,
 ): Promise<{ stopped: ServeInfo } | { stale: ServeInfo } | undefined> {
   const state = await inspectServer(home);
   if (state.kind === 'none') return undefined;
@@ -426,7 +460,7 @@ export async function stopServer(
         `otea serve (pid ${info.pid}) did not answer and the system did not say what that process is: nothing was ended and its record is kept; end it yourself if it is the server`,
       );
     }
-    if (!isServeCommand(line)) {
+    if (!isServeCommand(line, main)) {
       removeServeFile(home, info.pid);
       return { stale: info };
     }
