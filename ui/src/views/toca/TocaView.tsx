@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { activeLease } from '../../active-lease.ts';
 import { typeOfItem, useApp } from '../../app/context.tsx';
-import { CommandWords } from '../../components/AgentPrompt.tsx';
 import { EmptyProject } from '../../components/EmptyProject.tsx';
+import { NextStep } from '../../components/NextStep.tsx';
 import { t, tx } from '../../i18n/i18n.ts';
 import { Button } from '../../kit/Button.tsx';
 import { Count } from '../../kit/Count.tsx';
@@ -86,9 +86,6 @@ function NoAgents({
             <Icon name="plus" />
             {t('toca.connect')}
           </Button>
-          <code className="cmd">
-            <CommandWords text={t('toca.noAgents.command')} />
-          </code>
         </div>
       </div>
     </div>
@@ -166,6 +163,7 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
           <EmptyProject />
         ) : (
           <>
+            {atasco ? null : <NextStep key={app.project?.id} />}
             {lonely ? <NoAgents items={app.all} now={app.now} onConnect={app.openConnect} /> : null}
             <LaneHead />
             <LaneList
