@@ -10,10 +10,12 @@ import {
   silentHolder,
   unheard,
   unheardLead,
+  unheardWords,
   waitingToLand,
   workingAgents,
 } from './listening.ts';
 import type { Agent } from './presence.ts';
+import { agentCounts, agentRows, pillSummary } from './shell/topbar-model.ts';
 import type { Item, ItemEvent } from './types.ts';
 
 const agent = (name: string, o: Partial<Agent> = {}): Agent => ({
@@ -148,7 +150,56 @@ describe('hearing', () => {
       agents: ['a'],
     });
     expect(hearing([agent('a', { actedAt: ago(10) })], [], NOW)).toEqual({ kind: 'unheard' });
-    expect(hearing([], [], NOW)).toEqual({ kind: 'unheard' });
+    // Connected and idle in its chat: nobody hears the desk, and that is the alarm.
+    expect(hearing([agent('a', { listening: true })], [], NOW)).toEqual({ kind: 'unheard' });
+  });
+
+  // «Nadie está escuchando» in red read as a fault when no agent existed at all: that is not a
+  // silence to fix, it is an empty room, said calmly.
+  it('says no agent is connected, not that nobody listens, when there is none', () => {
+    expect(hearing([], [], NOW)).toEqual({ kind: 'nobody' });
+    expect(hearing([agent('a', { live: false })], [], NOW)).toEqual({ kind: 'nobody' });
+    expect(unheardWords([], true)).toEqual({ text: 'no agent is connected', calm: true });
+  });
+});
+
+describe('one status, one count', () => {
+  const lease = { holder: 'a', expiresAt: inMinutes(10) };
+  const items = [item({ id: 'TASK-2', lease })];
+
+  // After its handoff the agent was still «trabajando» for the listening window.
+  it('does not count an agent that handed off, though it called Otea a moment ago', () => {
+    const handed = agent('a', { actedAt: ago(0.5), status: 'connected' });
+    expect(workingAgents([handed], items, NOW)).toEqual([]);
+    expect(agentRows([handed], items, NOW)[0]?.working).toBe(false);
+  });
+
+  // «4 ocupados» beside a pill of 3: the queue note counted whoever called lately, the pill only
+  // whoever held an item.
+  it('counts the same agents on the pill and in the queue note', () => {
+    const asks = { question: 1, by: 'c', text: 'Which?', at: ago(1) };
+    const all = [
+      item({ id: 'TASK-2', lease }),
+      item({ id: 'TASK-3', lease: { holder: 'c', expiresAt: inMinutes(10) }, asks }),
+    ];
+    const agents = [
+      agent('a', { holding: ['TASK-2'], status: 'working' }),
+      agent('b', { actedAt: ago(0.5), status: 'working' }),
+      agent('c', { holding: ['TASK-3'], status: 'working' }),
+      agent('d', { status: 'connected' }),
+    ];
+    const rows = agentRows(agents, all, NOW);
+    expect(workingAgents(agents, all, NOW)).toEqual(['a', 'b']);
+    expect(agentCounts(rows).holding).toBe(2);
+  });
+
+  // An agent working a long step over the command line gave no sign for a while: the desk said
+  // «Ningún agente conectado» over it.
+  it('keeps an agent silent on a live lease out of the empty room', () => {
+    const silent = agent('a', { live: false, holding: ['TASK-2'], status: 'silent' });
+    expect(hearing([silent], [], NOW)).toEqual({ kind: 'unheard' });
+    expect(pillSummary('live', [], 1)).toEqual({ kind: 'silent', count: 1 });
+    expect(pillSummary('live', [], 0)).toEqual({ kind: 'none' });
   });
 });
 
