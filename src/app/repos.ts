@@ -68,6 +68,26 @@ export function identityAt(path: string): string | null {
   return repoIdentity(repoFingerprint(path));
 }
 
+// Everything that can identify the repo checked out at `path`, the best first: its origin URL, then
+// its root commits. A repo is registered under one of them, and a remote added after (or taken off)
+// changes which identityAt gives, so a checkout is the registered repo when any of them is.
+function identitiesAt(path: string): string[] {
+  const { remoteUrl, rootCommit } = repoFingerprint(path);
+  return [
+    repoIdentity({ remoteUrl, rootCommit: null }),
+    repoIdentity({ remoteUrl: null, rootCommit }),
+  ].filter((identity): identity is string => identity !== null);
+}
+
+// The repo of `repos` that the checkout at `path` is, by any of its identities.
+function repoAt(repos: readonly Repo[], path: string): Repo | undefined {
+  for (const identity of identitiesAt(path)) {
+    const found = repos.find((each) => each.identity === identity);
+    if (found) return found;
+  }
+  return undefined;
+}
+
 // The folders that lead to the project, as linked in the registry, or its own folder.
 function projectFolders(project: Project, env: Env): Array<{ path: string; kind: PathKind }> {
   const listed = withRegistry(env, listProjects)?.find(({ id }) => id === project.identity.id);
@@ -132,7 +152,7 @@ export function checkoutsOf(project: Project, name: string, env: Env = process.e
   const repo = listRepos(project, env).find((each) => sameRepo(each.name, name));
   if (!repo) return [];
   const folders = projectFolders(project, env).flatMap(reposAt);
-  return [...new Set(folders)].filter((folder) => identityAt(folder) === repo.identity);
+  return [...new Set(folders)].filter((folder) => repoAt([repo], folder) === repo);
 }
 
 // Registers the repos at a folder just linked to the project (the folder, or the repos below it),
@@ -150,7 +170,7 @@ export function repoNameAt(project: Project, cwd: string, env: Env = process.env
   const top = checkoutTop(cwd);
   if (top === undefined) throw new Error(`${cwd} is not in a git checkout`);
   const identity = identityAt(top);
-  const repo = identity && listRepos(project, env).find((each) => each.identity === identity);
+  const repo = repoAt(listRepos(project, env), top);
   if (repo) return repo.name;
   const why =
     identity === null
@@ -182,20 +202,25 @@ export function addRepo(
   if (name !== undefined && label === '')
     throw new OteaError('invalid_name', 'Give the repo a name');
   const repos = listRepos(project, env);
-  const existing = repos.find((repo) => repo.identity === identity);
+  // The repo this checkout already is, by its origin or its root commits: one registered before a
+  // remote was added is the same repo, and keeps the identity it was registered under.
+  const existing = repoAt(repos, top);
   const wanted = label || existing?.name || basename(top);
   if (existing?.name === wanted) return existing;
   // A gate check matches repo names whatever their case, so a case apart is the same name.
-  const holder = repos.find((repo) => repo.identity !== identity && sameRepo(repo.name, wanted));
+  const holder = repos.find((repo) => repo !== existing && sameRepo(repo.name, wanted));
   if (holder) {
     throw new OteaError(
       'already_exists',
       `"${holder.name}" already names another repo (${holder.identity}); give this one another name with --name`,
     );
   }
+  if (existing) {
+    renameRepo(project.db, existing.identity, wanted);
+    return { name: wanted, identity: existing.identity };
+  }
   const repo = { name: wanted, identity };
-  if (existing) renameRepo(project.db, identity, wanted);
-  else insertRepo(project.db, repo);
+  insertRepo(project.db, repo);
   return repo;
 }
 
