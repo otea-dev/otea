@@ -1,10 +1,13 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { processAlive } from '../app/presence.ts';
 import { readServeFile, SERVE_FILE } from './serve-file.ts';
 import { spawnCli, type TempRepo, tempGitRepo, until } from './testing.ts';
+
+const MAIN = fileURLToPath(new URL('./main.ts', import.meta.url));
 
 const home = () => process.env.OTEA_HOME ?? '';
 
@@ -55,6 +58,31 @@ describe('serve start, status and stop', () => {
     expect(existsSync(join(home(), SERVE_FILE))).toBe(false);
     const after = await spawnCli(repo.dir, 'serve', 'status');
     expect(after.code).toBe(11);
+  }, 60_000);
+
+  // A harness reads a command's output through a pipe until the pipe closes. A server that held it
+  // open (Windows lets a child inherit every handle of its parent) kept that read, and the agent's
+  // call with it, running for as long as the server did.
+  it('returns to a shell that reads its output through a pipe, with the server still running', async () => {
+    const node = `"${process.execPath}" --disable-warning=ExperimentalWarning "${MAIN}" serve start --no-open --port 0`;
+    const [shell, ...args] =
+      process.platform === 'win32'
+        ? ['powershell.exe', '-NoProfile', '-Command', `& ${node}`]
+        : ['sh', '-c', node];
+    const child = spawn(shell as string, args, {
+      cwd: repo.dir,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    // The read of its output ends with 'close', once nothing holds the pipe.
+    const returned = await new Promise<boolean>((resolve) => {
+      child.on('close', () => resolve(true));
+      setTimeout(() => resolve(false), 40_000);
+    });
+    if (!returned) child.kill();
+
+    expect(returned).toBe(true);
+    const info = readServeFile(home());
+    expect(processAlive(info?.pid ?? 0)).toBe(true);
   }, 60_000);
 
   it('runs one server per home: a second start reports the one running', async () => {
