@@ -6,7 +6,7 @@ import { t, tx } from '../i18n/i18n.ts';
 import { Button } from '../kit/Button.tsx';
 import { Icon } from '../kit/Icon.tsx';
 import type { ProjectSettings } from '../types.ts';
-import { PromptBlock, useAgentPrompt } from './AgentPrompt.tsx';
+import { PromptBlock, TechDetails, useAgentPrompt } from './AgentPrompt.tsx';
 
 // The list of a project with no items yet: its lanes run empty, and it says how items arrive.
 export function EmptyProject() {
@@ -49,6 +49,12 @@ export function EmptyProjectView({
 }) {
   const { name } = settings;
   const none = boards.length === 0;
+  // What an agent reads first: the person's to know, not to follow, so it sits behind the details.
+  const agents = (
+    <p className="cnote">
+      {tx('connect.tech.agents', { command: <code className="inl">otea board</code> })}
+    </p>
+  );
   return (
     <div className="pj-empty-project">
       <svg className="pj-empty-lanes" width="56" height="100%" aria-hidden="true">
@@ -60,7 +66,7 @@ export function EmptyProjectView({
         <p className="pj-empty-text">{t(none ? 'emptyProject.noBoards' : 'emptyProject.text')}</p>
         {none && prompt ? (
           <div className="pj-empty-prompt">
-            <PromptBlock prompt={prompt} primary />
+            <PromptBlock prompt={prompt} primary fold tech={agents} />
           </div>
         ) : null}
         <div className="pj-empty-acts">
@@ -83,14 +89,14 @@ export function EmptyProjectView({
             </>
           )}
         </div>
-        <p className="pj-empty-agents">
-          {tx('emptyProject.agents', { command: <code>otea board</code> })}
-        </p>
         {none ? null : (
-          <dl className="pj-facts">
-            <dt>{t('emptyProject.boards')}</dt>
-            <dd>{boards.join(', ')}</dd>
-          </dl>
+          <>
+            <TechDetails>{agents}</TechDetails>
+            <dl className="pj-facts">
+              <dt>{t('emptyProject.boards')}</dt>
+              <dd>{boards.join(', ')}</dd>
+            </dl>
+          </>
         )}
       </div>
     </div>

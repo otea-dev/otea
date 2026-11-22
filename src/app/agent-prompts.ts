@@ -33,7 +33,8 @@ export function joinFacts(ctx: Place, now = systemClock): JoinFacts {
       const waiting = listItems(ctx, { collection, turn: 'agent' }, now).filter(
         ({ lease }) => !lease,
       ).length;
-      return [{ name: live.def.name, agentSteps, waiting }];
+      const code = Object.values(live.def.parts).some((part) => part.kind === 'branch');
+      return [{ name: live.def.name, agentSteps, waiting, code }];
     });
   // Working: connected now, or holding an item while Otea cannot tell its session ended: a long
   // step runs with no wait and no otea call. Its name is taken either way.

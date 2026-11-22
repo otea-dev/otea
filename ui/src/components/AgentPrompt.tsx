@@ -1,8 +1,9 @@
-import { Fragment, useCallback, useState } from 'react';
+import { Fragment, type ReactNode, useCallback, useState } from 'react';
 import { type AgentPromptView, fetchAgentPrompt } from '../api.ts';
 import { useRemote } from '../hooks.ts';
 import { language, t } from '../i18n/i18n.ts';
 import { Button } from '../kit/Button.tsx';
+import { Icon } from '../kit/Icon.tsx';
 import type { Remote } from '../remote.ts';
 import { CopyGlyph } from './CopyCommand.tsx';
 
@@ -60,23 +61,69 @@ export function useAgentPrompt(
   return useRemote(load, version, 'live');
 }
 
-// What to paste into the agent's chat, one numbered line per paragraph, and the button that copies
-// it whole. `primary` when it is the first thing to do on the page.
-export function PromptBlock({ prompt, primary = false }: { prompt: string; primary?: boolean }) {
+// What the person may open to see the machinery: shut by default, it opens slowly.
+export function TechDetails({ children }: { children: ReactNode }) {
+  return (
+    <details className="tech">
+      <summary>
+        <Icon name="chevron" />
+        {t('connect.tech.summary')}
+      </summary>
+      <div className="tech-body">{children}</div>
+    </details>
+  );
+}
+
+// What to paste into the agent's chat, and the button that copies it whole. `primary` when it is
+// the first thing to do on the page. `fold` keeps the instruction, which speaks to the agent in its
+// own terms, behind «Detalles técnicos» (with `tech`, whatever else belongs there): the person
+// copies it without reading it. Unfolded, it is one numbered line per paragraph.
+export function PromptBlock({
+  prompt,
+  primary = false,
+  fold = false,
+  tech,
+}: {
+  prompt: string;
+  primary?: boolean;
+  fold?: boolean;
+  tech?: ReactNode;
+}) {
   const [copied, copy] = useCopy(prompt);
+  const text = (
+    <blockquote className="cprompt">
+      {prompt.split('\n').map((line) => (
+        <p key={line}>{withCode(line)}</p>
+      ))}
+    </blockquote>
+  );
+  const button = (
+    <Button variant={primary ? 'primary' : 'quiet'} onClick={copy}>
+      <CopyGlyph />
+      {copied ? t('connect.copiedPrompt') : t('connect.copyPrompt')}
+    </Button>
+  );
+  // The instruction is the agent's, in its terms: the person needn't read them.
+  if (fold) {
+    return (
+      <div className="cprompt-wrap cprompt-fold">
+        <div className="cprompt-act">
+          {button}
+          <p className="cprompt-aside">{t('connect.forAgent')}</p>
+        </div>
+        <TechDetails>
+          <p className="cprompt-label">{t('connect.tech.instruction')}</p>
+          {text}
+          {tech}
+        </TechDetails>
+      </div>
+    );
+  }
   return (
     <div className="cprompt-wrap">
-      {/* The instruction is the agent's, in its terms: the person needn't follow them. */}
       <p className="cprompt-for">{t('connect.forAgent')}</p>
-      <blockquote className="cprompt">
-        {prompt.split('\n').map((line) => (
-          <p key={line}>{withCode(line)}</p>
-        ))}
-      </blockquote>
-      <Button variant={primary ? 'primary' : 'quiet'} onClick={copy}>
-        <CopyGlyph />
-        {copied ? t('connect.copiedPrompt') : t('connect.copyPrompt')}
-      </Button>
+      {text}
+      {button}
     </div>
   );
 }

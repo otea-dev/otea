@@ -26,11 +26,24 @@ describe('the paste block', () => {
     const said = html.indexOf('Esto es para tu agente');
     expect(said).toBeGreaterThan(-1);
     expect(said).toBeLessThan(html.indexOf('<blockquote'));
-    expect(html).toContain('no hace falta que entiendas sus términos');
+    expect(html).toContain('no hace falta que lo leas');
 
     setLanguage('en');
     expect(
       renderToStaticMarkup(createElement(PromptBlock, { prompt: 'Run `otea next`.' })),
     ).toContain('This is for your agent');
+  });
+
+  // The person copies the instruction without reading it: folded, it waits behind «Detalles
+  // técnicos», after the button that copies it.
+  it('folds the instruction behind the technical details, after the copy button', () => {
+    setLanguage('es');
+    const html = renderToStaticMarkup(
+      createElement(PromptBlock, { prompt: 'Run `otea next`.', fold: true, primary: true }),
+    );
+    expect(html).toContain('<details class="tech">');
+    expect(html).not.toContain('<details class="tech" open');
+    expect(html.indexOf('Copiar la instrucción')).toBeLessThan(html.indexOf('<details'));
+    expect(html.indexOf('<details')).toBeLessThan(html.indexOf('<blockquote'));
   });
 });

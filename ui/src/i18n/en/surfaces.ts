@@ -247,9 +247,7 @@ export const surfaces = {
   // A project with no items yet
   'emptyProject.title': 'Nothing in {name} yet',
   'emptyProject.text':
-    'Items arrive when you write one, or when an agent creates them through the CLI or MCP. Nothing here is waiting for you.',
-  'emptyProject.agents':
-    'A connected agent reads {command} first: it tells it how this project works.',
+    'Items arrive when you write one, or when a connected agent creates them. Nothing here is waiting for you.',
   'emptyProject.boards': 'boards',
   'emptyProject.noBoards':
     'This project has no boards yet. The easiest way to start: paste this into your agent’s chat. It reads the project, asks how you work and proposes the boards for you to try.',
@@ -259,20 +257,36 @@ export const surfaces = {
 
   // Connect an agent
   'connect.title': 'Connect an agent',
-  'connect.mcp':
-    "The agent runs {connect}: it leaves Otea's guide in AGENTS.md and tells the agent which MCP server to add to its own config, whatever its harness (Claude Code, OpenCode, Codex or another). Without MCP, the otea command does the same.",
-  'connect.startBody':
-    'Paste this into your agent’s chat. It sets Otea up, connects, reads the project, asks how you work and proposes the boards for you to try.',
-  'connect.joinBody':
-    'To add one more agent, paste this into its chat. It connects with a name of its own and works the boards alongside the others, never taking what another one holds.',
-  'connect.firstBody':
-    "Paste this into your agent's chat. It connects under a name of its own, reads the boards and works what is the agents' to do.",
-  'connect.forAgent': "This is for your agent: you don't need to follow its terms.",
+  // The words the person reads (connect-words.ts lists them): no command, no tool's name. What an
+  // agent needs to know stays behind «Technical details» (connect.tech.*).
+  'connect.ledeStartCode':
+    'Paste this into your agent’s chat, the AI you work with. It will read your code, ask how you work and propose the boards for you to try.',
+  'connect.ledeStartFiles':
+    'Paste this into your agent’s chat, the AI that helps you. It will read what is in this folder, ask how you work and propose the boards for you to try.',
+  'connect.ledeFirst':
+    'Paste this into your agent’s chat, the AI that helps you. It will read the boards and do the steps that are the agents’ to do.',
+  'connect.ledeJoin':
+    'To add one more agent, paste this into its chat. It will work alongside the others, without taking what they already have in hand.',
+  'connect.whereCode':
+    'Each agent works on its own copy of your code, so it never steps on yours or on another’s.',
+  'connect.whereFiles':
+    'Each agent works on the files in this folder, leaving alone the ones another is changing.',
+  'connect.boards': 'It will do these steps:',
+  'connect.forAgent': 'This is for your agent: you don’t need to read it.',
   'connect.copyPrompt': 'Copy the instruction',
   'connect.copiedPrompt': 'Copied',
   'connect.appears':
-    'Otea checks the connection: the agent shows up here as soon as it calls Otea, with a warning if it asked for MCP and its harness never loaded it.',
+    'When your agent starts, it will show up under Agents, at the top. If something does not connect, Otea tells you there.',
   'connect.done': 'Done',
+  // Behind «Technical details»: for the agent, and for whoever wants to know what it does.
+  'connect.tech.summary': 'Technical details',
+  'connect.tech.instruction': 'The full instruction, as the agent reads it:',
+  'connect.tech.mcp':
+    "The agent runs {connect}: it leaves Otea's guide in AGENTS.md and tells the agent which MCP server to add to its own config, whatever its harness (Claude Code, OpenCode, Codex or another). Without MCP, the otea command does the same.",
+  'connect.tech.check':
+    'Otea checks the connection: the agent shows up as soon as it calls Otea, with a warning if it asked for MCP and its harness never loaded it.',
+  'connect.tech.agents':
+    'A connected agent reads {command} first: it tells it how this project works.',
   // Surfaces, redrawn (SPEC §10.4-10.5): Actividad, Triaje, Nuevo ítem, Te espera, Emparejar, Configuración
   'activity.open': 'See activity',
   'activity.openLine': 'leases running down, the latest events',

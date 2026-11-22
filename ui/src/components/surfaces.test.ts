@@ -382,7 +382,8 @@ describe('dialogs', () => {
       render(createElement(ConnectView, { view: { kind: 'start', prompt: startPrompt('es') } })),
     );
     expect(html).toContain('Conectar un agente');
-    expect(html).toContain('te pregunta cómo trabajas y te propone los tableros');
+    expect(html).toContain('te preguntará cómo trabajas y te propondrá los tableros');
+    // The whole instruction is still there to copy, behind «Detalles técnicos».
     expect(html).toContain('otea connect --as &lt;nombre&gt; --model &lt;modelo&gt;');
     expect(html).toContain('otea board draft --new');
     expect(html).not.toContain('otea mcp --as');
@@ -391,8 +392,27 @@ describe('dialogs', () => {
     expect(html).not.toContain('.mcp.json');
     expect(html).toContain('otea wait --turn agent --unclaimed');
     expect(html).toContain('Copiar la instrucción');
-    expect(html).toContain('en cuanto llama a Otea');
+    expect(html).toContain('<summary');
+    expect(html).toContain('Detalles técnicos');
+    expect(html).toContain('aparecerá en Agentes');
     expect(html).not.toContain('primera reserva');
+  });
+
+  it('Conectar un agente writes the first contact for a folder of files, not for code', () => {
+    setLanguage('es');
+    const code = render(
+      createElement(ConnectView, {
+        view: { kind: 'start', prompt: startPrompt('es'), code: true },
+      }),
+    );
+    const files = render(
+      createElement(ConnectView, {
+        view: { kind: 'start', prompt: startPrompt('es', false), code: false },
+      }),
+    );
+    expect(code).toContain('Leerá tu código');
+    expect(files).toContain('Leerá lo que hay en esta carpeta');
+    expect(files).not.toContain('Leerá tu código');
   });
 
   it('Conectar un agente gives a project with boards the join prompt, from the project now', () => {
@@ -401,8 +421,20 @@ describe('dialogs', () => {
       boards: [{ name: 'Cambios', agentSteps: ['Aclarar', 'Hacerlo'], waiting: 2 }],
       working: ['claude'],
     });
-    const html = render(createElement(ConnectView, { view: { kind: 'join', prompt } }));
+    const html = render(
+      createElement(ConnectView, {
+        view: {
+          kind: 'join',
+          prompt,
+          code: true,
+          boards: [{ name: 'Cambios', steps: ['Aclarar', 'Hacerlo'] }],
+        },
+      }),
+    );
     expect(html).toContain('Para sumar un agente más');
+    // The boards it will work, in the board's own words, and where it works.
+    expect(html).toContain('<b>Cambios</b><span>Aclarar · Hacerlo</span>');
+    expect(html).toContain('su propia copia de tu código');
     expect(html).toContain('(claude)');
     expect(html).toContain('- Cambios: Aclarar, Hacerlo (2 esperan a un agente ahora)');
     expect(html).not.toContain('otea board draft');
@@ -418,7 +450,7 @@ describe('dialogs', () => {
       createElement(ConnectView, { view: { kind: 'join', prompt, first: true } }),
     );
     expect(html).not.toContain('Para sumar un agente más');
-    expect(html).toContain('Pega esto en el chat de tu agente. Se conecta con un nombre propio');
+    expect(html).toContain('Leerá los tableros y hará los pasos que les tocan a los agentes');
     expect(html).toContain('El agente ejecuta <code class="inl">otea connect</code>');
   });
 

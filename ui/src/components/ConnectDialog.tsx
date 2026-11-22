@@ -5,6 +5,7 @@ import { t, tx } from '../i18n/i18n.ts';
 import { Button } from '../kit/Button.tsx';
 import { Dialog } from '../kit/pop/Dialog.tsx';
 import { PromptBlock, useAgentPrompt } from './AgentPrompt.tsx';
+import { ledeKey, whereKey } from './connect-words.ts';
 
 // Conectar un agente (SPEC §10.4): one text to paste into the agent's chat, written by the server for
 // the project's moment. A project with no board of its own gets the whole first contact (set up,
@@ -38,26 +39,52 @@ function ConnectBody({ version }: { version: number }) {
   return <ConnectView view={remote.status === 'ready' ? remote.value : null} />;
 }
 
-// The first agent of a project with boards joins no one: it is told to connect.
-function bodyOf(kind: AgentPromptView['kind'], first: boolean) {
-  if (kind !== 'join') return 'connect.startBody' as const;
-  return first ? ('connect.firstBody' as const) : ('connect.joinBody' as const);
-}
-
-// The dialog's words for the project's moment, and its prompt once the server wrote it.
+// The dialog's words for the project's moment, and its prompt once the server wrote it. The person
+// reads what the agent will do and where (plain words, written for code or for a folder of files);
+// the instruction and how it connects are behind «Detalles técnicos».
 export function ConnectView({ view }: { view: AgentPromptView | null }) {
-  const kind = view?.kind ?? 'start';
+  const where = whereKey(view);
+  const boards = view?.boards ?? [];
   return (
     <>
       <h4 data-i="">{t('connect.title')}</h4>
-      <p data-i="">{t(bodyOf(kind, view?.first === true))}</p>
+      <p data-i="">{t(ledeKey(view))}</p>
+      {boards.length > 0 ? (
+        <div className="cboards" data-i="">
+          <p className="cnote">{t('connect.boards')}</p>
+          <ul>
+            {boards.map(({ name, steps }) => (
+              <li key={name}>
+                <b>{name}</b>
+                <span>{steps.join(' · ')}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {where ? (
+        <p className="cnote" data-i="">
+          {t(where)}
+        </p>
+      ) : null}
       <div data-i="" className="cpaste">
-        {view ? <PromptBlock prompt={view.prompt} primary /> : null}
+        {view ? (
+          <PromptBlock
+            prompt={view.prompt}
+            primary
+            fold
+            tech={
+              <>
+                {/* Every agent connects the same way, whatever its harness: Otea writes no harness config. */}
+                <p className="cnote">
+                  {tx('connect.tech.mcp', { connect: <code className="inl">otea connect</code> })}
+                </p>
+                <p className="cnote">{t('connect.tech.check')}</p>
+              </>
+            }
+          />
+        ) : null}
       </div>
-      <p className="cnote" data-i="">
-        {/* Every agent connects the same way, whatever its harness: Otea writes no harness config. */}
-        {tx('connect.mcp', { connect: <code className="inl">otea connect</code> })}
-      </p>
       <p className="cnote" data-i="">
         {t('connect.appears')}
       </p>
