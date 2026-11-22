@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Project } from '../app/project.ts';
 import { createServer, type OteaServer } from './server.ts';
@@ -12,15 +15,20 @@ const OPEN_READS = new Set([`/p/${PROJECT}/api/session`]);
 describe('reads over the loopback socket', () => {
   let project: Project;
   let server: OteaServer;
+  let uiDir: string;
 
   beforeEach(() => {
     project = memoryProject();
-    server = createServer(project, { token: TOKEN });
+    // A page of its own, so the answers do not depend on whether the UI was built here.
+    uiDir = mkdtempSync(join(tmpdir(), 'otea-loopback-'));
+    writeFileSync(join(uiDir, 'index.html'), '<!doctype html><title>Otea</title>');
+    server = createServer(project, { token: TOKEN, uiDir });
   });
 
   afterEach(() => {
     server.close();
     project.db.close();
+    rmSync(uiDir, { recursive: true, force: true });
   });
 
   // Every GET the API has, found in the router: a route added later is held to the same rule
