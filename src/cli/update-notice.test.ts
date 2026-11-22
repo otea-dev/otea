@@ -125,12 +125,25 @@ describe('the notice of a newer otea', () => {
     ['under --json', { argv: ['projects', 'list', '--json'] }],
     ['with no terminal (a pipe, an agent, a hook)', { terminal: false }],
     ['for the MCP server', { argv: ['mcp', '--help'] }],
+    ['for uninstall', { argv: ['uninstall', '--dry-run'] }],
+    ['for an agent that gave --as', { argv: ['projects', 'list', '--as', 'bob'] }],
+    ['for an agent named in OTEA_AGENT', { env: { OTEA_AGENT: 'bob' } }],
+    ['for an agent named in OTEA_AS', { env: { OTEA_AS: 'bob' } }],
   ])('never asks the registry %s', async (_, options) => {
     const result = await runOtea(registry(latest('99.0.0')), options);
 
     expect(result.err).not.toContain('is available');
     expect(calls).toEqual([]);
     expect(existsSync(join(home, 'update-check.json'))).toBe(false);
+  });
+
+  it('never makes an Otea home that is not there', async () => {
+    const missing = join(home, 'not-made');
+
+    const result = await runOtea(registry(latest('99.0.0')), { env: { OTEA_HOME: missing } });
+
+    expect(result.err).toContain('99.0.0 is available');
+    expect(existsSync(missing)).toBe(false);
   });
 
   it('never asks where no fetch is given, as in every other test', async () => {

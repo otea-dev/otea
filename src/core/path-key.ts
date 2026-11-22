@@ -5,7 +5,8 @@ export function pathKey(realPath: string, platform: NodeJS.Platform): string {
   return platform === 'win32' || platform === 'darwin' ? slashed.toLowerCase() : slashed;
 }
 
-function contains(outer: string, inner: string): boolean {
+// Whether the key `inner` is `outer` or below it, by whole path parts (`/a/b` holds `/a/b/c`, not `/a/bc`).
+export function contains(outer: string, inner: string): boolean {
   if (inner === outer) return true;
   return inner.startsWith(outer.endsWith('/') ? outer : `${outer}/`);
 }

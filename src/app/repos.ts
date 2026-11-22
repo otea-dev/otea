@@ -5,6 +5,7 @@ import { OteaError } from '../core/errors.ts';
 import { repoIdentity } from '../core/repo.ts';
 import { transaction } from '../store/database.ts';
 import {
+  changeRepoIdentity,
   deleteRepo,
   insertRepo,
   markReposRead,
@@ -86,6 +87,18 @@ function repoAt(repos: readonly Repo[], path: string): Repo | undefined {
     if (found) return found;
   }
   return undefined;
+}
+
+// A repo registered by its root commits (it had no origin then) that a checkout with an origin
+// remote matches takes that origin as its identity. From then on a checkout is the repo by that
+// origin, or by root commits only while it has none: a fork, which shares the root commits under
+// another origin, is not the repo.
+function adoptOrigin(project: Project, repos: readonly Repo[], repo: Repo, path: string): Repo {
+  const [origin] = identitiesAt(path);
+  if (!repo.identity.startsWith('root:') || !origin?.startsWith('remote:')) return repo;
+  if (repos.some((each) => each.identity === origin)) return repo;
+  changeRepoIdentity(project.db, repo.identity, origin);
+  return { name: repo.name, identity: origin };
 }
 
 // The folders that lead to the project, as linked in the registry, or its own folder.
@@ -170,8 +183,9 @@ export function repoNameAt(project: Project, cwd: string, env: Env = process.env
   const top = checkoutTop(cwd);
   if (top === undefined) throw new Error(`${cwd} is not in a git checkout`);
   const identity = identityAt(top);
-  const repo = repoAt(listRepos(project, env), top);
-  if (repo) return repo.name;
+  const repos = listRepos(project, env);
+  const repo = repoAt(repos, top);
+  if (repo) return adoptOrigin(project, repos, repo, top).name;
   const why =
     identity === null
       ? 'it has no origin remote and no commit to tell it by'
@@ -204,11 +218,14 @@ export function addRepo(
   const repos = listRepos(project, env);
   // The repo this checkout already is, by its origin or its root commits: one registered before a
   // remote was added is the same repo, and keeps the identity it was registered under.
-  const existing = repoAt(repos, top);
+  const found = repoAt(repos, top);
+  const existing = found && adoptOrigin(project, repos, found, top);
   const wanted = label || existing?.name || basename(top);
   if (existing?.name === wanted) return existing;
   // A gate check matches repo names whatever their case, so a case apart is the same name.
-  const holder = repos.find((repo) => repo !== existing && sameRepo(repo.name, wanted));
+  const holder = repos.find(
+    (repo) => repo.identity !== found?.identity && sameRepo(repo.name, wanted),
+  );
   if (holder) {
     throw new OteaError(
       'already_exists',

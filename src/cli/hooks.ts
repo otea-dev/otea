@@ -32,6 +32,57 @@ const VERSION = '# otea-hook-version: 3';
 // How a hook runs this Otea, as `otea connect` does for the MCP server.
 const oteaCommand = shellLine;
 
+// What the hook says when Otea could not check a push, and when the Otea it runs is gone.
+const FAILED_LINES = [
+  'Otea could not check this push of $branch (exit $code), so it does not go through: make sure otea runs here (otea check --gate push --branch $branch --repo), then push again.',
+  "For the person: to push it yourself this once, git push --no-verify, which skips Otea's check. An agent never uses --no-verify.",
+  'Para la persona: para subirlo tú esta vez, git push --no-verify, que se salta la revisión de Otea. Un agente nunca usa --no-verify.',
+];
+const NOT_FOUND_LINE =
+  '  echo "otea: not found, so this push is not checked by Otea (run otea hook install --git to update the hook, or otea hook remove --git)" >&2';
+
+// The lines of every pre-push hook an Otea wrote, whatever its version; the lines that hold the
+// command that runs Otea (its path is the machine's) are told by shape. A hook with any other line
+// is not Otea's alone: it has been edited, or holds the person's own.
+const OWN_LINES: ReadonlySet<string> = new Set([
+  '#!/bin/sh',
+  MARK,
+  '# Written by otea hook install --git; otea hook remove --git removes it.',
+  'while read -r local_ref local_sha remote_ref remote_sha; do',
+  '  case "$remote_ref" in',
+  '    refs/heads/*)',
+  '      branch="${remote_ref#refs/heads/}"',
+  '      code=$?',
+  `      if [ $code -eq ${EXIT_CODES.gate_refused} ]; then exit 1; fi`,
+  `      if [ $code -ne 0 ] && [ $code -ne ${EXIT_CODES.invalid_gate} ]; then`,
+  ...FAILED_LINES.map((line) => `        echo "${line}" >&2`),
+  '        exit 1',
+  '      fi',
+  '      ;;',
+  '  esac',
+  'done',
+  'exit 0',
+  'fi',
+  '  exit 0',
+  NOT_FOUND_LINE,
+  // The hooks before the fail-closed one.
+  '      if [ $? -eq 1 ]; then exit 1; fi',
+  `      if [ $? -eq ${EXIT_CODES.gate_refused} ]; then exit 1; fi`,
+]);
+const OWN_PATTERNS: readonly RegExp[] = [
+  /^# otea-hook-version: \d+$/,
+  /^ {6}.+ check --gate push --branch "(\$branch|\$\{remote_ref#refs\/heads\/\})" --repo( --commits "\$remote_sha\.\.\$local_sha")? < \/dev\/null$/,
+  /^if ! \{ \[ -e .* \]; \}; then$/,
+];
+
+// Whether a pre-push hook holds only lines an Otea wrote (blank lines aside).
+export function isOteaOwnHook(content: string): boolean {
+  return content
+    .split(/\r?\n/)
+    .filter((line) => line.trim() !== '')
+    .every((line) => OWN_LINES.has(line) || OWN_PATTERNS.some((pattern) => pattern.test(line)));
+}
+
 // Checks every branch the push writes to or deletes on the remote, not the local branch it sends
 // from, which may be another; refuses when otea check refuses (gate_refused). It fails closed: when
 // Otea fails or cannot run at all, the push stops too, saying so, with the person's way past it
@@ -40,11 +91,7 @@ const oteaCommand = shellLine;
 // and what it gets, so a push into a base branch a board protects is checked against the branches
 // it brings in. Otea's language is unknown when it cannot run: the person's line is in both.
 function gitCheckLines(otea: Launcher): string {
-  const failed = [
-    'Otea could not check this push of $branch (exit $code), so it does not go through: make sure otea runs here (otea check --gate push --branch $branch --repo), then push again.',
-    "For the person: to push it yourself this once, git push --no-verify, which skips Otea's check. An agent never uses --no-verify.",
-    'Para la persona: para subirlo tú esta vez, git push --no-verify, que se salta la revisión de Otea. Un agente nunca usa --no-verify.',
-  ];
+  const failed = FAILED_LINES;
   return [
     'while read -r local_ref local_sha remote_ref remote_sha; do',
     '  case "$remote_ref" in',
@@ -88,7 +135,7 @@ function missingOteaLines(otea: Launcher): string[] {
   if (files.length === 0) return [];
   return [
     `if ! { ${files.map((file) => `[ -e ${word(file)} ]`).join(' && ')}; }; then`,
-    '  echo "otea: not found, so this push is not checked by Otea (run otea hook install --git to update the hook, or otea hook remove --git)" >&2',
+    NOT_FOUND_LINE,
     '  exit 0',
     'fi',
   ];
@@ -222,6 +269,13 @@ export function removeGitHook(cwd: string, dryRun = false): HookChange {
       `${path} is not Otea's pre-push hook; remove it yourself`,
     );
   }
+  // A hook with Otea's mark and lines of the person's own (or edited ones) is left whole.
+  if (!isOteaOwnHook(content)) {
+    throw new CommandFailure(
+      'forbidden',
+      `${path} has Otea's mark but also lines that are not what Otea writes (edited, or yours); Otea leaves it: take Otea's check out of it yourself, or delete it`,
+    );
+  }
   if (!dryRun) rmSync(path);
   return { path, action: 'removed', content };
 }
@@ -310,13 +364,23 @@ function writeSettings(path: string, settings: Settings): void {
   writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
 }
 
+// A JSON value as text with the keys of every object in order, to compare two by content.
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, each: unknown) =>
+    each !== null && typeof each === 'object' && !Array.isArray(each)
+      ? Object.fromEntries(Object.entries(each).sort(([a], [b]) => a.localeCompare(b)))
+      : each,
+  );
+}
+
 // `dryRun` says what would be removed, and touches nothing.
 export function removeClaudeHook(cwd: string, dryRun = false): HookChange {
   const path = claudeSettingsFile(cwd);
   if (!existsSync(path)) return { path, action: 'absent' };
   const before = readSettings(path);
   const after = withoutOurs(before);
-  if (JSON.stringify(after) === JSON.stringify(before)) return { path, action: 'absent' };
+  // Nothing of Otea's in it: not rewritten, and not said to be removed (withoutOurs may reorder keys).
+  if (canonical(after) === canonical(before)) return { path, action: 'absent' };
   // A file that held only Otea's hooks goes with them.
   if (dryRun) return { path, action: 'removed' };
   if (Object.keys(after).length === 0) rmSync(path);

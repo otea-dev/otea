@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // The one line otea prints when npm has a newer @otea/cli, at most once a day. It never gets in the
@@ -17,7 +17,7 @@ export const UPDATE_TIMEOUT_MS = 1200;
 
 // Commands that run for a long time, or that a hook, an agent's server or a follower reads: never a
 // place for a notice.
-const QUIET_COMMANDS = new Set(['mcp', 'check', 'serve', 'wait', 'events']);
+const QUIET_COMMANDS = new Set(['mcp', 'check', 'serve', 'wait', 'events', 'uninstall']);
 
 type Cache = { checkedAt: number; latest?: string };
 
@@ -33,6 +33,9 @@ export type UpdateCheck = {
   json: boolean;
   // Whether a person reads the output at a terminal.
   terminal: boolean;
+  // Whether an agent runs the command (--as, or OTEA_AGENT / OTEA_AS in its environment): a model
+  // reads an agent's output, which an update line has no business in.
+  agent?: boolean;
 };
 
 function readCache(home: string): Cache | undefined {
@@ -47,9 +50,11 @@ function readCache(home: string): Cache | undefined {
   }
 }
 
+// Never makes the Otea home: a computer that has none (or whose home an uninstall just deleted) is
+// left without one.
 function writeCache(home: string, cache: Cache): void {
   try {
-    mkdirSync(home, { recursive: true });
+    if (!existsSync(home)) return;
     writeFileSync(join(home, CACHE_FILE), `${JSON.stringify(cache)}\n`);
   } catch {
     // A home that cannot be written only means the check runs again next time.
@@ -73,7 +78,8 @@ export function isNewer(latest: string, current: string): boolean {
 
 // Whether this run may look at all: a person at a terminal, not CI, not --json, not turned off, not
 // the desktop app (it updates itself), and a command that is no server or hook.
-function allowed({ env, json, terminal, command }: UpdateCheck): boolean {
+function allowed({ env, json, terminal, command, agent }: UpdateCheck): boolean {
+  if (agent || env.OTEA_AGENT || env.OTEA_AS) return false;
   const off = env[UPDATE_OFF_ENV];
   if (off !== undefined && off !== '' && off !== '0') return false;
   if (env.CI !== undefined && env.CI !== '' && env.CI !== '0' && env.CI !== 'false') return false;

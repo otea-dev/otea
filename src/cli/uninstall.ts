@@ -1,11 +1,14 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, realpathSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, isAbsolute, join, parse, relative, resolve } from 'node:path';
+import { dirname, join, parse, resolve } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { pathToFileURL } from 'node:url';
 import { removeAgentsMd } from '../app/agents.ts';
-import { listProjects, withRegistry } from '../app/home.ts';
-import { gitCommonDir, oteaDir } from '../app/project.ts';
+import { listProjects } from '../app/home.ts';
+import { databasePath, gitCommonDir, oteaDir } from '../app/project.ts';
 import { reposInside } from '../app/repos.ts';
+import { contains, pathKey } from '../core/path-key.ts';
 import { CommandFailure } from './command.ts';
 import { inspectServer, stopServer, unresponsiveText } from './daemon.ts';
 import { checkoutRoot } from './gitrepo.ts';
@@ -19,6 +22,8 @@ export type Step = {
   changed: boolean;
   // Something of the person's that Otea left on purpose, and says so.
   kept?: true;
+  // Something that went wrong and was reported; the rest of the work went on.
+  failed?: true;
   text: string;
 };
 
@@ -53,7 +58,23 @@ function uninstallFolder(cwd: string, dryRun: boolean): Step[] {
     steps.push(...uninstallGit(cwd, dryRun, remove));
   }
   const root = checkoutRoot(cwd) ?? resolve(cwd);
-  const agents = removeAgentsMd(root, dryRun);
+  let agents: ReturnType<typeof removeAgentsMd>;
+  try {
+    agents = removeAgentsMd(root, dryRun);
+  } catch (error) {
+    steps.push(failedStep('agents-md', join(root, 'AGENTS.md'), error));
+    return steps;
+  }
+  if (agents.action === 'refused') {
+    steps.push({
+      what: 'agents-md',
+      path: agents.path,
+      changed: false,
+      kept: true,
+      text: `Left ${agents.path}: ${agents.reason}`,
+    });
+    return steps;
+  }
   steps.push({
     what: 'agents-md',
     path: agents.path,
@@ -88,17 +109,11 @@ function uninstallGit(cwd: string, dryRun: boolean, remove: (verb: string) => st
           },
     );
   } catch (error) {
-    if (!(error instanceof CommandFailure)) throw error;
-    const path = foreignGitHookRunsOtea(cwd);
-    steps.push({
-      what: 'git-hook',
-      changed: false,
-      kept: true,
-      text:
-        path === undefined
-          ? "Left the pre-push hook: it is not Otea's"
-          : `Left ${path}: it is another pre-push hook, with Otea's check in it; take those lines out yourself`,
-    });
+    if (!(error instanceof CommandFailure)) {
+      steps.push(failedStep('git-hook', undefined, error));
+    } else {
+      steps.push(leftHook(cwd, error));
+    }
   }
 
   try {
@@ -113,23 +128,51 @@ function uninstallGit(cwd: string, dryRun: boolean, remove: (verb: string) => st
           : `No Otea hooks in ${claude.path}`,
     });
   } catch (error) {
-    if (!(error instanceof CommandFailure)) throw error;
-    steps.push({
-      what: 'claude-hooks',
-      changed: false,
-      kept: true,
-      text: `Left it: ${error.message}`,
-    });
+    steps.push(
+      error instanceof CommandFailure
+        ? {
+            what: 'claude-hooks',
+            changed: false,
+            kept: true,
+            text: `Left it: ${error.message}`,
+          }
+        : failedStep('claude-hooks', undefined, error),
+    );
   }
-
   return steps;
+}
+
+// What went wrong with one thing, told without stopping the rest.
+function failedStep(what: Step['what'], path: string | undefined, error: unknown): Step {
+  const reason = error instanceof Error ? error.message : String(error);
+  return {
+    what,
+    ...(path === undefined ? {} : { path }),
+    changed: false,
+    failed: true,
+    text: `Could not clean ${path ?? what}: ${reason}`,
+  };
+}
+
+// A pre-push hook left as it is, and why.
+function leftHook(cwd: string, error: CommandFailure): Step {
+  const path = foreignGitHookRunsOtea(cwd);
+  return {
+    what: 'git-hook',
+    changed: false,
+    kept: true,
+    text:
+      path === undefined
+        ? `Left the pre-push hook: ${error.message}`
+        : `Left ${path}: it is another pre-push hook, with Otea's check in it; take those lines out yourself`,
+  };
 }
 
 // The folders `otea uninstall` goes through: the repo at cwd with all its worktrees (each has its
 // own AGENTS.md), then every folder the registry links to a project, a repo or a folder over
 // several repos (and the repos and worktrees below it): the projects Otea was set up in. Each once.
 // A registered folder that is gone is skipped, and said.
-export function repoTargets(cwd: string): { targets: string[]; missing: string[] } {
+export function repoTargets(cwd: string, home: string): { targets: string[]; missing: string[] } {
   const seen = new Set<string>();
   const targets: string[] = [];
   const missing: string[] = [];
@@ -144,8 +187,7 @@ export function repoTargets(cwd: string): { targets: string[]; missing: string[]
     for (const tree of worktreesOf(path)) add(tree);
   };
   if (inRepo(cwd)) addRepo(checkoutRoot(cwd) ?? resolve(cwd));
-  const projects = withRegistry(process.env, listProjects) ?? [];
-  for (const { paths } of projects) {
+  for (const { paths } of readRegistry(home)) {
     for (const { path, kind } of paths) {
       if (!existsSync(path)) {
         missing.push(path);
@@ -159,6 +201,29 @@ export function repoTargets(cwd: string): { targets: string[]; missing: string[]
     }
   }
   return { targets, missing: [...new Set(missing)] };
+}
+
+const REGISTRY_FILE = 'registry.db';
+
+// The projects the registry in `home` links to folders, read without writing anything: not
+// created when missing, not migrated, not switched to WAL. Nothing when it cannot be read. A
+// registry no server holds open is read as the file it is (immutable), so no -wal or -shm file
+// appears beside it; one a server has open is read through its WAL, whose files already exist.
+function readRegistry(home: string): ReturnType<typeof listProjects> {
+  const file = join(home, REGISTRY_FILE);
+  if (!existsSync(file)) return [];
+  const live = existsSync(`${file}-wal`);
+  let db: DatabaseSync | undefined;
+  try {
+    db = new DatabaseSync(live ? file : `${pathToFileURL(file).href}?immutable=1`, {
+      readOnly: true,
+    });
+    return listProjects(db);
+  } catch {
+    return [];
+  } finally {
+    db?.close();
+  }
 }
 
 // The checkouts of the repo at `path`, the main one and every linked worktree that still exists.
@@ -185,12 +250,32 @@ export type RepoReport = { path: string; steps: Step[] };
 // worktrees) is told once.
 export function uninstallRepos(
   cwd: string,
+  home: string,
   dryRun: boolean,
 ): { reports: RepoReport[]; missing: string[] } {
-  const { targets, missing } = repoTargets(cwd);
+  const { targets, missing } = repoTargets(cwd, home);
   const told = new Set<string>();
   const reports = targets.map((path) => {
-    const steps = uninstallFolder(path, dryRun).filter((step) => {
+    let done: Step[];
+    try {
+      done = uninstallFolder(path, dryRun);
+    } catch (error) {
+      // One folder's trouble (a file in use, an unreadable one) never stops the others.
+      const reason = error instanceof Error ? error.message : String(error);
+      return {
+        path,
+        steps: [
+          {
+            what: 'agents-md' as const,
+            path,
+            changed: false,
+            failed: true as const,
+            text: `Could not clean ${path}: ${reason}`,
+          },
+        ],
+      };
+    }
+    const steps = done.filter((step) => {
       if (step.path === undefined) return true;
       const key = `${step.what}:${step.path.toLowerCase()}`;
       if (told.has(key)) return false;
@@ -205,11 +290,7 @@ export function uninstallRepos(
 // Ends this Otea home's server, as otea serve stop does: by its process id, once it is known to be
 // this home's. Nothing running is no change. A server that cannot be ended is a failure, said in
 // the step.
-export async function uninstallServer(
-  home: string,
-  main: string,
-  dryRun: boolean,
-): Promise<Step & { failed?: true }> {
+export async function uninstallServer(home: string, main: string, dryRun: boolean): Promise<Step> {
   const none: Step = { what: 'server', changed: false, text: 'No otea serve is running' };
   try {
     if (dryRun) {
@@ -258,61 +339,88 @@ export async function uninstallServer(
   }
 }
 
-// A folder is Otea's home when it holds what Otea keeps there; any other folder OTEA_HOME names
-// is left alone, whatever it is.
-const HOME_MARKS = ['registry.db', 'data', 'serve.json', 'ui-token'];
-
-function looksLikeHome(home: string): boolean {
-  return HOME_MARKS.some((name) => existsSync(join(home, name)));
-}
-
-// Whether `path` is `folder` or below it.
-const inside = (folder: string, path: string) => {
-  const rel = relative(folder, path);
-  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
-};
-
 function userHome(): string | undefined {
   try {
-    return resolve(homedir());
+    return realpathSync.native(homedir());
   } catch {
     return undefined;
   }
 }
 
+// The real path of a folder, or its resolved one when it does not exist.
+const real = (path: string) => {
+  try {
+    return realpathSync.native(path);
+  } catch {
+    return resolve(path);
+  }
+};
+
+// Why `folder`, an Otea home about to be deleted, must not be: it is a filesystem root, the
+// person's own home folder, or holds the folder the command runs in or their home folder. Real
+// paths, compared in the form the file system compares them (case-insensitively where it is), and
+// by containment, never by how the text starts. Nothing when it is safe to delete.
+export function unsafeHome(
+  folder: string,
+  cwd: string,
+  own: string | undefined = userHome(),
+): string | undefined {
+  const at = real(folder);
+  const key = (path: string) => pathKey(path, process.platform);
+  const here = key(at);
+  if (here === key(parse(at).root)) return 'a filesystem root';
+  if (own !== undefined && contains(here, key(own))) return 'or holds your home folder';
+  if (contains(here, key(real(cwd)))) return 'or holds the folder you are in';
+  return undefined;
+}
+
 // What deleting the person's Otea data would remove: the Otea home (every project registered
-// there, its boards and its history) and the .otea folder of a local project in the repo at cwd.
-// Only for --purge-data. Refuses a home that is the user's own home folder, a filesystem root, or
-// holds the folder the command runs in.
-export function dataTargets(home: string, cwd: string, repoScope: boolean): string[] {
+// there, its boards and its history) when it holds a registry, and the .otea folder of a local
+// project in the repo at cwd. Only for --purge-data. `home` is resolved against `cwd`. Refuses a
+// folder that is more than Otea's home (unsafeHome), and deletes nothing then.
+export function dataTargets(home: string, cwd: string, repoScope: boolean, own?: string): string[] {
   const targets: string[] = [];
-  const folder = resolve(home);
-  if (existsSync(folder) && looksLikeHome(folder)) {
-    if (folder === parse(folder).root || folder === userHome() || inside(folder, resolve(cwd))) {
+  const folder = resolve(cwd, home);
+  if (existsSync(join(folder, REGISTRY_FILE))) {
+    const why = unsafeHome(folder, cwd, own);
+    if (why !== undefined) {
       throw new CommandFailure(
         'forbidden',
-        `${folder} is the Otea home but also a folder that holds more than Otea's data (a root, your home folder, or where you are): nothing was deleted; point OTEA_HOME at a folder of its own`,
+        `${folder} holds Otea's registry but is also ${why}: nothing was deleted; point OTEA_HOME at a folder of its own`,
       );
     }
-    targets.push(folder);
+    targets.push(real(folder));
   }
   if (repoScope) {
     for (const root of checkouts(cwd)) {
       const local = oteaDir(root);
-      if (existsSync(local)) targets.push(local);
+      if (existsSync(databasePath(local))) targets.push(local);
     }
   }
   return targets;
 }
 
+// Deletes what dataTargets named; one that cannot be (in use: EBUSY, EPERM) is reported and the
+// rest goes on.
 export function purgeData(targets: readonly string[], dryRun: boolean): Step[] {
   if (targets.length === 0) {
     return [{ what: 'data', changed: false, text: 'No Otea data to delete' }];
   }
-  return targets.map((path) => {
-    if (!dryRun) rmSync(path, { recursive: true, force: true, maxRetries: 5 });
+  return targets.map((path): Step => {
+    try {
+      if (!dryRun) rmSync(path, { recursive: true, force: true, maxRetries: 5 });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      return {
+        what: 'data',
+        path,
+        changed: false,
+        failed: true,
+        text: `Could not delete the Otea data in ${path}: ${reason} (is something still using it? close it, then run this again)`,
+      };
+    }
     return {
-      what: 'data' as const,
+      what: 'data',
       path,
       changed: true,
       text: `${said(dryRun, 'Deleted', 'Would delete')} the Otea data in ${path}`,

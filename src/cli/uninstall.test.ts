@@ -299,12 +299,14 @@ describe('uninstall', () => {
 
     it('never deletes a folder that holds the repo it runs in', async () => {
       vi.stubEnv('OTEA_HOME', repo.dir);
+      repo.write('registry.db', '');
       mkdirSync(join(repo.dir, 'data'));
 
       const result = await otea('uninstall', '--purge-data', '--yes');
 
       expect(result.code).toBe(7);
       expect(existsSync(join(repo.dir, 'data'))).toBe(true);
+      expect(existsSync(join(repo.dir, 'registry.db'))).toBe(true);
     });
   });
 });
