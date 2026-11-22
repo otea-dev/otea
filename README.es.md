@@ -162,6 +162,14 @@ Si trabajas directo en `main` y no quieres que nada se suba antes de verlo, píd
 
 Git Bash convierte en ruta un argumento que empieza con `/`. Otea lo corrige en los textos que recibe (un título, un campo, una nota), así que `otea create --title "/deploy falla"` conserva su barra. En cualquier otro caso, pon `MSYS_NO_PATHCONV=1` delante de ese comando o empieza el valor con `//`.
 
+## Actualizar y quitar
+
+**Actualizar.** Con npm, `npm i -g @otea/cli` otra vez; `otea --version` dice la versión que tienes. Una vez al día, cuando ejecutas `otea` en una terminal, pregunta al registro de npm si hay una versión nueva y, si la hay, imprime una línea. Nunca lo hace en CI, con `--json`, en una tubería, para un agente (`--as` u `OTEA_AGENT`), para el servidor MCP, el hook ni `otea uninstall`; espera como mucho un segundo y no dice nada sin conexión. `OTEA_NO_UPDATE_CHECK=1` lo apaga. La app de escritorio no hace esta comprobación: en Windows y en Linux (`.deb`) se actualiza sola; en macOS descargas cada versión. Tus proyectos, tableros e historial viven en la carpeta de Otea (`~/.otea`, o `$OTEA_HOME`), y actualizar no los toca.
+
+**Qué escribe Otea en tu repo.** Un bloque en `AGENTS.md`, entre `<!-- otea:begin -->` y `<!-- otea:end -->`, que apunta a `otea board` (lo escriben `otea connect` y `otea init --agents-md`); el hook `pre-push` marcado `# otea-hook` (lo escribe `otea hook install --git`); y `.otea/` con una línea en `.git/info/exclude` (lo escribe `otea init --local`). `otea init` con el almacenamiento por omisión y la app de escritorio no escriben nada en el repo. Otea no escribe configuración de ningún arnés: si añadiste su servidor MCP a la configuración de un agente, quítalo allí.
+
+**Quitar.** `otea uninstall --dry-run` lista cada repo y archivo que tocaría y no cambia nada; `otea uninstall` saca el hook y el bloque de `AGENTS.md` de cada repo y detiene el servidor en segundo plano. Quita solo lo que es exactamente de Otea: un hook que sea, línea por línea, uno de los que Otea escribió, y el bloque de `AGENTS.md` que Otea escribe, una vez, entre sus marcas. Un hook que editaste, otro hook de pre-push y el resto de `AGENTS.md` se quedan, y lo dice. No toca tus datos: para borrar también la carpeta de Otea y el `.otea/` del repo (sin vuelta atrás) añade `--purge-data`, que te pide escribir `yes` (`--yes` responde por un script). Después quita el comando: `npm uninstall -g @otea/cli`; en Windows, Configuración > Aplicaciones > Otea > Desinstalar; en macOS, arrastra Otea fuera de Aplicaciones; en Linux, `sudo apt remove otea-desktop` o borra el AppImage.
+
 ## Estado
 
 Otea está en su versión 0.1.0: ya se puede usar, pero todavía es temprana y cambia rápido. La definición del producto está en [`docs/otea-product-definition.md`](docs/otea-product-definition.md) (en inglés).
