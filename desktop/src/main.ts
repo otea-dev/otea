@@ -200,7 +200,13 @@ function statusWindow(icon: NativeImage, page: string): BrowserWindow {
     icon,
     autoHideMenuBar: true,
     backgroundColor: INSTALLING_GROUND[nativeTheme.shouldUseDarkColors ? 'dark' : 'light'],
+    // No preload, no Node: the page is one string of ours and loads nothing else.
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
+  // It shows words and goes nowhere: nothing opens from it and nothing navigates away.
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-navigate', (event) => event.preventDefault());
+  win.webContents.on('will-redirect', (event) => event.preventDefault());
   void win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`);
   return win;
 }
@@ -638,10 +644,11 @@ class Shell {
       this.restarting = true;
       // The installer runs silently for several seconds with no window, which looked like a crash:
       // say first that Otea is updating and reopens by itself.
+      let notice: BrowserWindow | undefined;
       void restartWithNotice({
         show: () => {
           this.win.hide();
-          statusWindow(
+          notice = statusWindow(
             this.icons.app,
             installingPage({
               lang: this.lang,
@@ -654,6 +661,13 @@ class Shell {
         install: () => {
           this.quitting = true;
           electronUpdater.autoUpdater.quitAndInstall(true, true);
+        },
+        // The installer could not start: the app stays, so the notice goes and the window returns.
+        recover: () => {
+          this.quitting = false;
+          this.restarting = false;
+          if (notice && !notice.isDestroyed()) notice.destroy();
+          this.show();
         },
       });
     } else if (update?.kind === 'download') void shell.openExternal(update.url);

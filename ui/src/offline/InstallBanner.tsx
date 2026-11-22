@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../app/context.tsx';
 import {
   browserStore,
@@ -32,9 +32,26 @@ export type InstallBannerViewProps = {
 };
 
 export function InstallBannerView({ offer, onInstall, onDismiss }: InstallBannerViewProps) {
-  if (offer === 'none') return null;
+  const box = useRef<HTMLElement>(null);
+  const shown = offer !== 'none';
+  // Its height, for the page to end clear of it (phone.css pads the views by --install-h): the
+  // banner lies over the foot of the page, and must never cover the last row.
+  useEffect(() => {
+    const el = box.current;
+    const root = document.documentElement;
+    if (!shown || !el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => root.style.setProperty('--install-h', `${el.offsetHeight}px`);
+    measure();
+    const seen = new ResizeObserver(measure);
+    seen.observe(el);
+    return () => {
+      seen.disconnect();
+      root.style.removeProperty('--install-h');
+    };
+  }, [shown]);
+  if (!shown) return null;
   return (
-    <aside className="install-banner" aria-labelledby="install-banner-title">
+    <aside ref={box} className="install-banner" aria-labelledby="install-banner-title">
       <h2 id="install-banner-title">{t('install.title')}</h2>
       <p>{offer === 'prompt' ? t('install.prompt') : t(STEPS[offer])}</p>
       {offer === 'ios' ? <p className="install-note">{t('install.iosPair')}</p> : null}

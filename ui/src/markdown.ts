@@ -145,6 +145,17 @@ export function renderMarkdown(
   });
 }
 
+// renderMarkdown for what a person or an agent typed as a note or a field, where a line break is
+// meant: a list of links, one to a line, ran together into one line when a single newline read as a
+// space. Each soft break inside a paragraph becomes a <br />; a hard break (two spaces or a
+// backslash) already is one, and gets no second. Evidence documents keep renderMarkdown: their
+// hard-wrapped paragraphs must flow.
+export function renderLines(source: string): string {
+  return renderMarkdown(source).replace(/<p>([\s\S]*?)<\/p>/g, (_, inner: string) => {
+    return `<p>${inner.replace(/(<br \/>)?\n/g, (whole, br?: string) => (br ? whole : '<br />\n'))}</p>`;
+  });
+}
+
 function escapeText(text: string): string {
   return text
     .replace(/&/g, '&amp;')

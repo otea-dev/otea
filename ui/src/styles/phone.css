@@ -548,9 +548,15 @@
   .app {
     padding-top: env(safe-area-inset-top, 0px);
   }
-  /* Every page ends clear of the bottom bar. */
+  /* The bottom bar's height, one number for what stands above it (the install banner) and what
+     ends clear of it (the pages). */
+  :root {
+    --tabbar-h: calc(74px + env(safe-area-inset-bottom, 0px));
+  }
+  /* Every page ends clear of the bottom bar, and of the install banner while that is up
+     (InstallBanner.tsx measures it into --install-h). */
   .view > * {
-    padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(var(--tabbar-h) + 16px + var(--install-h, 0px));
   }
 
   /* The bottom bar (mobile mock 1, 4): Te toca · Nuevo · Panel, solid on the screen's foot. One
@@ -565,6 +571,7 @@
     right: 0;
     bottom: 0;
     z-index: 35;
+    min-height: var(--tabbar-h);
     padding: 6px max(12px, env(safe-area-inset-right, 0px))
       calc(8px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
     background: color-mix(in oklch, var(--ground) 86%, transparent);
@@ -1842,7 +1849,7 @@
   }
   .install-banner {
     position: fixed;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+    bottom: calc(var(--tabbar-h) + 10px);
     left: max(12px, env(safe-area-inset-left, 0px));
     right: max(12px, env(safe-area-inset-right, 0px));
     z-index: 34;

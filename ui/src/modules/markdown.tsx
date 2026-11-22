@@ -1,9 +1,9 @@
-import { renderMarkdown } from '../markdown.ts';
+import { renderLines } from '../markdown.ts';
 import type { EditProps, FieldModuleUi, ShowProps } from './contract.ts';
 
 function Rendered({ value }: ShowProps) {
   // biome-ignore lint/security/noDangerouslySetInnerHtml: renderMarkdown escapes raw HTML and drops dangerous links
-  return <div className="md" dangerouslySetInnerHTML={{ __html: renderMarkdown(value) }} />;
+  return <div className="md" dangerouslySetInnerHTML={{ __html: renderLines(value) }} />;
 }
 
 function TextArea({ id, value, disabled, required, describedBy, onChange }: EditProps) {
