@@ -69,16 +69,28 @@ export const toca = {
   'toca.replied': '{agent} answered',
   'toca.round': 'round {n}',
 
+  // After the project's first finished item: what people usually do next (once, then it is gone)
+  'next.label': 'What to do next',
+  'next.title': 'Your first item is finished',
+  'next.body': 'A good start. Here is what usually comes next:',
+  'next.pair': 'Pair your phone',
+  'next.pairNote': 'Review and approve from wherever you are.',
+  'next.board': 'Make another board',
+  'next.boardNote': 'A way of working for another kind of work.',
+  'next.agent': 'Invite another agent',
+  'next.agentNote': 'More hands at once, each on its own work.',
+  'next.dismiss': 'Not now',
+  'next.once': 'This will not show again.',
+
   // No agent connected
   'toca.noAgents.title': 'No agent connected',
   'toca.noAgents.waiting': {
-    one: 'One item is on an agent’s turn, waiting for someone to take it. Connect one from its terminal and it starts there.',
+    one: 'One item is on an agent’s turn, waiting for someone to take it. Connect an agent and it starts there.',
     other:
-      '{count} items are on an agent’s turn, waiting for someone to take them. Connect one from its terminal and it starts with the oldest.',
+      '{count} items are on an agent’s turn, waiting for someone to take them. Connect an agent and it starts with the oldest.',
   },
   'toca.noAgents.nothing':
-    'Nothing waits for an agent right now. Connect one from its terminal and it takes what reaches its turn.',
-  'toca.noAgents.command': 'otea connect --as <name> --model <model> --effort <effort>',
+    'Nothing waits for an agent right now. Connect an agent and it takes what reaches its turn.',
 
   // An agent's activity line (in its sheet)
   'toca.agent.trace': 'The last two hours of {agent}',

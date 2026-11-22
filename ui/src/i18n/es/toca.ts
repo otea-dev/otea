@@ -74,16 +74,28 @@ export const toca = {
   'toca.replied': '{agent} contestó',
   'toca.round': 'ronda {n}',
 
+  // Tras el primer ítem terminado del proyecto: lo que suele venir después (una vez, y se va)
+  'next.label': 'Qué hacer ahora',
+  'next.title': 'Tu primer ítem está terminado',
+  'next.body': 'Buen comienzo. Esto es lo que suele venir ahora:',
+  'next.pair': 'Emparejar tu teléfono',
+  'next.pairNote': 'Revisa y aprueba desde donde estés.',
+  'next.board': 'Crear otro tablero',
+  'next.boardNote': 'Una forma de trabajar para otra clase de trabajo.',
+  'next.agent': 'Invitar a otro agente',
+  'next.agentNote': 'Más manos a la vez, cada una en lo suyo.',
+  'next.dismiss': 'Ahora no',
+  'next.once': 'No volverá a aparecer.',
+
   // Sin agentes conectados
   'toca.noAgents.title': 'Ningún agente conectado',
   'toca.noAgents.waiting': {
-    one: 'Un ítem está en turno de un agente y espera a que alguien lo tome. Conecta uno desde su terminal y empezará por él.',
+    one: 'Un ítem está en turno de un agente y espera a que alguien lo tome. Conecta un agente y empezará por él.',
     other:
-      '{count} ítems están en turno de un agente y esperan a que alguien los tome. Conecta uno desde su terminal y empezará por el más antiguo.',
+      '{count} ítems están en turno de un agente y esperan a que alguien los tome. Conecta un agente y empezará por el más antiguo.',
   },
   'toca.noAgents.nothing':
-    'Nada espera a un agente ahora. Conecta uno desde su terminal y tomará lo que llegue a su turno.',
-  'toca.noAgents.command': 'otea connect --as <nombre> --model <modelo> --effort <esfuerzo>',
+    'Nada espera a un agente ahora. Conecta un agente y tomará lo que llegue a su turno.',
 
   // La línea de actividad de un agente (en su ficha)
   'toca.agent.trace': 'Últimas dos horas de {agent}',

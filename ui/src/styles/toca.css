@@ -77,12 +77,151 @@
   align-items: center;
   margin-top: 14px;
 }
-.noagents .cmd {
-  font: 400 12px / 1 var(--mono);
-  color: var(--ink-3);
-}
 .view.narrow .noagents {
   display: none;
+}
+/* after the project's first finished item: what usually comes next, once. It rests on the lanes'
+   reading edge like the card above, with a line of your colour: it is yours to answer or put away. */
+.nextstep {
+  position: relative;
+  margin: 4px 0 22px 72px;
+  padding: 20px 24px 16px 26px;
+  border-radius: 12px;
+  background: var(--sheet);
+  box-shadow: 0 0 0 1px var(--rule);
+  max-width: 720px;
+  display: grid;
+  gap: 14px;
+  animation: ns-in 560ms var(--ease) both;
+  transition:
+    opacity 320ms var(--ease),
+    transform 320ms var(--ease);
+}
+.nextstep::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 18px;
+  bottom: 18px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--you);
+}
+.nextstep[data-leaving] {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+@keyframes ns-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.nextstep h4 {
+  font: 450 20px / 1.2 var(--serif);
+  margin: 0;
+}
+.nextstep .ns-head p {
+  font: 400 italic 15px / 1.45 var(--serif);
+  color: var(--ink-2);
+  margin: 4px 0 0;
+}
+.ns-moves {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  border-top: 1px solid var(--rule);
+}
+.ns-moves li + li {
+  border-top: 1px solid var(--rule);
+}
+.ns-move {
+  appearance: none;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 4px;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: color 160ms var(--ease);
+}
+.ns-move .ns-what {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.ns-move b {
+  font: 500 14px / 1.35 var(--sans);
+  color: var(--ink);
+}
+.ns-move small {
+  font: 400 12.5px / 1.4 var(--sans);
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+.ns-move .ns-go {
+  color: var(--ink-3);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition:
+    opacity 200ms var(--ease),
+    transform 320ms var(--ease);
+}
+.ns-move:hover .ns-go,
+.ns-move:focus-visible .ns-go {
+  opacity: 1;
+  transform: none;
+}
+@media (hover: none) {
+  .ns-move .ns-go {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ns-move:focus-visible {
+  outline: 2px solid var(--you);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+.ns-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.ns-foot span {
+  font: 400 12.5px / 1.4 var(--sans);
+  color: var(--ink-3);
+}
+@media (max-width: 720px) {
+  .nextstep {
+    margin-left: 0;
+    padding: 18px 18px 14px 20px;
+  }
+  .ns-move {
+    min-height: 56px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nextstep {
+    animation-duration: 320ms;
+  }
+  .nextstep[data-leaving] {
+    transform: none;
+  }
+  @keyframes ns-in {
+    from {
+      opacity: 0;
+    }
+  }
 }
 .head {
   padding-left: 72px;
