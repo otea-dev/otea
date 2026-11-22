@@ -300,7 +300,7 @@ describe('token budget of a work cycle', () => {
     if (result.code !== 0) throw new Error(`otea ${argv.join(' ')}: ${result.err}`);
     return result.out;
   };
-  const quote = (arg: string) => (/[\s"'=]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg);
+  const quote = (arg: string) => (/[\s"'=]/.test(arg) ? `"${arg.replace(/[\\"]/g, '\\$&')}"` : arg);
 
   // The item the person filed, as each surface's agent will find it.
   const file = (title: string) =>
