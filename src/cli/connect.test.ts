@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -94,7 +94,7 @@ describe('setup for agents', () => {
 
     // The server an agent adds to its own harness: pinned to the project, naming no agent.
     const entry = () => ({
-      command: 'node',
+      command: process.execPath,
       args: ['--disable-warning=ExperimentalWarning', MAIN, 'mcp', '--project', id],
     });
 
@@ -155,7 +155,7 @@ describe('setup for agents', () => {
       );
       expect(out).toContain('Never edit your user or global config');
       expect(out).toMatch(/^ {2}name {5}otea$/m);
-      expect(out).toMatch(/^ {2}command {2}node$/m);
+      expect(out).toContain(`  command  ${process.execPath}\n`);
       expect(out).toContain(`As JSON: ${JSON.stringify({ otea: entry() })}`);
       // The JSON is one shape among many: the agent translates it or uses its harness's own command,
       // and the usual project files are named as examples only.
@@ -192,13 +192,13 @@ describe('setup for agents', () => {
 
       expect(mcp).toEqual({
         name: 'otea',
-        command: 'node',
+        command: process.execPath,
         args: ['--disable-warning=ExperimentalWarning', MAIN, 'mcp', '--project', own],
         env: { OTEA_HOME: home },
       });
     });
 
-    it('prints the otea command when otea is on PATH, so the config survives a moved checkout', async () => {
+    it('names the otea that runs, by absolute path, even when another otea is first on PATH', async () => {
       const bin = join(repo.dir, 'bin');
       mkdirSync(bin);
       writeFileSync(join(bin, 'otea'), '#!/bin/sh\n');
@@ -209,14 +209,10 @@ describe('setup for agents', () => {
       const { mcp } = JSON.parse((await onPath('connect', '--json')).out);
       const { out } = await onPath('connect');
 
-      // A harness on Windows starts no .cmd shim by itself: cmd /c runs it.
-      const command =
-        process.platform === 'win32'
-          ? { command: 'cmd', args: ['/c', 'otea', 'mcp', '--project', id] }
-          : { command: 'otea', args: ['mcp', '--project', id] };
-      expect(mcp).toEqual({ name: 'otea', ...command });
-      expect(out).toContain(`As JSON: ${JSON.stringify({ otea: command })}`);
-      expect(out).not.toContain('main.ts');
+      expect(mcp).toEqual({ name: 'otea', ...entry() });
+      expect(isAbsolute(mcp.command)).toBe(true);
+      expect(isAbsolute(mcp.args.at(-4))).toBe(true);
+      expect(out).toContain(`As JSON: ${JSON.stringify({ otea: entry() })}`);
     });
 
     it('writes AGENTS.md in the worktree it runs in, not in the main checkout', async () => {

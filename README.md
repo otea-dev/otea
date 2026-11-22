@@ -214,6 +214,52 @@ Then [give your agent the text](#give-your-agent-the-text).
 
 Both paths meet here. Paste the text into your agent's chat (Claude Code, OpenCode, Codex or any other with a shell or MCP); `otea prompt` prints the same text in a terminal. The agent connects itself, reads the project, asks you one question at a time how you work and drafts its boards. You try them and publish them in Studio. From then on each request goes through a board, and what waits for you shows in **Your turn**.
 
+### MCP config for your harness
+
+An agent over MCP adds Otea's server to its own harness, for this project only. `otea connect` prints the exact `command`, `args` and `env` to use, as absolute paths to the Otea that ran it (never an `otea` that happens to be first on `PATH`). The same entry in the config shape of three harnesses, with the values `otea connect` printed in place of the `<...>` ones (`env` only when it printed one):
+
+- Cursor, in `.cursor/mcp.json` of the project:
+
+  ```json
+  {
+    "mcpServers": {
+      "otea": {
+        "command": "<command>",
+        "args": ["<arg>", "<arg>", "mcp", "--project", "<project-id>"]
+      }
+    }
+  }
+  ```
+
+- VS Code, in `.vscode/mcp.json` of the project:
+
+  ```json
+  {
+    "servers": {
+      "otea": {
+        "type": "stdio",
+        "command": "<command>",
+        "args": ["<arg>", "<arg>", "mcp", "--project", "<project-id>"]
+      }
+    }
+  }
+  ```
+
+- Antigravity, in its raw MCP config (Manage MCP servers, then View raw config). That file is the user's, not the project's, so the server named `otea` there points at one project: use the project's id and rename the entry (`otea-shop`) if you work on more than one.
+
+  ```json
+  {
+    "mcpServers": {
+      "otea": {
+        "command": "<command>",
+        "args": ["<arg>", "<arg>", "mcp", "--project", "<project-id>"]
+      }
+    }
+  }
+  ```
+
+On Windows write the paths with `/` or doubled `\\` inside JSON. Then reload the harness and run `otea connect --check`.
+
 ## Everyday commands
 
 | You run | What it does |
