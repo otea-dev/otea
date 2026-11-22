@@ -68,6 +68,8 @@ describe('an agent’s questions to the person, read from the item’s events', 
     expect(openQuestion([one, move])).toBeUndefined();
     expect(openQuestion([move, one])?.text).toBe('¿pregunta 1?');
     expect(openQuestion([])).toBeUndefined();
+    const undo = { type: 'transitioned', actor: move.actor, at: 'a', data: { undoes: 1 } };
+    expect(() => openQuestion([one, undo])).toThrow(/without its id/);
   });
 });
 

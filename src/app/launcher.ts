@@ -111,8 +111,10 @@ export function withHome(launcher: Launcher, home: string | undefined): Launcher
   return { ...launcher, env: { ...launcher.env, OTEA_HOME: home } };
 }
 
-// A bare word or a flag goes as it is; anything else (a path) in double quotes.
-const word = (part: string) => (/^(--)?[\w=.-]+$/.test(part) ? part : `"${part}"`);
+// A bare word or a flag goes as it is; anything else (a path) in double quotes, with the characters
+// the shell reads inside them (`"`, `$`, a backtick) escaped. A backslash stays: a Windows path.
+export const word = (part: string) =>
+  /^(--)?[\w=.-]+$/.test(part) ? part : `"${part.replace(/(["$`])/g, '\\$1')}"`;
 
 // The launcher as the start of a POSIX shell command line (git hooks, Claude Code hooks).
 export function shellLine(launcher: Launcher): string {

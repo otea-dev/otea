@@ -52,7 +52,7 @@ describe('a note left while the item is in its land step', () => {
         now,
       );
     // Going back waits until the note is answered, so it is never left behind unread.
-    expect(back).toThrow(/note/i);
+    expect(back).toThrow(/note 1 from the person is unanswered(.|\n)*Answer it first: otea reply/);
     replyNote(ctx, { id, note: 1, text: 'Lo miro', actor: agent, channel: 'cli' }, now);
     expect(back).not.toThrow();
     expect(roundNotesOf(ctx, id)).toEqual([]);
