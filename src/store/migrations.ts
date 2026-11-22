@@ -489,6 +489,11 @@ export function applyMigrations(
   target = migrations.length,
 ): void {
   const current = userVersion(db);
+  if (current > migrations.length) {
+    throw new Error(
+      `This database was made by a newer Otea (schema version ${current}; this build knows up to ${migrations.length}). Update Otea to open it; it was left untouched.`,
+    );
+  }
   for (const [offset, sql] of migrations.slice(current, target).entries()) {
     transaction(db, () => {
       db.exec(sql);

@@ -31,6 +31,8 @@ openspec/
 
 # Local databases
 *.db
+# The database the published 0.1.0 wrote, for the upgrade test (scripts/make-upgrade-fixture.mjs).
+!src/app/fixtures/otea-0.1.0.db
 
 # Signing certificates and keys
 *.p12

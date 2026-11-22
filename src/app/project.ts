@@ -116,7 +116,13 @@ function ensureIdentity(db: DatabaseSync, identity: () => ProjectIdentity): Proj
 
 function open(found: Found, env: Env, identity = () => newIdentity(found.root)): Project {
   const db = openDatabase(databasePath(found.dataDir));
-  migrate(db);
+  try {
+    migrate(db);
+  } catch (error) {
+    // A database this build cannot open must not stay locked by the attempt.
+    db.close();
+    throw error;
+  }
   const presets = loadPresets(found.dataDir);
   nameImplicitTypes({ db, presets });
   const project: Project = {
