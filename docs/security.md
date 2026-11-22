@@ -55,7 +55,7 @@ Writes need more still: the signed-in browser, the page's own origin (checked on
 
 ### DNS rebinding
 
-A page on the internet can try to make your browser talk to `localhost` under its own name. Otea refuses a request whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` (or, over the local network, one of this computer's own private addresses or `.local` name), and refuses any request a proxy forwarded (`X-Forwarded-For`) unless it came through the Tailscale door you set up. The session cookie is `SameSite=Strict`, so a page on another site never sends it either.
+A page on the internet can try to make your browser talk to `localhost` under its own name. Otea refuses a request whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` (or, over the local network, one of this computer's own private addresses or `.local` name), and refuses any request a proxy forwarded (`X-Forwarded-For`) unless it came through the Tailscale door you set up. The session cookie is `SameSite=Strict`, so a page on another site never sends it either. Cookies are scoped by host, not port, though: another web server on `127.0.0.1` or `localhost` that your browser visits receives the cookie too, so only run local servers you trust in the browser you sign in with.
 
 ## What leaves the machine
 
@@ -64,6 +64,7 @@ Nothing leaves the computer on its own, with these exceptions, each tied to some
 - **Git and GitHub, in your repositories.** When a board protects a branch, `otea check` and the desk ask the repository's own remote what it holds (`git ls-remote`, and `git fetch` of that branch) to compare it with what was approved. That is the remote you already configured, using your git credentials. `otea hook install --forge` runs the `gh` CLI, signed in as you, to set a GitHub ruleset on the protected branches. Otea sends nothing to any other server.
 - **Notifications to a paired phone.** If you subscribe a phone to notifications (this needs Tailscale's HTTPS), the server posts an encrypted Web Push message to the push service your phone's browser named (its address is in the subscription). The push service sees the message's size and timing, not its text.
 - **The desktop app's updates.** An installed desktop app (not `otea` from npm) checks the project's GitHub Releases for a newer version when it starts and every four hours, and downloads it in the background when there is one (an unsigned macOS build only tells you a newer one exists).
+- **Phone status checks.** `otea phone status` and Settings > Phone fetch `/manifest.webmanifest` from the phone URLs (this computer's `.local` name and private addresses, or your Tailscale host name) to tell whether Otea answers there. They are requests to your own computer or your own tailnet name, nothing else.
 - **Tailscale.** If you choose it, your phone reaches the desk through Tailscale's network, as that service works. Otea only runs the `tailscale` command on your computer.
 
 The `otea` command from npm makes no network request of its own: it does not check for new versions and sends no usage data. If that changes, this page changes with it.

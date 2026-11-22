@@ -60,6 +60,35 @@ describe('reads over the loopback socket', () => {
     expect(response.status).toBe(401);
   });
 
+  // The gate reads the path as the server got it and the router reads it after decoding: a path
+  // spelled another way must not reach a route the gate did not see. Whatever the router answers
+  // to the signed-in browser, it must refuse to the anonymous one.
+  it.each([
+    `//p/${PROJECT}/api/items`,
+    `/p/${PROJECT}//api/items`,
+    `/p/${PROJECT}/%61pi/items`,
+    `/p/${PROJECT}/api/%69tems`,
+    `/p/${PROJECT}/api/../api/items`,
+    `/p/${PROJECT}/api/items/`,
+    `/%70/${PROJECT}/api/items`,
+    `//api/items`,
+    `/%61pi/items`,
+    `/p/${PROJECT}/API/items`,
+  ])('keeps the gate and the router agreeing on %s', async (path) => {
+    const open = await request(server, path);
+    const closed = await anonymous(server, path);
+
+    expect(open.status, path).toBeLessThan(500);
+    // Another spelling may fall through to the page (HTML, no data), never to a route's JSON.
+    expect(
+      closed.status === 200 && (closed.headers.get('content-type') ?? '').includes('json'),
+      path,
+    ).toBe(false);
+    if (open.headers.get('content-type')?.includes('json') && open.status === 200) {
+      expect(closed.status, path).toBe(401);
+    }
+  });
+
   it('refuses the machine-wide reads and the live streams too', async () => {
     for (const path of ['/api/items', '/api/lan', '/api/language', `/p/${PROJECT}/api/notify`]) {
       expect((await anonymous(server, path)).status, path).toBe(401);
@@ -68,7 +97,9 @@ describe('reads over the loopback socket', () => {
 
   it('answers every read of the API once signed in', async () => {
     for (const path of reads().filter((each) => !each.endsWith('/stream'))) {
-      expect((await request(server, path)).status, path).not.toBe(401);
+      const { status } = await request(server, path);
+      expect(status, path).not.toBe(401);
+      expect(status, path).toBeLessThan(500);
     }
     expect((await request(server, `/p/${PROJECT}/api/items`)).status).toBe(200);
   });
