@@ -75,6 +75,44 @@ describe('a board read by desks in two languages', () => {
     expect(findVersion(project.db, id, 1)?.definition).toBe(stored);
   });
 
+  // The editor opens a draft in Spanish, the person switches the desk to English, and the editor's
+  // autosave sends the Spanish words it holds under an English header: the server reconciles
+  // against the language the draft was read in (`readIn`), not the one the request says, so the
+  // snapshot survives and the draft still reads in both languages.
+  it('keeps the snapshot when the desk switches language under an open editor', async () => {
+    const made = await call('POST', '/boards', {
+      name: 'Errores',
+      lang: 'es',
+      template: 'bug-reports',
+    });
+    const { id } = made.body;
+    const opened = (await call('GET', `/boards/${id}`, undefined, 'es')).body.record;
+    const draft = opened.draft?.definition;
+    const [first] = draft?.steps ?? [];
+    if (!draft || !first) throw new Error('no draft');
+    expect(first.name).toBe('Completar');
+
+    // The edit made after the switch: the second step's name, typed in Spanish.
+    const second = draft.steps[1];
+    if (!second) throw new Error('no second step');
+    second.name = 'Mirar a ojo';
+    const autosaved = await call(
+      'PUT',
+      `/boards/${id}/draft`,
+      { definition: draft, baseVersion: null, readIn: 'es' },
+      'en',
+    );
+    expect(autosaved.status).toBe(200);
+
+    const stepsIn = async (lang: string) =>
+      (await call('GET', `/boards/${id}`, undefined, lang)).body.record.draft?.definition.steps.map(
+        ({ name }) => name,
+      );
+    // What was not touched still follows the language; the edit is the person's in both.
+    expect(await stepsIn('en')).toEqual(['Complete', 'Mirar a ojo', 'Fix', 'Land']);
+    expect(await stepsIn('es')).toEqual(['Completar', 'Mirar a ojo', 'Arreglar', 'Integrar']);
+  });
+
   it('keeps the words a person wrote when the desk switches language', async () => {
     const made = await call('POST', '/boards', {
       name: 'Errores',

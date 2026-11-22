@@ -56,6 +56,8 @@ const DraftBody = z.strictObject({
   definition: z.unknown(),
   baseVersion: z.number().int().positive().nullable(),
   draftStamp: z.string().nullable().optional(),
+  // The language the editor read the draft in: the words it sends are in it.
+  readIn: z.enum(['en', 'es']).optional(),
 });
 
 const PublishBody = z.strictObject({
@@ -253,6 +255,7 @@ export function boardsApi(project: Project, feed: ChangeFeed, auth: Session): Ho
           definition: input.definition,
           baseVersion: input.baseVersion,
           ...(input.draftStamp === undefined ? {} : { draftStamp: input.draftStamp }),
+          ...(input.readIn === undefined ? {} : { readIn: input.readIn }),
         });
         feed.notify();
         return c.json(saved);

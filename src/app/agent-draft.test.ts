@@ -29,6 +29,7 @@ import { checkGate } from './gates.ts';
 import { createItem, getItem, moveItem, showItem, updateItem } from './items.ts';
 import { itemNextText, nextFor } from './next.ts';
 import type { Project } from './project.ts';
+import { inLanguage } from './reading-lang.ts';
 import { memoryContext, projectOf } from './testing.ts';
 import { undoMove } from './undo.ts';
 
@@ -159,6 +160,40 @@ describe('an agent drafting a board', () => {
       `step 1 "${name}": scout no longer reviews it: any agent does, never the one that did it [steps.0.reviewer]`,
     ]);
     expect(getBoardRecord(ctx, board.id).draft?.definition.steps[0]?.reviewer).toBe('any');
+  });
+
+  // An agent writes its board.json from the draft it printed, in the language the board was made in,
+  // and may leave out `lang` and `snapshot`. The person merging it from a desk in another language
+  // must not strip them: the board is the draft's, and its words read in each language afterwards.
+  it('keeps the language and the snapshot of a board whose draft the agent handed in without them, merged from another language', () => {
+    const ctx = project();
+    const { board, item } = requestAgentDraft(
+      ctx,
+      { name: 'Criaturas', need: 'x', agent: 'kiln', lang: 'es' },
+      now,
+    );
+    const draft = getBoardRecord(ctx, board.id).draft?.definition;
+    if (!draft) throw new Error('no draft');
+    const { lang, snapshot, ...file } = agentFile(draft);
+    expect(lang).toBe('es');
+    expect(Object.keys(snapshot ?? {})).toContain('title');
+
+    inLanguage('en', () =>
+      submitAgentDraft(
+        ctx,
+        { id: item, text: JSON.stringify(file), actor: kiln, channel: 'cli' },
+        now,
+      ),
+    );
+
+    const read = (language: 'en' | 'es' | undefined) =>
+      inLanguage(language, () => getBoardRecord(ctx, board.id).draft?.definition);
+    expect(read(undefined)?.lang).toBe('es');
+    expect(read('es')?.title).toBe('Título');
+    expect(read('en')?.title).toBe('Title');
+    // What the agent wrote is its own, in every language.
+    expect(read('en')?.steps[0]?.name).toBe('Concepto');
+    expect(read('en')?.parts.eart?.name).toBe('Arte conceptual');
   });
 
   it('says, by name, the parts no form, handoff or anytime places: no item would get them', () => {

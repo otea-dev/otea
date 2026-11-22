@@ -6,11 +6,19 @@ import { sequenceIds } from '../core/board/ids.ts';
 import { parsePreset } from '../core/preset.ts';
 import { selectEvents } from '../store/queries.ts';
 import { migrateBoards, migrateProjectBoards } from './board-migration.ts';
-import { getBoardRecord, listBoardSummaries } from './boards.ts';
+import {
+  createBoard,
+  getBoardRecord,
+  listBoardSummaries,
+  publishBoard,
+  saveDraft,
+  syncBoardPresets,
+} from './boards.ts';
 import { addCollection } from './collections.ts';
 import type { Context } from './context.ts';
 import { checkGate } from './gates.ts';
 import { createItem, getItem, moveItem } from './items.ts';
+import { nextFor } from './next.ts';
 import { loadPresets } from './presets.ts';
 import { addRelation } from './relations.ts';
 import { catalogWith, memoryContext } from './testing.ts';
@@ -248,6 +256,40 @@ workflow:
     ctx.db.prepare("UPDATE collections SET preset = 'gone' WHERE name = 'Recetas'").run();
     migrateProjectBoards({ ...ctx, dataDir: dir }, 'es');
     expect(existsSync(path)).toBe(true);
+  });
+
+  // A board Otea made at version 1 from a preset is read again when a release changes the reading;
+  // if the reading no longer has the keys the board's items are stored under (a field renamed), the
+  // stored board stands: reading it again would leave the items' data under ids nothing knows.
+  it('leaves a board alone when the reading no longer has the keys its items are stored under', () => {
+    const ctx = memoryContext();
+    const made = createBoard(ctx, { name: 'Tareas', lang: 'es', template: 'todos' }, now);
+    const def = made.draft?.definition;
+    if (!def) throw new Error('no draft');
+    saveDraft(ctx, made.id, { definition: { ...def, template: 'tasks' }, baseVersion: null }, now);
+    publishBoard(ctx, made.id, { moves: {}, by: { kind: 'human', name: 'otea' } }, now);
+    const asked = def.form
+      .filter(({ required }) => required)
+      .map(({ ref }) => [ref, 'algo'] as const);
+    const task = createItem(
+      ctx,
+      { collection: 'Tareas', title: 'Regar', fields: Object.fromEntries(asked), actor: you },
+      now,
+    );
+    const before = getItem(ctx, task.id);
+
+    expect(migrateBoards(ctx, 'es', now, sequenceIds())).toBe(0);
+
+    const after = getBoardRecord(ctx, made.id);
+    expect(after.live?.version).toBe(1);
+    expect(Object.keys(after.live?.definition.parts ?? {})).toEqual(Object.keys(def.parts));
+    expect(getItem(ctx, task.id).state).toBe(before.state);
+    // The project still opens: the board compiles and an agent is offered its item.
+    syncBoardPresets(ctx);
+    expect(ctx.presets.presets.get(made.id)).toBeDefined();
+    expect(nextFor(ctx, 'kiln', { collection: 'Tareas' }, now)).toMatchObject({
+      item: task.id,
+    });
   });
 
   it('keeps a blueprint it cannot read', () => {

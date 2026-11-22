@@ -128,13 +128,13 @@ export function snapshotOf(made: Readonly<Partial<Record<Lang, BoardDefinition>>
 }
 
 // The text of a word in `lang`: its own, else the language the board was made in, else any.
-function pick(said: Said, lang: Lang, madeIn: Lang | undefined): Text | undefined {
+function pick(said: Said, lang: string, madeIn: string | undefined): Text | undefined {
   return said[lang] ?? (madeIn === undefined ? undefined : said[madeIn]) ?? Object.values(said)[0];
 }
 
 // A board read in a language: every word that has a snapshot is said in `lang`, else in the
 // language the board was made in. A word the person wrote has no snapshot and stays as it is.
-export function speak(def: BoardDefinition, lang: Lang | undefined): BoardDefinition {
+export function speak(def: BoardDefinition, lang: string | undefined): BoardDefinition {
   if (!def.snapshot) return def;
   const said = clone(def);
   for (const [path, words] of Object.entries(def.snapshot)) {
@@ -148,7 +148,7 @@ export function speak(def: BoardDefinition, lang: Lang | undefined): BoardDefini
 // a word whose text is no longer the snapshot's in that language was changed by the person, so its
 // snapshot goes and what they wrote stands, in every language. A snapshot of a word the board no
 // longer has goes too.
-export function reconcile(def: BoardDefinition, reading: Lang | undefined): BoardDefinition {
+export function reconcile(def: BoardDefinition, reading: string | undefined): BoardDefinition {
   if (!def.snapshot) return def;
   const kept: Record<string, Said> = {};
   for (const [path, words] of Object.entries(def.snapshot)) {

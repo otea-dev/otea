@@ -307,10 +307,7 @@ export const definitionSchema = z
       .array(z.string())
       .meta(about('Titles of the sample items previews draw', ['Login fails on Safari'], [])),
     template: text('The template it was copied from, for the record', 'bugs').optional(),
-    lang: z
-      .enum(['en', 'es'])
-      .meta(about('The language the board was made in; leave it as it is', 'en'))
-      .optional(),
+    lang: text('The language the board was made in (en or es); leave it as it is', 'en').optional(),
     snapshot: z
       .record(z.string(), z.record(z.string(), z.union([z.string(), z.array(z.string())])))
       .meta(
@@ -528,6 +525,6 @@ export function readDefinition(json: string, lang?: Lang): BoardDefinition {
 // in (the reader's, else the one it was made in): a word its template gave it that no longer says
 // what the snapshot says in that language was changed by the person, and their text stands in
 // every language (localize.ts reconcile).
-export function storedDefinition(definition: BoardDefinition, reading?: Lang): string {
+export function storedDefinition(definition: BoardDefinition, reading?: string): string {
   return JSON.stringify(reconcile(definition, reading ?? readerLang()));
 }

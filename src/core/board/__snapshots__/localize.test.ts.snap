@@ -1,27 +1,23 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`the words of a board made from a template > pins the keys and option order of every template 1`] = `
+exports[`the words of a board made from a template > pins the step, option and motive keys of every template 1`] = `
 {
   "blocked-tasks": {
     "motives": [],
-    "parts": [
-      "todo:long",
-      "did:long",
-      "priority:level",
-    ],
+    "options": {},
     "steps": [
       "doit",
     ],
   },
   "blog": {
     "motives": [],
-    "parts": [
-      "idea:long",
-      "outline:long",
-      "text:long",
-      "cover:images",
-      "section:choice[o0,o1,o2]",
-    ],
+    "options": {
+      "section": [
+        "o0",
+        "o1",
+        "o2",
+      ],
+    },
     "steps": [
       "outlining",
       "drafting",
@@ -35,25 +31,19 @@ exports[`the words of a board made from a template > pins the keys and option or
       "mdesign",
       "mwont",
     ],
-    "parts": [
-      "fsaid:long",
-      "fsource:url",
-      "fenv:text",
-      "fkind:choice[kvisual,kbehave,kperf]",
-      "frepro:long",
-      "fexp:long",
-      "fgot:long",
-      "fsev:level",
-      "feffort:choice[s,m,l,xl]",
-      "frisk:level",
-      "farea:text",
-      "fbranch:branch",
-      "ediff:code",
-      "etests:log",
-      "ebench:log",
-      "evideo:video",
-      "fcommit:text",
-    ],
+    "options": {
+      "feffort": [
+        "s",
+        "m",
+        "l",
+        "xl",
+      ],
+      "fkind": [
+        "kvisual",
+        "kbehave",
+        "kperf",
+      ],
+    },
     "steps": [
       "scomplete",
       "striage",
@@ -63,15 +53,19 @@ exports[`the words of a board made from a template > pins the keys and option or
   },
   "bugs": {
     "motives": [],
-    "parts": [
-      "what:long",
-      "repro:check[o0,o1,o2]",
-      "severity:level",
-      "area:choice[o0,o1,o2,o3]",
-      "cause:long",
-      "code:code",
-      "video:video",
-    ],
+    "options": {
+      "area": [
+        "o0",
+        "o1",
+        "o2",
+        "o3",
+      ],
+      "repro": [
+        "o0",
+        "o1",
+        "o2",
+      ],
+    },
     "steps": [
       "refine",
       "fix",
@@ -83,20 +77,21 @@ exports[`the words of a board made from a template > pins the keys and option or
       "duplicate",
       "stale",
     ],
-    "parts": [
-      "want:long",
-      "check:long",
-      "kind:choice[ui,cli,bug,doc,other]",
-      "impact:level",
-      "effort:choice[s,m,l,xl]",
-      "branch:branch",
-      "diff:code",
-      "shots:images",
-      "video:video",
-      "tests:log",
-      "term:log",
-      "commit:text",
-    ],
+    "options": {
+      "effort": [
+        "s",
+        "m",
+        "l",
+        "xl",
+      ],
+      "kind": [
+        "ui",
+        "cli",
+        "bug",
+        "doc",
+        "other",
+      ],
+    },
     "steps": [
       "clarify",
       "doit",
@@ -105,15 +100,14 @@ exports[`the words of a board made from a template > pins the keys and option or
   },
   "content": {
     "motives": [],
-    "parts": [
-      "fbrief:long",
-      "fchannel:choice[cblog,cnews,cdocs,csocial]",
-      "foutline:long",
-      "fdraft:long",
-      "fcover:images",
-      "eaudio:audio",
-      "furl:url",
-    ],
+    "options": {
+      "fchannel": [
+        "cblog",
+        "cnews",
+        "cdocs",
+        "csocial",
+      ],
+    },
     "steps": [
       "soutline",
       "sdraft",
@@ -122,16 +116,7 @@ exports[`the words of a board made from a template > pins the keys and option or
   },
   "decisions": {
     "motives": [],
-    "parts": [
-      "fq:long",
-      "fctx:long",
-      "ffind:long",
-      "fsrc:url",
-      "fopts:long",
-      "fdiag:diagram",
-      "fdecided:long",
-      "eadr:code",
-    ],
+    "options": {},
     "steps": [
       "sdig",
       "sdecide",
@@ -140,16 +125,14 @@ exports[`the words of a board made from a template > pins the keys and option or
   },
   "deliveries": {
     "motives": [],
-    "parts": [
-      "repo:text",
-      "branch:branch",
-      "proposal:long",
-      "order:number",
-      "pr:url",
-      "prstate:choice[open,green,red,merged]",
-      "code:code",
-      "tests:log",
-    ],
+    "options": {
+      "prstate": [
+        "open",
+        "green",
+        "red",
+        "merged",
+      ],
+    },
     "steps": [
       "implement",
       "approve",
@@ -160,19 +143,7 @@ exports[`the words of a board made from a template > pins the keys and option or
       "mrejected",
       "mstale",
     ],
-    "parts": [
-      "fbrief:long",
-      "frefs:images",
-      "fblind:yesno",
-      "frepo:yesno",
-      "fbranch:branch",
-      "ediff:code",
-      "eshots:images",
-      "eab:images",
-      "emotion:video",
-      "fkey:text",
-      "fcommit:text",
-    ],
+    "options": {},
     "steps": [
       "screate",
       "sland",
@@ -183,15 +154,7 @@ exports[`the words of a board made from a template > pins the keys and option or
       "mfalse",
       "mstale",
     ],
-    "parts": [
-      "fhyp:long",
-      "fplan:long",
-      "fbranch:branch",
-      "ediff:code",
-      "elog:log",
-      "fresult:long",
-      "echart:images",
-    ],
+    "options": {},
     "steps": [
       "splan",
       "srun",
@@ -199,19 +162,18 @@ exports[`the words of a board made from a template > pins the keys and option or
   },
   "ideaboard": {
     "motives": [],
-    "parts": [
-      "idea:long",
-      "kind:choice[idea,decision]",
-      "brief:long",
-      "options:long",
-      "decision:long",
-      "architecture:long",
-      "diagrams:diagram",
-      "docs:file",
-      "plan:long",
-      "impact:level",
-      "effort:choice[s,m,l,xl]",
-    ],
+    "options": {
+      "effort": [
+        "s",
+        "m",
+        "l",
+        "xl",
+      ],
+      "kind": [
+        "idea",
+        "decision",
+      ],
+    },
     "steps": [
       "refine",
       "design",
@@ -223,16 +185,13 @@ exports[`the words of a board made from a template > pins the keys and option or
       "out_of_scope",
       "duplicate",
     ],
-    "parts": [
-      "todo:long",
-      "donewhen:long",
-      "size:choice[s,m,l]",
-      "did:long",
-      "tests:log",
-      "changes:code",
-      "branch:branch",
-      "commit:text",
-    ],
+    "options": {
+      "size": [
+        "s",
+        "m",
+        "l",
+      ],
+    },
     "steps": [
       "prepare",
       "doit",
@@ -241,15 +200,7 @@ exports[`the words of a board made from a template > pins the keys and option or
   },
   "jobs": {
     "motives": [],
-    "parts": [
-      "issue:url",
-      "what:long",
-      "analysis:long",
-      "plan:long",
-      "mergeplan:long",
-      "checked:long",
-      "checklog:log",
-    ],
+    "options": {},
     "steps": [
       "analyse",
       "deliver",
@@ -261,20 +212,21 @@ exports[`the words of a board made from a template > pins the keys and option or
       "duplicate",
       "stale",
     ],
-    "parts": [
-      "want:long",
-      "check:long",
-      "kind:choice[ui,cli,bug,doc,other]",
-      "impact:level",
-      "effort:choice[s,m,l,xl]",
-      "branch:branch",
-      "diff:code",
-      "shots:images",
-      "video:video",
-      "tests:log",
-      "term:log",
-      "commit:text",
-    ],
+    "options": {
+      "effort": [
+        "s",
+        "m",
+        "l",
+        "xl",
+      ],
+      "kind": [
+        "ui",
+        "cli",
+        "bug",
+        "doc",
+        "other",
+      ],
+    },
     "steps": [
       "clarify",
       "doit",
@@ -283,13 +235,7 @@ exports[`the words of a board made from a template > pins the keys and option or
   },
   "research": {
     "motives": [],
-    "parts": [
-      "fq:long",
-      "fwhy:long",
-      "ffind:long",
-      "fsrc:url",
-      "fanswer:long",
-    ],
+    "options": {},
     "steps": [
       "sdig",
       "sanswer",
@@ -297,23 +243,14 @@ exports[`the words of a board made from a template > pins the keys and option or
   },
   "review": {
     "motives": [],
-    "parts": [
-      "brief:long",
-      "target:text",
-      "take:video",
-      "shots:images",
-    ],
+    "options": {},
     "steps": [
       "doit",
     ],
   },
   "tasks": {
     "motives": [],
-    "parts": [
-      "todo:long",
-      "did:long",
-      "priority:level",
-    ],
+    "options": {},
     "steps": [
       "doit",
     ],
@@ -323,17 +260,14 @@ exports[`the words of a board made from a template > pins the keys and option or
       "tnotneeded",
       "trejected",
     ],
-    "parts": [
-      "twant:long",
-      "tdone:long",
-      "tmine:yesno",
-      "timpact:level",
-      "teffort:choice[s,m,l,xl]",
-      "tresult:long",
-      "timages:images",
-      "tfiles:file",
-      "tlinks:url",
-    ],
+    "options": {
+      "teffort": [
+        "s",
+        "m",
+        "l",
+        "xl",
+      ],
+    },
     "steps": [
       "tself",
       "tdo",
@@ -345,17 +279,13 @@ exports[`the words of a board made from a template > pins the keys and option or
       "duplicate",
       "wont_fix",
     ],
-    "parts": [
-      "desc:long",
-      "repro:long",
-      "expected:long",
-      "actual:long",
-      "severity:level",
-      "category:choice[o0,o1,o2]",
-      "area:text",
-      "code:code",
-      "proof:video",
-    ],
+    "options": {
+      "category": [
+        "o0",
+        "o1",
+        "o2",
+      ],
+    },
     "steps": [
       "fill",
       "sort",

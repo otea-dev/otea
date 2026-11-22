@@ -589,8 +589,7 @@
     },
     "lang": {
       "type": "string",
-      "enum": ["en", "es"],
-      "description": "The language the board was made in; leave it as it is",
+      "description": "The language the board was made in (en or es); leave it as it is",
       "examples": ["en"]
     },
     "snapshot": {
