@@ -20,6 +20,8 @@ export const boardStudio = {
   'bs.problem.group_unnamed': 'Un grupo de evidencias de {step} no tiene nombre.',
   'bs.problem.group_small':
     'El grupo «{group}» de {step} pide {min} de {of}. Necesita al menos una, y no más de las que tiene.',
+  'bs.problem.group_duplicate':
+    '«{part}» está dos veces en el grupo «{group}» de {step}. Quita una.',
   'bs.problem.group_member':
     '«{part}» en el grupo «{group}» de {step} no es una evidencia opcional de ese paso. Sácala del grupo.',
   'bs.problem.way_invalid':
@@ -76,6 +78,9 @@ export const boardStudio = {
   'bs.change.hand_added': '{name} entrega también {part}, {req}.',
   'bs.change.hand_changed': '{part} en {name}: {req}.',
   'bs.change.hand_removed': '{name} ya no entrega {part}.',
+  'bs.change.group_added': '{name} pide también {group}: al menos {min} de {parts}.',
+  'bs.change.group_changed': '{group} en {name}: al menos {min} de {parts}.',
+  'bs.change.group_removed': '{name} ya no pide {group}.',
   'bs.change.step_instructions': 'Instrucciones nuevas en {name}.',
   'bs.change.step_ways': 'Caminos nuevos desde {name}.',
   'bs.change.step_back': 'Si devuelves {name}, ahora vuelve a {to}.',
@@ -127,6 +132,7 @@ export const boardStudio = {
   'bs.req.always_fresh': 'obligatorio y nuevo en cada ronda',
   'bs.req.when': 'obligatorio solo a veces',
   'bs.req.no': 'opcional',
+  'bs.req.no_fresh': 'opcional y nuevo en cada ronda',
 
   'bs.who.you': 'Tú',
   'bs.who.any': 'Cualquier agente',

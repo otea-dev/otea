@@ -19,6 +19,7 @@ export const boardStudio = {
   'bs.problem.group_unnamed': 'A group of evidence in {step} has no name.',
   'bs.problem.group_small':
     'The group “{group}” in {step} asks for {min} of {of}. It needs at least one, and no more than it has.',
+  'bs.problem.group_duplicate': '“{part}” is twice in the group “{group}” of {step}. Take one out.',
   'bs.problem.group_member':
     '“{part}” in the group “{group}” of {step} is not optional evidence of that step. Take it out of the group.',
   'bs.problem.way_invalid':
@@ -76,6 +77,9 @@ export const boardStudio = {
   'bs.change.hand_added': '{name} also hands off {part}, {req}.',
   'bs.change.hand_changed': '{part} in {name}: {req}.',
   'bs.change.hand_removed': '{name} no longer hands off {part}.',
+  'bs.change.group_added': '{name} also asks for {group}: at least {min} of {parts}.',
+  'bs.change.group_changed': '{group} in {name}: at least {min} of {parts}.',
+  'bs.change.group_removed': '{name} no longer asks for {group}.',
   'bs.change.step_instructions': 'New instructions in {name}.',
   'bs.change.step_ways': 'New ways out of {name}.',
   'bs.change.step_back': 'When you send {name} back, it now goes to {to}.',
@@ -127,6 +131,7 @@ export const boardStudio = {
   'bs.req.always_fresh': 'required and new each round',
   'bs.req.when': 'required only sometimes',
   'bs.req.no': 'optional',
+  'bs.req.no_fresh': 'optional and new each round',
 
   // Who does a step and who reviews it.
   'bs.who.you': 'You',

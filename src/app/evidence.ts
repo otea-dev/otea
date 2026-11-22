@@ -26,8 +26,8 @@ import {
   diffPartFor,
   diffPartText,
   evidenceModules,
+  fittingModules,
   holderOf,
-  moduleAccepts,
   type Placement,
   placeEvidence,
 } from '../core/placement.ts';
@@ -146,8 +146,10 @@ function personsPlace(
   if (!board) return undefined;
   const asked = new Set(board.def.form.map(({ ref }) => ref));
   const type = typeOfItem(project, item);
-  const form = evidenceModules(type.layout).find(
-    (entry) => asked.has(entry.id) && moduleAccepts(entry, request.filename),
+  // A part made for the kind wins over one that takes any file, as for an agent's file.
+  const [form] = fittingModules(
+    evidenceModules(type.layout).filter((entry) => asked.has(entry.id)),
+    request.filename,
   );
   if (form) {
     return placeEvidence(

@@ -305,7 +305,8 @@ function handOf(def: BoardDefinition, stepId: string, ref: string) {
   return stepOf(def, stepId)?.hand.find((h) => h.ref === ref);
 }
 
-// Required always, only when… or optional; optional is never new each round.
+// Required always, only when… or optional; optional is new each round only as a member of a group
+// ("at least one new screenshot or log each round").
 export function setRequirement(
   def: BoardDefinition,
   stepId: string,
@@ -318,7 +319,6 @@ export function setRequirement(
   hand.req = req;
   if (req !== 'when') delete hand.when;
   if (fresh !== undefined) hand.fresh = fresh;
-  if (req === 'no') hand.fresh = false;
   const step = stepOf(def, stepId);
   if (step) tidyGroups(step);
 }
@@ -327,16 +327,25 @@ export function setRequirement(
 
 // A group asks only for evidence the step hands off and does not already require: a part that
 // leaves the step or becomes required leaves its groups, a group left with nothing goes, and a
-// minimum never asks for more than the group has.
+// minimum never asks for more than the group has. Optional evidence is new each round only while
+// it is a member of a group.
+export function isGroupMember(step: Step, ref: string): boolean {
+  return (step.groups ?? []).some((group) => group.parts.includes(ref));
+}
+
 function tidyGroups(step: Step): void {
-  if (!step.groups) return;
-  const optional = new Set(step.hand.filter((h) => h.req !== 'always').map((h) => h.ref));
-  for (const group of step.groups) {
-    group.parts = group.parts.filter((ref) => optional.has(ref));
-    group.min = Math.max(1, Math.min(group.min, group.parts.length));
+  if (step.groups) {
+    const optional = new Set(step.hand.filter((h) => h.req !== 'always').map((h) => h.ref));
+    for (const group of step.groups) {
+      group.parts = group.parts.filter((ref) => optional.has(ref));
+      group.min = Math.max(1, Math.min(group.min, group.parts.length));
+    }
+    step.groups = step.groups.filter((group) => group.parts.length > 0);
+    if (step.groups.length === 0) delete step.groups;
   }
-  step.groups = step.groups.filter((group) => group.parts.length > 0);
-  if (step.groups.length === 0) delete step.groups;
+  for (const hand of step.hand) {
+    if (hand.req === 'no' && !isGroupMember(step, hand.ref)) hand.fresh = false;
+  }
 }
 
 // The evidence a group of the step may name: what it hands off and does not require on its own.
@@ -391,6 +400,7 @@ export function toggleGroupPart(
     group.parts = step.hand.map((h) => h.ref).filter((r) => r === ref || group.parts.includes(r));
   }
   group.min = Math.max(1, Math.min(group.min, group.parts.length));
+  tidyGroups(step);
 }
 
 export function removeGroup(def: BoardDefinition, stepId: string, id: string): void {
@@ -398,11 +408,13 @@ export function removeGroup(def: BoardDefinition, stepId: string, id: string): v
   if (!step?.groups) return;
   step.groups = step.groups.filter((group) => group.id !== id);
   if (step.groups.length === 0) delete step.groups;
+  tidyGroups(step);
 }
 
 export function setFresh(def: BoardDefinition, stepId: string, ref: string, fresh: boolean) {
   const hand = handOf(def, stepId, ref);
-  if (hand && hand.req !== 'no') hand.fresh = fresh;
+  const step = stepOf(def, stepId);
+  if (hand && step && (hand.req !== 'no' || isGroupMember(step, ref))) hand.fresh = fresh;
 }
 
 export function setWhen(def: BoardDefinition, stepId: string, ref: string, when: When): void {

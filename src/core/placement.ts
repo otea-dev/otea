@@ -61,7 +61,10 @@ function takesAnything(entry: LayoutEntry): boolean {
 }
 
 // The modules a file goes to: those that draw it, else the ones that take any file.
-function fittingModules(modules: EvidenceModuleEntry[], filename: string): EvidenceModuleEntry[] {
+export function fittingModules(
+  modules: EvidenceModuleEntry[],
+  filename: string,
+): EvidenceModuleEntry[] {
   const fitting = modules.filter((entry) => moduleAccepts(entry, filename));
   const specific = fitting.filter((entry) => !takesAnything(entry));
   return specific.length > 0 ? specific : fitting;

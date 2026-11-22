@@ -120,6 +120,12 @@ export function problemText(problem: Problem): string {
         min: Number(p.min),
         of: Number(p.of),
       });
+    case 'group_duplicate':
+      return t('bs.problem.group_duplicate', {
+        group: str(p.group) as string,
+        step: str(p.step) as string,
+        part: str(p.part) as string,
+      });
     case 'group_member':
       return t('bs.problem.group_member', {
         group: str(p.group) as string,
@@ -221,7 +227,8 @@ function groupName(group: string | undefined): string | undefined {
 
 function reqText(req: 'always' | 'when' | 'no', fresh: boolean): string {
   if (req === 'always') return t(fresh ? 'bs.req.always_fresh' : 'bs.req.always');
-  return t(req === 'when' ? 'bs.req.when' : 'bs.req.no');
+  if (req === 'no') return t(fresh ? 'bs.req.no_fresh' : 'bs.req.no');
+  return t('bs.req.when');
 }
 
 export function changeText(change: Change): string {
@@ -267,6 +274,19 @@ export function changeText(change: Change): string {
       return t('bs.change.step_back', { name: change.name, to: change.to });
     case 'hand_removed':
       return t('bs.change.hand_removed', { name: change.name, part: change.partName });
+    case 'group_added':
+    case 'group_changed':
+      return t(
+        change.kind === 'group_added' ? 'bs.change.group_added' : 'bs.change.group_changed',
+        {
+          name: change.name,
+          group: change.groupName,
+          min: change.min,
+          parts: listOr(change.parts),
+        },
+      );
+    case 'group_removed':
+      return t('bs.change.group_removed', { name: change.name, group: change.groupName });
     case 'step_instructions':
       return t('bs.change.step_instructions', { name: change.name });
     case 'step_ways':

@@ -637,7 +637,7 @@ function partLines(def: BoardDefinition, hands: readonly Hand[], input: NextInpu
         ? `required${fresh}`
         : hand.req === 'when'
           ? whenText(def, hand)
-          : 'optional';
+          : `optional${fresh}`;
     const mark = missing ? '✗' : hand.req === 'always' ? '✓' : '·';
     const proof = part.kind === 'check' && part.proof ? ', each ticked point with its proof' : '';
     const line = `  ${mark} ${part.name}: ${req}${proof}${missing ? ` (${reasonText(missing)})` : ''}${choicesText(part, hand.req !== 'no', boardLangOf(def))}`;

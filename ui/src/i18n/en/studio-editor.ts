@@ -121,7 +121,6 @@ export const studioEditor = {
   'bs.editor.group.remove': 'Remove this group',
   'bs.editor.group.conseq':
     'The agent attaches whichever of these fit the work. It cannot hand off with fewer than {min}.',
-  'bs.editor.group.need_two': 'Mark two or more of what it hands off as optional to group them.',
   'bs.editor.ways.to_done': 'ends here',
   'bs.editor.ways.to_step': 'skips the steps in between',
   'bs.editor.ways.approve': 'When you approve it you choose: Approve {ways}.',
@@ -174,6 +173,7 @@ export const studioEditor = {
   'bs.editor.req.always_fresh': 'required · new each round',
   'bs.editor.req.when': 'sometimes',
   'bs.editor.req.no': 'optional',
+  'bs.editor.req.no_fresh': 'optional · new each round',
   'bs.editor.req.any': 'at any step',
   'bs.editor.part.name': 'Name',
   'bs.editor.part.hint': 'What goes here',

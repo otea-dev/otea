@@ -7,6 +7,7 @@ import {
   DROPPED,
   type Drop,
   defaultWay,
+  type Group,
   guardedBranch,
   isEvidence,
   type ListView,
@@ -17,6 +18,7 @@ import {
   type Reviewer,
   SAME,
   STEP,
+  type Step,
   stepById,
   stepIndex,
   type Target,
@@ -47,6 +49,17 @@ export type Change =
       fresh: boolean;
     }
   | { kind: 'hand_removed'; step: string; name: string; part: string; partName: string }
+  // "At least N of" groups of evidence: `parts` are the names of what it picks from.
+  | {
+      kind: 'group_added' | 'group_changed';
+      step: string;
+      name: string;
+      group: string;
+      groupName: string;
+      min: number;
+      parts: string[];
+    }
+  | { kind: 'group_removed'; step: string; name: string; group: string; groupName: string }
   | { kind: 'step_instructions' | 'step_ways'; step: string; name: string }
   // `to`: the name of the step a send-back now lands on (the step itself for the same one).
   | { kind: 'step_back'; step: string; name: string; to: string }
@@ -130,6 +143,7 @@ export function changePlan(
       const partName = partOf(live, before.ref)?.name ?? '';
       out.push({ kind: 'hand_removed', step: id, name, part: before.ref, partName });
     }
+    out.push(...groupChanges(live, draft, old, step));
     if (!same(old.instructions, step.instructions))
       out.push({ kind: 'step_instructions', step: id, name });
     if (!same(forward(live, old.id), forward(draft, step.id)))
@@ -170,6 +184,54 @@ export function changePlan(
   if (!same(live.cap, draft.cap)) out.push({ kind: 'cap', cap: draft.cap });
   out.push(...laterBoardChanges(live, draft, context));
   return out;
+}
+
+// What changed in a step's "at least N of" groups, by group id: added, changed (its name, its
+// minimum or what it picks from) and removed.
+function groupChanges(
+  live: BoardDefinition,
+  draft: BoardDefinition,
+  old: Step,
+  step: Step,
+): Change[] {
+  const out: Change[] = [];
+  const names = (def: BoardDefinition, group: Group) =>
+    group.parts.map((ref) => partOf(def, ref)?.name ?? ref);
+  for (const group of step.groups ?? []) {
+    const before = old.groups?.find(({ id }) => id === group.id);
+    const base = {
+      step: step.id,
+      name: step.name,
+      group: group.id,
+      groupName: group.name,
+      min: group.min,
+      parts: names(draft, group),
+    };
+    if (!before) out.push({ kind: 'group_added', ...base });
+    else if (
+      before.name !== group.name ||
+      before.min !== group.min ||
+      !same(before.parts, group.parts)
+    )
+      out.push({ kind: 'group_changed', ...base });
+  }
+  for (const before of old.groups ?? []) {
+    if (!step.groups?.some(({ id }) => id === before.id))
+      out.push({
+        kind: 'group_removed',
+        step: step.id,
+        name: step.name,
+        group: before.id,
+        groupName: before.name,
+      });
+  }
+  return out;
+}
+
+// Whether a group asks more than it did: a new one, a higher minimum, or fewer parts to pick from.
+function stricter(before: Group | undefined, group: Group): boolean {
+  if (!before) return true;
+  return group.min > before.min || before.parts.some((ref) => !group.parts.includes(ref));
 }
 
 function laterBoardChanges(
@@ -379,12 +441,22 @@ export function itemEffects(
       new Set(list.filter(({ req }) => req === 'always').map(({ ref }) => ref));
     const before = required(old.hand);
     const added = [...required(step.hand)].filter((ref) => !before.has(ref));
-    if (doing.length > 0 && added.length > 0)
+    // A new or stricter group is one more thing the handoff needs, named by the group.
+    const groups = (step.groups ?? []).filter((group) =>
+      stricter(
+        old.groups?.find(({ id }) => id === group.id),
+        group,
+      ),
+    );
+    if (doing.length > 0 && (added.length > 0 || groups.length > 0))
       out.needs.push({
         step: step.id,
         name: step.name,
         items: doing,
-        parts: added.map((ref) => partOf(draft, ref)?.name ?? ''),
+        parts: [
+          ...added.map((ref) => partOf(draft, ref)?.name ?? ''),
+          ...groups.map(({ name }) => name),
+        ],
       });
     const lost = here.filter(({ phase }) => !phaseSurvives(draft, step.id, phase));
     if (lost.length > 0)
