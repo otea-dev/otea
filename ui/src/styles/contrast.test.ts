@@ -185,3 +185,23 @@ describe.each([
     }
   });
 });
+
+// The route's lines and nodes (the lanes, the item's route diagram, the closed trunk) carry
+// meaning, so they are graphics WCAG 1.4.11 asks 3:1 of, against the page and the sheet they are
+// drawn on. Lightness moves to reach it; chroma stays, so the lines keep their pen-drawn tone.
+describe.each([
+  ['light', light],
+  ['dark', dark],
+])('the route lines in %s', (_theme, t) => {
+  it.each(['--lane', '--lane-lit', '--closed'])(
+    '%s reads at 3:1 or more on the page and the sheet',
+    (token) => {
+      for (const name of ['ground', 'sheet']) {
+        const bg = parse(t[`--${name}`] as string);
+        expect(ratio(parse(t[token] as string), bg), `${token} on ${name}`).toBeGreaterThanOrEqual(
+          3,
+        );
+      }
+    },
+  );
+});
