@@ -1110,6 +1110,7 @@
   min-width: 0;
   font: 400 14px / 1.35 var(--sans);
   color: var(--ink-2);
+  overflow-wrap: anywhere;
 }
 .p-fold .sum .mk {
   margin-right: 6px;
