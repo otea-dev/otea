@@ -7,7 +7,7 @@ import type { Drift } from '../../src/server/drift.ts';
 import type { FeedEvent } from './activity.ts';
 import { apiUrl } from './base.ts';
 import type { WrittenBrief } from './brief.ts';
-import { type Language, t } from './i18n/i18n.ts';
+import { type Language, languageHeader, t } from './i18n/i18n.ts';
 import type { NotifyView } from './notify/offer.ts';
 import { noteRead, readOf } from './offline/sync-state.ts';
 import { type Agent, parseAgents } from './presence.ts';
@@ -39,7 +39,7 @@ async function get(path: string, signal: AbortSignal): Promise<Response> {
   // Every read says whether the PC answered it (the offline line, sync-state.ts).
   const response = await fetch(apiUrl(path), {
     signal,
-    headers: { accept: 'application/json' },
+    headers: { accept: 'application/json', ...languageHeader() },
   }).catch((error: unknown) => {
     if (!signal.aborted) noteRead({ kind: 'failed' });
     throw error;
@@ -154,8 +154,13 @@ async function post<T>(
   const response = await fetch(apiUrl(path), {
     method: 'POST',
     headers: form
-      ? { accept: 'application/json', ...extra }
-      : { accept: 'application/json', 'content-type': 'application/json', ...extra },
+      ? { accept: 'application/json', ...languageHeader(), ...extra }
+      : {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          ...languageHeader(),
+          ...extra,
+        },
     body: form ? payload : JSON.stringify(payload),
   }).catch(() => {
     throw new Unheard(unreachable());

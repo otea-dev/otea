@@ -25,10 +25,12 @@ import {
 } from './model.ts';
 
 // Ready-made boards named after a job, as data in both languages. Using one copies it with fresh
-// ids: nothing stays linked to the template. Instructions mention parts and steps as `@{key}`,
-// which a copy turns into `@[id]`.
+// ids and every word it says in each language: the copy reads nothing of the template afterwards,
+// so a later release can change a template without touching a board made from it. Instructions
+// mention parts and steps as `@{key}`, which a copy turns into `@[id]`.
 
-import { EMPTY, type Lang, TITLE_NAME, type Words, w } from './template-words.ts';
+import { snapshotOf } from './localize.ts';
+import { EMPTY, LANGS, type Lang, TITLE_NAME, type Words, w } from './template-words.ts';
 import { CATALOGUE_TEMPLATES } from './templates-catalogue.ts';
 import { COVERAGE_TEMPLATES, TEMPLATE_SETS } from './templates-coverage.ts';
 import { FLOW_TEMPLATES } from './templates-flows.ts';
@@ -38,7 +40,7 @@ export { LANGS, type Lang, TITLE_NAME } from './template-words.ts';
 // `options` may carry their own keys (`optionKeys`, in order), which a copy that keeps keys (a
 // preset's reading) takes as choice ids. `initial` is a level key, yes or no, or an option's key or
 // position (`0`, `1`…). `guard` names step keys and the repository field's key.
-type TemplatePart = {
+export type TemplatePart = {
   key: string;
   kind: PartKind;
   name: Words;
@@ -411,27 +413,77 @@ export function defaultZone(kind: PartKind): Zone {
 // A board name where a command takes it: quoted when it has a space.
 const asArg = (name: string) => (/\s/.test(name) ? `"${name}"` : name);
 
+// Fills the board names a text mentions as #{key} (#{key:arg} where a command takes it): this
+// board's own name, the set's name for that board, or else the template's in the language of the
+// text. A board has the one name it was given, so every language says that name.
+function namer(
+  template: Template,
+  lang: Lang,
+  name: string | undefined,
+  boards?: Readonly<Record<string, string>>,
+) {
+  const boardName = (key: string) => {
+    if (key === template.key) return name?.trim() || template.board[lang];
+    return boards?.[key] ?? requireTemplate(key).board[lang];
+  };
+  return (text: string) =>
+    text.replace(/#\{([a-z_-]+)(:arg)?\}/g, (_, key: string, arg?: string) =>
+      arg ? asArg(boardName(key)) : boardName(key),
+    );
+}
+
+type InstantiateOptions = { keep?: boolean; boards?: Readonly<Record<string, string>> };
+
+// A board made from a template, with the words the template says in every language kept on it
+// (its `snapshot`, localize.ts): the board reads in the language on screen, and never looks at the
+// template again, so editing or removing a template later touches no board made from it.
 // `keep`: the template's keys become the ids (a preset's reading keeps the keys its items' data is
-// stored under); otherwise every id is fresh, so nothing stays linked to the template.
+// stored under); otherwise every id is fresh.
 // `boards`: the names of the boards a set makes with it, by template key. A text names a board as
 // #{key} (#{key:arg} where a command takes it): this board's own name, the set's name for that
-// board, or else the template's.
+// board, or else the template's; every language says the names the boards have.
 export function instantiate(
   template: Template,
   lang: Lang,
   names: { name?: string; item?: string },
   ids: IdSource = newId,
-  options: { keep?: boolean; boards?: Readonly<Record<string, string>> } = {},
+  options: InstantiateOptions = {},
+): BoardDefinition {
+  const given: string[] = [];
+  const recording: IdSource = (kind) => {
+    const id = ids(kind);
+    given.push(id);
+    return id;
+  };
+  const def = build(template, lang, names, recording, options, lang);
+  let next = 0;
+  const made: Partial<Record<Lang, BoardDefinition>> = { [lang]: def };
+  for (const other of LANGS.filter((candidate) => candidate !== lang)) {
+    next = 0;
+    made[other] = build(
+      template,
+      other,
+      { name: def.name, ...(names.item?.trim() ? { item: names.item } : {}) },
+      () => given[next++] ?? '',
+      options,
+      lang,
+    );
+  }
+  const snapshot = snapshotOf(made);
+  if (Object.keys(snapshot).length > 0) def.snapshot = snapshot;
+  return def;
+}
+
+function build(
+  template: Template,
+  lang: Lang,
+  names: { name?: string; item?: string },
+  ids: IdSource,
+  options: InstantiateOptions,
+  madeIn: Lang,
 ): BoardDefinition {
   const keep = options.keep === true;
-  const boardName = (key: string) => {
-    if (key === template.key) return names.name?.trim() || template.board[lang];
-    return options.boards?.[key] ?? requireTemplate(key).board[lang];
-  };
-  const named = (text: string) =>
-    text.replace(/#\{([a-z_-]+)(:arg)?\}/g, (_, key: string, arg?: string) =>
-      arg ? asArg(boardName(key)) : boardName(key),
-    );
+  const named = namer(template, lang, names.name, options.boards);
   const refs = new Map<string, string>();
   const choices = new Map<string, string[]>();
   const parts: BoardDefinition['parts'] = {};
@@ -441,6 +493,7 @@ export function instantiate(
     const show = part.show ?? EVIDENCE_SHOWS[part.kind as keyof typeof EVIDENCE_SHOWS]?.[0];
     const options = (part.options ?? []).map((option, index) => ({
       id: keep ? (part.optionKeys?.[index] ?? `v${index + 1}`) : ids('c'),
+      key: optionKey(part, index),
       name: option[lang],
     }));
     choices.set(
@@ -449,6 +502,7 @@ export function instantiate(
     );
     parts[id] = {
       id,
+      key: part.key,
       name: part.name[lang],
       kind: part.kind,
       hint: named(part.hint[lang]),
@@ -477,10 +531,15 @@ export function instantiate(
         ...(part.guard.base === undefined ? {} : { base: part.guard.base }),
       };
   }
+  // A text with the board names filled and `@{key}` turned into `@[id]`.
   const words = (text: Words | undefined) =>
-    named(text?.[lang] ?? '').replace(/@\{([a-z_]+)\}/g, (_, key: string) => `@[${ref(key)}]`);
+    named(text?.[lang] ?? '').replace(
+      /@\{([a-z_]+)\}/g,
+      (_, key: string) => `@[${refs.get(key) ?? key}]`,
+    );
   const steps: Step[] = template.steps.map((step) => ({
     id: ref(step.key),
+    key: step.key,
     name: step.name[lang],
     doer: step.doer,
     reviewer: step.reviewer,
@@ -534,6 +593,7 @@ export function instantiate(
   const group = template.list?.group;
   const motives = (template.motives ?? []).map(([key, name]) => ({
     id: keep ? key : ids('c'),
+    key,
     name: name[lang],
   }));
   return {
@@ -569,7 +629,13 @@ export function instantiate(
         }
       : {}),
     template: template.key,
+    lang: madeIn,
   };
+}
+
+// The key a template's option goes by: the one it names, else its place.
+export function optionKey(part: TemplatePart, index: number): string {
+  return part.optionKeys?.[index] ?? `o${index}`;
 }
 
 // A template that makes several boards: `boards` are single-board template keys, in order;
@@ -704,19 +770,22 @@ export function blankBoard(
   names: { name: string; item?: string },
   ids: IdSource = newId,
 ): BoardDefinition {
-  return {
+  const step = ids('s');
+  const make = (said: Lang): BoardDefinition => ({
     ...boardDefaults(),
     schema: BOARD_SCHEMA,
     name: names.name.trim(),
-    item: names.item?.trim() || BLANK.item[lang],
+    item: names.item?.trim() || BLANK.item[said],
     icon: 'layers',
-    title: TITLE_NAME[lang],
+    title: TITLE_NAME[said],
     parts: {},
     form: [],
+    lang,
     steps: [
       {
-        id: ids('s'),
-        name: BLANK.step[lang],
+        id: step,
+        key: 'doit',
+        name: BLANK.step[said],
         doer: 'any',
         reviewer: 'you',
         hand: [],
@@ -733,7 +802,11 @@ export function blankBoard(
     idle: '',
     cap: { on: false, n: 3 },
     samples: [],
-  };
+  });
+  const def = make(lang);
+  const snapshot = snapshotOf(Object.fromEntries(LANGS.map((said) => [said, make(said)])));
+  if (Object.keys(snapshot).length > 0) def.snapshot = snapshot;
+  return def;
 }
 
 const REQUESTS: Template = {
@@ -785,9 +858,10 @@ const REQUESTS: Template = {
   },
 };
 
-// The language a board was made in, read from what it calls the title.
+// The language a board was made in, which the words it makes for an agent or a Pedido about it are
+// said in whatever language the desk is in; for a board that says none, the one its title is in.
 export function boardLang(def: BoardDefinition): Lang {
-  return def.title === TITLE_NAME.es ? 'es' : 'en';
+  return def.lang ?? (def.title === TITLE_NAME.es ? 'es' : 'en');
 }
 
 // The project's built-in board for loose requests (Pedidos); an agent's board draft arrives on one.

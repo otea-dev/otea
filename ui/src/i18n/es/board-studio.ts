@@ -27,7 +27,7 @@ export const boardStudio = {
     'Solo tú das algo por hecho: en {step} lo cerraría un agente. Revísalo tú, ahí o en el paso justo anterior (entonces un agente puede integrarlo).',
   'bs.problem.wait_no_split': '{step} espera a sus partes, pero {board} no se divide en nada.',
   'bs.problem.skip_invalid':
-    '«Empieza directamente en…» solo vale en el primer paso, y solo si nadie lo revisa. Quítalo de {step}.',
+    '«Empezar directamente en…» solo vale en el primer paso, y solo si nadie lo revisa. Quítalo de {step}.',
   'bs.problem.step_always_skipped':
     'Todo ítem nuevo se salta {step}: el formulario ya pide todo lo que entrega, así que nunca se hace. Haz opcional uno de esos campos o quita «Empezar directamente en…».',
   'bs.problem.split_cycle':

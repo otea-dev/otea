@@ -117,9 +117,9 @@ describe('the readings of the shipped presets', () => {
     expect(bugs?.drop).toEqual({
       by: 'page',
       motives: [
-        { id: 'rejected', name: 'Rechazado' },
-        { id: 'duplicate', name: 'Duplicado' },
-        { id: 'wont_fix', name: 'No se arreglará' },
+        { id: 'rejected', key: 'rejected', name: 'Rechazado' },
+        { id: 'duplicate', key: 'duplicate', name: 'Duplicado' },
+        { id: 'wont_fix', key: 'wont_fix', name: 'No se arreglará' },
       ],
     });
     expect(bugs?.list).toEqual({ as: 'table', group: 'severity' });

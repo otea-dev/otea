@@ -173,14 +173,22 @@ export function targetName(def: BoardDefinition, target: Target): string {
 }
 
 // The way an agent names (`--way "Animar"`, `--way Done`), as a target of the step; undefined when
-// the step has no such way.
+// the step has no such way. A way is named by the step's name as `next` prints it, its id, or the
+// stable key its template gave it (`land`, `doit`): the key stays the same when the board is read in
+// another language or the step is renamed, so a command written once keeps working; the name an
+// agent should copy is the one `next` prints.
 export function wayByName(def: BoardDefinition, stepId: string, name: string): Target | undefined {
   const wanted = name.trim().toLocaleLowerCase();
   // Forward ways first, then the ways back to earlier steps (`--way "Triar"`).
-  return [...waysOf(def, stepId), ...backWaysOf(def, stepId)].find((target) => {
+  const ways = [...waysOf(def, stepId), ...backWaysOf(def, stepId)];
+  const byName = ways.find((target) => {
     if (target === DONE) return ['done', 'hecho', DONE_NAME.toLowerCase()].includes(wanted);
     return target === name || targetName(def, target).trim().toLocaleLowerCase() === wanted;
   });
+  return (
+    byName ??
+    ways.find((target) => target !== DONE && stepById(def, target)?.key?.toLowerCase() === wanted)
+  );
 }
 
 function choiceNames(part: Part, value: unknown): string {
@@ -1428,9 +1436,14 @@ function fieldValueLines(def: BoardDefinition): string[] {
 // with the Matrix, its fields the form leaves out come after: an agent estimates them as it
 // creates the item (P4-R3-4).
 function createLines(def: BoardDefinition): string[] {
+  // A piece of evidence on the form is attached as a file, not given as a field.
   const fields = def.form.flatMap(({ ref, required }) => {
     const part = def.parts[ref];
-    return part ? [{ name: part.name, required }] : [];
+    return part && !isEvidence(part) ? [{ name: part.name, required }] : [];
+  });
+  const attached = def.form.flatMap(({ ref }) => {
+    const part = def.parts[ref];
+    return part && isEvidence(part) ? [part.name] : [];
   });
   const formed = new Set(def.form.map(({ ref }) => ref));
   const scales = viewsOf(def).includes('matrix')
@@ -1445,7 +1458,10 @@ function createLines(def: BoardDefinition): string[] {
   const later = fields.filter(({ required }) => !required).map(({ name }) => name);
   const wait = later.length > 0 ? ` (${and(later)} may wait)` : '';
   const quoted = /\s/.test(def.name) ? `"${def.name}"` : def.name;
-  return [`  otea create --collection ${quoted} --title "<title>"${given}${wait}`];
+  return [
+    `  otea create --collection ${quoted} --title "<title>"${given}${wait}`,
+    ...attached.map((name) => `  otea attach <id> <file> --module "${name}"`),
+  ];
 }
 
 // The Matrix, on a board that maps two scale roles (core/board/analysis.ts): what the person does

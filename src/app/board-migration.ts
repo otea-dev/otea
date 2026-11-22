@@ -13,7 +13,7 @@ import {
   rereadable,
   routeItem,
 } from '../core/board/readings.ts';
-import { parseDefinition, readDefinition } from '../core/board/schema.ts';
+import { parseDefinition, readDefinition, storedDefinition } from '../core/board/schema.ts';
 import type { Lang } from '../core/board/templates.ts';
 import {
   findBoardOfCollection,
@@ -131,7 +131,7 @@ function publish(
   insertVersion(ctx.db, {
     boardId: board,
     version,
-    definition: JSON.stringify(definition),
+    definition: storedDefinition(definition, definition.lang),
     publishedAt: at,
     publishedBy: 'otea',
   });
