@@ -188,6 +188,8 @@ Las preguntas y los errores van a [GitHub Issues](https://github.com/otea-dev/ot
 
 Otea es software libre bajo la [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). Puedes usarlo, estudiarlo, modificarlo y compartirlo. Si distribuyes una versión modificada, o dejas que otras personas la usen por red, debes publicar su código fuente bajo la misma licencia y conservar los avisos de copyright.
 
+**Uso dentro de una empresa.** Usar Otea, sin cambios o modificado, en los equipos de tu propio equipo de trabajo y para tu propio trabajo no te exige nada, siempre que no lo distribuyas ni lo ofrezcas como servicio de red a personas ajenas a tu organización. Las obligaciones de la AGPL empiezan cuando entregas copias a otros, o dejas que otros usen por red tu versión modificada. Es una lectura sencilla de la licencia, no asesoría legal: [SECURITY.md](SECURITY.md#using-otea-inside-a-company-the-agpl) (en inglés) tiene el detalle, y rige el texto de la [licencia](LICENSE).
+
 **Licencia comercial.** Si la AGPL no te sirve para tu uso (por ejemplo, integrar Otea en un producto cerrado), hay una licencia comercial. Abre un issue o escribe a Federico Daniel Ara ([@Lartweib](https://github.com/Lartweib)).
 
 **Nombre.** «Otea» y su logo identifican este proyecto. Los forks son bienvenidos bajo la AGPL, pero deben usar otro nombre.
@@ -204,3 +206,4 @@ Esta guía no traduce todo el README. Para los comandos de cada día, la referen
 - [Tableros](docs/boards.md): plantillas, tableros que se dividen en otros y los controles de git.
 - [El escritorio](docs/desk.md): `otea serve` y la interfaz web.
 - [Varios proyectos y un teléfono](docs/phone.md): un servidor para todos los proyectos, el teléfono y los avisos.
+- [Seguridad y datos](docs/security.md): dónde guarda Otea sus datos, qué escucha y dónde, qué sale de la máquina, qué escribe en tus repos y cómo quitarlo.
