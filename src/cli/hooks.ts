@@ -198,7 +198,21 @@ export function gitHookOf(project: Project, item: Item): GitHookStatus | undefin
   };
 }
 
-export function removeGitHook(cwd: string): HookChange {
+// A pre-push hook that is no Otea's but runs Otea's check (as the lines hook install prints): Otea
+// leaves it, and the person takes that part out.
+export function foreignGitHookRunsOtea(cwd: string): string | undefined {
+  try {
+    const path = gitHookFile(cwd);
+    if (!existsSync(path)) return undefined;
+    const content = readFileSync(path, 'utf8');
+    return !content.includes(MARK) && content.includes('check --gate push') ? path : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// `dryRun` says what would be removed, and touches nothing.
+export function removeGitHook(cwd: string, dryRun = false): HookChange {
   const path = gitHookFile(cwd);
   if (!existsSync(path)) return { path, action: 'absent' };
   const content = readFileSync(path, 'utf8');
@@ -208,7 +222,7 @@ export function removeGitHook(cwd: string): HookChange {
       `${path} is not Otea's pre-push hook; remove it yourself`,
     );
   }
-  rmSync(path);
+  if (!dryRun) rmSync(path);
   return { path, action: 'removed', content };
 }
 
@@ -296,13 +310,15 @@ function writeSettings(path: string, settings: Settings): void {
   writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
 }
 
-export function removeClaudeHook(cwd: string): HookChange {
+// `dryRun` says what would be removed, and touches nothing.
+export function removeClaudeHook(cwd: string, dryRun = false): HookChange {
   const path = claudeSettingsFile(cwd);
   if (!existsSync(path)) return { path, action: 'absent' };
   const before = readSettings(path);
   const after = withoutOurs(before);
   if (JSON.stringify(after) === JSON.stringify(before)) return { path, action: 'absent' };
   // A file that held only Otea's hooks goes with them.
+  if (dryRun) return { path, action: 'removed' };
   if (Object.keys(after).length === 0) rmSync(path);
   else writeSettings(path, after);
   return { path, action: 'removed' };

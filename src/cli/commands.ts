@@ -263,6 +263,14 @@ import { portFrom, portToOpen, projectPage } from './ports.ts';
 import { probeSignIn } from './probe.ts';
 import { readServeFile, removeServeFile, writeServeFile } from './serve-file.ts';
 import { statsText } from './stats.ts';
+import {
+  dataTargets,
+  purgeData,
+  type RepoReport,
+  type Step,
+  uninstallRepos,
+  uninstallServer,
+} from './uninstall.ts';
 
 // The text names an item's type only when its collection's preset has several.
 function typesShown(project: Project): (item: { collection: string }) => boolean {
@@ -861,6 +869,12 @@ const connect: Command = {
     const old = oldMcpEntry(here);
     const text = [
       `${AGENTS_MD_TEXT[agentsMd.action](agentsMd.path)}: every agent that reads AGENTS.md finds Otea there (if your harness doesn't read AGENTS.md, import it from the file it reads)`,
+      // The one file connect writes in the repo: said each time it changes it, with the way back.
+      ...(agentsMd.action === 'unchanged'
+        ? []
+        : [
+            `${agentsMd.path} is the only file otea connect writes in your repo: the block between <!-- otea:begin --> and <!-- otea:end -->, which only points to otea board. otea uninstall takes it out.`,
+          ]),
       // A harness's permission mode blocked git push and git worktree add mid-flow (p6).
       HARNESS_PERMISSIONS,
       ...(usePath
@@ -3662,6 +3676,94 @@ const hookRemove: Command = {
     ),
 };
 
+const UNINSTALL_LEFT =
+  "Otea wrote no config in your agent's harness: if you added the otea MCP server there, remove it from that config yourself.";
+
+const uninstall: Command = {
+  name: 'uninstall',
+  summary:
+    "Take Otea's footprint off this computer, leave every repo it was set up in as it was before otea init, and tell what it removed. Repos (--only repos): in the repo here and in every repo and folder the registry links to a project (otea projects list), skipping, and saying so, one that is gone: the pre-push hook (only one marked as Otea's), the Claude Code hooks and allow rules an older Otea wrote, and Otea's block in AGENTS.md (the file goes when nothing else is in it). Machine (--only machine): this Otea home's background server (otea serve stop). Without --only, both. Your Otea data (the Otea home, and .otea in the repo) is never deleted unless --purge-data says so, and then it asks first (--yes confirms for a script). --dry-run lists every repo and file it would touch and changes nothing. The otea command itself goes with npm uninstall -g @otea/cli, or the desktop app's uninstaller",
+  args: [],
+  options: {
+    only: { choices: ['repos', 'machine'], placeholder: 'repos|machine' },
+    'dry-run': { flag: true },
+    'purge-data': { flag: true },
+    yes: { flag: true },
+  },
+  execute: async (input) => {
+    const { cwd, flag } = input;
+    const dryRun = flag('dry-run');
+    const purge = flag('purge-data');
+    const only = input.option('only');
+    const repoScope = only !== 'machine';
+    const machineScope = only !== 'repos';
+    const home = input.home ?? oteaHome();
+    // The data is deleted only when asked for, and once the person (or --yes) has confirmed.
+    const targets = purge ? dataTargets(home, cwd, repoScope) : [];
+    if (purge && !dryRun && targets.length > 0 && !flag('yes')) {
+      const answer = await input.ask(
+        `Delete ${targets.join(' and ')}? It holds your boards, items and history and cannot be undone. Type "yes" to delete it: `,
+      );
+      if (answer?.trim().toLowerCase() !== 'yes') {
+        throw new CommandFailure(
+          'forbidden',
+          'Nothing was deleted: --purge-data needs a "yes" at the prompt, or --yes',
+        );
+      }
+    }
+    const steps: Step[] = [];
+    const lines: string[] = [];
+    let repos: RepoReport[] = [];
+    let missing: string[] = [];
+    if (repoScope) {
+      ({ reports: repos, missing } = uninstallRepos(cwd, dryRun));
+      // Each repo says what changed, or what Otea left; one that had nothing of Otea's, one line.
+      for (const { path, steps: done } of repos) {
+        steps.push(...done);
+        const told = done.filter((step) => step.changed || step.kept);
+        if (told.length === 0) lines.push(`Nothing of Otea's in ${path}`);
+        else lines.push(...told.map(({ text }) => text));
+      }
+      lines.push(...missing.map((path) => `Skipped ${path}: it no longer exists`));
+    }
+    let failed = false;
+    if (machineScope) {
+      const server = await uninstallServer(home, OTEA.args.at(-1) ?? '', dryRun);
+      failed = server.failed === true;
+      steps.push(server);
+      lines.push(server.text);
+    }
+    // A server that would not stop holds the data open: it stays.
+    if (purge) {
+      const data: Step[] = failed
+        ? [
+            {
+              what: 'data',
+              changed: false,
+              kept: true,
+              text: 'Left the Otea data: the server still holds it',
+            },
+          ]
+        : purgeData(targets, dryRun);
+      steps.push(...data);
+      lines.push(...data.map(({ text }) => text));
+    }
+    const left = [
+      ...(purge
+        ? []
+        : [`Your Otea data stays in ${home} (otea uninstall --purge-data deletes it).`]),
+      ...(repoScope ? ['If you set a GitHub ruleset, otea hook remove --forge takes it off.'] : []),
+      UNINSTALL_LEFT,
+    ];
+    const head = dryRun ? ['Dry run: nothing was changed.'] : [];
+    return {
+      data: { dryRun, repos: repos.map(({ path }) => path), missing, steps, left },
+      text: [...head, ...lines, ...left].join('\n'),
+      ...(failed ? { failure: 'unexpected' as const } : {}),
+    };
+  },
+};
+
 // Side topics (app/topics.ts): what the person asked an agent off the work, kept as a short
 // conversation so none is left hanging. The agent records the question and answers it; the person
 // keeps it going, closes it or turns it into a task. They are not work: no lease, never in next.
@@ -3927,6 +4029,7 @@ export const COMMANDS: readonly Command[] = [
   check,
   hookInstall,
   hookRemove,
+  uninstall,
   // The longer names first: a command is the first whose words all match.
   serveStart,
   serveStop,
