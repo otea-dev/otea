@@ -562,6 +562,7 @@
 
 .ev-tools {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -893,6 +894,25 @@
   min-height: 30px;
   padding: 0 12px;
   font-size: 13px;
+}
+
+/* On a phone the search takes its own full line, at a thumb's height and 16 px (iOS zooms a smaller
+   field); a 13 rem box pushed to the right edge looked cut off beside the buttons. */
+@media (max-width: 720px) {
+  .ev-tools .ev-tool-set {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+  .ev-find {
+    flex: 1 1 100%;
+  }
+  .ev-find-input.input {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+    min-height: 44px;
+    font-size: 16px;
+  }
 }
 
 .ev-find-count {

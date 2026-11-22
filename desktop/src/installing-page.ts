@@ -28,7 +28,17 @@ export const INSTALLING_GROUND = { light: '#f7f8fc', dark: '#13161c' } as const;
 const escapeHtml = (text: string) =>
   text.replace(/[&<>"]/g, (c) => `&${{ '&': 'amp', '<': 'lt', '>': 'gt', '"': 'quot' }[c]};`);
 
-export function installingPage({ lang, font }: { lang: Lang; font: string }): string {
+// `lines`: what the window says, a paragraph each; with several, the first leads. The installer's
+// wait says its one line by default; the update's restart gives its own (update-restart.ts).
+export function installingPage({
+  lang,
+  font,
+  lines = [COPY[lang].installing],
+}: {
+  lang: Lang;
+  font: string;
+  lines?: readonly string[];
+}): string {
   const face = font
     ? `@font-face { font-family: 'Schibsted Grotesk Variable'; font-weight: 400 900; src: url('${font}') format('woff2-variations'); }`
     : '';
@@ -45,6 +55,8 @@ body {
   display: grid; place-content: center; gap: 14px; padding: 0 32px;
 }
 p { margin: 0; color: var(--ink-2); max-width: 36ch; }
+p:not(:only-of-type):first-of-type { color: var(--ink); font-weight: 560; font-size: 16px; }
 ${BRAND_CSS}`;
-  return `<!doctype html><html lang="${lang}"><meta charset="utf-8"><title>Otea</title><style>${style}</style><body>${wordmark(true)}<p>${escapeHtml(COPY[lang].installing)}</p></body></html>`;
+  const words = lines.map((line) => `<p>${escapeHtml(line)}</p>`).join('');
+  return `<!doctype html><html lang="${lang}"><meta charset="utf-8"><title>Otea</title><style>${style}</style><body>${wordmark(true)}${words}</body></html>`;
 }

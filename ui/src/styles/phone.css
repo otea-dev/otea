@@ -1312,25 +1312,28 @@
   padding: 0;
   border: 0;
   cursor: pointer;
-  height: 104px;
+  height: 124px;
   border-radius: 10px;
   overflow: hidden;
   background: var(--fig);
   box-shadow: inset 0 0 0 1px var(--fig-line);
 }
+/* The whole picture, never a crop of it (a tall phone capture lost its top and foot): it sits in the
+   well above the caption's strip, which no longer lies over it. */
 .p-shot img {
   display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: calc(100% - 22px);
+  object-fit: contain;
 }
 .p-shot .cap {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
+  height: 22px;
   padding: 3px 10px 4px;
-  background: color-mix(in oklch, var(--sheet) 88%, transparent);
+  background: var(--sheet);
   font: 400 11px var(--mono);
   color: var(--ink-2);
   white-space: nowrap;
@@ -1664,10 +1667,21 @@
   min-height: 44px;
 }
 .p-dock .hint {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   text-align: center;
   font: 400 12px / 1.4 var(--mono);
   color: var(--ink-3);
+}
+/* What the primary move does: in the page's flow, just above the dock, not in the sticky bar. */
+.p-says {
+  margin: 12px 0 10px;
+  text-align: center;
+  font: 400 12px / 1.4 var(--mono);
+  color: var(--ink-3);
+}
+.p-says b {
+  font-weight: 500;
+  color: var(--ink-2);
 }
 .p-dock .hint b {
   font-weight: 500;
@@ -1814,14 +1828,21 @@
 }
 
 /* ───────── install Otea on the home screen: the first open in a phone's browser ───────── */
-/* Under the top bar, clear of the tab bar and of the language note at the screen's foot. */
+/* Above the tab bar, in reach of the thumb: at the top it lay over the page's own header (its title
+   and first line). The first-run language note takes that place until it is answered, so the banner
+   waits for it. */
 .install-banner {
   display: none;
 }
 @media (max-width: 720px) {
+  /* ...and on a page with its moves docked it would lie over Aprobar and Devolver. */
+  body:has(.language-note-host) .install-banner,
+  body:has(.p-dock) .install-banner {
+    display: none;
+  }
   .install-banner {
     position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 64px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
     left: max(12px, env(safe-area-inset-left, 0px));
     right: max(12px, env(safe-area-inset-right, 0px));
     z-index: 34;

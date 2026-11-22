@@ -40,8 +40,24 @@
   font-style: normal;
   color: var(--ink);
 }
-.intake {
+/* The form fills the column the bar and the title stand in: detail.css gives every .intake a 34rem
+   cap (the item's own fields), which left this form at 544 px inside its 800 px column. */
+.intake,
+.nform .intake {
   display: block;
+  max-width: none;
+}
+/* A sheet too narrow for a label column beside the field (the sheet beside a list is about 500 px
+   on a laptop) stacks the label over it, as on a phone: the field gets the whole width. */
+@container detail (max-width: 38rem) {
+  .nform .ffield {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+  }
+  .nform .ffield > label,
+  .nform .ffield > .flab {
+    padding-top: 0;
+  }
 }
 .ffield {
   display: grid;
