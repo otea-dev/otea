@@ -60,7 +60,7 @@
    on the left of the detail again, carried there by the list's relayout (relayoutList). Every
    column stands 40px in from the pane and puts its reading text 72px further in, past the lanes'
    gutter: one page axis for every view. */
-.view:not(.narrow) :is(.panel, .board, .sh, .se, .tri) {
+.view:not(.narrow) :is(.panel, .board, .sh, .se, .tri, .tp-page) {
   margin-inline: auto;
 }
 .view.leaving {
