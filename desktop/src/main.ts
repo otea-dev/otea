@@ -23,6 +23,7 @@ import {
   app,
   BrowserWindow,
   dialog,
+  type IpcMainInvokeEvent,
   ipcMain,
   Menu,
   type MenuItemConstructorOptions,
@@ -42,6 +43,7 @@ import {
   type LinkState,
 } from './command-link.ts';
 import { COPY, type Copy, type Lang, langOf } from './copy.ts';
+import { showNotice, whenAsked } from './front.ts';
 import { type Icons, loadIcons, type Theme } from './icons.ts';
 import { installing, untilInstalled } from './install-wait.ts';
 import { INSTALLING_GROUND, installingPage } from './installing-page.ts';
@@ -62,6 +64,7 @@ import {
   probeProject,
   sourceCli,
 } from './server.ts';
+import { booleanArg, fromServer, parseSettings, type Settings } from './settings.ts';
 import {
   badgeText,
   collectionLabel,
@@ -110,15 +113,25 @@ const IS_WIN = process.platform === 'win32';
 const IS_MAC = process.platform === 'darwin';
 const IS_LINUX = !IS_WIN && !IS_MAC;
 
-type Settings = { askForAttention: boolean; animateTray: boolean };
+const SETTINGS_FILE = () => join(app.getPath('userData'), 'settings.json');
 
 function readSettings(): Settings {
-  const defaults: Settings = { askForAttention: true, animateTray: true };
   try {
-    const path = join(app.getPath('userData'), 'settings.json');
-    return { ...defaults, ...JSON.parse(readFileSync(path, 'utf8')) };
+    return parseSettings(JSON.parse(readFileSync(SETTINGS_FILE(), 'utf8')));
   } catch {
-    return defaults;
+    return parseSettings(undefined);
+  }
+}
+
+function writeSettings(settings: Settings): void {
+  try {
+    writeFileSync(
+      SETTINGS_FILE(),
+      `${JSON.stringify(settings, null, 2)}
+`,
+    );
+  } catch {
+    // only a preference: the app works without keeping it
   }
 }
 
@@ -281,7 +294,7 @@ class Shell {
   private menu: Menu | undefined;
   private leaseTimer: NodeJS.Timeout | undefined;
   private bounceId: number | undefined;
-  private readonly settings = readSettings();
+  private settings = readSettings();
   private readonly mayInterrupt = cooldown(ATTENTION_MS);
   private readonly apply = throttle(() => this.applyNow(), APPLY_MS);
   private readonly tray: Tray;
@@ -448,20 +461,17 @@ class Shell {
   // Preferencias › Avisos in the desktop app: the server's notices as the system's notifications;
   // a click opens the window on the item (or Te toca, for a burst).
   private notify(notice: DeskNotice): void {
-    if (SMOKE || !Notification.isSupported()) return;
-    const key = notice.tag || notice.url;
-    this.shown.get(key)?.close();
-    const shown = new Notification({
-      title: notice.title,
-      body: notice.body,
-      icon: this.icons.app,
-    });
-    shown.on('click', () => this.showPlace(notice.url));
-    shown.on('close', () => {
-      if (this.shown.get(key) === shown) this.shown.delete(key);
-    });
-    this.shown.set(key, shown);
-    shown.show();
+    if (SMOKE) return;
+    showNotice(
+      {
+        supported: Notification.isSupported(),
+        create: ({ title, body }) => new Notification({ title, body, icon: this.icons.app }),
+        // A click is the person asking: it opens the window whatever bringToFront says.
+        open: (url) => this.showPlace(url),
+        shown: this.shown,
+      },
+      notice,
+    );
   }
 
   async showPicker(): Promise<void> {
@@ -615,6 +625,22 @@ class Shell {
     return !isInstalled(macLinkPort(this.copy).state(COMMAND_LINK), this.macCommand);
   }
 
+  // Preferencias › Avisos: bring the window to the front when an agent asks. Asked by the page of
+  // the project's own server only (wirePrefs).
+  fromServerPage(url: string | undefined): boolean {
+    return fromServer(url, this.connection?.url);
+  }
+
+  bringToFront(): boolean {
+    return this.settings.bringToFront;
+  }
+
+  setBringToFront(on: boolean): boolean {
+    this.settings = { ...this.settings, bringToFront: on };
+    writeSettings(this.settings);
+    return on;
+  }
+
   // A place in the app (`/p/<id>/#/i/T-1`): its hash on the page shown, or that project's page.
   private showPlace(url: string): void {
     this.show();
@@ -666,7 +692,11 @@ class Shell {
       this.buildMenu();
       this.drawTray();
     }
-    if (grew(this.applied, next)) this.askForAttention();
+    if (grew(this.applied, next)) {
+      this.askForAttention();
+      // Only when the person chose it (Preferencias › Avisos): otherwise the app only signals.
+      if (!SMOKE) whenAsked(this.settings, () => this.show());
+    }
     this.applied = next;
   }
 
@@ -819,6 +849,24 @@ function wirePicker(shellInstance: Shell): void {
   ipcMain.on('desktop:notice-dismiss', () => shellInstance.dismissNotice());
 }
 
+// Preferencias › Avisos asks for the one desktop preference the page shows, and changes it. The
+// page of the project's own server only; the argument must be a boolean.
+function wirePrefs(shellInstance: Shell): void {
+  const guard = (event: IpcMainInvokeEvent) => {
+    if (!shellInstance.fromServerPage(event.senderFrame?.url)) throw new Error('not the desk');
+  };
+  ipcMain.handle('prefs:get-front', (event) => {
+    guard(event);
+    return shellInstance.bringToFront();
+  });
+  ipcMain.handle('prefs:set-front', (event, arg: unknown) => {
+    guard(event);
+    const on = booleanArg(arg);
+    if (on === undefined) throw new Error('a boolean is expected');
+    return shellInstance.setBringToFront(on);
+  });
+}
+
 // A second launch hands the running app the folder it was asked for, resolved where it ran.
 const launchData: LaunchData =
   typeof options.project === 'string' ? { project: resolve(options.project) } : {};
@@ -846,6 +894,7 @@ else {
       shellInstance = new Shell(icons, langOf(app.getLocale()));
       shellInstance.start();
       wirePicker(shellInstance);
+      wirePrefs(shellInstance);
       wireUpdates(shellInstance);
       const first = firstProject({ asked: ASKED_DIR, recents: readRecents(), exists: existsSync });
       // The folder --project names may be no project yet; a recent one is.

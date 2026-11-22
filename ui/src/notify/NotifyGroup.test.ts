@@ -117,6 +117,37 @@ describe('Preferencias › Avisos', () => {
     expect(html).not.toContain('Turn off on this phone');
   });
 
+  describe('bring Otea to the front when an agent asks', () => {
+    const desktop = {
+      offer: 'desktop',
+      view: { ...view, target: 'desktop', subscribed: true },
+    } as const;
+
+    it('is a switch of the desktop app, off as the app starts, with what it does either way', () => {
+      const html = render({ ...desktop, front: false, onFront: () => {} });
+      expect(html).toContain('Bring Otea to the front when an agent asks');
+      expect(html).toContain('a notification and the count on the taskbar or Dock');
+      expect(html).toMatch(/aria-checked="false"[^>]*>(?:(?!<button).)*Bring Otea to the front/s);
+    });
+
+    it('shows it on when chosen, and in Spanish', () => {
+      setLanguage('es');
+      const html = render({ ...desktop, front: true, onFront: () => {} });
+      expect(html).toMatch(
+        /aria-checked="true"[^>]*>(?:(?!<button).)*Traer Otea al frente cuando un agente pregunta/s,
+      );
+      expect(html).toContain('el número en la barra de tareas o el Dock');
+    });
+
+    it('waits for the app to answer, and is not in a browser or on a phone', () => {
+      expect(render({ ...desktop, front: null, onFront: () => {} })).not.toContain('to the front');
+      expect(render({ ...desktop })).not.toContain('to the front');
+      expect(
+        render({ view: { ...view, subscribed: true }, front: false, onFront: () => {} }),
+      ).not.toContain('to the front');
+    });
+  });
+
   it('says when turning them on failed', () => {
     expect(render({ problem: 'notify.failed' })).toContain('could not be turned on');
   });
