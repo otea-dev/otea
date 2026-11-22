@@ -143,7 +143,7 @@ npm i -g @otea/cli
 otea --version
 ```
 
-To update, run `npm i -g @otea/cli` again. To remove it, `npm uninstall -g @otea/cli`. You open the desk with `otea serve` (see [Quickstart](#quickstart)).
+To update, run `npm i -g @otea/cli` again. To remove it, `npm uninstall -g @otea/cli`. You open the desk with `otea serve` (see [Get started](#from-the-terminal-npm-or-source)).
 
 ### From source
 
@@ -165,7 +165,27 @@ otea --version
 Git Bash turns an argument that starts with `/` into a path (`/deploy` reaches Otea as `C:/Program Files/Git/deploy`). Otea undoes it for the text it is given (a title, a field, a note), so `otea create --title "/deploy fails"` keeps its slash. Anywhere else, set `MSYS_NO_PATHCONV=1` for that command, or start the value with `//`.
 
 
-## Quickstart
+## Get started
+
+Which steps you follow depends on how you installed Otea. Both paths end at the same place: the desk, with the text to give your agent.
+
+### With the desktop app
+
+You do not run `otea init` or `otea serve`: the app does both for you.
+
+1. **Open Otea and pick the project folder.** The first time, the app asks you to open a project:
+   - **Open folder** picks a folder that is already an Otea project. If it is not one yet, the app asks "Create one there?" and makes it when you say yes.
+   - **Create project** picks the folder for a new project.
+
+   Choose the folder you want to track, usually a repository. If it is inside a git repository, the app offers to create the project for the whole repository. Nothing is written into the repo, and the project starts with no boards. The next times, Otea reopens your last project; **Switch project…** in the tray or menu bar icon brings the picker back.
+
+2. **The desk opens in the app's window.** A project with no boards starts on **Your turn**, with a text for your agent and a **Copy the instruction** button. The **Connect an agent** button shows the same text later.
+
+3. **Check that your agent can run `otea`.** The text has your agent run `otea` commands, so `otea` has to be in its terminal. Windows and the Linux `.deb` set that up when they install (open a new terminal, or restart your agent, after installing). On macOS, click the Otea icon in the menu bar and choose **Install the otea command**. The AppImage does not set it up: use the `.deb` or npm.
+
+Then [give your agent the text](#give-your-agent-the-text).
+
+### From the terminal (npm or source)
 
 1. **Make the project.** In the folder you want to track, usually a repository:
 
@@ -190,7 +210,9 @@ Git Bash turns an argument that starts with `/` into a path (`/deploy` reaches O
 
    It prints `Otea running at http://127.0.0.1:4400/p/tienda-web-yafrhx/` and opens the desk in your browser, signed in. A project with no boards opens on **Your turn** with a text for your agent and a **Copy the instruction** button.
 
-3. **Hand it to your agent.** Paste that text into your agent's chat (Claude Code, OpenCode, Codex or any other with a shell or MCP); `otea prompt` prints the same text. The agent connects itself, reads the project, asks you one question at a time how you work and drafts its boards. You try them and publish them in Studio. From then on each request goes through a board, and what waits for you shows in **Your turn**.
+### Give your agent the text
+
+Both paths meet here. Paste the text into your agent's chat (Claude Code, OpenCode, Codex or any other with a shell or MCP); `otea prompt` prints the same text in a terminal. The agent connects itself, reads the project, asks you one question at a time how you work and drafts its boards. You try them and publish them in Studio. From then on each request goes through a board, and what waits for you shows in **Your turn**.
 
 ## Everyday commands
 
