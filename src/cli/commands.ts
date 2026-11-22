@@ -148,6 +148,7 @@ import {
   repoNameAt,
   UnknownRepo,
 } from '../app/repos.ts';
+import { startProject } from '../app/start.ts';
 import type { TailscaleCli } from '../app/tailscale.ts';
 import { approvedTipOf } from '../app/tips.ts';
 import {
@@ -757,6 +758,18 @@ function mcpInstructionText(entry: McpEntry): string[] {
   ];
 }
 
+// The MCP server entry for a project, as connect and start print it. The otea on PATH only when
+// it is this same install: another one would run other code.
+function mcpEntryFor(input: Pick<Input, 'oteaOnPath' | 'home'>, id: string) {
+  const onPath = input.oteaOnPath?.();
+  const running = runningRoot(OTEA_MAIN);
+  const same = (a: string, b: string) =>
+    process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+  const usePath = onPath?.root !== undefined && running !== undefined && same(onPath.root, running);
+  const entry = mcpEntry(withHome(usePath && onPath ? onPath.launcher : OTEA, input.home), id);
+  return { entry, usePath, onPath };
+}
+
 // What an agent's harness must let it run for Otea's flow, said the same for every harness: Otea
 // writes no harness config, and the docs give an example per harness.
 const HARNESS_PERMISSIONS =
@@ -858,14 +871,7 @@ const connect: Command = {
     // read it there.
     const here = checkoutRoot(cwd) ?? root;
     const agentsMd = writeAgentsMd(here);
-    // The otea on PATH only when it is this same install: another one would run other code.
-    const onPath = input.oteaOnPath?.();
-    const running = runningRoot(OTEA_MAIN);
-    const same = (a: string, b: string) =>
-      process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
-    const usePath =
-      onPath?.root !== undefined && running !== undefined && same(onPath.root, running);
-    const entry = mcpEntry(withHome(usePath && onPath ? onPath.launcher : OTEA, input.home), id);
+    const { entry, usePath, onPath } = mcpEntryFor(input, id);
     const mcp = { name: MCP_SERVER, ...entry };
     const old = oldMcpEntry(here);
     const text = [
@@ -3135,6 +3141,89 @@ const serveStatus: Command = {
   },
 };
 
+// otea start: the person's first minutes in one command (README, Getting started).
+const start: Command = {
+  name: 'start',
+  summary: `For you, not for an agent, in the project's folder: set everything up for a first session in one command, and say what is ready. It creates the project when there is none (otea init), starts this computer's background server and opens the desk signed in (otea serve start; --no-open prints the sign-in link instead, --port picks the port for a first start), offers a first board from a template when the project has none of its own (--template <key> names one, none skips it; asked at a terminal when not given; otherwise your agent designs the boards with you) and prints the text to paste into your agent's chat (otea prompt) with the MCP server it adds to its own config. It looks before it acts: run again, it changes nothing that exists and says what was already there. An agent never runs it: it connects with otea connect and never starts the desk`,
+  details: TEMPLATE_LIST,
+  args: [],
+  options: { template: { placeholder: 'key' }, port: {}, 'no-open': { flag: true } },
+  execute: async (input) => {
+    const { cwd, option, agent, warn } = input;
+    if (agent !== undefined) {
+      throw new OteaError(
+        'forbidden',
+        `otea start is for the person: it starts the desk, which closes with an agent's session. An agent connects with otea connect --as ${agent} --model <model> --effort <effort>`,
+      );
+    }
+    const template = option('template');
+    const report = await startProject(cwd, {
+      template,
+      lang: defaultLang(),
+      choose: async () =>
+        (
+          await input.ask(
+            `${TEMPLATE_LIST}\nA first board? Its key, or Enter to let your agent design the boards with you: `,
+          )
+        )
+          ?.trim()
+          .toLowerCase(),
+    });
+    // The background server serves this project: a local one is remembered for it first.
+    const here = projectHere(cwd);
+    const home = oteaHome();
+    const { state, started } = await ensureServer(home, {
+      port: portFrom(option('port')),
+      launch: daemonLaunch(),
+      warn,
+    });
+    const { url, signInUrl } = pages(state.url, state.token, here);
+    const signIn = await signInLines(input, signInUrl);
+    const { entry } = mcpEntryFor(input, report.project.id);
+    const mcp = { name: MCP_SERVER, ...entry };
+    const { project, created, boards, prompt } = report;
+    const { pid, port } = state;
+    const kept =
+      template !== undefined &&
+      template !== NO_BOARDS &&
+      boards.made.length === 0 &&
+      boards.all.length > 0;
+    const projectLine = created
+      ? `Project: set up "${project.name}" (data in ${project.dataDir})`
+      : `Project: "${project.name}" is already set up (data in ${project.dataDir})`;
+    const boardsLine =
+      boards.made.length > 0
+        ? `Boards: made ${boards.made.map(({ name }) => `"${name}"`).join(', ')}`
+        : boards.all.length > 0
+          ? `Boards: already has ${boards.all.map((name) => `"${name}"`).join(', ')}${kept ? `; --template ${template} was not added to them (otea board add <name> --template ${template} adds it)` : ''}`
+          : 'Boards: none yet; your agent designs them with you (otea start --template <key> starts from a template instead)';
+    const deskLine = started
+      ? `Desk: running in the background at ${url} (pid ${pid}; stop it with otea serve stop)`
+      : `Desk: already running at ${url} (pid ${pid})`;
+    const text = [
+      projectLine,
+      boardsLine,
+      deskLine,
+      ...signIn,
+      '',
+      "Next: paste this into your agent's chat (otea prompt prints it again):",
+      ...prompt.split('\n').map((line) => `  ${line}`),
+      '',
+      `Your agent adds Otea's MCP server to its own config when it connects (the text above tells it; otea connect prints the details): ${JSON.stringify({ [MCP_SERVER]: entry })}`,
+    ];
+    return {
+      data: {
+        project: { ...project, created },
+        boards,
+        desk: { url, pid, port, started },
+        prompt,
+        mcp,
+      },
+      text: text.join('\n'),
+    };
+  },
+};
+
 const serve: Command = {
   name: 'serve',
   summary: `Serve the live UI of every project on this computer on 127.0.0.1 (default port ${DEFAULT_PORT}) until Ctrl+C, and open this project's page signed in; when this computer's otea serve runs already, it opens this project there instead. It also opens to phones on the same network when that was left open (Settings > Phone, otea phone lan --open), and --lan opens it for this run only; a phone on Tailscale (otea phone tailscale) pairs without it. It stops once the process that started it ends (a terminal closed, an agent's session over), saying so on stderr; otea serve start keeps it running on its own instead (--no-owner is what it runs with), and otea serve stop and otea serve status manage it`,
@@ -4062,6 +4151,7 @@ export const COMMANDS: readonly Command[] = [
   hookInstall,
   hookRemove,
   uninstall,
+  start,
   // The longer names first: a command is the first whose words all match.
   serveStart,
   serveStop,

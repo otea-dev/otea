@@ -43,6 +43,8 @@ export const AGENT_COMMANDS = [
 
 export const CLI_ONLY_COMMANDS = [
   'init',
+  // The person's first minutes in one command: it starts the desk, which an agent never does.
+  'start',
   'brief',
   // How each model performs is the person's reading, not an agent's.
   'stats',

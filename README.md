@@ -187,28 +187,33 @@ Then [give your agent the text](#give-your-agent-the-text).
 
 ### From the terminal (npm or source)
 
-1. **Make the project.** In the folder you want to track, usually a repository:
+1. **Start.** In the folder you want to track, usually a repository, run one command:
 
    ```sh
-   otea init
+   otea start
    ```
 
-   It says where the project's data lives and what to do next:
+   It does the first minutes for you, and says what it did:
+
+   - makes the project when there is none (what `otea init` does);
+   - starts the desk in the background (`otea serve start`) and opens it in your browser, signed in; `--no-open` prints the sign-in link instead;
+   - offers a first board from a template (`--template <key>` names one, `none` skips it), or leaves the boards for your agent to design with you;
+   - prints the text to paste into your agent's chat, and the MCP server it adds to its own config.
 
    ```text
-   Project data in ~/.otea/data/tienda-web-yafrhx
-   Next: run otea serve in a terminal of your own, or open the Otea desktop app: the desk gives you the text to paste into your agent's chat (otea prompt prints it here).
+   Project: set up "tienda-web" (data in ~/.otea/data/tienda-web-yafrhx)
+   Boards: none yet; your agent designs them with you (otea start --template <key> starts from a template instead)
+   Desk: running in the background at http://127.0.0.1:4400/p/tienda-web-yafrhx/ (pid 4120; stop it with otea serve stop)
+
+   Next: paste this into your agent's chat (otea prompt prints it again):
+     Set up Otea in this project and design with me how we will work. ...
    ```
 
-   `otea init` writes nothing into the repo, and the project starts with no boards (`otea init --agents-md` and your agent's `otea connect` add one block to `AGENTS.md`: see [What Otea writes in your repo](#what-otea-writes-in-your-repo)).
+   Run it again any time: it looks before it acts, changes nothing that exists and says what was already there. It is for you: an agent never runs it (it connects with `otea connect` and never starts the desk). It writes nothing into the repo, and the project starts with no boards unless you pick one (your agent's `otea connect` adds one block to `AGENTS.md`: see [What Otea writes in your repo](#what-otea-writes-in-your-repo)).
 
-2. **Open the desk.** In a terminal of your own, and leave it running:
+   A project with no boards opens on **Your turn** with a **Copy the instruction** button; **Technical details** under it holds the full text, for whoever wants to read it.
 
-   ```sh
-   otea serve
-   ```
-
-   It prints `Otea running at http://127.0.0.1:4400/p/tienda-web-yafrhx/` and opens the desk in your browser, signed in. A project with no boards opens on **Your turn** with a text for your agent and a **Copy the instruction** button.
+   Prefer the steps one at a time? `otea init` makes the project, and `otea serve` (in a terminal of your own, left running) opens the desk until you press Ctrl+C.
 
 ### Give your agent the text
 
@@ -267,6 +272,7 @@ On Windows write the paths with `/` or doubled `\\` inside JSON. Then reload the
 
 | You run | What it does |
 | --- | --- |
+| `otea start` | the first minutes in one command: the project, a first board, the desk in the background and the text for your agent; run again, it reports what exists |
 | `otea init` | makes the project for this folder |
 | `otea serve` | opens the desk in your browser |
 | `otea prompt` | prints the text to paste into an agent's chat |
