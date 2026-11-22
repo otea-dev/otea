@@ -13,6 +13,9 @@ export async function restartWithNotice(o: {
   sleep: (ms: number) => Promise<void>;
   // Quits and installs.
   install: () => void;
+  // The installer could not be handed over: take the notice down and give the app back, so the
+  // person is not left with a notice that never ends and a window that never returns.
+  recover: () => void;
 }): Promise<void> {
   try {
     o.show();
@@ -20,5 +23,9 @@ export async function restartWithNotice(o: {
   } catch {
     // A window that could not be drawn is no reason to leave the update undone.
   }
-  o.install();
+  try {
+    o.install();
+  } catch {
+    o.recover();
+  }
 }
