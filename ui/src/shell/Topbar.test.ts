@@ -116,7 +116,7 @@ describe('the topbar', () => {
       }),
     );
     expect(menu).toContain('data-agent="Mender"');
-    expect(menu).toContain('sin señal · tiene un ítem');
+    expect(menu).toContain('<span class="verb">sin señal en</span><span class="id">ERR-231</span>');
     expect(menu).toContain('1 sin señal');
     expect(menu).not.toContain('Todavía no hay agentes conectados');
   });
