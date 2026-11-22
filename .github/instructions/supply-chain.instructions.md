@@ -16,7 +16,7 @@ The published package `@otea/cli` has six runtime dependencies on purpose (`@hon
 
 ## Workflows (`.github/workflows/`)
 
-- **`pull_request_target`** (`cla.yml` and `copilot-review.yml` use it): it runs with write access on the base repo, so it must never check out, build or run the pull request's code, or expand `${{ github.event.* }}` text (titles, branch names, comments) into a `run:` script. Pass such values through `env:`.
+- **`pull_request_target`** (`cla.yml` uses it): it runs with write access on the base repo, so it must never check out, build or run the pull request's code, or expand `${{ github.event.* }}` text (titles, branch names, comments) into a `run:` script. Pass such values through `env:`.
 - **Permissions:** the default is `contents: read`. Flag a widened `permissions`, a job-level grant that is broader than the job needs, `id-token: write` or `secrets: inherit` outside the release workflows, and new use of secrets in jobs that run on pull requests.
 - **Pinning:** third-party actions are pinned to a full commit SHA with a version comment, as they are now. Flag a tag or branch ref (`@v4`, `@main`).
 - **Release path** (`release-please.yml`, `npm-publish.yml`, `desktop.yml`): npm publishing is trusted publishing that only stages; the workflow file name is what npm matches. Flag a token, a plain `npm publish`, a renamed workflow, or a change to what runs on tags.
