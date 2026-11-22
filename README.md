@@ -177,7 +177,7 @@ You do not run `otea init` or `otea serve`: the app does both for you.
    - **Open folder** picks a folder that is already an Otea project. If it is not one yet, the app asks "Create one there?" and makes it when you say yes.
    - **Create project** picks the folder for a new project.
 
-   Choose the folder you want to track, usually a repository. If it is inside a git repository, the app offers to create the project for the whole repository. Nothing is written into the repo, and the project starts with no boards. The next times, Otea reopens your last project; **Switch project…** in the tray or menu bar icon brings the picker back.
+   Choose the folder you want to track, usually a repository. If it is inside a git repository, the app offers to create the project for the whole repository. Creating the project writes nothing into the repo, and it starts with no boards (what your agent's `otea connect` adds later is in [What Otea writes in your repo](#what-otea-writes-in-your-repo)). The next times, Otea reopens your last project; **Switch project…** in the tray or menu bar icon brings the picker back.
 
 2. **The desk opens in the app's window.** A project with no boards starts on **Your turn**, with a text for your agent and a **Copy the instruction** button. The **Connect an agent** button shows the same text later.
 
@@ -200,7 +200,7 @@ Then [give your agent the text](#give-your-agent-the-text).
    Next: run otea serve in a terminal of your own, or open the Otea desktop app: the desk gives you the text to paste into your agent's chat (otea prompt prints it here).
    ```
 
-   Nothing is written into the repo, and the project starts with no boards.
+   `otea init` writes nothing into the repo, and the project starts with no boards (`otea init --agents-md` and your agent's `otea connect` add one block to `AGENTS.md`: see [What Otea writes in your repo](#what-otea-writes-in-your-repo)).
 
 2. **Open the desk.** In a terminal of your own, and leave it running:
 
@@ -274,6 +274,7 @@ On Windows write the paths with `/` or doubled `\\` inside JSON. Then reload the
 | `otea topic on` | has agents keep the side questions you ask them, with their answers |
 | `otea devices list` | lists the paired phones; `otea devices revoke <id>` unpairs one |
 | `otea hook install --git` | in a repo: a pre-push hook that checks each push against the boards |
+| `otea uninstall --dry-run` | lists what removing Otea from your repos and this computer would touch; `otea uninstall` does it |
 
 | Agents run | What it does |
 | --- | --- |
@@ -283,6 +284,46 @@ On Windows write the paths with `/` or doubled `\\` inside JSON. Then reload the
 | `otea wait --turn agent --unclaimed` | blocks until there is work, then `otea next` again |
 
 `otea help` lists every command, and `otea <command> --help` its options; the [docs](#docs) go into each part.
+
+## Upgrade and remove
+
+### Upgrade
+
+```sh
+otea --version          # the version you run now
+npm i -g @otea/cli      # npm: installs the latest
+```
+
+- **npm:** run `npm i -g @otea/cli` again. Once a day, when you run `otea` in a terminal, it asks the npm registry whether there is a newer version and prints one line if there is. It never runs in CI, under `--json`, in a pipe, for the MCP server or the hook, waits at most about a second, and says nothing offline. `OTEA_NO_UPDATE_CHECK=1` turns it off. The answer is kept in `update-check.json` in the Otea home.
+- **Desktop app:** Windows and Linux (`.deb`) update themselves; on macOS you download each new version. The app does not run the check above.
+- Your projects, boards and history live in the Otea home (`~/.otea`, or `$OTEA_HOME`), and an upgrade keeps them.
+
+### What Otea writes in your repo
+
+| What | Written by | Removed by |
+| --- | --- | --- |
+| A block in `AGENTS.md`, between `<!-- otea:begin -->` and `<!-- otea:end -->`, that points to `otea board`: it holds no copy of the guide | `otea connect`, `otea init --agents-md` (and `connect` says so each time it writes it) | `otea uninstall` |
+| The `pre-push` hook (in `.git/hooks`, or where `core.hooksPath` points), marked `# otea-hook` | `otea hook install --git` | `otea uninstall`, or `otea hook remove --git` |
+| `.otea/` in the repo, excluded from git | `otea init --local` | `otea uninstall --purge-data` |
+| Hooks and allow rules in `.claude/settings.local.json` that an older Otea wrote | an older `otea hook install --claude` | `otea uninstall` |
+
+`otea init` in the default storage and the desktop app write nothing in the repo. Otea writes no harness config: if you added its MCP server to an agent's own config, remove it there.
+
+### Remove
+
+```sh
+otea uninstall --dry-run   # lists every repo and file it would touch, and changes nothing
+otea uninstall             # takes the hook and the AGENTS.md block out of every repo, and stops the background server
+```
+
+`otea uninstall` goes through the repo you are in and every repo or folder the registry links to a project (`otea projects list`), and leaves each as it was before `otea init`: it removes only what carries Otea's mark (another pre-push hook, or any other line of `AGENTS.md`, stays, and `AGENTS.md` is deleted only when nothing else is in it), and it says what it removed, and which registered folder no longer exists. It stops this Otea home's background server (`otea serve start`) by its process id. `--only repos` or `--only machine` does one half.
+
+It does not touch your data. To delete the Otea home and the repo's `.otea/` too (every project, board and item in them, with no way back), add `--purge-data`: it asks you to type `yes` (`--yes` answers for a script). A GitHub ruleset from `otea hook install --forge` is removed with `otea hook remove --forge`, before the command is gone.
+
+Then remove the command itself:
+
+- **npm:** `npm uninstall -g @otea/cli` (`npm unlink -g @otea/cli` if you ran `npm link`).
+- **Windows:** Settings > Apps > Otea > Uninstall. **macOS:** drag Otea out of Applications. **Linux:** `sudo apt remove otea-desktop`, or delete the AppImage.
 
 ## Why Otea, and when not
 
