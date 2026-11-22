@@ -74,7 +74,7 @@ import {
   createdTextOf,
   dropItem,
   handoffItem,
-  heldBy,
+  type Look,
   laterLine,
   liveBoardOf,
   liveBoards,
@@ -189,7 +189,6 @@ import { profileLine } from '../core/profile.ts';
 import { describeRelation, RELATION_KINDS } from '../core/relations.ts';
 import { timeText } from '../core/time.ts';
 import { TURNS, type Turn } from '../core/workflow.ts';
-import { offeredFields } from '../mcp/structured.ts';
 import { DEFAULT_PORT } from '../server/hosts.ts';
 import { machineProjects, type ServedProject } from '../server/hub.ts';
 import { formatCode } from '../server/lan.ts';
@@ -1115,27 +1114,16 @@ const list: Command = {
   },
 };
 
-// What next and show leave out when brief: the board's words and the step's "Before you hand it
-// off", which an agent read when it took the item. --brief says so; --whole gives the whole again
-// (--full is taken: topic answer's); else an agent reading an item it holds gets it brief, and
-// anyone else (an agent that has not taken it, the person at a terminal) the whole.
-const BRIEFING = {
-  brief: { flag: true as const },
-  whole: { flag: true as const },
-};
-
-// Whether the reading is brief: true or false when --brief or --whole says so, else `holds()`.
-function wantsBrief(input: Input, holds: () => boolean): boolean {
-  const brief = input.flag('brief');
-  const whole = input.flag('whole');
-  if (brief && whole) throw new UsageError('--brief and --whole say opposite things: give one');
-  return brief || (!whole && holds());
-}
+// --brief on next and show leaves out the board's words and the step's "Before you hand it off":
+// for the repeat read of an item the agent holds and already read in this session. Every reading
+// is whole without it, as only the agent knows what it read (a new session, a compacted context, a
+// step edited in Studio since).
+const BRIEFING = { brief: { flag: true as const } };
 
 const show: Command = {
   name: 'show',
   summary:
-    'Show an item, what to do with it now, its fields, the moves available to the agent and its events timeline; --brief leaves out the board and step instructions you read when you took it (the default for an item you hold), --whole gives them',
+    'Show an item, what to do with it now, its fields, the moves available to the agent and its events timeline; --brief leaves out the board and step instructions: only to read again an item you hold and already read',
   args: ['id'],
   options: { ...BRIEFING },
   execute: (input) => {
@@ -1144,10 +1132,14 @@ const show: Command = {
     const performer = { actor, channel };
     return withReader(input, (project) => {
       const shown = showItem(project, id, performer);
-      const brief = wantsBrief(
-        input,
-        () => actor.kind === 'agent' && heldBy(shown, actor.name, systemClock()),
-      );
+      const brief = input.flag('brief');
+      // Over MCP the fields come once, as one JSON object line the agent parses (not again under
+      // Starts with); brief leaves Starts with out anywhere.
+      const asJson = input.fieldsAsJson === true;
+      const look: Look = {
+        ...(brief ? { brief: true as const } : {}),
+        ...(brief || asJson ? { startsAs: 'none' as const } : {}),
+      };
       const gitHook = gitHookOf(project, shown);
       // Each event's profile is left to otea events: show stays within its token budget.
       const item = {
@@ -1158,7 +1150,7 @@ const show: Command = {
           return path === undefined ? entry : { ...entry, path };
         }),
         events: shown.events.map(({ profile: _profile, ...event }) => event),
-        hint: hintFor(project, shown, actor.name, brief),
+        hint: hintFor(project, shown, actor.name, look),
         ...(gitHook === undefined ? {} : { gitHook }),
       };
       const { layout } = typeOfItem(project, shown);
@@ -1169,6 +1161,7 @@ const show: Command = {
         layout,
         typesShown(project),
         named,
+        asJson,
       );
       // The person's notes of this round, as data too: the text has them in its Next: block.
       const notes = roundNotesOf(project, item.id);
@@ -1519,7 +1512,7 @@ function topicLines(project: Project, agent: string, brief = false): string[] {
 const next: Command = {
   name: 'next',
   summary:
-    'Say which item to take now on the published boards (or in --collection), sent-back ones first, then approved work, then new, each in the Matrix order, and what its step asks: what it starts with, the instructions, the handoff and where it goes next; when there is none, what to do meanwhile. Never offers an item another agent holds or was just offered; --claim also claims it in the same call. --brief leaves out the board and step instructions you read when you took it (the default for an item you hold), --whole gives them',
+    'Say which item to take now on the published boards (or in --collection), sent-back ones first, then approved work, then new, each in the Matrix order, and what its step asks: what it starts with, the instructions, the handoff and where it goes next; when there is none, what to do meanwhile. Never offers an item another agent holds or was just offered; --claim also claims it in the same call. --brief leaves out the board and step instructions: only to read again an item you hold and already read',
   args: [],
   options: { collection: {}, claim: { flag: true }, ...BRIEFING },
   execute: (input) => {
@@ -1527,14 +1520,14 @@ const next: Command = {
     const claim = input.flag('claim');
     const { actor, channel } = input;
     const brief = input.flag('brief');
-    const whole = input.flag('whole');
-    if (brief && whole) throw new UsageError('--brief and --whole say opposite things: give one');
     return withAgent(input, (project) => {
       const profile = requireProfile(project.db, actor.name, { channel, confirmed: true });
       const answer = nextFor(project, actor.name, {
         ...(collection === undefined ? {} : { collection }),
         ...(claim ? { claim } : {}),
-        ...(brief ? { brief: true } : whole ? { brief: false } : {}),
+        ...(brief ? { brief: true } : {}),
+        // Over MCP the item's fields come as one JSON object line, which a model parses.
+        ...(input.fieldsAsJson ? { startsAs: 'json' as const } : {}),
       });
       const offered = answer.item === null ? undefined : getItem(project, answer.item);
       const outside = offered && mergedOutsideLine(project, input.cwd, offered);
@@ -1547,14 +1540,11 @@ const next: Command = {
         answer.text,
         ...(shared ? [shared] : []),
         ...topicLines(project, actor.name, answer.brief === true),
-        // A brief next leaves out what the agent read when it took the item, the profile line too.
+        // A brief next leaves out what the agent already read, the profile line too.
         ...(answer.brief ? [] : [profileReminder(profile, actor.name, channel)]),
         keepWaitingLine(actor.name, channel, { idle: answer.idle === true, collection }),
       ].join('\n\n');
-      // The offered item's own data (title, state, turn and its fields by name) rides with the
-      // answer, for a client that reads it as an object (MCP's structuredContent).
-      const view = offered === undefined ? {} : offeredFields(itemData(project, offered));
-      return { data: { ...answer, ...view, text, profile: profileView(profile) }, text };
+      return { data: { ...answer, text, profile: profileView(profile) }, text };
     });
   },
 };

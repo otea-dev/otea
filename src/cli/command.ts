@@ -40,6 +40,10 @@ export type Input = {
   // The agent's first call in a new session (an MCP server it has not called before): its profile
   // stands unconfirmed until it declares it again.
   newSession?: boolean;
+  // The text goes to a model that parses an item's fields (an MCP tool's text): show and next give
+  // them as one JSON object line, not `name: value` lines. Not under otea mcp --json, whose data
+  // is the CLI's.
+  fieldsAsJson?: boolean;
   signal: AbortSignal;
   openUrl: Opener;
   // The tailscale CLI otea phone tailscale runs, and how otea phone status tries a phone URL.

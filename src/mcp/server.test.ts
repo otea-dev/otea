@@ -149,67 +149,72 @@ describe('mcp server', () => {
   });
 
   // What a tool returns is what the agent reads, on every call: the CLI's text, in the words of
-  // the tools, never the whole item as JSON (MCP-TOKENS: a cycle cost 54% more over MCP). An item
-  // also comes as a small object (structuredContent), its fields by name.
+  // the tools, never the whole item as JSON (MCP-TOKENS: a cycle cost 54% more over MCP), and no
+  // structuredContent beside it: clients that show both pay for the same fields twice (+34% to
+  // +107% on show, next and a work cycle). An item's fields come as one JSON object line instead.
   describe('results', () => {
     let agent: Client;
     const text = async (name: string, args: Record<string, unknown> = {}) => {
       const reply = await call(name, args, agent);
       expect(reply.isError, reply.content[0]?.text).toBeFalsy();
       expect(reply.content).toHaveLength(1);
+      expect(reply).not.toHaveProperty('structuredContent');
       return reply.content[0]?.text ?? '';
     };
-    type Structured = Reply & { structuredContent?: Record<string, unknown> };
 
-    it('gives an item as an object with its fields by name, beside the text', async () => {
-      const reply = (await agent.callTool({
-        name: 'show',
-        arguments: { id: 'TASKS-1' },
-      })) as Structured;
+    it('lists no tool with an output schema', async () => {
+      const { tools } = await agent.listTools();
 
-      expect(reply.isError).toBeFalsy();
-      expect(reply.structuredContent).toEqual({
-        id: 'TASKS-1',
-        collection: 'tasks',
-        title: 'Docs',
-        state: expect.any(String),
-        turn: 'agent',
-        fields: expect.objectContaining({ Descripción: 'For v1' }),
-      });
-      // Not the whole item: its events, moves and evidence cost tokens beside the text.
-      expect(reply.structuredContent).not.toHaveProperty('events');
-      expect(reply.content[0]?.text).toContain('Docs');
+      expect(tools.filter((tool) => tool.outputSchema !== undefined)).toEqual([]);
     });
 
-    it('gives next’s offer as an object with the item and its fields', async () => {
+    it('gives an item’s fields as one JSON object line in show, by name', async () => {
+      const shown = await text('show', { id: 'TASKS-1' });
+      const line = shown.split('\n').find((each) => each.startsWith('fields: '));
+
+      expect(JSON.parse(line?.slice('fields: '.length) ?? '')).toMatchObject({
+        Descripción: 'For v1',
+      });
+      // Once: not again as name: value lines.
+      expect(shown).not.toContain('\nDescripción: For v1');
+    });
+
+    it('gives next’s fields as one JSON object line, and the whole step', async () => {
       await agent.callTool({
         name: 'profile',
         arguments: { as: 'claude', model: 'claude-opus-5-5', effort: 'high' },
       });
-      const reply = (await agent.callTool({
-        name: 'next',
-        arguments: { claim: true },
-      })) as Structured;
+      const offered = await text('next', { claim: true });
+      const line = offered.split('\n').find((each) => each.trimStart().startsWith('fields: '));
 
-      expect(reply.isError, reply.content[0]?.text).toBeFalsy();
-      expect(reply.structuredContent).toMatchObject({
-        item: expect.stringMatching(/^TASKS-\d+$/),
-        collection: 'tasks',
-        fields: expect.any(Object),
-      });
-      expect(reply.structuredContent).not.toHaveProperty('text');
+      const fields = JSON.parse(line?.trim().slice('fields: '.length) ?? '');
+      expect(Object.values(fields)).toContain('Docs');
+      expect(offered).not.toContain('Brief:');
     });
 
-    it('answers a wait that gave up with a result, not an error', async () => {
-      const reply = (await agent.callTool({
-        name: 'wait',
-        arguments: { turn: 'human', timeout: '1s' },
-      })) as Structured;
+    it('reads next and show brief only when asked to', async () => {
+      await agent.callTool({
+        name: 'profile',
+        arguments: { as: 'claude', model: 'claude-opus-5-5', effort: 'high' },
+      });
+      await text('claim', { id: 'TASKS-1' });
+      const whole = await text('show', { id: 'TASKS-1' });
+      const brief = await text('show', { id: 'TASKS-1', brief: true });
+
+      expect(whole).not.toContain('Brief:');
+      expect(brief).toContain("Brief: the board's and the step's whole instructions are in");
+      expect(brief.length).toBeLessThan(whole.length);
+    });
+
+    it('answers a wait that gave up with a result, not an error, saying nothing arrived', async () => {
+      const reply = await call('wait', { turn: 'human', timeout: '1s' }, agent);
 
       expect(reply.isError).toBe(false);
+      expect(reply.content[0]?.text).toMatch(/^Nothing arrived \(this is not an error\): /);
       expect(reply.content[0]?.text).toContain('No item reached the human turn within 1s');
-      expect(reply.structuredContent).toMatchObject({ timedOut: true });
+      expect(reply).not.toHaveProperty('structuredContent');
     });
+
     const cliText = async (...argv: string[]) => (await otea(...argv)).out.trimEnd();
 
     beforeEach(async () => {
@@ -231,7 +236,11 @@ describe('mcp server', () => {
     it('shows an item as otea show prints it, in the words of the tools', async () => {
       const shown = await text('show', { id: 'TASKS-1' });
 
-      expect(shown).toBe(mcpWords(await cliText('show', 'TASKS-1'), COMMANDS));
+      // As the CLI prints it, but for the fields: one JSON object line over MCP, once.
+      const cli = mcpWords(await cliText('show', 'TASKS-1'), COMMANDS);
+      expect(shown.split('\n').filter((line) => !/^(fields: |Starts with)/.test(line))).toEqual(
+        expect.arrayContaining(cli.split('\n').slice(0, 3)),
+      );
       expect(shown).toContain('claim { id: "TASKS-1" }');
       expect(shown).toContain('Docs');
     });

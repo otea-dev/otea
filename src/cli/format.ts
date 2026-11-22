@@ -86,6 +86,12 @@ function orderLabel(priority: { pin?: number; rank?: number } | undefined): stri
   return '';
 }
 
+// The fields as one JSON object line, for a model that parses them (over MCP) rather than reads
+// `name: value` lines.
+function fieldsJson(fields: Record<string, unknown>): string[] {
+  return Object.keys(fields).length > 0 ? ['', `fields: ${JSON.stringify(fields)}`] : [];
+}
+
 function fieldLines(fields: Record<string, unknown>): string[] {
   const lines = Object.entries(fields).map(([name, value]) => {
     const text = typeof value === 'string' ? value : JSON.stringify(value);
@@ -364,6 +370,7 @@ export function formatItemWithEvents(
   layout?: Layout,
   typed: Typed = notImplicit,
   named = false,
+  asJson = false,
 ): string {
   return [
     `${item.id}  ${item.title}`,
@@ -378,7 +385,7 @@ export function formatItemWithEvents(
             : `Next: ${item.hint}`,
         ]
       : []),
-    ...fieldLines(item.fields),
+    ...(asJson ? fieldsJson(item.fields) : fieldLines(item.fields)),
     '',
     ...(item.missing.length > 0 && item.turn !== 'none'
       ? [`Missing to complete: ${item.missing.join(', ')}`]
