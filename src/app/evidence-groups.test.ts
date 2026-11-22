@@ -100,7 +100,7 @@ describe('"at least N of" groups of evidence', () => {
     const text = readNext();
     expect(text).toContain('✗ Prueba: at least 1 of Animación, Captura, Salida (0 attached)');
     expect(text).toContain(
-      '{"group":"Prueba","min":1,"have":0,"of":["Animación","Captura","Salida"],"held":[]}',
+      'groups: {"Prueba":{"min":1,"have":0,"parts":["Animación","Captura","Salida"],"held":[]}}',
     );
     expect(text).toContain('Prueba: attach at least 1 of Animación, Captura, Salida');
 
