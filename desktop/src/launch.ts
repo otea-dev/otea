@@ -28,3 +28,13 @@ export function secondLaunchProject(
   if (typeof handed === 'string' && handed !== '') return handed;
   return projectArg(argv, workingDirectory);
 }
+
+// The id Windows groups a window, its taskbar button and its notifications under. The packaged app
+// takes the installer's appId (electron-builder.yml), which its Start menu shortcut carries; a
+// development run takes its own, so a shortcut made while testing it never stands for the
+// installed app.
+const APP_ID = 'dev.otea.desktop';
+
+export function appUserModelId(packaged: boolean): string {
+  return packaged ? APP_ID : `${APP_ID}.dev`;
+}

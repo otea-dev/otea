@@ -48,7 +48,7 @@ import { type Icons, loadIcons, type Theme } from './icons.ts';
 import { installing, untilInstalled } from './install-wait.ts';
 import { INSTALLING_GROUND, installingPage } from './installing-page.ts';
 import { wirePicker, wirePrefs } from './ipc.ts';
-import { type LaunchData, secondLaunchProject } from './launch.ts';
+import { appUserModelId, type LaunchData, secondLaunchProject } from './launch.ts';
 import { type DeskNotice, type Snapshot, type Watch, watchItems, watchNotices } from './live.ts';
 import { FRAME_MS } from './marks.ts';
 import { externalUrl, navigationVerdict } from './navigation.ts';
@@ -878,7 +878,7 @@ const launchData: LaunchData =
 
 if (!app.requestSingleInstanceLock(launchData)) app.quit();
 else {
-  if (IS_WIN) app.setAppUserModelId('dev.otea.desktop');
+  if (IS_WIN) app.setAppUserModelId(appUserModelId(app.isPackaged));
   Menu.setApplicationMenu(null);
   let shellInstance: Shell | undefined;
   // `--project` on a second launch opens that project in the running app.

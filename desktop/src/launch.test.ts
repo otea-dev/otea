@@ -1,6 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { projectArg, secondLaunchProject } from './launch.ts';
+import { appUserModelId, projectArg, secondLaunchProject } from './launch.ts';
 
 const HERE = resolve('/work/here');
 
@@ -31,5 +32,18 @@ describe('secondLaunchProject', () => {
       resolve(HERE, 'repo'),
     );
     expect(secondLaunchProject({}, ['Otea.exe'], HERE)).toBeUndefined();
+  });
+});
+
+describe('appUserModelId', () => {
+  it('is the installer’s appId for the packaged app, so Windows ties the window to its shortcut', () => {
+    const builder = readFileSync(new URL('../electron-builder.yml', import.meta.url), 'utf8');
+    const appId = /^appId:\s*(\S+)\s*$/m.exec(builder)?.[1];
+    expect(appId).toBeDefined();
+    expect(appUserModelId(true)).toBe(appId);
+  });
+
+  it('is a different id for the development app, so its shortcuts never stand for the installed one', () => {
+    expect(appUserModelId(false)).not.toBe(appUserModelId(true));
   });
 });
