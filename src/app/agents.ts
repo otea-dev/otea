@@ -48,22 +48,62 @@ export function writeAgentsMd(root: string): AgentsMdResult {
   return { path, action: current.includes(BEGIN) ? 'updated' : 'added' };
 }
 
-export type AgentsMdRemoval = { path: string; action: 'removed' | 'deleted' | 'absent' };
+export type AgentsMdRemoval =
+  | { path: string; action: 'removed' | 'deleted' | 'absent' }
+  // Markers that are not one block exactly as Otea writes it: the file is left whole.
+  | { path: string; action: 'refused'; reason: string };
+
+function occurrences(text: string, word: string): number[] {
+  const at: number[] = [];
+  for (let from = text.indexOf(word); from >= 0; from = text.indexOf(word, from + word.length)) {
+    at.push(from);
+  }
+  return at;
+}
 
 // Takes Otea's block out of AGENTS.md at the project root, with the blank line writeAgentsMd put
-// before it, and deletes the file when nothing else is left (Otea made it). Text outside the
-// markers is never touched. `dryRun` says what would happen and writes nothing.
+// before it, and deletes the file when nothing else is left (Otea made it). Only a block that is
+// exactly the one Otea writes (a CRLF file's too) goes: one begin and one end marker, in that order,
+// with the text between them what Otea wrote. Anything else (a marker twice, one alone, a line of
+// the person's inside the block) is refused, and the file is left as it is: text outside the
+// markers is never touched, and never crossed. `dryRun` says what would happen and writes nothing.
 export function removeAgentsMd(root: string, dryRun = false): AgentsMdRemoval {
   const path = join(root, 'AGENTS.md');
   if (!existsSync(path)) return { path, action: 'absent' };
   const current = readFileSync(path, 'utf8');
-  const begin = current.indexOf(BEGIN);
-  const end = begin < 0 ? -1 : current.indexOf(END, begin);
-  if (begin < 0 || end < 0) return { path, action: 'absent' };
+  const begins = occurrences(current, BEGIN);
+  const ends = occurrences(current, END);
+  if (begins.length === 0 && ends.length === 0) return { path, action: 'absent' };
+  const [begin] = begins;
+  const [end] = ends;
+  if (begins.length !== 1 || ends.length !== 1 || begin === undefined || end === undefined) {
+    return {
+      path,
+      action: 'refused',
+      reason: `its ${BEGIN} and ${END} markers are not one pair (one is missing or repeated); remove Otea's block by hand`,
+    };
+  }
+  if (end < begin) {
+    return {
+      path,
+      action: 'refused',
+      reason: `its ${END} marker comes before ${BEGIN}; remove Otea's block by hand`,
+    };
+  }
+  const block = current.slice(begin, end + END.length);
+  if (block.replace(/\r\n/g, '\n') !== AGENTS_BLOCK) {
+    return {
+      path,
+      action: 'refused',
+      reason: `the text between its markers is not what Otea writes (it was edited, or is from an older Otea); remove Otea's block by hand`,
+    };
+  }
   let before = current.slice(0, begin);
-  const after = current.slice(end + END.length).replace(/^\r?\n/, '');
-  // The block went at the end after a blank line: take that line with it.
-  if (after === '') before = before.replace(/\n\n$/, '\n');
+  let after = current.slice(end + END.length).replace(/^\r?\n/, '');
+  // The block went at the end after a blank line: take that line with it. In the middle, between
+  // two blank lines, they become one.
+  if (after === '') before = before.replace(/(\r?\n)\r?\n$/, '$1');
+  else if (/\n\r?\n$/.test(before) && /^\r?\n/.test(after)) after = after.replace(/^\r?\n/, '');
   const next = `${before}${after}`;
   const empty = next.trim() === '';
   if (!dryRun) {

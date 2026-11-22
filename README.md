@@ -294,7 +294,7 @@ otea --version          # the version you run now
 npm i -g @otea/cli      # npm: installs the latest
 ```
 
-- **npm:** run `npm i -g @otea/cli` again. Once a day, when you run `otea` in a terminal, it asks the npm registry whether there is a newer version and prints one line if there is. It never runs in CI, under `--json`, in a pipe, for the MCP server or the hook, waits at most about a second, and says nothing offline. `OTEA_NO_UPDATE_CHECK=1` turns it off. The answer is kept in `update-check.json` in the Otea home.
+- **npm:** run `npm i -g @otea/cli` again. Once a day, when you run `otea` in a terminal, it asks the npm registry whether there is a newer version and prints one line if there is. It never runs in CI, under `--json`, in a pipe, for an agent (`--as` or `OTEA_AGENT`), for the MCP server, the hook or `otea uninstall`, waits at most about a second, and says nothing offline. `OTEA_NO_UPDATE_CHECK=1` turns it off. The answer is kept in `update-check.json` in the Otea home.
 - **Desktop app:** Windows and Linux (`.deb`) update themselves; on macOS you download each new version. The app does not run the check above.
 - Your projects, boards and history live in the Otea home (`~/.otea`, or `$OTEA_HOME`), and an upgrade keeps them.
 
@@ -304,7 +304,7 @@ npm i -g @otea/cli      # npm: installs the latest
 | --- | --- | --- |
 | A block in `AGENTS.md`, between `<!-- otea:begin -->` and `<!-- otea:end -->`, that points to `otea board`: it holds no copy of the guide | `otea connect`, `otea init --agents-md` (and `connect` says so each time it writes it) | `otea uninstall` |
 | The `pre-push` hook (in `.git/hooks`, or where `core.hooksPath` points), marked `# otea-hook` | `otea hook install --git` | `otea uninstall`, or `otea hook remove --git` |
-| `.otea/` in the repo, excluded from git | `otea init --local` | `otea uninstall --purge-data` |
+| `.otea/` in the repo, and a line `.otea/` in `.git/info/exclude` | `otea init --local` | `otea uninstall --purge-data` deletes `.otea/`; the `.git/info/exclude` line stays (it is inside `.git`, never committed, and harmless: delete the line by hand if you want it gone) |
 | Hooks and allow rules in `.claude/settings.local.json` that an older Otea wrote | an older `otea hook install --claude` | `otea uninstall` |
 
 `otea init` in the default storage and the desktop app write nothing in the repo. Otea writes no harness config: if you added its MCP server to an agent's own config, remove it there.
@@ -316,9 +316,9 @@ otea uninstall --dry-run   # lists every repo and file it would touch, and chang
 otea uninstall             # takes the hook and the AGENTS.md block out of every repo, and stops the background server
 ```
 
-`otea uninstall` goes through the repo you are in and every repo or folder the registry links to a project (`otea projects list`), and leaves each as it was before `otea init`: it removes only what carries Otea's mark (another pre-push hook, or any other line of `AGENTS.md`, stays, and `AGENTS.md` is deleted only when nothing else is in it), and it says what it removed, and which registered folder no longer exists. It stops this Otea home's background server (`otea serve start`) by its process id. `--only repos` or `--only machine` does one half.
+`otea uninstall` goes through the repo you are in and every repo or folder the registry links to a project (`otea projects list`), and leaves each as it was before `otea init`: it removes only what is exactly Otea's: a pre-push hook that holds nothing but the lines Otea writes, and an `AGENTS.md` block that is the one Otea writes, once, between its markers. A hook you edited or added to, another pre-push hook, markers that are repeated or have your text inside them, and every other line of `AGENTS.md` stay, and it says so; `AGENTS.md` is deleted only when nothing else is in it. It says what it removed, which registered folder no longer exists, and any folder it could not clean (it goes on with the others, and exits 1). It stops this Otea home's background server (`otea serve start`) by its process id. `--only repos` or `--only machine` does one half.
 
-It does not touch your data. To delete the Otea home and the repo's `.otea/` too (every project, board and item in them, with no way back), add `--purge-data`: it asks you to type `yes` (`--yes` answers for a script). A GitHub ruleset from `otea hook install --forge` is removed with `otea hook remove --forge`, before the command is gone.
+It does not touch your data. To delete the Otea home and the repo's `.otea/` too (every project, board and item in them, with no way back), add `--purge-data`: it asks you to type `yes` (`--yes` answers for a script). It stops the background server first, whatever `--only` says, refuses if it cannot, and only deletes a folder that holds Otea's registry and is not a filesystem root, your home folder or a folder holding where you run it. A GitHub ruleset from `otea hook install --forge` is removed with `otea hook remove --forge`, before the command is gone.
 
 Then remove the command itself:
 

@@ -307,6 +307,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
         command: findCommand(argv.filter((token) => !token.startsWith('-')))?.name,
         json,
         terminal: io.stdout.isTTY === true,
+        agent: argv.some((token) => token === '--as' || token.startsWith('--as=')),
       })
     : undefined;
   let code: number;

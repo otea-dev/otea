@@ -3705,7 +3705,7 @@ const uninstall: Command = {
     const only = input.option('only');
     const repoScope = only !== 'machine';
     const machineScope = only !== 'repos';
-    const home = input.home ?? oteaHome();
+    const home = resolve(cwd, input.home ?? oteaHome());
     // The data is deleted only when asked for, and once the person (or --yes) has confirmed.
     const targets = purge ? dataTargets(home, cwd, repoScope) : [];
     if (purge && !dryRun && targets.length > 0 && !flag('yes')) {
@@ -3719,43 +3719,44 @@ const uninstall: Command = {
         );
       }
     }
+    // The server first, when it is stopped at all: a home is never deleted under a live server, so
+    // whatever --only says, purging the data stops it, and one that will not stop refuses the whole
+    // run before anything is changed.
+    const server =
+      machineScope || purge
+        ? await uninstallServer(home, OTEA.args.at(-1) ?? '', dryRun)
+        : undefined;
+    if (purge && !dryRun && server?.failed && targets.length > 0) {
+      throw new CommandFailure(
+        'forbidden',
+        `${server.text}: the Otea data is in use, so nothing was deleted or changed; stop the server (otea serve stop), then run this again`,
+      );
+    }
     const steps: Step[] = [];
     const lines: string[] = [];
     let repos: RepoReport[] = [];
     let missing: string[] = [];
     if (repoScope) {
-      ({ reports: repos, missing } = uninstallRepos(cwd, dryRun));
+      ({ reports: repos, missing } = uninstallRepos(cwd, home, dryRun));
       // Each repo says what changed, or what Otea left; one that had nothing of Otea's, one line.
       for (const { path, steps: done } of repos) {
         steps.push(...done);
-        const told = done.filter((step) => step.changed || step.kept);
+        const told = done.filter((step) => step.changed || step.kept || step.failed);
         if (told.length === 0) lines.push(`Nothing of Otea's in ${path}`);
         else lines.push(...told.map(({ text }) => text));
       }
       lines.push(...missing.map((path) => `Skipped ${path}: it no longer exists`));
     }
-    let failed = false;
-    if (machineScope) {
-      const server = await uninstallServer(home, OTEA.args.at(-1) ?? '', dryRun);
-      failed = server.failed === true;
+    if (server) {
       steps.push(server);
       lines.push(server.text);
     }
-    // A server that would not stop holds the data open: it stays.
     if (purge) {
-      const data: Step[] = failed
-        ? [
-            {
-              what: 'data',
-              changed: false,
-              kept: true,
-              text: 'Left the Otea data: the server still holds it',
-            },
-          ]
-        : purgeData(targets, dryRun);
+      const data = purgeData(targets, dryRun);
       steps.push(...data);
       lines.push(...data.map(({ text }) => text));
     }
+    const failed = steps.some((step) => step.failed);
     const left = [
       ...(purge
         ? []

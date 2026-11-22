@@ -611,6 +611,10 @@ export function renameRepo(db: DatabaseSync, identity: string, name: string): vo
   db.prepare('UPDATE repos SET name = ? WHERE identity = ?').run(name, identity);
 }
 
+export function changeRepoIdentity(db: DatabaseSync, from: string, to: string): void {
+  db.prepare('UPDATE repos SET identity = ? WHERE identity = ?').run(to, from);
+}
+
 export function deleteRepo(db: DatabaseSync, name: string): void {
   db.prepare('DELETE FROM repos WHERE name = ?').run(name);
 }

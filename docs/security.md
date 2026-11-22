@@ -67,7 +67,9 @@ Nothing leaves the computer on its own, with these exceptions, each tied to some
 - **Phone status checks.** `otea phone status` and Settings > Phone fetch `/manifest.webmanifest` from the phone URLs (this computer's `.local` name and private addresses, or your Tailscale host name) to tell whether Otea answers there. They are requests to your own computer or your own tailnet name, nothing else.
 - **Tailscale.** If you choose it, your phone reaches the desk through Tailscale's network, as that service works. Otea only runs the `tailscale` command on your computer.
 
-The `otea` command from npm makes no network request of its own: it does not check for new versions and sends no usage data. If that changes, this page changes with it.
+- **The `otea` command's version check.** At most once a day, when you run `otea` at a terminal, it sends one `GET` to the npm registry (`https://registry.npmjs.org/@otea%2Fcli/latest`, no cookie, no identifier, no body) and prints one line if a newer `@otea/cli` exists. The registry sees your IP address and that request, as for any `npm` call. The answer is kept in `update-check.json` in the Otea home, and a failed or slow try (it waits at most about a second) is tried again in an hour. It never runs in CI (`CI` set), under `--json`, when the output is piped, for an agent (`--as`, or `OTEA_AGENT` set), for `otea mcp`, `check`, `serve`, `wait`, `events` or `uninstall`, or in the desktop app. `OTEA_NO_UPDATE_CHECK=1` turns it off.
+
+Apart from the list above, Otea sends no usage data and makes no other network request. If that changes, this page changes with it.
 
 The web page the server serves loads its fonts and scripts from the server itself, not from a CDN.
 
@@ -87,6 +89,8 @@ Otea writes no agent configuration: no `.mcp.json`, no `.claude/` files. `otea c
 More on these files in [Projects](projects.md#files-otea-writes-in-the-repo).
 
 ## Removing Otea
+
+The short way: `otea uninstall --dry-run` lists what it would do, and `otea uninstall` does it in every repository the registry knows (the pre-push hook and the `AGENTS.md` block, only when they are exactly what Otea wrote) and stops the server; `--purge-data` also deletes the Otea home after you confirm. The steps by hand:
 
 1. Stop the server: `otea serve stop` (and quit the desktop app).
 2. In each repository you used it in, take out what it wrote: `otea hook remove --git`, `otea hook remove --forge` and, if an older version wrote them, `otea hook remove --claude`; delete the block between `<!-- otea:begin -->` and `<!-- otea:end -->` in `AGENTS.md`; delete `.otea/` and any `.otea.migrated-*` folder of a local project, and the `.otea/` line in `.git/info/exclude`.
