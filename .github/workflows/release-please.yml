@@ -68,6 +68,31 @@ jobs:
           gh workflow run npm-publish.yml --ref "$TAG" -f publish=true
           echo "Started desktop.yml and npm-publish.yml on $TAG" >> "$GITHUB_STEP_SUMMARY"
 
+      # release-please can fail after it made the tag and the Release (for example, on a comment it
+      # cannot post), which skips the step above. This one then starts what is missing. It dispatches
+      # only when the Release for the version in the manifest has no installer and neither workflow
+      # has a run on that tag, so a tag is never dispatched twice.
+      - name: Start the release workflows if the step above was skipped
+        if: failure() && steps.release.outputs.release_created != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          version="$(gh api "repos/$GH_REPO/contents/.release-please-manifest.json?ref=$SHA" --jq .content | base64 -d | jq -r '.["."]')"
+          if [ -z "$version" ] || [ "$version" = "null" ]; then echo "No version in the manifest"; exit 0; fi
+          TAG="v$version"
+          if ! gh release view "$TAG" > /dev/null 2>&1; then echo "No Release for $TAG: nothing to start" >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          installers="$(gh release view "$TAG" --json assets --jq '[.assets[].name | select(endswith(".exe"))] | length')"
+          if [ "$installers" != "0" ]; then echo "$TAG already has installers: nothing to start" >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          for wf in desktop.yml npm-publish.yml; do
+            runs="$(gh run list --workflow "$wf" --branch "$TAG" --limit 1 --json databaseId --jq length)"
+            if [ "$runs" != "0" ]; then echo "$wf already ran on $TAG: nothing to start" >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          done
+          gh workflow run desktop.yml --ref "$TAG"
+          gh workflow run npm-publish.yml --ref "$TAG" -f publish=true
+          echo "Fallback: started desktop.yml and npm-publish.yml on $TAG" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run the CI checks on the release pull request
         if: steps.release.outputs.prs_created == 'true'
         env:
