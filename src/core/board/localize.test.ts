@@ -9,6 +9,7 @@ import {
   instantiateSet,
   LANGS,
   type Lang,
+  optionKey,
   TEMPLATE_SETS,
   TEMPLATES,
 } from './templates.ts';
@@ -125,6 +126,18 @@ describe('the words of a board made from a template', () => {
     expect(readDefinition(json, 'en').title).toBe('Title');
   });
 
+  // A release that speaks one more language makes boards in it; an older binary reads them: in the
+  // language asked when the board has it, else the board's own, else any it has.
+  it('reads a board made by a later release in a language this one does not speak', () => {
+    const stored = JSON.parse(storedDefinition(made('bugs', 'es'))) as Record<string, unknown>;
+    stored.lang = 'fr';
+    const json = JSON.stringify(stored);
+    expect(readDefinition(json, 'en').steps[0]?.name).toBe('Refine');
+    expect(readDefinition(json, 'es').steps[0]?.name).toBe('Refinar');
+    expect(readDefinition(json).steps[0]?.name).toBeTypeOf('string');
+    expect(['en', 'es']).toContain(boardLang(readDefinition(json)));
+  });
+
   it('keeps a board whole through a read, an edit and a save in the other language', () => {
     const def = made('bugs', 'es');
     const english = readDefinition(storedDefinition(def), 'en');
@@ -146,23 +159,21 @@ describe('the words of a board made from a template', () => {
 
   // A release may rename or drop a template's keys, reorder its options or remove it: a board made
   // before reads as it did, because it reads nothing of the template.
-  it('still reads after the template it was made from changes', () => {
-    const original = template('bugs');
+  // (The shared templates are never changed to show it: the stored board is written the way a later
+  // release's template would have keyed it, every key renamed, and read as it is.)
+  it('still reads a board whose template keys changed since it was made', () => {
     const json = storedDefinition(made('bugs', 'es'));
-    const before = { es: readDefinition(json, 'es'), en: readDefinition(json, 'en') };
-    const kept = { steps: original.steps, parts: original.parts };
-    try {
-      Object.assign(original, {
-        steps: original.steps.map((step) => ({ ...step, key: `${step.key}_renamed` })),
-        parts: original.parts
-          .slice(1)
-          .reverse()
-          .map((part) => ({ ...part, options: [...(part.options ?? [])].reverse() })),
-      });
-      expect(readDefinition(json, 'es')).toEqual(before.es);
-      expect(readDefinition(json, 'en')).toEqual(before.en);
-    } finally {
-      Object.assign(original, kept);
+    const renamed = JSON.stringify(JSON.parse(json), (name, value: unknown) =>
+      name === 'key' && typeof value === 'string' ? `${value}_in_a_later_release` : value,
+    );
+    expect(renamed).not.toBe(json);
+    for (const lang of LANGS) {
+      const read = (text: string) => JSON.parse(JSON.stringify(readDefinition(text, lang)));
+      const strip = (def: Record<string, unknown>) =>
+        JSON.parse(
+          JSON.stringify(def, (name, value: unknown) => (name === 'key' ? undefined : value)),
+        );
+      expect(strip(read(renamed))).toEqual(strip(read(json)));
     }
   });
 
@@ -181,21 +192,20 @@ describe('the words of a board made from a template', () => {
     expect(readDefinition(json, 'en').title).toBe('Título');
   });
 
-  // The keys a template gives its parts, steps, choices and motives are what an agent may name
-  // instead of a name (`--way land`), so they and the order of the options are pinned: changing one
-  // is a decision, not an edit.
-  it('pins the keys and option order of every template', () => {
+  // The keys a template gives its steps, choices and motives are what an agent may name instead of
+  // a name (`--way land`) and what a stored board's keys read as, so the step keys, the option keys
+  // (and so their order) and the motive keys are pinned: changing one is a decision, not an edit.
+  it('pins the step, option and motive keys of every template', () => {
     const shape = Object.fromEntries(
       TEMPLATES.map((candidate) => [
         candidate.key,
         {
           steps: candidate.steps.map((step) => step.key),
-          parts: candidate.parts.map((part) => {
-            const options = (part.options ?? []).map((_, at) => part.optionKeys?.[at] ?? `o${at}`);
-            return options.length > 0
-              ? `${part.key}:${part.kind}[${options.join(',')}]`
-              : `${part.key}:${part.kind}`;
-          }),
+          options: Object.fromEntries(
+            candidate.parts
+              .filter((part) => (part.options ?? []).length > 0)
+              .map((part) => [part.key, (part.options ?? []).map((_, at) => optionKey(part, at))]),
+          ),
           motives: (candidate.motives ?? []).map(([key]) => key),
         },
       ]),

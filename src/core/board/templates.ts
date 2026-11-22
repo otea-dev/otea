@@ -861,7 +861,8 @@ const REQUESTS: Template = {
 // The language a board was made in, which the words it makes for an agent or a Pedido about it are
 // said in whatever language the desk is in; for a board that says none, the one its title is in.
 export function boardLang(def: BoardDefinition): Lang {
-  return def.lang ?? (def.title === TITLE_NAME.es ? 'es' : 'en');
+  if (def.lang === 'en' || def.lang === 'es') return def.lang;
+  return def.title === TITLE_NAME.es ? 'es' : 'en';
 }
 
 // The project's built-in board for loose requests (Pedidos); an agent's board draft arrives on one.

@@ -219,6 +219,10 @@ function readOne(
     checked(index === 0 ? waits(def) : def),
   );
   if (defs.some((def) => def === undefined)) return false;
+  // A board read again in place keeps the keys its items' data is stored under. If the template has
+  // since changed them (a release renamed a field or a step), reading it again would orphan that
+  // data: the stored board stands as it is.
+  if (plan.board && !keepsStoredKeys(ctx, plan.board, defs[0])) return false;
   defs.forEach((def, index) => {
     const id = boardIds[index] ?? '';
     if (!def) return;
@@ -259,6 +263,25 @@ function readOne(
   }
   for (const name of names.slice(1)) numberAfterMoved(ctx, name);
   return true;
+}
+
+// Whether a board read again has every part and step the stored version has, under the same id.
+function keepsStoredKeys(
+  ctx: Context,
+  stored: { id: string; version: number },
+  again: BoardDefinition | undefined,
+): boolean {
+  const row = findVersion(ctx.db, stored.id, stored.version);
+  if (!row || !again) return false;
+  try {
+    const live = readDefinition(row.definition);
+    return (
+      Object.keys(live.parts).every((id) => id in again.parts) &&
+      live.steps.every((step) => again.steps.some(({ id }) => id === step.id))
+    );
+  } catch {
+    return false;
+  }
 }
 
 // Moved items keep their number; the board they moved to numbers its new items after the highest.

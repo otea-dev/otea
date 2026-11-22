@@ -12,7 +12,7 @@ import type { BoardDefinition, Target } from '../../../src/core/board/model.ts';
 import type { Problem } from '../../../src/core/board/problems.ts';
 import type { Lang, TemplateView } from '../../../src/core/board/templates.ts';
 import { apiUrl } from '../base.ts';
-import { languageHeader } from '../i18n/i18n.ts';
+import { type Language, languageHeader } from '../i18n/i18n.ts';
 import { serverMessage, unreachable } from '../remote.ts';
 
 // The board Studio's client for /api/boards and /api/templates (src/server/boards.ts). Every
@@ -117,9 +117,13 @@ export function saveDraft(
   definition: BoardDefinition,
   baseVersion: number | null,
   draftStamp?: string | null,
+  readIn?: Language,
 ): Promise<{ record: BoardRecord; problems: Problem[] }> {
   const stamp = draftStamp === undefined ? {} : { draftStamp };
-  return call('PUT', `${board(id)}/draft`, { definition, baseVersion, ...stamp });
+  // `readIn`: the language `definition` was read in, which its words are in (the editor says it, so
+  // a language switched since never makes the server take its words for the person's edits).
+  const said = readIn === undefined ? {} : { readIn };
+  return call('PUT', `${board(id)}/draft`, { definition, baseVersion, ...stamp, ...said });
 }
 
 export function discardDraft(id: string): Promise<{ deleted: boolean }> {

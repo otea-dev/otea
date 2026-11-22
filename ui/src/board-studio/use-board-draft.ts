@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { BoardDefinition, Selection } from '../../../src/core/board/model.ts';
 import { type BoardRef, type Problem, problemsOf } from '../../../src/core/board/problems.ts';
+import { type Language, language } from '../i18n/i18n.ts';
 import { type BoardRecord, fetchBoard, saveDraft } from './api.ts';
 import {
   canRedo,
@@ -45,6 +46,9 @@ export type ReadyDraft = {
   redo: () => void;
   retrySave: () => void;
   reload: () => void;
+  // The language the draft was read in: the words in `def` are in it, whatever the desk says now,
+  // and every save says so (a desk switched to another language mid-edit keeps its snapshot).
+  readIn: Language;
 };
 
 export type BoardDraft =
@@ -93,11 +97,13 @@ export function useBoardDraft(id: string, options: DraftOptions): BoardDraft {
   });
   // The draft as last read or written here: a save over a draft changed since is refused.
   const stamp = useRef<string | null>(null);
+  const readIn = useRef<Language>(language());
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new attempt loads the board again
   useEffect(() => {
     const abort = new AbortController();
     setLoad({ status: 'loading' });
+    readIn.current = language();
     fetchBoard(id, abort.signal)
       .then(({ record }) => {
         const def = (record.draft ?? record.live)?.definition;
@@ -131,7 +137,7 @@ export function useBoardDraft(id: string, options: DraftOptions): BoardDraft {
       createSaver({
         delay: options.delay ?? 600,
         save: async (def) => {
-          const saved = await saveDraft(id, def, base.current, stamp.current);
+          const saved = await saveDraft(id, def, base.current, stamp.current, readIn.current);
           stamp.current = saved.record.draft?.updatedAt ?? null;
           setLoad({ status: 'ready', record: saved.record });
         },
@@ -207,5 +213,6 @@ export function useBoardDraft(id: string, options: DraftOptions): BoardDraft {
     redo: () => step(redo),
     retrySave: () => void saver.flush(),
     reload: () => setAttempt((n) => n + 1),
+    readIn: readIn.current,
   };
 }

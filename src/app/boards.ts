@@ -300,10 +300,14 @@ export function insertNewBoard(
 // `draftStamp`: the draft's updatedAt as the writer last read it (null: it read no draft). When
 // given, a draft written since (an agent's arriving, another tab) refuses the write instead of
 // being lost under it.
+// `readIn`: the language the editor read the draft in, which the words it sends are in; a desk
+// that switched language since still saves the words it holds, and the snapshot is reconciled
+// against that language, not the one the request says. Without it, the request's language.
 export type SaveDraftInput = {
   definition: unknown;
   baseVersion: number | null;
   draftStamp?: string | null;
+  readIn?: Lang;
 };
 
 function assertDraftUnchanged(ctx: Context, id: string, stamp: string | null | undefined): void {
@@ -345,7 +349,7 @@ export function saveDraft(
     const previous = findDraft(ctx.db, id);
     upsertDraft(ctx.db, {
       boardId: id,
-      definition: storedDefinition(reading.definition),
+      definition: storedDefinition(reading.definition, input.readIn),
       baseVersion: input.baseVersion,
       updatedAt: now(),
       requestItem: previous?.requestItem ?? null,

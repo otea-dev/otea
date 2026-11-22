@@ -229,7 +229,9 @@ export type BoardDefinition = {
   template?: string;
   // The language the board was made in: what an agent, and any reader with no language of its own,
   // reads it in.
-  lang?: 'en' | 'es';
+  // A plain string, not one of today's languages: a board made by a later release, in a language
+  // this one does not speak, still reads (in the language asked, else the closest it has).
+  lang?: string;
   // The words its template gave it, in every language, by where each lives (localize.ts). A word
   // the person changed has none: their text stands, in every language.
   snapshot?: Snapshot;
