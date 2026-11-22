@@ -195,7 +195,10 @@ describe('reviewing an item on the phone', () => {
     const dock = html.slice(html.indexOf('class="p-dock"'));
     expect(dock).toContain('>Devolver…</button>');
     expect(dock).toContain('>Aprobar</button>');
-    expect(dock).toContain('Aprobar <b>→ ');
+    // What Aprobar does is said just above the dock, in the page: kept in the sticky bar it took
+    // three of its lines (a quarter of the screen).
+    expect(html.slice(0, html.indexOf('class="p-dock"'))).toContain('class="p-says">Aprobar <b>→ ');
+    expect(dock).not.toContain('Aprobar <b>→ ');
     expect(html).not.toContain('Descartar');
     expect(html).not.toContain('cerrar como');
   });

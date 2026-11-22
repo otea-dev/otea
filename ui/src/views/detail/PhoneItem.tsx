@@ -1029,76 +1029,83 @@ export function PhoneItem(p: PhoneItemProps) {
           )}
         </section>
       ) : docked ? (
-        <section ref={dockEl} className="p-dock" aria-label={t('phone.r.dock')}>
-          <div className={(primary || picking) && sendback ? 'btns two' : 'btns'}>
-            {sendback ? (
-              <button
-                ref={backBtn}
-                type="button"
-                className="btn quiet"
-                aria-haspopup="dialog"
-                aria-expanded={!!asking?.open && asking.choice === sendback}
-                onClick={() => choose(sendback)}
-              >
-                {sendback.label}
-              </button>
-            ) : null}
-            {primary ? (
-              <button
-                ref={primaryBtn}
-                type="button"
-                className="btn primary"
-                onClick={() => choose(primary)}
-              >
-                {primary.label}
-              </button>
-            ) : null}
-            {picking ? (
-              <button
-                ref={pickBtn}
-                type="button"
-                className="btn primary"
-                aria-haspopup="dialog"
-                aria-expanded={pickOpen}
-                onClick={() => setPickOpen(true)}
-              >
-                {t('pick.open')}
-              </button>
-            ) : null}
-          </div>
-          {moreMoves.length > 0 ? (
-            <p className="p-ways">
-              {moreMoves.map((c) => (
-                <Button
-                  key={c.move.to}
-                  variant="text"
-                  data-move={c.move.to}
-                  onClick={() => choose(c)}
-                >
-                  {c.label}
-                </Button>
-              ))}
-            </p>
-          ) : null}
-          {(primary || picking) && unseen.unopened > 0 && !refused ? (
-            <p className="hint unseen">
-              {t('phone.r.unopened', { n: unseen.unopened, total: unseen.total })}
-            </p>
-          ) : null}
-          {refused ? (
-            <p className="hint warn" role="alert">
-              {refused}
-            </p>
-          ) : says ? (
-            <p className="hint">
+        <>
+          {/* What Aprobar does, in the page just above the dock: kept inside it, three lines of the
+            sticky bar's quarter of the screen went to words that are read once. */}
+          {!refused && says ? (
+            <p className="p-says">
               {says.verb} <b>→ {says.state}</b> · {says.tail}
             </p>
           ) : null}
-          {/* Beside the moves the dock makes at once; Devolver says it in its own sheet. */}
-          {!refused && heard && handsToAgent([primary, ...moreMoves, ...(picking?.ways ?? [])]) ? (
-            <Unheard className="hint unheard" hearing={heard} />
-          ) : null}
-        </section>
+          <section ref={dockEl} className="p-dock" aria-label={t('phone.r.dock')}>
+            <div className={(primary || picking) && sendback ? 'btns two' : 'btns'}>
+              {sendback ? (
+                <button
+                  ref={backBtn}
+                  type="button"
+                  className="btn quiet"
+                  aria-haspopup="dialog"
+                  aria-expanded={!!asking?.open && asking.choice === sendback}
+                  onClick={() => choose(sendback)}
+                >
+                  {sendback.label}
+                </button>
+              ) : null}
+              {primary ? (
+                <button
+                  ref={primaryBtn}
+                  type="button"
+                  className="btn primary"
+                  onClick={() => choose(primary)}
+                >
+                  {primary.label}
+                </button>
+              ) : null}
+              {picking ? (
+                <button
+                  ref={pickBtn}
+                  type="button"
+                  className="btn primary"
+                  aria-haspopup="dialog"
+                  aria-expanded={pickOpen}
+                  onClick={() => setPickOpen(true)}
+                >
+                  {t('pick.open')}
+                </button>
+              ) : null}
+            </div>
+            {moreMoves.length > 0 ? (
+              <p className="p-ways">
+                {moreMoves.map((c) => (
+                  <Button
+                    key={c.move.to}
+                    variant="text"
+                    data-move={c.move.to}
+                    onClick={() => choose(c)}
+                  >
+                    {c.label}
+                  </Button>
+                ))}
+              </p>
+            ) : null}
+            {(primary || picking) && unseen.unopened > 0 && !refused ? (
+              <p className="hint unseen">
+                {t('phone.r.unopened', { n: unseen.unopened, total: unseen.total })}
+              </p>
+            ) : null}
+            {refused ? (
+              <p className="hint warn" role="alert">
+                {refused}
+              </p>
+            ) : null}
+            {/* Beside the moves the dock makes at once; Devolver says it in its own sheet. */}
+            {!refused &&
+            heard &&
+            handsToAgent([primary, ...moreMoves, ...(picking?.ways ?? [])]) ? (
+              <Unheard className="hint unheard" hearing={heard} />
+            ) : null}
+          </section>
+        </>
       ) : null}
 
       {leave ? (

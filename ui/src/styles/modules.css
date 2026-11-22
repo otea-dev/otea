@@ -12,6 +12,15 @@
   margin: 0;
 }
 
+/* What a person or an agent typed as a note or a field keeps its line breaks: a list of links, one
+   to a line, ran together into one line («url url url») when a single newline read as a space. A
+   document (evidence) is not here: its hard-wrapped paragraphs still flow. */
+.note-md p,
+.p-text.md p,
+.d-sec.field .md p {
+  white-space: pre-line;
+}
+
 .md h1,
 .md h2,
 .md h3,

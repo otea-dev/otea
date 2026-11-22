@@ -82,6 +82,7 @@ import {
   tooltip,
 } from './state.ts';
 import { cooldown, throttle } from './throttle.ts';
+import { restartWithNotice } from './update-restart.ts';
 import { type Notice, startUpdates, updateMode } from './updates.ts';
 
 const { values: options } = parseArgs({
@@ -188,6 +189,22 @@ function installerWriting(): boolean {
   }
 }
 
+// A small window of its own for a state with nothing else to show (the installer at work, an update
+// about to restart), drawn from no file of the app's.
+function statusWindow(icon: NativeImage, page: string): BrowserWindow {
+  const win = new BrowserWindow({
+    width: 460,
+    height: 200,
+    resizable: false,
+    title: 'Otea',
+    icon,
+    autoHideMenuBar: true,
+    backgroundColor: INSTALLING_GROUND[nativeTheme.shouldUseDarkColors ? 'dark' : 'light'],
+  });
+  void win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`);
+  return win;
+}
+
 // Started while the installer still writes the app, it waits in a small window of its own, drawn
 // from no file of the app's, and then goes on.
 async function waitForInstaller(lang: Lang, icon: NativeImage): Promise<void> {
@@ -196,17 +213,7 @@ async function waitForInstaller(lang: Lang, icon: NativeImage): Promise<void> {
     installing: installerWriting,
     onWaiting: () => {
       if (SMOKE) return;
-      wait = new BrowserWindow({
-        width: 460,
-        height: 200,
-        resizable: false,
-        title: 'Otea',
-        icon,
-        autoHideMenuBar: true,
-        backgroundColor: INSTALLING_GROUND[nativeTheme.shouldUseDarkColors ? 'dark' : 'light'],
-      });
-      const page = installingPage({ lang, font: SCHIBSTED });
-      void wait.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`);
+      wait = statusWindow(icon, installingPage({ lang, font: SCHIBSTED }));
     },
     sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
   });
@@ -291,6 +298,8 @@ class Shell {
   private snapshot: Snapshot = { items: [], collections: [] };
   private connected = false;
   private quitting = false;
+  // «Restart» was pressed: the notice is up and the update goes on, whatever is pressed next.
+  private restarting = false;
   private theme: Theme = 'light';
   private step = 0;
   private spinner: NodeJS.Timeout | undefined;
@@ -625,8 +634,28 @@ class Shell {
   actOnUpdate(): void {
     const update = this.update;
     if (update?.kind === 'restart') {
-      this.quitting = true;
-      electronUpdater.autoUpdater.quitAndInstall(true, true);
+      if (this.restarting) return;
+      this.restarting = true;
+      // The installer runs silently for several seconds with no window, which looked like a crash:
+      // say first that Otea is updating and reopens by itself.
+      void restartWithNotice({
+        show: () => {
+          this.win.hide();
+          statusWindow(
+            this.icons.app,
+            installingPage({
+              lang: this.lang,
+              font: SCHIBSTED,
+              lines: [this.copy.updating, this.copy.updatingNote],
+            }),
+          );
+        },
+        sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
+        install: () => {
+          this.quitting = true;
+          electronUpdater.autoUpdater.quitAndInstall(true, true);
+        },
+      });
     } else if (update?.kind === 'download') void shell.openExternal(update.url);
   }
 
