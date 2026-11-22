@@ -218,6 +218,7 @@ import {
   type Launch,
   SERVE_LOG,
   stopServer,
+  unresponsiveText,
 } from './daemon.ts';
 import { installForge, removeForge } from './forge.ts';
 import {
@@ -3040,7 +3041,7 @@ const serveStop: Command = {
   args: [],
   options: {},
   execute: async () => {
-    const result = await stopServer(oteaHome());
+    const result = await stopServer(oteaHome(), OTEA.args.at(-1) ?? '');
     if (!result) return { data: { stopped: false }, text: 'No otea serve is running' };
     if ('stale' in result) {
       return {
@@ -3069,7 +3070,7 @@ const serveStatus: Command = {
     if (state.kind === 'unresponsive') {
       throw new CommandFailure(
         'timeout',
-        `otea serve (pid ${state.info.pid}, port ${state.info.port}) is running but did not answer in time; its record is kept. Try again, or end it with otea serve stop`,
+        `${unresponsiveText(state)}; its record is kept. Try again, or end it with otea serve stop`,
       );
     }
     if (state.kind !== 'running') {

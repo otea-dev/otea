@@ -13,6 +13,24 @@ const MAIN = fileURLToPath(new URL('./main.ts', import.meta.url));
 
 const home = () => process.env.OTEA_HOME ?? '';
 
+// A process that accepts connections and never answers, with `words` after its script on its
+// command line (where a real server has its entry point and subcommand).
+function hungServer(words: readonly string[]) {
+  const child = spawn(
+    process.execPath,
+    [
+      '-e',
+      "require('node:net').createServer(() => {}).listen(0, '127.0.0.1', function () { console.log(this.address().port); })",
+      ...words,
+    ],
+    { stdio: ['ignore', 'pipe', 'ignore'] },
+  );
+  const port = new Promise<number>((resolve) =>
+    child.stdout.once('data', (chunk) => resolve(Number(String(chunk).trim()))),
+  );
+  return { child, port };
+}
+
 // otea serve start runs the server on its own, so a test that fails halfway must still end it.
 async function stopWhatRuns(cwd: string) {
   const running = readServeFile(home());
@@ -131,21 +149,11 @@ describe('serve start, status and stop', () => {
   // A busy server may not answer a probe in time; a record of a live process is not stale for that.
   it('keeps the record of a live server that does not answer in time, and ends it only on stop', async () => {
     ensureUiToken(home());
-    // Accepts connections and never answers; its command line says it is an otea serve.
-    const hung = spawn(
-      process.execPath,
-      [
-        '-e',
-        "require('node:net').createServer(() => {}).listen(0, '127.0.0.1', function () { console.log(this.address().port); })",
-        'serve',
-      ],
-      { stdio: ['ignore', 'pipe', 'ignore'] },
-    );
+    // Accepts connections and never answers; its command line is this install's background server.
+    const hung = hungServer([MAIN, 'serve', '--no-owner', '--no-open', '--daemon']);
     try {
-      const port = await new Promise<number>((resolve) =>
-        hung.stdout.once('data', (chunk) => resolve(Number(String(chunk).trim()))),
-      );
-      const pid = hung.pid ?? 0;
+      const port = await hung.port;
+      const pid = hung.child.pid ?? 0;
       writeFileSync(join(home(), SERVE_FILE), JSON.stringify({ port, pid }));
 
       const status = await spawnCli(repo.dir, 'serve', 'status');
@@ -163,8 +171,71 @@ describe('serve start, status and stop', () => {
       await until(() => !processAlive(pid), 10_000);
       expect(readServeFile(home())).toBeUndefined();
     } finally {
-      hung.kill();
+      hung.child.kill();
     }
+  }, 120_000);
+
+  // What stop kills must be this install's background server: a `node … serve` of another program
+  // (vite serve, npx serve) that holds a recorded pid is not.
+  it('does not end a live process that only looks like a serve, when it cannot be confirmed', async () => {
+    ensureUiToken(home());
+    const other = hungServer(['serve', '--port', '5173']);
+    const lookalike = hungServer([MAIN, 'serve']); // otea's own serve, but not the daemon
+    try {
+      for (const bystander of [other, lookalike]) {
+        const port = await bystander.port;
+        const pid = bystander.child.pid ?? 0;
+        writeFileSync(join(home(), SERVE_FILE), JSON.stringify({ port, pid }));
+
+        const stopped = await spawnCli(repo.dir, 'serve', 'stop');
+
+        expect(stopped.code).toBe(0);
+        expect(stopped.out).toContain(`removed the record of ${pid}`);
+        expect(processAlive(pid)).toBe(true);
+        expect(readServeFile(home())).toBeUndefined();
+      }
+    } finally {
+      other.child.kill();
+      lookalike.child.kill();
+    }
+  }, 120_000);
+
+  // Without its key nothing can ask the process anything; that is no proof it is not a server.
+  it('keeps the record of a live process when the key to ask it with is missing', async () => {
+    const hung = hungServer([MAIN, 'serve', '--no-owner', '--no-open', '--daemon']);
+    try {
+      const port = await hung.port;
+      const pid = hung.child.pid ?? 0;
+      rmSync(join(home(), 'ui-token'), { force: true });
+      writeFileSync(join(home(), SERVE_FILE), JSON.stringify({ port, pid }));
+
+      const status = await spawnCli(repo.dir, 'serve', 'status');
+
+      expect(status.code).toBe(13);
+      expect(status.err).toContain('ui-token');
+      expect(readServeFile(home())).toEqual({ port, pid });
+      expect(processAlive(pid)).toBe(true);
+    } finally {
+      hung.child.kill();
+      rmSync(join(home(), SERVE_FILE), { force: true });
+    }
+  }, 120_000);
+
+  // The lock file is made before its owner's id is written into it: an empty one is a start under
+  // way, not one left behind.
+  it('waits for a start whose lock is not written yet', async () => {
+    const lock = join(home(), 'serve.lock');
+    writeFileSync(lock, '');
+
+    const start = spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    const early = readServeFile(home());
+    rmSync(lock, { force: true });
+    const started = await start;
+
+    expect(early).toBeUndefined();
+    expect(started.code).toBe(0);
+    expect(readServeFile(home())).toBeDefined();
   }, 120_000);
 
   it('runs one server per home: a second start reports the one running', async () => {
