@@ -1,5 +1,5 @@
 ---
-applyTo: "src/store/**,src/core/board/**,src/core/preset*.ts,src/app/board*.ts,src/app/migrate*.ts,schemas/**,presets/**,src/cli/**,src/mcp/**,src/core/agent-guide.ts,src/core/agent-prompts.ts,src/app/agent-prompts.ts"
+applyTo: "src/store/**,src/core/board/**,src/core/preset*.ts,src/app/board*.ts,src/app/migrate*.ts,schemas/**,presets/**,src/cli/**,src/mcp/**,src/core/agent-guide.ts,src/core/agent-prompts.ts,src/app/agent-prompts.ts,src/core/authority*.ts,src/core/lease*.ts,src/app/relay*.ts,src/app/gates*.ts"
 ---
 
 # Stored data and the contracts agents depend on (HIGH)
@@ -16,4 +16,4 @@ applyTo: "src/store/**,src/core/board/**,src/core/preset*.ts,src/app/board*.ts,s
 - **MCP** (`src/mcp/`): tool names are the CLI command with underscores (`send-back` is `send_back`), take the command's options by name, return the CLI's text as one text content, and stay in step with the CLI. Flag a tool renamed, removed or reshaped, `structuredContent`, or anything written to stdout besides the protocol. Writes stay pinned to `--project` (`forbidden`, exit 7).
 - **Agent guide and prompts** (`src/core/agent-guide.ts`, `agent-prompts.ts`): every agent reads the guide each session, so each word costs tokens, and its rules are numbered and cross-referenced. Flag a rule added or reworded casually, or a growth in the output of `show`, `list`, `board`, `next` and `handoff`: `src/cli/token-budget.test.ts` holds budgets, and raising one needs a reason in the pull request.
 - **Process spawning** (`src/cli/gitrepo.ts`, `gh.ts`, `forge.ts`, `owner.ts`, `src/server/drift.ts`, `diff-tip.ts`): `execFile` with an array, no shell; branch names, file names and item fields are untrusted. `git` and `gh` calls keep their timeouts. Writes to `.git/hooks` go through `hooks.ts` (marker, version line, `otea hook remove`).
-- **Authority** (`src/core/authority.ts`, `lease.ts`): rules that stop an agent approving its own work, relaying its own step, or pushing to a protected branch must not weaken.
+- **Authority** (`src/core/authority.ts`, `lease.ts`, `src/app/relay.ts`, `src/app/gates.ts`, and their tests): rules that stop an agent approving its own work, relaying its own step, or pushing to a protected branch must not weaken. Flag a gate that can be skipped, a check moved after the action it guards, or a test relaxed to match.
