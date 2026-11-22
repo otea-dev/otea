@@ -3,6 +3,7 @@ import type { ItemChoice } from '../../../../src/core/board/choices.ts';
 import {
   type GateAnswer,
   gateAt,
+  groupRef,
   groupStates,
   handoffCheck,
   isAsked,
@@ -39,7 +40,7 @@ import {
   definitionRoute,
   type RouteWords,
 } from '../../board-studio/preview/route.ts';
-import { listOf, t } from '../../i18n/i18n.ts';
+import { listOf, listOr, t } from '../../i18n/i18n.ts';
 import type { Look } from '../../lanes/looks.ts';
 import type { AgentProfile } from '../../presence.ts';
 import { keptStateWord } from '../../preset-words.ts';
@@ -766,6 +767,19 @@ export function handRows(
       ok: hand.req === 'no' ? (filled?.(hand.ref) ?? false) : !lacks.has(hand.ref),
       required: hand.req !== 'no',
       ...(isEvidence(part) ? {} : { part }),
+    });
+  }
+  // «Al menos N de»: one row for each group, done when enough of its parts hold a file.
+  for (const group of step.groups ?? []) {
+    rows.push({
+      ref: groupRef(group.id),
+      name: t('bi.hand.group', {
+        name: group.name,
+        min: group.min,
+        list: listOr(group.parts.map((ref) => def.parts[ref]?.name ?? ref)),
+      }),
+      ok: !lacks.has(groupRef(group.id)),
+      required: true,
     });
   }
   return rows;

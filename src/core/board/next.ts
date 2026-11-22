@@ -589,7 +589,9 @@ function groupLines(def: BoardDefinition, step: Step, input: NextInput): string[
       : '';
     return `  ${met ? '✓' : '✗'} ${group.name}: ${groupWords(group, def)}${have}`;
   });
-  return Object.keys(states).length === 0 ? lines : [...lines, `  groups: ${JSON.stringify(states)}`];
+  return Object.keys(states).length === 0
+    ? lines
+    : [...lines, `  groups: ${JSON.stringify(states)}`];
 }
 
 // What the step's "at least N of" groups mean for the one handing off, said once: pick what fits.
