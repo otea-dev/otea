@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -144,7 +144,7 @@ describe('hook', () => {
       expect(read('.git/hooks/pre-push').split('\n').slice(0, 3)).toEqual([
         '#!/bin/sh',
         '# otea-hook: pre-push',
-        '# otea-hook-version: 2',
+        '# otea-hook-version: 3',
       ]);
     });
 
@@ -253,9 +253,26 @@ describe('hook', () => {
         expect(said).toContain('git push --no-verify');
         expect(said).toContain('Para la persona');
         expect(push('HEAD:refs/heads/nogate')).toBe(0);
+      });
 
-        installGitHook(repo.dir, oteaLauncher(join(repo.dir, 'missing.mjs'), { execPath: 'node' }));
-        expect(push('HEAD:refs/heads/open')).toBe(1);
+      // An Otea that is gone (uninstalled, a checkout moved) is not one that failed: the push goes
+      // through with one stderr line from the hook, never a Node stack trace.
+      it.each([
+        ['a checkout, on Node', { execPath: 'node' }],
+        ['the desktop app', { execPath: join('gone', 'Otea.exe'), electron: '45.2.1' }],
+      ])('lets the push through, quietly, when Otea is gone: %s', (_, runtime) => {
+        installGitHook(repo.dir, oteaLauncher(join(repo.dir, 'gone', 'main.ts'), runtime));
+
+        const pushed = spawnSync('git', ['push', remote.dir, 'HEAD:refs/heads/frozen'], {
+          cwd: repo.dir,
+          encoding: 'utf8',
+        });
+
+        expect(pushed.status).toBe(0);
+        const said = pushed.stderr.split('\n').filter((line) => line.startsWith('otea:'));
+        expect(said).toHaveLength(1);
+        expect(pushed.stderr).not.toMatch(/Error|\bat .*:\d+/);
+        expect(existsSync(join(repo.dir, 'asked.log'))).toBe(false);
       });
 
       it('checks a branch the push deletes, and leaves tags alone', () => {

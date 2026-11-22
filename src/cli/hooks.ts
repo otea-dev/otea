@@ -27,7 +27,7 @@ const MARK = '# otea-hook: pre-push';
 // version (or none: the ones before #495, which let a push through when Otea could not check it)
 // is outdated: Otea says so, and rewrites it only on otea hook install --git. Bump it whenever the
 // hook's lines change what a push does.
-const VERSION = '# otea-hook-version: 2';
+const VERSION = '# otea-hook-version: 3';
 
 // How a hook runs this Otea, as `otea connect` does for the MCP server.
 const oteaCommand = shellLine;
@@ -70,7 +70,25 @@ function preHook(otea: Launcher): string {
     VERSION,
     '# Written by otea hook install --git; otea hook remove --git removes it.',
   ];
-  return `${[...header, gitCheckLines(otea), 'exit 0'].join('\n')}\n`;
+  return `${[...header, ...missingOteaLines(otea), gitCheckLines(otea), 'exit 0'].join('\n')}\n`;
+}
+
+// When the Otea this hook runs is gone (uninstalled, a checkout moved), the push goes through with
+// one line on stderr rather than failing on a Node stack trace: a missing Otea checks nothing, and
+// is not a check that failed. Looks at the command and at each argument that is a path.
+function missingOteaLines(otea: Launcher): string[] {
+  const isPath = (part: string) => /[\\/]/.test(part);
+  const tests = [otea.command, ...otea.args].flatMap((part) => {
+    if (isPath(part)) return [`[ -e "${part}" ]`];
+    return part === otea.command ? [`command -v ${part} > /dev/null 2>&1`] : [];
+  });
+  if (tests.length === 0) return [];
+  return [
+    `if ! { ${tests.join(' && ')}; }; then`,
+    '  echo "otea: not found, so this push is not checked by Otea (run otea hook install --git to update the hook, or otea hook remove --git)" >&2',
+    '  exit 0',
+    'fi',
+  ];
 }
 
 // The pre-push hook of the repo at cwd, wherever core.hooksPath puts it.
