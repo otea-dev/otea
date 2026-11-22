@@ -107,7 +107,10 @@ Download the installer for your system from the [latest release](https://github.
 
 The installers are not signed yet: Otea is an open-source project without a paid signing certificate so far. Your system warns you the first time; here is how to get past it.
 
-**Windows.** Open the `.exe`. If a blue window says "Windows protected your PC", click **More info**, then **Run anyway**. Otea installs for you alone (no administrator needed) and opens.
+**Windows.**
+
+1. Your browser may warn about the download before you can open it. In **Edge** ("Make sure you trust Otea-Setup-… before you open it", Publisher: Unknown), click the arrow next to **Delete**, then **Keep**; if it asks again, **Show more**, then **Keep anyway**. **Chrome** shows a similar "not commonly downloaded" warning: open the download's menu and choose **Keep** (or **Keep dangerous file**).
+2. Open the `.exe`. If a blue window says "Windows protected your PC", click **More info**, then **Run anyway**. Otea installs for you alone (no administrator needed) and opens.
 
 **macOS.** Open the `.dmg` and drag Otea to Applications. Open Otea: macOS says it cannot check it. Click **Done** (or **OK**), then open **System Settings › Privacy & Security**, scroll down to the message about Otea and click **Open Anyway**. Confirm, and Otea opens; from then on it opens normally. To have `otea` in your terminal, click the Otea icon in the menu bar and choose **Install the otea command**. Updates are manual for now: when a new version is out, Otea tells you, and you download it and drag it to Applications again.
 
