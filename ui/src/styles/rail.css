@@ -398,7 +398,8 @@
   background: var(--hov);
   color: var(--ink);
 }
-.prefs-btn[aria-expanded="true"] {
+.prefs-btn[aria-expanded="true"],
+.prefs-btn[aria-current="page"] {
   background: var(--sheet);
   box-shadow: 0 0 0 1.5px var(--ink);
   color: var(--ink);

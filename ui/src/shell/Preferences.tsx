@@ -1,6 +1,5 @@
 import { type ReactNode, useState } from 'react';
 import { useApp } from '../app/context.tsx';
-import { focusSettings } from '../components/settings-focus.ts';
 import { isStandalone } from '../home-screen.ts';
 import {
   browserLanguage,
@@ -17,20 +16,20 @@ import { Pop } from '../kit/pop/Pop.tsx';
 import { Seg } from '../kit/Seg.tsx';
 import { Swap } from '../kit/Swap.tsx';
 import { type MotionPref, motionPref, setMotionPref } from '../motion/reduced.ts';
-import { NotifyGroup } from '../notify/NotifyGroup.tsx';
-import { InstallHint, wantsInstallLine } from '../offline/InstallHint.tsx';
 import type { ThemeChoice } from '../theme.ts';
 import { loadChoice, switchChoice } from '../theme-dom.ts';
 import { motionNote, prefsScope } from './prefs-model.ts';
 import { shellUi, useShellUi } from './shell-ui.ts';
 import { useMedia } from './use-media.ts';
 
-// Preferences (SPEC §7.3, mock:778-794, 3395-3421): what belongs to this browser. A Pop on the
-// bottom edge, 420 wide, rising from the button at the rail's foot (its line leads from the
-// button's centre), left aligned with the rail; on a phone the same pop pinned 12 px from the
-// sides and the bottom. Theme (the feathered circle), motion (with its note that swaps in place),
-// language (only the interface is translated), notifications (Avisos, where they can reach), the session (the way to Configuración › Teléfono,
-// where this browser may connect a phone) and the server. The handoff is not a choice: it always folds (Plegar).
+// Preferences (SPEC §7.3, mock:778-794, 3395-3421): what belongs to this browser, in two places. The
+// quick ones are a Pop on the bottom edge, 420 wide, rising from the button at the rail's foot (its
+// line leads from the button's centre), left aligned with the rail; on a phone the same pop pinned
+// 12 px from the sides and the bottom: theme (the feathered circle), motion (with its note that
+// swaps in place) and language (only the interface is translated), then the way to the rest. The
+// rest is the Preferences page (PreferencesView): the same three, then notifications (Avisos),
+// the window of the desktop app, the app's install, the session and the server. The handoff is
+// not a choice: it always folds (Plegar).
 
 function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -55,31 +54,15 @@ function MotionNoteText({ pref, systemReduced }: { pref: MotionPref; systemReduc
     : tx('prefs.reducedNote', { label: <b>{t('prefs.reducedLabel')}</b> });
 }
 
-type PrefsBodyProps = {
-  // The server this browser talks to (its host and port).
-  server: string;
-  // Leads to Configuración › Teléfono, where a phone is connected; the panel closes on the way.
-  onPhone: () => void;
-};
-
-export function PrefsBody({ server, onPhone }: PrefsBodyProps) {
-  const app = useApp();
+// The three quick choices, as the pop and the page both show them: each a segment and what it
+// does. Each reads and writes its own store, so either place is always right.
+export function QuickPrefs() {
   const systemReduced = useMedia(REDUCE);
   const [theme, setTheme] = useState<ThemeChoice>(loadChoice);
   const [motion, setMotion] = useState<MotionPref>(motionPref);
   const [lang, setLang] = useState<LanguageChoice>(languageChoice);
-  const [standalone] = useState(
-    () => typeof window !== 'undefined' && isStandalone(window.matchMedia, navigator),
-  );
   return (
     <>
-      <div className="phead" data-i="">
-        <Buddy size={20} />
-        <span>
-          <b>{t('prefs.title')}</b>
-          <small>{t(prefsScope({ phone: app.phone, standalone }))}</small>
-        </span>
-      </div>
       <Group label={t('prefs.theme')}>
         <Seg<ThemeChoice>
           well
@@ -141,26 +124,36 @@ export function PrefsBody({ server, onPhone }: PrefsBodyProps) {
           {tx('prefs.translated', { only: <b>{t('prefs.onlyInterface')}</b> })}
         </p>
       </Group>
-      {wantsInstallLine(app.phone) ? (
-        <Group label={t('offline.install.title')}>
-          <InstallHint />
-        </Group>
-      ) : null}
-      <NotifyGroup />
-      {app.session.canManageDevices ? (
-        <Group label={t('prefs.session')}>
-          <button type="button" className="plink" onClick={onPhone}>
-            <Icon name="link" />
-            {t('prefs.phone')}
-          </button>
-        </Group>
-      ) : null}
-      <Group label={t('prefs.about')}>
-        <dl className="about">
-          <dt>{t('prefs.server')}</dt>
-          <dd>{server}</dd>
-        </dl>
-      </Group>
+    </>
+  );
+}
+
+type PrefsBodyProps = {
+  // Leads to the Preferences page (the rest of the choices); the panel closes on the way.
+  onMore: () => void;
+};
+
+export function PrefsBody({ onMore }: PrefsBodyProps) {
+  const app = useApp();
+  const [standalone] = useState(
+    () => typeof window !== 'undefined' && isStandalone(window.matchMedia, navigator),
+  );
+  return (
+    <>
+      <div className="phead" data-i="">
+        <Buddy size={20} />
+        <span>
+          <b>{t('prefs.title')}</b>
+          <small>{t(prefsScope({ phone: app.phone, standalone }))}</small>
+        </span>
+      </div>
+      <QuickPrefs />
+      <div className="pmore" data-i="">
+        <button type="button" className="plink" onClick={onMore}>
+          {t('prefs.all')}
+          <Icon name="chevron" />
+        </button>
+      </div>
     </>
   );
 }
@@ -202,6 +195,7 @@ export function PrefsButton() {
         className="prefs-btn"
         aria-expanded={ui.prefs}
         aria-haspopup="dialog"
+        aria-current={app.route.view === 'preferences' ? 'page' : undefined}
         data-tip={t('nav.prefs')}
         onClick={() => shellUi.set({ prefs: !ui.prefs })}
       >
@@ -220,11 +214,9 @@ export function PrefsButton() {
         onClose={close}
       >
         <PrefsBody
-          server={typeof window === 'undefined' ? '' : window.location.host}
-          onPhone={() => {
+          onMore={() => {
             close();
-            focusSettings('phone');
-            app.go({ view: 'settings' });
+            app.go({ view: 'preferences' });
           }}
         />
       </Pop>

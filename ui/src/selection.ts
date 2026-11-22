@@ -1,5 +1,5 @@
 // Routes live in the hash (SPEC §6.2): `#/` Te toca, `#/atasco`, `#/b/<board>` a board, `#/triage`,
-// `#/projects`, `#/settings`, `#/performance`, `#/lan` (the pairing dialog over Te toca; `#/settings/lan` over Configuración), `#/studio[/...]` (see
+// `#/projects`, `#/settings`, `#/performance`, `#/preferences`, `#/lan` (the pairing dialog over Te toca; `#/settings/lan` over Configuración), `#/studio[/...]` (see
 // StudioPage), `#/modules[/<name>]` and `#/brief/<id>,<id>`. An open item appends
 // `/i/<id>` to Te toca, Atasco, a board and Triage (`#/b/Errores/i/ERR-214`; `#/i/ERR-214` on
 // Te toca; `#/triage/i/ERR-214` over the pass, which goes on as it was once it closes). A
@@ -12,6 +12,7 @@ export type ViewRoute =
   | { view: 'projects' }
   | { view: 'settings' }
   | { view: 'performance' }
+  | { view: 'preferences' }
   | { view: 'topics'; topic?: string }
   | { view: 'lan'; over?: 'settings' }
   | { view: 'studio'; page: StudioPage }
@@ -32,6 +33,7 @@ const LAN = '/lan';
 const PROJECTS = '/projects';
 const SETTINGS = '/settings';
 const PERFORMANCE = '/performance';
+const PREFERENCES = '/preferences';
 const TOPICS = '/topics';
 
 // LAN access: the pairing code for a phone and the paired devices.
@@ -45,6 +47,9 @@ export const SETTINGS_HASH = `#${SETTINGS}`;
 
 // How each model performs: handoffs, send-backs and rounds per model family and effort.
 export const PERFORMANCE_HASH = `#${PERFORMANCE}`;
+
+// What is yours on this browser, not the project's: theme, language, notifications, the window.
+export const PREFERENCES_HASH = `#${PREFERENCES}`;
 
 // Side topics: what you asked an agent off the work, as short conversations; one open by its id.
 export function topicsHash(topic?: string): string {
@@ -98,6 +103,7 @@ export function routeFromHash(hash: string): Route {
   if (path === PROJECTS) return { view: 'projects' };
   if (path === SETTINGS) return { view: 'settings' };
   if (path === PERFORMANCE) return { view: 'performance' };
+  if (path === PREFERENCES) return { view: 'preferences' };
   if (path === TOPICS || path.startsWith(`${TOPICS}/`)) {
     const topic = decode(path.slice(TOPICS.length + 1));
     return topic ? { view: 'topics', topic } : { view: 'topics' };
@@ -153,6 +159,8 @@ export function hashOf(route: Route): string {
       return SETTINGS_HASH;
     case 'performance':
       return PERFORMANCE_HASH;
+    case 'preferences':
+      return PREFERENCES_HASH;
     case 'topics':
       return topicsHash(route.topic);
     case 'lan':

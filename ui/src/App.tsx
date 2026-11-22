@@ -32,6 +32,7 @@ import { DeskOnly, deskOnlyOf } from './phone/DeskOnly.tsx';
 import { NavSheet } from './phone/NavSheet.tsx';
 import { TabBar } from './phone/TabBar.tsx';
 import type { Route } from './selection.ts';
+import { PreferencesView } from './shell/PreferencesView.tsx';
 import { Rail } from './shell/Rail.tsx';
 import { Topbar } from './shell/Topbar.tsx';
 import { BoardView } from './views/board/BoardView.tsx';
@@ -105,6 +106,8 @@ function View({ route }: { route: Route }): ReactNode {
       return settings();
     case 'performance':
       return <ModelPerformance />;
+    case 'preferences':
+      return <PreferencesView />;
     case 'topics':
       return <TopicsView topic={route.topic} />;
     case 'studio':

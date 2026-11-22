@@ -53,6 +53,8 @@ describe('selection', () => {
     ['#/projects', { view: 'projects' }],
     ['#/settings', { view: 'settings' }],
     ['#/performance', { view: 'performance' }],
+    ['#/preferences', { view: 'preferences' }],
+    ['#/preferences/x', { view: 'toca' }],
     ['#/projects/x', { view: 'toca' }],
     ['#/triagex', { view: 'toca' }],
     ['#/triage/x', { view: 'toca' }],
@@ -76,6 +78,7 @@ describe('selection', () => {
     [{ view: 'projects' }, '#/projects'],
     [{ view: 'settings' }, '#/settings'],
     [{ view: 'performance' }, '#/performance'],
+    [{ view: 'preferences' }, '#/preferences'],
     [{ view: 'lan' }, '#/lan'],
     // TS-14: Emparejar un teléfono from Configuración opens over it, and Hecho goes back there.
     [{ view: 'lan', over: 'settings' }, '#/settings/lan'],
