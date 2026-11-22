@@ -60,7 +60,7 @@ describe('oteaLauncher', () => {
       const launcher = withHome(oteaLauncher(MAIN, { execPath: 'node' }), 'C:\\Otea home');
 
       expect(launcher.env).toEqual({ OTEA_HOME: 'C:\\Otea home' });
-      expect(shellLine(launcher)).toMatch(/^OTEA_HOME="C:\\Otea home" node /);
+      expect(shellLine(launcher)).toMatch(/^OTEA_HOME="C:\\\\Otea home" node /);
     });
 
     it('changes nothing without one', () => {

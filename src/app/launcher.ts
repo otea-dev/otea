@@ -112,9 +112,10 @@ export function withHome(launcher: Launcher, home: string | undefined): Launcher
 }
 
 // A bare word or a flag goes as it is; anything else (a path) in double quotes, with the characters
-// the shell reads inside them (`"`, `$`, a backtick) escaped. A backslash stays: a Windows path.
+// the shell reads inside them (a quote, $, a backtick, a backslash) escaped. A Windows path comes
+// out with its backslashes doubled, which the shell reads back as one.
 export const word = (part: string) =>
-  /^(--)?[\w=.-]+$/.test(part) ? part : `"${part.replace(/(["$`])/g, '\\$1')}"`;
+  /^(--)?[\w=.-]+$/.test(part) ? part : `"${part.replace(/(["$`\\])/g, '\\$1')}"`;
 
 // The launcher as the start of a POSIX shell command line (git hooks, Claude Code hooks).
 export function shellLine(launcher: Launcher): string {
