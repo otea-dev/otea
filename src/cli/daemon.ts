@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { closeSync, mkdirSync, openSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -60,6 +60,96 @@ function logTail(home: string): string {
   }
 }
 
+// The process that starts the server, as far as the start can tell whether it is still coming up.
+type Starting = {
+  failed: () => Error | undefined;
+  ended: () => boolean;
+  kill: () => void;
+};
+
+// A new session on Linux and macOS, with the output in the log. Only the three standard streams
+// reach it: the shell's own pipes are closed in the child, so a command that captures this one's
+// output sees it end as soon as this ends.
+function detach(
+  command: string,
+  args: readonly string[],
+  env: NodeJS.ProcessEnv,
+  logPath: string,
+): Starting {
+  const log = openSync(logPath, 'w');
+  let ended = false;
+  let failed: Error | undefined;
+  const child = spawn(command, args as string[], {
+    // Never from a project's folder: it would stay busy for as long as the server runs.
+    cwd: tmpdir(),
+    env,
+    stdio: ['ignore', log, log],
+    detached: true,
+    windowsHide: true,
+  });
+  closeSync(log);
+  child.on('error', (error) => {
+    failed = error;
+  });
+  child.on('exit', () => {
+    ended = true;
+  });
+  child.unref();
+  return {
+    failed: () => failed,
+    ended: () => ended,
+    kill: () => {
+      if (child.pid !== undefined && processAlive(child.pid)) process.kill(child.pid);
+    },
+  };
+}
+
+// On Windows a child inherits every inheritable handle of its parent, whatever it is given as its
+// streams: started the usual way, the server would hold the pipe a harness reads this command's
+// output from, and that read would not end for as long as the server runs. A process the shell
+// starts (ShellExecute, through PowerShell's Start-Process) inherits none, so PowerShell starts
+// cmd, which runs the server with its output in the log. `-PassThru` names cmd, which lives as long
+// as the server does.
+async function detachOnWindows(
+  command: string,
+  args: readonly string[],
+  env: NodeJS.ProcessEnv,
+  logPath: string,
+): Promise<Starting> {
+  const quoted = [command, ...args].map((word) => `"${word}"`).join(' ');
+  // cmd /s drops the outer pair of quotes and keeps the rest as typed.
+  const line = `/d /s /c "${quoted} >"${logPath}" 2>&1"`;
+  const script = [
+    `$p = Start-Process -FilePath cmd.exe -ArgumentList '${line.replaceAll("'", "''")}' -WindowStyle Hidden -PassThru`,
+    '[Console]::Out.Write($p.Id)',
+  ].join('\n');
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
+  const wrapper = await new Promise<number>((resolve, reject) => {
+    const helper = spawn(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
+      { cwd: tmpdir(), env, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true },
+    );
+    let printed = '';
+    helper.stdout.on('data', (chunk) => {
+      printed += String(chunk);
+    });
+    helper.on('error', reject);
+    helper.on('close', () => {
+      const pid = Number(printed.trim());
+      if (Number.isInteger(pid) && pid > 0) resolve(pid);
+      else reject(new Error('Could not start otea serve: PowerShell did not start it'));
+    });
+  });
+  return {
+    failed: () => undefined,
+    ended: () => !processAlive(wrapper),
+    kill: () => {
+      spawnSync('taskkill', ['/PID', String(wrapper), '/T', '/F'], { windowsHide: true });
+    },
+  };
+}
+
 // Starts otea serve on its own, detached from the shell that ran this (a new session on
 // Linux and macOS, a process of its own without a window on Windows), and resolves once it answers.
 // It watches no owner: it keeps serving after the terminal or the agent's session that started it
@@ -70,7 +160,6 @@ export async function startServer(
   { port, lan, launch }: StartOptions,
 ): Promise<Extract<ServerState, { kind: 'running' }>> {
   mkdirSync(home, { recursive: true });
-  const log = openSync(join(home, SERVE_LOG), 'w');
   const args = [
     ...launch.args,
     'serve',
@@ -80,41 +169,28 @@ export async function startServer(
     String(port),
     ...(lan ? ['--lan'] : []),
   ];
-  let ended: number | null | undefined;
-  let failed: Error | undefined;
-  const child = spawn(launch.command, args, {
-    // Never from a project's folder: Windows would keep it busy for as long as the server runs.
-    cwd: tmpdir(),
-    env: { ...process.env, ...launch.env, OTEA_HOME: home },
-    stdio: ['ignore', log, log],
-    detached: true,
-    windowsHide: true,
-  });
-  closeSync(log);
-  child.on('error', (error) => {
-    failed = error;
-  });
-  child.on('exit', (code) => {
-    ended = code;
-  });
-  child.unref();
+  const env = { ...process.env, ...launch.env, OTEA_HOME: home };
+  const logPath = join(home, SERVE_LOG);
+  const child =
+    process.platform === 'win32'
+      ? await detachOnWindows(launch.command, args, env, logPath)
+      : detach(launch.command, args, env, logPath);
   const deadline = Date.now() + START_TIMEOUT_MS;
   for (;;) {
     const state = await inspectServer(home);
     if (state.kind === 'running') return state;
+    const failed = child.failed();
     if (failed) throw new Error(`Could not start otea serve: ${failed.message}`);
     // Ended without serving: another start may have won (it answers by now), or it failed.
-    if (ended !== undefined) {
+    if (child.ended()) {
       await pause(POLL_MS);
       const other = await inspectServer(home);
       if (other.kind === 'running') return other;
       const said = logTail(home);
-      throw new Error(
-        `otea serve ended before it answered (exit ${ended})${said ? `:\n${said}` : ''}`,
-      );
+      throw new Error(`otea serve ended before it answered${said ? `:\n${said}` : ''}`);
     }
     if (Date.now() > deadline) {
-      if (child.pid !== undefined && processAlive(child.pid)) process.kill(child.pid);
+      child.kill();
       throw new Error(
         `otea serve did not answer in ${START_TIMEOUT_MS / 1000} s; its log is ${join(home, SERVE_LOG)}`,
       );
