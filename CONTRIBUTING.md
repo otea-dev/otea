@@ -5,7 +5,8 @@ Thanks for your interest in Otea.
 ## Before you open a pull request
 
 - Run `npm run check` (lint, type check, tests, the UI build and the build of the published package). CI runs the same on Linux, Windows and macOS.
-- Use [conventional commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`...), one reviewable unit of work per commit.
+- Use [conventional commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`...), one reviewable unit of work per commit. Pull requests merge by rebase, so every commit lands on `main` as you wrote it, and release-please reads its subject. The `commits` check (`.github/workflows/commits.yml`) reads each commit of your pull request, not only its title, and accepts the types `feat`, `fix`, `perf`, `revert`, `docs`, `chore`, `ci`, `build`, `test`, `refactor` and `style`, plus the `Revert "..."` and merge commits GitHub makes. To see what it will say before you push: `node .github/scripts/check-commits.mjs origin/main HEAD`.
+- The pull request description follows [the template](.github/pull_request_template.md): what and why, how you checked it, the risk, and a short checklist.
 - New official modules and presets arrive through pull requests. Local modules and project presets need no approval: they live in your project's `.otea/`.
 
 ## Contributor License Agreement
