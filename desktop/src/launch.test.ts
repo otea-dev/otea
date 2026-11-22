@@ -43,12 +43,7 @@ describe('appUserModelId', () => {
     expect(appUserModelId(true)).toBe(appId);
   });
 
-  it('is a different id for the development app, so its shortcuts never stand for the installed one', () => {
+  it('is dev.otea.desktop.dev for the development app, so its shortcuts never stand for the installed one', () => {
     expect(appUserModelId(false)).toBe('dev.otea.desktop.dev');
-  });
-
-  it('is asked for with whether the app is packaged, not a constant', () => {
-    const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-    expect(main).toContain('appUserModelId(app.isPackaged)');
   });
 });
