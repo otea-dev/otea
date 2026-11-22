@@ -777,12 +777,33 @@ describe('agent presence', () => {
       expect(quietVoices(calls, 'claude', 170_000, new Set([next]))).toEqual(['claude']);
     });
 
-    it('keeps the session own name while the new one has not called after it', () => {
+    // Each case has the old name idle past the window and a signalled name quiet too: only the
+    // order of their last calls says whether the signalled one replaced it. A rule that looks at
+    // the signal alone, or at idleness alone, drops `claude` in every one of them.
+    it.each([
+      ['called before it', 50_000],
+      ['called at the very moment of its last call', 100_000],
+    ])('keeps the session own name while the new one %s', (_, newAt) => {
       const calls = new Map([
         ['claude', 100_000],
-        ['claude-2', 50_000],
+        ['claude-2', newAt],
       ]);
-      expect(quietVoices(calls, 'claude', 400_000, new Set(['claude-2']))).toEqual(['claude-2']);
+      const quiet = quietVoices(calls, 'claude', 400_000, new Set(['claude-2']));
+      expect(quiet).not.toContain('claude');
+      expect(quiet).toEqual(['claude-2']);
+    });
+
+    // Guide rule 2: every subagent declares its profile under its own name, so a dispatch fills the
+    // server with names. None of them is a rename (only whoami says so, and the server tells
+    // `named` of nothing else): the lead that dispatched stays the session however long it idles.
+    it('keeps the lead while its subagents work and it idles past the listening window', () => {
+      const calls = new Map([
+        ['lead', 0],
+        ['lead-scout', 300_000],
+        ['explorer', 310_000],
+      ]);
+      expect(quietVoices(calls, 'lead', 400_000, new Set())).toEqual([]);
+      expect(quietVoices(calls, 'lead', 1_000_000, new Set())).toEqual(['lead-scout', 'explorer']);
     });
 
     it('keeps the old name for a window while it may still call', () => {

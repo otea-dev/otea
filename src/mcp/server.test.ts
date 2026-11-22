@@ -703,9 +703,10 @@ describe('mcp server', () => {
       await other.close();
     });
 
-    // A rename mid-session is told by the agent: whoami or profile under another name. Any other
-    // call under a name says nothing of what the session is called.
-    it('tells the server when an agent says its name with whoami or profile, and on no other call', async () => {
+    // A rename mid-session is told by the agent running whoami under another name. Any other call
+    // says nothing of what the session is called, a profile least of all: every subagent declares
+    // one under its own name.
+    it('tells the server when an agent says its name with whoami, and on no other call', async () => {
       const rebound: string[] = [];
       const server = createMcpServer(COMMANDS, {
         cwd: repo.dir,
@@ -724,7 +725,7 @@ describe('mcp server', () => {
         arguments: { as: 'codex-d', model: 'm', effort: 'low' },
       });
 
-      expect(rebound).toEqual(['codex-c', 'codex-d']);
+      expect(rebound).toEqual(['codex-c']);
       await other.close();
     });
 

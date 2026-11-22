@@ -903,7 +903,7 @@ describe('next among several agents', () => {
     const lease = taken.lease;
     expect(lease?.holder).toBe('quill');
     expect(taken.text).toContain(
-      `You hold it until ${timeText(lease?.expiresAt ?? '')}; your otea calls keep it, and on a long step with none (a rebase, a test run), otea heartbeat ${first.id} every 2 minutes.`,
+      `You hold it until ${timeText(lease?.expiresAt ?? '')}; your otea calls keep it, and on a long step with none (a rebase, a test run), otea heartbeat ${first.id} every 90 seconds.`,
     );
     expect(selectEvents(ctx.db, first.id).at(-1)).toMatchObject({ type: 'claimed' });
     expect(nextFor(ctx, 'kiln', { claim: true }, at).item).toBe(second.id);
