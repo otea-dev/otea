@@ -57,7 +57,10 @@ Descarga el instalador de tu sistema desde la [última versión](https://github.
 
 Los instaladores todavía no están firmados: Otea es un proyecto de código abierto que aún no tiene un certificado de firma de pago. Tu sistema te avisa la primera vez; así lo pasas.
 
-**Windows.** Abre el `.exe`. Si aparece una ventana azul que dice «Windows protegió su PC», haz clic en **Más información** y después en **Ejecutar de todos modos**. Otea se instala solo para ti (no hace falta ser administrador) y se abre.
+**Windows.**
+
+1. Tu navegador puede avisarte de la descarga antes de que puedas abrirla. En **Edge** (pide confirmar que confías en `Otea-Setup-…`), haz clic en la flecha junto a **Eliminar**, luego en **Conservar**; si te lo vuelve a pedir, en **Mostrar más** y después en **Conservar de todos modos**. **Chrome** muestra un aviso parecido (un archivo que casi nadie descarga): abre el menú de la descarga y elige **Conservar** (o **Conservar archivo peligroso**).
+2. Abre el `.exe`. Si aparece una ventana azul que dice «Windows protegió su PC», haz clic en **Más información** y después en **Ejecutar de todos modos**. Otea se instala solo para ti (no hace falta ser administrador) y se abre.
 
 **macOS.** Abre el `.dmg` y arrastra Otea a Aplicaciones. Abre Otea: macOS dice que no puede comprobarlo. Haz clic en **Listo** (o **OK**), abre **Configuración del Sistema › Privacidad y seguridad**, baja hasta el mensaje sobre Otea y haz clic en **Abrir igualmente**. Confirma y Otea se abre; desde entonces se abre como cualquier app. Para tener `otea` en tu terminal, haz clic en el ícono de Otea en la barra de menús y elige **Instalar el comando otea**. Por ahora las actualizaciones son a mano: cuando sale una versión nueva, Otea te avisa, y tú la descargas y la arrastras otra vez a Aplicaciones.
 
