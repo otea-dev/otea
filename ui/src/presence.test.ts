@@ -22,6 +22,18 @@ describe('liveAgents', () => {
 });
 
 describe('parseAgents', () => {
+  // The desk read an agent that handed off as at work because the status the server sent never
+  // reached it: the parser dropped the field.
+  it('keeps the status the server says, and drops one it does not know', () => {
+    const agents = [
+      { name: 'a', lastSeen: 'x', status: 'listening' },
+      { name: 'b', lastSeen: 'x', status: 'dancing' },
+    ];
+    const [a, b] = parseAgents({ agents });
+    expect(a?.status).toBe('listening');
+    expect(b?.status).toBeUndefined();
+  });
+
   it('reads the payload and leaves out what it cannot read', () => {
     const body = {
       agents: [
