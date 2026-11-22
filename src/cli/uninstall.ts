@@ -191,7 +191,7 @@ export function repoTargets(
     for (const tree of worktreesOf(path)) add(tree);
   };
   if (inRepo(cwd)) addRepo(checkoutRoot(cwd) ?? resolve(cwd));
-  for (const { paths } of readRegistry(home, warn)) {
+  for (const { paths } of readRegistry(home, warn) ?? []) {
     for (const { path, kind } of paths) {
       if (!existsSync(path)) {
         missing.push(path);
@@ -210,13 +210,14 @@ export function repoTargets(
 const REGISTRY_FILE = 'registry.db';
 
 // The projects the registry in `home` links to folders, read without writing anything: not
-// created when missing, not migrated, not switched to WAL. Nothing when it cannot be read. A
-// registry no server holds open is read as the file it is (immutable), so no -wal or -shm file
-// appears beside it; one a server has open is read through its WAL, whose files already exist.
+// created when missing, not migrated, not switched to WAL. No projects when there is no registry,
+// and nothing at all (undefined) when there is one that cannot be read. A registry no server holds
+// open is read as the file it is (immutable), so no -wal or -shm file appears beside it; one a
+// server has open is read through its WAL, whose files already exist.
 function readRegistry(
   home: string,
   warn?: (message: string) => void,
-): ReturnType<typeof listProjects> {
+): ReturnType<typeof listProjects> | undefined {
   const file = join(home, REGISTRY_FILE);
   if (!existsSync(file)) return [];
   const live = existsSync(`${file}-wal`);
@@ -229,7 +230,7 @@ function readRegistry(
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     warn?.(`could not read the registry in ${home} (${reason}); only this repo was checked`);
-    return [];
+    return undefined;
   } finally {
     db?.close();
   }
@@ -403,7 +404,15 @@ export function dataTargets(
   const targets: string[] = [];
   const folder = resolve(cwd, home);
   if (existsSync(join(folder, REGISTRY_FILE))) {
-    const registered = readRegistry(folder).flatMap(({ paths }) => paths.map(({ path }) => path));
+    const projects = readRegistry(folder);
+    // A registry that cannot be read cannot say which folders are registered in it: refused.
+    if (projects === undefined) {
+      throw new CommandFailure(
+        'forbidden',
+        `${folder} holds a registry.db that cannot be read, so Otea cannot tell what is registered in it: nothing was deleted; delete the folder yourself if it is Otea's home`,
+      );
+    }
+    const registered = projects.flatMap(({ paths }) => paths.map(({ path }) => path));
     const why = unsafeHome(folder, cwd, own(), registered);
     if (why !== undefined) {
       throw new CommandFailure(
