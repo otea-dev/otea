@@ -93,7 +93,7 @@ describe('desk-only routes, with LAN access on', () => {
   const settings = async () => {
     const response = await server.app.request(
       `/p/${project.identity.id}/api/project/settings`,
-      { headers: { host: LOCAL_HOST } },
+      { headers: { host: LOCAL_HOST, cookie: SESSION_COOKIE } },
       { incoming: { socket: { remoteAddress: '127.0.0.1' } } },
     );
     return (await response.json()) as ProjectSettings;
@@ -102,7 +102,7 @@ describe('desk-only routes, with LAN access on', () => {
   const boards = async () => {
     const response = await server.app.request(
       `/p/${project.identity.id}/api/boards`,
-      { headers: { host: LOCAL_HOST } },
+      { headers: { host: LOCAL_HOST, cookie: SESSION_COOKIE } },
       { incoming: { socket: { remoteAddress: '127.0.0.1' } } },
     );
     return ((await response.json()) as { boards: Array<{ name: string }> }).boards;

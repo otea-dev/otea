@@ -4,7 +4,11 @@ import type { Project } from '../app/project.ts';
 import { lanAddresses } from './lan.ts';
 import { isUnsafePort, type Listening, listen, localNetwork } from './listen.ts';
 import { createServer } from './server.ts';
-import { memoryProject } from './testing.ts';
+import { sessionCookie } from './session.ts';
+import { memoryProject, TOKEN } from './testing.ts';
+
+// A read over the loopback socket as the signed-in browser makes it.
+const signedIn = (port: number) => ({ headers: { cookie: `${sessionCookie(port)}=${TOKEN}` } });
 
 function occupyPort(): Promise<{ port: number; server: Server }> {
   const server = createNetServer();
@@ -16,10 +20,10 @@ function occupyPort(): Promise<{ port: number; server: Server }> {
   });
 }
 
-function reopenStreamOnSameSocket(url: string): Promise<void> {
+function reopenStreamOnSameSocket(url: string, cookie: string): Promise<void> {
   const { hostname, port } = new URL(url);
   const socket = connect(Number(port), hostname);
-  const request = `GET /p/memory-aaaaaa/api/stream HTTP/1.1\r\nHost: ${hostname}:${port}\r\n\r\n`;
+  const request = `GET /p/memory-aaaaaa/api/stream HTTP/1.1\r\nHost: ${hostname}:${port}\r\nCookie: ${cookie}\r\n\r\n`;
   const { promise: ready, resolve } = Promise.withResolvers<void>();
   let received = '';
   let reopened = false;
@@ -56,10 +60,13 @@ describe('listen', () => {
   });
 
   it('serves on 127.0.0.1 only', async () => {
-    listening = await listen(createServer(project), 0);
+    listening = await listen(createServer(project, { token: TOKEN }), 0);
+    const items = `${listening.url}/p/memory-aaaaaa/api/items`;
 
     expect(listening.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
-    expect((await fetch(`${listening.url}/p/memory-aaaaaa/api/items`)).status).toBe(200);
+    expect((await fetch(items, signedIn(listening.port))).status).toBe(200);
+    // Reaching the port is not enough: another program on this computer has no session.
+    expect((await fetch(items)).status).toBe(401);
   });
 
   const lan = lanAddresses()[0];
@@ -73,19 +80,20 @@ describe('listen', () => {
   });
 
   it.skipIf(lan === undefined)('opens the LAN while it runs, and closes it again', async () => {
-    const server = createServer(project, { network: localNetwork });
+    const server = createServer(project, { network: localNetwork, token: TOKEN });
     listening = await listen(server, 0);
     const items = `http://${lan}:${listening.port}/p/memory-aaaaaa/api/items`;
+    const desk = `${listening.url}/p/memory-aaaaaa/api/items`;
 
     await server.lan.open();
     const response = await fetch(items);
     expect(response.status).toBe(401);
     expect(await response.json()).toMatchObject({ error: { code: 'unpaired' } });
-    expect((await fetch(`${listening.url}/p/memory-aaaaaa/api/items`)).status).toBe(200);
+    expect((await fetch(desk, signedIn(listening.port))).status).toBe(200);
 
     await server.lan.close();
     await expect(fetch(items)).rejects.toThrow();
-    expect((await fetch(`${listening.url}/p/memory-aaaaaa/api/items`)).status).toBe(200);
+    expect((await fetch(desk, signedIn(listening.port))).status).toBe(200);
   });
 
   it.skipIf(lan === undefined)('stops listening on the LAN when it stops', async () => {
@@ -110,9 +118,9 @@ describe('listen', () => {
   });
 
   it('ends open streams and stops listening on close', async () => {
-    listening = await listen(createServer(project), 0);
-    const { url } = listening;
-    const response = await fetch(`${url}/p/memory-aaaaaa/api/stream`);
+    listening = await listen(createServer(project, { token: TOKEN }), 0);
+    const { url, port } = listening;
+    const response = await fetch(`${url}/p/memory-aaaaaa/api/stream`, signedIn(port));
     const reader = response.body?.getReader();
 
     await listening.close();
@@ -124,8 +132,8 @@ describe('listen', () => {
   });
 
   it('closes promptly when a client reopens the stream on its kept-alive connection', async () => {
-    listening = await listen(createServer(project), 0);
-    await reopenStreamOnSameSocket(listening.url);
+    listening = await listen(createServer(project, { token: TOKEN }), 0);
+    await reopenStreamOnSameSocket(listening.url, `${sessionCookie(listening.port)}=${TOKEN}`);
 
     const closed = listening.close().then(() => 'closed');
     listening = undefined;

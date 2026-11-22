@@ -18,6 +18,7 @@ export const common = {
   // Errors the UI words itself (a server's refusals: refusal.* below)
   'error.unreachable': "Can't reach Otea. Is `otea serve` running?",
   'error.signIn': 'This browser is not signed in. Run `otea open` to act from it.',
+  'error.readSignIn': 'This browser is not signed in. Run `otea open` to open the desk from it.',
   'error.requestFailed': 'Request failed with {status}',
   'error.getFailed': 'GET {path} failed with {status}',
 

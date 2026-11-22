@@ -22,6 +22,11 @@ function occupyPort(): Promise<{ port: number; server: Server }> {
 const signInFor = (origin: string, token: string, id: string) =>
   `${origin}/auth?token=${token}&next=${encodeURIComponent(`/p/${id}/`)}`;
 
+// What the signed-in browser sends with a read: the session cookie, named after the server's port.
+const sessionOf = (origin: string, token: string) => ({
+  headers: { cookie: `otea_session_${new URL(origin).port}=${token}` },
+});
+
 describe('serve', () => {
   let repo: ReturnType<typeof tempGitRepo>;
   let interrupt: AbortController;
@@ -56,8 +61,12 @@ describe('serve', () => {
 
     expect(code).toBe(0);
     expect(origin).toBeDefined();
-    const items = await (await fetch(`${origin}/p/${id}/api/items`)).json();
+    const items = await (
+      await fetch(`${origin}/p/${id}/api/items`, sessionOf(origin ?? '', token()))
+    ).json();
     expect(items).toMatchObject([{ id: 'TASKS-1', title: 'First' }]);
+    // Reaching the port is not signing in: without the session nothing is read.
+    expect((await fetch(`${origin}/p/${id}/api/items`)).status).toBe(401);
 
     interrupt.abort();
     await vi.waitFor(() => expect(fetch(`${origin}/p/${id}/api/items`)).rejects.toThrow());
@@ -87,7 +96,7 @@ describe('serve', () => {
       const page = new URL(data.url);
       expect(page.origin).toBe(origin);
       // The running server serves the second project too, which it had never seen.
-      const project = await fetch(`${data.url}api/project`);
+      const project = await fetch(`${data.url}api/project`, sessionOf(origin, token()));
       expect(project.status).toBe(200);
       expect(page.pathname).toBe(`/p/${((await project.json()) as { id: string }).id}/`);
     } finally {
@@ -139,7 +148,9 @@ describe('serve', () => {
 
     expect(code).toBe(0);
     expect(err).toBe('otea: Could not open a browser (nope); run "otea open" to try again\n');
-    expect((await fetch(`${origin}/p/${id}/api/items`)).status).toBe(200);
+    expect(
+      (await fetch(`${origin}/p/${id}/api/items`, sessionOf(origin ?? '', token()))).status,
+    ).toBe(200);
   });
 
   it('reuses the token across restarts', async () => {

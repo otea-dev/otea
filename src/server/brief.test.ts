@@ -5,7 +5,7 @@ import type { Project } from '../app/project.ts';
 import { linkItems } from '../app/relations.ts';
 import type { Actor } from '../core/item.ts';
 import { createServer, type OteaServer } from './server.ts';
-import { LOCAL_HOST, memoryProject } from './testing.ts';
+import { LOCAL_HOST, memoryProject, SESSION_COOKIE, TOKEN } from './testing.ts';
 
 const ana: Actor = { kind: 'human', name: 'ana' };
 
@@ -17,7 +17,7 @@ describe('POST /api/brief', () => {
     Promise.resolve(
       server.app.request('/p/memory-aaaaaa/api/brief', {
         method: 'POST',
-        headers: { host: LOCAL_HOST, 'content-type': 'application/json' },
+        headers: { host: LOCAL_HOST, cookie: SESSION_COOKIE, 'content-type': 'application/json' },
         body: JSON.stringify(body),
       }),
     );
@@ -35,7 +35,7 @@ describe('POST /api/brief', () => {
       actor: ana,
       channel: 'cli',
     });
-    server = createServer(project);
+    server = createServer(project, { token: TOKEN });
   });
 
   afterEach(() => {
@@ -43,7 +43,7 @@ describe('POST /api/brief', () => {
     project.db.close();
   });
 
-  it('writes the brief in block order, without a session', async () => {
+  it('writes the brief in block order', async () => {
     const response = await post({
       ids: ['TASKS-2', 'TASKS-1'],
       limits: ['Stay in docs/'],

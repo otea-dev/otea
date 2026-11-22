@@ -126,6 +126,7 @@ import { generateVapidKeys, type PushSender, type VapidKeys, webPushSender } fro
 import {
   type Client,
   deviceCookie,
+  isOpenApiCall,
   LOCAL,
   mountAuth,
   type OteaEnv,
@@ -1020,6 +1021,8 @@ export function createServer(
   };
   // Each project's API runs as its own app; the client the root identified travels with the request.
   const clients = new WeakMap<Request, Client>();
+  const boundPort = () => port;
+  const auth = session(options.token, boundPort);
   app.use(async (c, next) => {
     const client = identify(c);
     c.set('client', client);
@@ -1032,14 +1035,17 @@ export function createServer(
         'This device is not paired; scan the pairing code shown on the desk',
       );
     }
+    // Reaching this computer's port is not signing in: the API answers the signed-in browser and a
+    // paired device only, so another program on this computer reads nothing without the token.
+    if (isApiPath(c.req.path) && !isOpenApiCall(c.req.method, c.req.path) && !auth.canRead(c)) {
+      throw new RejectedRequest(401, 'unauthorized', 'Sign in with "otea open" to read from here');
+    }
     await next();
   });
-  const boundPort = () => port;
   mountAuth(app, options.token, boundPort);
   const keys = options.notify?.keys ?? generateVapidKeys();
   const sender = options.notify?.sender ?? webPushSender(keys);
   const hosts = new Map<string, Host>();
-  const auth = session(options.token, boundPort);
   const computer = options.computer ?? 'Otea';
   const onError = (error: Error, c: Context) => {
     if (error instanceof ForbiddenHost && wantsPage(c)) {

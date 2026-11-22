@@ -33,6 +33,9 @@ const BAD_LINK = `<!doctype html>
 `;
 
 export type Session = {
+  // Reads the API: this computer's signed-in browser, or a paired device. A request from this
+  // computer without the sign-in cookie is no one's yet: another program or another local user.
+  canRead(c: Context): boolean;
   // Acts on items: this computer's signed-in browser, or a paired device.
   canWrite(c: Context): boolean;
   // Shows the pairing code and pairs or revokes devices: this computer's signed-in browser only.
@@ -48,10 +51,19 @@ export function session(token: string | undefined, port: Port): Session {
     token !== undefined &&
     sameToken(getCookie(c, sessionCookie(port())) ?? '', token);
   return {
+    canRead: (c) => clientOf(c).kind === 'device' || signedIn(c),
     canWrite: (c) => clientOf(c).kind === 'device' || signedIn(c),
     canManageDevices: signedIn,
     canConfigure: signedIn,
   };
+}
+
+// What the API answers without a session or a device token: who the caller is (the UI asks before
+// it knows whether it is signed in) and the two pairing calls (their own code check guards them).
+// Everything else under an API path reads or writes only for a signed-in browser or a paired device.
+export function isOpenApiCall(method: string, path: string): boolean {
+  if (method === 'POST') return /^\/api\/pair(?:\/peek)?$/.test(path);
+  return (method === 'GET' || method === 'HEAD') && /^(?:\/p\/[^/]+)?\/api\/session$/.test(path);
 }
 
 // Where a sign-in goes on to: a project's page on this server (`otea open` names the project it

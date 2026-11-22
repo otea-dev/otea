@@ -24,6 +24,8 @@ export type Connection = {
   // under it.
   url: string;
   signInUrl: string;
+  // The session cookie the sign-in sets (`name=value`): the main process reads the API with it.
+  cookie: string;
   // Set when the shell started the server, which it then stops on quit.
   child?: ChildProcess;
 };
@@ -139,6 +141,11 @@ export function followedBase(watched: string, url: string): string | undefined {
   }
 }
 
+// The session cookie the sign-in sets, named after the server's port: the main process sends it
+// with its own reads, as the window does.
+export const sessionCookie = (origin: string, token: string) =>
+  `otea_session_${new URL(origin).port}=${token}`;
+
 // The sign-in link that lands on a project's page: `origin` is the server's, `id` the project's.
 export const signInUrl = (origin: string, token: string, id: string) =>
   `${origin}/auth?token=${encodeURIComponent(token)}&next=${encodeURIComponent(`/p/${id}/`)}`;
@@ -226,7 +233,8 @@ export async function connect(cli: Cli, cwd: string, port?: number): Promise<Con
   const { origin } = new URL(url);
   const page = `${origin}/p/${project.id}`;
   const link = signInUrl(origin, token, project.id);
+  const cookie = sessionCookie(origin, token);
   return attached
-    ? { project, url: page, signInUrl: link }
-    : { project, url: page, signInUrl: link, child };
+    ? { project, url: page, signInUrl: link, cookie }
+    : { project, url: page, signInUrl: link, cookie, child };
 }

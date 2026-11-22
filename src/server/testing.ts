@@ -25,10 +25,16 @@ export function tempDatabase(): { open: () => DatabaseSync; remove: () => void }
 
 export const LOCAL_HOST = '127.0.0.1:4400';
 
-export function request(server: OteaServer, path: string, host = LOCAL_HOST): Promise<Response> {
-  return Promise.resolve(server.app.request(path, { headers: { host } }));
-}
-
 export const TOKEN = 'test-token-0123456789abcdefghijklmnopqrstuv';
 
 export const SESSION_COOKIE = `otea_session_4400=${TOKEN}`;
+
+// A read as this computer's signed-in browser: a server answers it when it was made with `token:
+// TOKEN`. `anonymous` is the same read without the session, as another program would make it.
+export function request(server: OteaServer, path: string, host = LOCAL_HOST): Promise<Response> {
+  return Promise.resolve(server.app.request(path, { headers: { host, cookie: SESSION_COOKIE } }));
+}
+
+export function anonymous(server: OteaServer, path: string, host = LOCAL_HOST): Promise<Response> {
+  return Promise.resolve(server.app.request(path, { headers: { host } }));
+}

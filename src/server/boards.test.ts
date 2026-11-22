@@ -380,7 +380,7 @@ describe('a board published elsewhere', () => {
       });
 
       const response = await server.app.request(`/p/${serving.identity.id}/api/items/${item.id}`, {
-        headers: { host: LOCAL_HOST },
+        headers: { host: LOCAL_HOST, cookie: SESSION_COOKIE },
       });
 
       expect(response.status).toBe(200);

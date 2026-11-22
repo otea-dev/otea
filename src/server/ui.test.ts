@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Project } from '../app/project.ts';
 import { createServer, type OteaServer } from './server.ts';
-import { memoryProject, request } from './testing.ts';
+import { memoryProject, request, TOKEN } from './testing.ts';
 
 describe('ui', () => {
   let dir: string;
@@ -31,7 +31,7 @@ describe('ui', () => {
       mkdirSync(join(uiDir, 'assets'), { recursive: true });
       writeFileSync(join(uiDir, 'index.html'), '<!doctype html><title>Otea</title>');
       writeFileSync(join(uiDir, 'assets', 'app.js'), 'console.log(1)');
-      server = createServer(project, { uiDir });
+      server = createServer(project, { uiDir, token: TOKEN });
     });
 
     it('opens a project from /, and serves its page at /p/<id>/', async () => {

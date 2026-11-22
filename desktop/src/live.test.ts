@@ -1,9 +1,11 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseNotice, sseEvents, sseMessages } from './live.ts';
-import { readServeFile, readUiToken, signInUrl } from './server.ts';
+import { parseNotice, readSnapshot, sseEvents, sseMessages } from './live.ts';
+import { readServeFile, readUiToken, sessionCookie, signInUrl } from './server.ts';
 
 describe('sseEvents', () => {
   it('reads the event names of complete messages and keeps the unfinished rest', () => {
@@ -67,6 +69,32 @@ describe('the serve files', () => {
       expect(readUiToken(dir)).toBeUndefined();
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // The server answers its API to a signed-in browser only, so the tray and the notices read with
+  // the session cookie the sign-in sets: a stand-in server that checks it, as the real one does.
+  it('reads the items with the session cookie the server expects', async () => {
+    const token = 'a'.repeat(43);
+    let port = 0;
+    const server = createServer((request, response) => {
+      const signedIn = request.headers.cookie === `otea_session_${port}=${token}`;
+      response.writeHead(signedIn ? 200 : 401, { 'content-type': 'application/json' });
+      response.end(signedIn ? '[]' : '{"error":{"code":"unauthorized"}}');
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    port = (server.address() as AddressInfo).port;
+    const origin = `http://127.0.0.1:${port}`;
+    const base = `${origin}/p/web-k3x7qa`;
+    try {
+      const signal = new AbortController().signal;
+      await expect(readSnapshot(base, sessionCookie(origin, token), signal)).resolves.toEqual({
+        items: [],
+        collections: [],
+      });
+      await expect(readSnapshot(base, '', signal)).rejects.toThrow('401');
+    } finally {
+      server.close();
     }
   });
 

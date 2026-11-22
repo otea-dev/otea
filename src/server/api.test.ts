@@ -43,7 +43,7 @@ describe('api', () => {
     });
     moveItem(project, { id: 'BUGS-1', to: 'in_progress', actor: bot, channel: 'cli' });
     moveItem(project, { id: 'BUGS-1', to: 'review', actor: bot, channel: 'cli' });
-    server = createServer(project);
+    server = createServer(project, { token: TOKEN });
   });
 
   afterEach(() => {
@@ -234,7 +234,7 @@ describe('api', () => {
     it('gives no icon to a collection whose preset has none', async () => {
       const reviews = memoryProject(REVIEWS);
       addCollection(reviews, { name: 'reviews', preset: 'reviews' });
-      const withReviews = createServer(reviews);
+      const withReviews = createServer(reviews, { token: TOKEN });
 
       const [collection] = (await (
         await request(withReviews, '/p/memory-aaaaaa/api/collections')
@@ -300,7 +300,7 @@ describe('api', () => {
 
     it('includes project presets with their origin', async () => {
       const reviews = memoryProject(REVIEWS);
-      const withReviews = createServer(reviews);
+      const withReviews = createServer(reviews, { token: TOKEN });
 
       const presets = (await (
         await request(withReviews, '/p/memory-aaaaaa/api/presets')
@@ -336,7 +336,7 @@ types:
 `);
       const withIcons = memoryProject(icons);
       addCollection(withIcons, { name: 'mixed', preset: 'icons' });
-      const app = createServer(withIcons);
+      const app = createServer(withIcons, { token: TOKEN });
       const typesOf = async (path: string, name: string) =>
         (
           (await (await request(app, path)).json()) as Array<{ name: string; types: object[] }>

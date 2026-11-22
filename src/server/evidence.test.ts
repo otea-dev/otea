@@ -53,7 +53,7 @@ describe('evidence api', () => {
     it('includes the evidence metadata of the item', async () => {
       attach('before.png', 'png', 'before');
 
-      const item = (await (await get('/p/memory-aaaaaa/api/items/TASKS-1', '')).json()) as ItemView;
+      const item = (await (await get('/p/memory-aaaaaa/api/items/TASKS-1')).json()) as ItemView;
 
       expect(item.evidence).toEqual([
         expect.objectContaining({ id: 1, role: 'before', kind: 'image', filename: 'before.png' }),
