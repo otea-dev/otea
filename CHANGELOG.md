@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.1](https://github.com/otea-dev/otea/compare/v0.1.0...v0.1.1) (2026-11-22)
+
+
+### Bug fixes
+
+* **connect:** print the absolute path of the running Otea, never an otea found on PATH ([e5d0e40](https://github.com/otea-dev/otea/commit/e5d0e40d555746842435e53bb5c612590f64c235))
+* **connect:** trust the otea on PATH only when it is this install ([7429e8d](https://github.com/otea-dev/otea/commit/7429e8dfb5713aaf0d2cf4aec37a94c859bc3eb9))
+* **desktop:** give the development app its own Windows app id ([f559566](https://github.com/otea-dev/otea/commit/f55956677fbb9722d1bcb311be3d5e975e406c96))
+* **hook:** fail open only when a file the hook names is gone, and quote paths safely ([cbcbbc0](https://github.com/otea-dev/otea/commit/cbcbbc04e3c70046ffe025849a45eb0276141b20))
+* **hook:** let a push through, with one stderr line, when the Otea the pre-push hook runs is gone ([e7eeb1a](https://github.com/otea-dev/otea/commit/e7eeb1a6ff6fe50157f044c781092c237899f647))
+* **launcher:** escape backslashes in a quoted shell word ([d723d59](https://github.com/otea-dev/otea/commit/d723d594b145d5f159e6faab084b7e7bef54d5cf))
+* **notes:** an agent answers the person's notes before taking an item back a step, so a note left in the land step is not lost ([f85ed22](https://github.com/otea-dev/otea/commit/f85ed222d5ce361c030556a8358d5b333a4b849e))
+* **questions:** a move the person took back no longer closes a waiting question ([44c6a24](https://github.com/otea-dev/otea/commit/44c6a24be6ba60e1c6572edd912e741ffdb86673))
+* **store:** close a database whose setup fails, for the project, registry and machine stores ([2021496](https://github.com/otea-dev/otea/commit/2021496f95764ca1222316df19e241b07c00be3e))
+* **ui:** centre Rendimiento and Configuración like the other desk views ([d2935ad](https://github.com/otea-dev/otea/commit/d2935ad27e5a55b080b7db4f9420a1945eb0a0b6))
+* **ui:** lay out the Temas view like the other desk views ([539ab30](https://github.com/otea-dev/otea/commit/539ab306947ae0b03cf308617607a349da82edd5))
+
 ## 0.1.0 (2026-11-22)
 
 
