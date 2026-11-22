@@ -36,7 +36,7 @@ const px = (body: string, prop: string) =>
 
 describe('one centring for every reading column', () => {
   it('centres the panel and the board while nothing is open', () => {
-    expect(rule(frame, '.view:not(.narrow) :is(.panel, .board, .sh, .se, .tri)')).toMatch(
+    expect(rule(frame, '.view:not(.narrow) :is(.panel, .board, .sh, .se, .tri, .tp-page)')).toMatch(
       /margin-inline: auto;/,
     );
   });
@@ -119,7 +119,7 @@ describe('one page axis for every view', () => {
   });
 
   it('centres Studio and Triaje on a wide screen like the boards', () => {
-    expect(rule(frame, '.view:not(.narrow) :is(.panel, .board, .sh, .se, .tri)')).toMatch(
+    expect(rule(frame, '.view:not(.narrow) :is(.panel, .board, .sh, .se, .tri, .tp-page)')).toMatch(
       /margin-inline: auto;/,
     );
     expect(px(rule(triage, '.tri'), 'max-width')).toBeGreaterThan(0);
