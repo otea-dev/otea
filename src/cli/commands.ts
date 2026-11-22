@@ -710,7 +710,7 @@ const migrateCommand: Command = {
 
 // How what Otea writes (hooks, the MCP server connect prints) runs this Otea again: Node on
 // main.ts in a checkout, main.js in the published package; the desktop app on its own
-// Electron. connect prefers the otea command on $PATH.
+// Electron. connect names this one, never an otea that happens to be on $PATH.
 const OTEA = oteaLauncher(
   fileURLToPath(new URL(`./main${extname(import.meta.url)}`, import.meta.url)),
   {
@@ -842,7 +842,7 @@ const connect: Command = {
     // read it there.
     const here = checkoutRoot(cwd) ?? root;
     const agentsMd = writeAgentsMd(here);
-    const entry = mcpEntry(withHome(input.oteaOnPath?.() ?? OTEA, input.home), id);
+    const entry = mcpEntry(withHome(OTEA, input.home), id);
     const mcp = { name: MCP_SERVER, ...entry };
     const old = oldMcpEntry(here);
     const text = [
