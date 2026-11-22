@@ -34,6 +34,8 @@ win:
   icon: build/icon.ico
 nsis:
   # Per user, no admin: installs in %LOCALAPPDATA%\Programs\Otea and puts its bin on the user's PATH.
+  # A per-user one-click installer would name that folder after the package (otea-desktop), so
+  # build/installer.nsh sets it to the product name; appId, and so the uninstall GUID, stay as they are.
   oneClick: true
   perMachine: false
   include: build/installer.nsh

@@ -15,7 +15,21 @@
   Pop $0
 !macroend
 
+; electron-builder names a per-user one-click install folder after the package (otea-desktop), not
+; the product: only a per-machine or assisted installer uses the product name. So the default
+; folder is set here to Programs\Otea. A folder an earlier install chose (the registry's
+; InstallLocation) and one given with /D are kept as they are, so an update never moves the app
+; and the uninstaller, the shortcuts and the PATH entry keep pointing at the same place.
+!macro oteaInstallDir
+  ReadRegStr $0 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
+  ${If} $0 == ""
+  ${AndIf} $INSTDIR == "$LOCALAPPDATA\Programs\${APP_FILENAME}"
+    StrCpy $INSTDIR "$LOCALAPPDATA\Programs\${PRODUCT_FILENAME}"
+  ${EndIf}
+!macroend
+
 !macro customInit
+  !insertmacro oteaInstallDir
   CreateDirectory "$APPDATA\Otea"
   FileOpen $0 "$APPDATA\Otea\installing" w
   FileClose $0
