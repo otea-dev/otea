@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.0](https://github.com/otea-dev/otea/compare/v0.1.1...v0.2.0) (2026-11-22)
+
+
+### Features
+
+* **cli:** run otea serve as a detached daemon with serve start, stop and status ([25e6077](https://github.com/otea-dev/otea/commit/25e6077a2ad1dcdfa579ec078fac19c4b9e18db3))
+* **server:** answer the API only to a signed-in browser or a paired device ([4d0f3f6](https://github.com/otea-dev/otea/commit/4d0f3f683c47f5bf1e55902c701ea84a8979ab35))
+
+
+### Bug fixes
+
+* **cli:** keep the daemon's log private, never orphan a live server, serialise starts ([853cc1e](https://github.com/otea-dev/otea/commit/853cc1e73e7641753c6b4ae52bd4a182087ffee3))
+* **cli:** start the server through ShellExecute on Windows so it never holds the caller's pipe ([03bfff0](https://github.com/otea-dev/otea/commit/03bfff039d00d0c277722bd98f4adf2f8d7ce563))
+* **cli:** tighten what serve stop may kill, and two small races ([b8c5fb6](https://github.com/otea-dev/otea/commit/b8c5fb64b26aec41cd52a87ef651d6d410b19904))
+
 ## [0.1.1](https://github.com/otea-dev/otea/compare/v0.1.0...v0.1.1) (2026-11-22)
 
 
