@@ -202,7 +202,9 @@ describe('the agents menu’s rows', () => {
       lease: { holder: 'Kiln', expiresAt: inMinutes(30) },
       asks: { question: 1, by: 'Kiln', text: '¿Liso?', at: ago(5) },
     });
-    const [row] = agentRows([agent('Kiln', { holding: ['CRI-1'] })], [asked], NOW);
+    // The server says a holder waiting for its answer is connected, not working.
+    const kiln = agent('Kiln', { holding: ['CRI-1'], status: 'connected' });
+    const [row] = agentRows([kiln], [asked], NOW);
     expect(row).toMatchObject({ state: 'wait', working: false, item: { id: 'CRI-1' } });
   });
 
@@ -255,6 +257,7 @@ describe('the agents menu’s rows', () => {
       idle: 2,
       connected: 0,
       quiet: 1,
+      silent: 0,
       noProfile: 4,
     });
   });

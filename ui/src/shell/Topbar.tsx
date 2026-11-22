@@ -312,7 +312,9 @@ export function PillWords({ summary }: { summary: PillSummary }) {
             ? t('shell.pill.of', { count: extra.n })
             : extra.kind === 'quiet'
               ? t('shell.pill.quiet', { count: extra.n })
-              : t('shell.pill.noProfile', { count: extra.n })}
+              : extra.kind === 'silent'
+                ? t('shell.pill.silent', { count: extra.n })
+                : t('shell.pill.noProfile', { count: extra.n })}
         </small>
       ) : null}
     </>
@@ -326,6 +328,16 @@ function RowDoing({ row, now }: { row: AgentRow; now: number }) {
     return (
       <span className="held wrap">
         <span className="verb">{t('shell.row.noProfile')}</span>
+      </span>
+    );
+  }
+  if (row.state === 'silent') {
+    const held = row.held[0];
+    return (
+      <span className="held warn">
+        {held ? <NodeGlyph look={held.look} size={14} /> : null}
+        <span className="verb">{t('shell.row.silent')}</span>
+        {held ? <span className="id">{held.id}</span> : null}
       </span>
     );
   }
@@ -396,6 +408,12 @@ export function AgentsMenuBody({
               <>
                 {' · '}
                 <span className="warn-t">{t('shell.pill.quiet', { count: counts.quiet })}</span>
+              </>
+            ) : null}
+            {counts.silent ? (
+              <>
+                {counts.holding || waiting || counts.connected || counts.quiet ? ' · ' : null}
+                <span className="warn-t">{t('shell.pill.silent', { count: counts.silent })}</span>
               </>
             ) : null}
           </span>
@@ -517,7 +535,7 @@ function AgentsPill() {
   // One source for the pill and its menu: the menu's rows.
   const rows = agentRows(agents, app.all, app.now, app.feed);
   const mark = pillMark(connection, rows);
-  const summary = pillSummary(connection, rows, agents.filter((a) => a.status === 'silent').length);
+  const summary = pillSummary(connection, rows);
   const offline = mark === 'offline';
   const counts = agentCounts(rows);
   const close = () => setOpen(false);

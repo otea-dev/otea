@@ -20,7 +20,6 @@ import {
   noteCall,
   offerName,
   ownerGone,
-  ownName,
   presenceSignature,
   quietVoices,
   seeAgent,
@@ -763,24 +762,57 @@ describe('agent presence', () => {
   });
 
   // After a mid-session rename the old name stayed connected: the server beat it for as long as the
-  // session was open, as «the agent this session is».
-  describe('ownName', () => {
-    it('is the first name that called, then the one the session took after', () => {
-      expect(ownName(undefined, 'claude')).toBe('claude');
-      expect(ownName('claude', 'claude-2')).toBe('claude-2');
-    });
-
-    it('keeps the session its own name for its subagents', () => {
-      expect(ownName('claude', 'claude-haiku-hacer')).toBe('claude');
-      expect(ownName('claude', 'claude')).toBe('claude');
-    });
-
-    it('lets the old name go quiet after a rename', () => {
+  // session was open, as «the agent this session is». A rename is told by the agent (whoami or
+  // profile under the new name, `named`), never guessed from how the names look.
+  describe('a rename mid-session', () => {
+    it.each([
+      ['a name that is no subagent of it', 'claude-orquestador'],
+      ['a number after it', 'claude-2'],
+      ['an unrelated name', 'mender'],
+    ])('lets the old name go quiet once the agent took %s, and keeps the new one', (_, next) => {
       const calls = new Map([
         ['claude', 0],
-        ['claude-2', 100_000],
+        [next, 100_000],
       ]);
-      expect(quietVoices(calls, ownName('claude', 'claude-2'), 170_000)).toEqual(['claude']);
+      expect(quietVoices(calls, 'claude', 170_000, new Set([next]))).toEqual(['claude']);
+    });
+
+    it('keeps the session own name while the new one has not called after it', () => {
+      const calls = new Map([
+        ['claude', 100_000],
+        ['claude-2', 50_000],
+      ]);
+      expect(quietVoices(calls, 'claude', 400_000, new Set(['claude-2']))).toEqual(['claude-2']);
+    });
+
+    it('keeps the old name for a window while it may still call', () => {
+      const calls = new Map([
+        ['claude', 100_000],
+        ['claude-2', 120_000],
+      ]);
+      expect(quietVoices(calls, 'claude', 170_000, new Set(['claude-2']))).toEqual([]);
+    });
+
+    // Guessing from names broke these: a subagent called through the same server, which never told
+    // the server a rename, must not move «the agent this session is».
+    it('never moves the session from a subagent that kept the old prefix', () => {
+      const calls = new Map([
+        ['claude', 0],
+        ['claude-scout', 100_000],
+      ]);
+      expect(quietVoices(calls, 'claude', 170_000)).toEqual([]);
+      expect(quietVoices(calls, 'claude', 1_000_000)).toEqual(['claude-scout']);
+    });
+
+    it('never moves the session from a subagent with no prefix, however its calls alternate', () => {
+      const calls = new Map([
+        ['claude', 0],
+        ['explorer', 100_000],
+      ]);
+      expect(quietVoices(calls, 'claude', 170_000)).toEqual([]);
+      calls.set('claude', 160_000);
+      calls.set('explorer', 165_000);
+      expect(quietVoices(calls, 'claude', 400_000)).toEqual(['explorer']);
     });
   });
 

@@ -485,6 +485,7 @@ export const detail = {
   'sheet.stuck.agents': 'give it to',
   'sheet.stuck.working': 'working',
   'sheet.stuck.quiet': 'quiet',
+  'sheet.stuck.silent': 'no signal',
   'sheet.stuck.free': 'free',
   'sheet.stuck.none': 'No agent has shown up yet.',
   'sheet.aside.resume': 'Resume',

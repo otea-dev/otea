@@ -78,8 +78,8 @@ export const common = {
     other: 'en cola: {count} agentes trabajando',
   },
   'listen.busyLead': {
-    one: '{agent} está ocupado con otro ítem; lo verá cuando vuelva a esperar.',
-    other: '{count} agentes están ocupados con otros ítems; lo verán cuando vuelvan a esperar.',
+    one: '{agent} está trabajando en otro ítem; lo verá cuando vuelva a esperar.',
+    other: '{count} agentes están trabajando en otros ítems; lo verán cuando vuelvan a esperar.',
   },
   'listen.activeLead': {
     one: '{agent} está trabajando y lo verá cuando vuelva a esperar.',

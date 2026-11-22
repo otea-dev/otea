@@ -4,7 +4,7 @@ import type { Connection } from '../hooks.ts';
 import { t } from '../i18n/i18n.ts';
 import { type Look, lookOf } from '../lanes/looks.ts';
 import { isWorking } from '../listening.ts';
-import { type Agent, type AgentProfile, liveAgents } from '../presence.ts';
+import { type Agent, type AgentProfile, isConnected, liveAgents, statusOf } from '../presence.ts';
 import { projectHref, waitingElsewhere, whereOf } from '../projects.ts';
 import type { Item, ProjectOverview, ProjectView } from '../types.ts';
 import { type AgentStateName, agentState } from '../views/toca/trace.ts';
@@ -88,9 +88,9 @@ export type HeldItem = { id: string; title: string; look: Look };
 
 // What an agent is up to, in the menu's order of attention: gone quiet on a lease that ran out,
 // working on what it holds, waiting for your answer, or idle.
-export type AgentDoing = 'quiet' | 'work' | 'wait' | 'idle';
+export type AgentDoing = 'quiet' | 'silent' | 'work' | 'wait' | 'idle';
 
-const ATTENTION: readonly AgentDoing[] = ['quiet', 'work', 'wait', 'idle'];
+const ATTENTION: readonly AgentDoing[] = ['quiet', 'silent', 'work', 'wait', 'idle'];
 
 export type AgentRow = {
   name: string;
@@ -104,7 +104,10 @@ export type AgentRow = {
   held: HeldItem[];
   // It went quiet: a lease of its ran out with nobody releasing it.
   quiet: boolean;
-  // It holds a lease now.
+  // It holds a live lease and gave no sign for a while, with nothing saying its session ended: not
+  // connected, not at work («sin señal»).
+  silent: boolean;
+  // The server says it is at work (status working).
   working: boolean;
   // It waits in otea wait, so what you do here reaches it; connected only (its MCP server open, idle
   // in its chat) it hears nothing. An older server that does not say counts as waiting.
@@ -146,41 +149,54 @@ export function agentRows(
   const stuckBy = (name: string) =>
     items.filter((it) => isStuck(it, now) && it.expiredLease?.holder === name);
   const live = liveAgents(agents);
-  const gone = agents.filter((a) => !a.live && stuckBy(a.name).length > 0);
-  const rows = [...live, ...liveAgents(gone.map((a) => ({ ...a, live: true })))].map(
-    (a): AgentRow => {
-      const holding = a.holding.map((id): HeldItem => {
-        const it = items.find((each) => each.id === id);
-        return { id, title: it?.title ?? '', look: it ? lookOf(it, now) : 'working' };
-      });
-      const stuck = stuckBy(a.name).map(
-        (it): HeldItem => ({ id: it.id, title: it.title, look: 'stuck' }),
-      );
-      const st = agentState(a.name, items, feed, now, a.lastSeen);
-      const quiet = stuck.length > 0;
-      // An item whose question waits for you is not work: the agent waits for your answer. One
-      // no longer connected works on nothing, whatever its lease still holds (P7-R3-10).
-      const working = live.includes(a) && isWorking(a, items, now);
-      const state: AgentDoing = working ? 'work' : quiet ? 'quiet' : DOING[st.state];
-      return {
-        name: a.name,
-        harness: harnessOf(a),
-        profile: a.profile ?? null,
-        confirmed: a.profileConfirmed ?? false,
-        changedAt: a.profileChangedAt ?? null,
-        held: [...holding, ...stuck.filter((s) => !holding.some((h) => h.id === s.id))],
-        quiet,
-        working,
-        waiting: a.waiting !== false,
-        mcpMissing: a.mcp ? a.mcp === 'missing' : a.mcpMissing === true,
-        mcpUnused: a.mcp === 'unused',
-        state,
-        since: st.since,
-        item: st.item ? { id: st.item.id, title: st.item.title, look: lookOf(st.item, now) } : null,
-        lastSeen: a.lastSeen,
-      };
-    },
+  const byRecent = (list: readonly Agent[]) =>
+    list.toSorted((a, b) => (Date.parse(b.lastSeen) || 0) - (Date.parse(a.lastSeen) || 0));
+  // Not connected, yet listed: one holding a live lease that gave no sign («sin señal»), and one
+  // gone quiet on an item it left stuck, so the menu says where the silence is.
+  const silent = byRecent(agents.filter((a) => statusOf(a) === 'silent'));
+  const gone = byRecent(
+    agents.filter((a) => !isConnected(a) && !silent.includes(a) && stuckBy(a.name).length > 0),
   );
+  const rows = [...live, ...silent, ...gone].map((a): AgentRow => {
+    const holding = a.holding.map((id): HeldItem => {
+      const it = items.find((each) => each.id === id);
+      return { id, title: it?.title ?? '', look: it ? lookOf(it, now) : 'working' };
+    });
+    const stuck = stuckBy(a.name).map(
+      (it): HeldItem => ({ id: it.id, title: it.title, look: 'stuck' }),
+    );
+    const st = agentState(a.name, items, feed, now, a.lastSeen);
+    const quiet = stuck.length > 0;
+    // An item whose question waits for you is not work: the agent waits for your answer. One
+    // no longer connected works on nothing, whatever its lease still holds (P7-R3-10).
+    const working = live.includes(a) && isWorking(a);
+    const isSilent = silent.includes(a);
+    const state: AgentDoing = working
+      ? 'work'
+      : quiet
+        ? 'quiet'
+        : isSilent
+          ? 'silent'
+          : DOING[st.state];
+    return {
+      name: a.name,
+      harness: harnessOf(a),
+      profile: a.profile ?? null,
+      confirmed: a.profileConfirmed ?? false,
+      changedAt: a.profileChangedAt ?? null,
+      held: [...holding, ...stuck.filter((s) => !holding.some((h) => h.id === s.id))],
+      quiet,
+      silent: isSilent,
+      working,
+      waiting: a.waiting !== false,
+      mcpMissing: a.mcp ? a.mcp === 'missing' : a.mcpMissing === true,
+      mcpUnused: a.mcp === 'unused',
+      state,
+      since: st.since,
+      item: st.item ? { id: st.item.id, title: st.item.title, look: lookOf(st.item, now) } : null,
+      lastSeen: a.lastSeen,
+    };
+  });
   return rows
     .map((row, index) => ({ row, index }))
     .sort(
@@ -200,16 +216,18 @@ export function agentCounts(rows: readonly AgentRow[]): {
   idle: number;
   connected: number;
   quiet: number;
+  silent: number;
   noProfile: number;
 } {
   const holding = rows.filter((a) => a.working).length;
-  const free = rows.filter((a) => !a.working && !a.quiet);
+  const free = rows.filter((a) => !a.working && !a.quiet && !a.silent);
   return {
-    live: rows.length,
+    live: rows.filter((a) => !a.silent).length,
     holding,
     idle: free.filter((a) => a.waiting).length,
     connected: free.filter((a) => !a.waiting).length,
     quiet: rows.filter((a) => a.quiet).length,
+    silent: rows.filter((a) => a.silent && !a.quiet).length,
     noProfile: rows.filter((a) => !a.profile).length,
   };
 }
@@ -235,7 +253,7 @@ export function pillMark(connection: Connection, rows: readonly AgentRow[]): Pil
 
 // The pill's second datum, in grey or in warn: one gone quiet wins over one without a profile,
 // which wins over the total ("de 3") beside those working. Never more than two data on the pill.
-export type PillExtra = { kind: 'quiet' | 'noProfile' | 'of'; n: number } | null;
+export type PillExtra = { kind: 'quiet' | 'silent' | 'noProfile' | 'of'; n: number } | null;
 
 export type PillSummary =
   | { kind: 'offline' }
@@ -247,26 +265,23 @@ export type PillSummary =
 
 // What the pill says (mock §1): what happens, not how many there are. "2 trabajando" before "3
 // agentes"; with nobody working, how many wait; nobody connected; or that it cannot tell.
-export function pillSummary(
-  connection: Connection,
-  rows: readonly AgentRow[],
-  // The agents with no sign for a while that still hold a live lease (status silent).
-  silent = 0,
-): PillSummary {
+export function pillSummary(connection: Connection, rows: readonly AgentRow[]): PillSummary {
   if (connection === 'reconnecting') return { kind: 'offline' };
   const c = agentCounts(rows);
-  if (c.live === 0) return silent > 0 ? { kind: 'silent', count: silent } : { kind: 'none' };
+  if (c.live === 0) return c.silent > 0 ? { kind: 'silent', count: c.silent } : { kind: 'none' };
   // Only agents gone quiet: nobody listens, as Te toca says; the pill still names the silence.
   if (c.holding === 0 && c.idle === 0 && c.connected === 0) return { kind: 'none', quiet: c.quiet };
   const working = c.holding > 0;
   const extra: PillExtra =
     c.quiet > 0
       ? { kind: 'quiet', n: c.quiet }
-      : c.noProfile > 0
-        ? { kind: 'noProfile', n: c.noProfile }
-        : working && c.live > c.holding
-          ? { kind: 'of', n: c.live }
-          : null;
+      : c.silent > 0
+        ? { kind: 'silent', n: c.silent }
+        : c.noProfile > 0
+          ? { kind: 'noProfile', n: c.noProfile }
+          : working && c.live > c.holding
+            ? { kind: 'of', n: c.live }
+            : null;
   if (working) return { kind: 'working', count: c.holding, extra };
   // Connected but none waiting: nobody hears the desk, and the pill does not say "escuchando".
   return c.idle > 0

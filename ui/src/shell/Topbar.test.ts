@@ -87,6 +87,40 @@ describe('the topbar', () => {
     expect(html).toContain('class="orb"');
   });
 
+  // An agent on a long command-line step gave no sign for a while: the pill said «Sin agentes»
+  // over a menu that did not list it. Through the real wiring, pill and menu now say the same.
+  it('says «sin señal» on the pill and in the menu for an agent holding a lease that went silent', () => {
+    setLanguage('es');
+    const silent = agent('Mender', {
+      live: false,
+      status: 'silent',
+      holding: ['ERR-231'],
+      profile: opus,
+    });
+    const html = topbar({ agents: [silent] });
+    expect(html).toContain('<span>1 sin señal</span>');
+    expect(html).not.toContain('Sin agentes');
+
+    const rows = agentRows([silent], [], NOW);
+    const menu = renderIn(
+      testApp(),
+      createElement(AgentsMenuBody, {
+        project: 'Hollowmere',
+        rows,
+        counts: agentCounts(rows),
+        now: NOW,
+        onOpen: () => undefined,
+        onActivity: () => undefined,
+        onConnect: () => undefined,
+        onPerformance: () => undefined,
+      }),
+    );
+    expect(menu).toContain('data-agent="Mender"');
+    expect(menu).toContain('sin señal · tiene un ítem');
+    expect(menu).toContain('1 sin señal');
+    expect(menu).not.toContain('Todavía no hay agentes conectados');
+  });
+
   it('says how many wait when nobody works, and that one has no profile', () => {
     setLanguage('es');
     const html = topbar({ agents: [agent('Scout', { profile: opus }), agent('Quill')] });

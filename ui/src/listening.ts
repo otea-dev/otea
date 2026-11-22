@@ -2,7 +2,7 @@ import { isClosed, isLandStep, positionOf } from '../../src/core/board/engine.ts
 import type { BoardDefinition } from '../../src/core/board/model.ts';
 import { activeLease } from './active-lease.ts';
 import { t } from './i18n/i18n.ts';
-import type { Agent } from './presence.ts';
+import { type Agent, isConnected, statusOf } from './presence.ts';
 import type { Item, ItemEvent } from './types.ts';
 
 // Whether the desk is heard (PLAN5 G3): only an agent waiting in otea wait wakes for what the person
@@ -29,15 +29,9 @@ export function handsToAgent(
   return choices.some((choice) => choice?.move.turn === 'agent');
 }
 
-// Whether the agent called Otea lately: any command, through the command line or MCP. A listener's
-// beat is no call: an open MCP server is heard whether or not its agent acts, and idle in its chat,
-// it hears nothing of the desk.
-const calledLately = (a: Agent, now: number) =>
-  !!a.actedAt && now - (Date.parse(a.actedAt) || 0) <= AT_WORK_MS;
-
-// The agents at work now (P7-R2-9, P7-R2-12): each is connected, which the server says of a holder
-// only while its session is heard (P7-R3-10), and holds an item it works on, not one that only
-// waits for your answer; or it called Otea lately, between two items too. While one is, what the
+// The agents at work now (P7-R2-9, P7-R2-12), as the server says (status working): connected, and
+// holding an item they work on (not one that only waits for their question to be answered), or
+// having called Otea lately without handing off, between two items too. While one is, what the
 // person hands to an agent reaches it when it waits again, and an item nobody hears waits its turn
 // in a queue: the desk says so calmly, not as an alarm.
 export function workingAgents(
@@ -48,19 +42,16 @@ export function workingAgents(
   return (agents ?? []).filter((a) => isWorking(a, items, now)).map((a) => a.name);
 }
 
-// Whether one agent is at work: the one definition the pill, the menu and the queue note share. It
-// holds an item it works on (not one that only waits for your answer), or called Otea lately
-// without having just handed its work off, which the server says in `status` (an older one does
-// not: any recent call counts).
+// Whether one agent is at work: the server's status, the one definition the pill, the menu and the
+// queue note share (it holds an item it works on, not one that waits for its own question to be
+// answered; or it called Otea lately and did not just hand its work off). `items` and `now` stay
+// for the callers; the desk works out nothing of its own.
 export function isWorking(
   a: Agent,
-  items: readonly Pick<Item, 'id' | 'asks'>[],
-  now: number,
+  _items?: readonly Pick<Item, 'id' | 'asks'>[],
+  _now?: number,
 ): boolean {
-  if (!a.live) return false;
-  const asks = (id: string) => !!items.find((it) => it.id === id)?.asks;
-  if (a.holding.some((id) => !asks(id))) return true;
-  return calledLately(a, now) && (a.status === undefined || a.status === 'working');
+  return statusOf(a) === 'working';
 }
 
 // The agent that holds the item's live lease while it is no longer connected (P7-R3-10): its
@@ -73,7 +64,7 @@ export function goneHolder(
 ): Agent | null {
   const lease = activeLease(item.lease, now);
   const holder = lease ? agents?.find((a) => a.name === lease.holder) : undefined;
-  return holder && !holder.live ? holder : null;
+  return holder && !isConnected(holder) ? holder : null;
 }
 
 // The holder of the item's live lease when its question on it was answered and it never picked the
@@ -116,7 +107,7 @@ export type Hearing =
 // Whether no agent is here at all (none connected, none silent on a lease): an empty room, which
 // the desk says calmly, never as a silence to fix. Before presence loads it is not.
 export function noAgents(agents: readonly Agent[] | null | undefined): boolean {
-  return !!agents && !agents.some((a) => a.live || a.status === 'silent');
+  return !!agents && agents.every((a) => statusOf(a) === 'away');
 }
 
 export function hearing(
@@ -173,7 +164,7 @@ export function unheard(
   const lease = activeLease(item.lease, now);
   if (!lease) return true;
   const holder = agents?.find((a) => a.name === lease.holder);
-  return !holder?.live || now - (Date.parse(holder.lastSeen) || 0) > AT_WORK_MS;
+  return !holder || !isConnected(holder) || now - (Date.parse(holder.lastSeen) || 0) > AT_WORK_MS;
 }
 
 // The items waiting behind `item` to land: on a board's land step (one agent lands at a time on a
