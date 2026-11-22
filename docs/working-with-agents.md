@@ -6,6 +6,7 @@ With `otea` on your PATH (see [Install](../README.md#install)), run it inside th
 
 ```sh
 cd /path/to/your/project
+otea start                                 # for you, once: the project, a first board (--template <key>), the desk in the background and the text for your agent; run again, it reports what exists. An agent never runs it
 otea init                                  # a new project starts with no board: pick them here or in Studio
 otea init --template changes               # Cambios, the changes you ask an agent for (templates below; none for no board)
 otea board add Errores --template bug-reports   # another board, from a template, published at once (yours: no agent name)
