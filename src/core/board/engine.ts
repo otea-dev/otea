@@ -425,6 +425,22 @@ export function handoff(
   if (!mayDo(step, options.by)) return { ok: false, code: 'not_yours' };
   if (options.way !== undefined && backWaysOf(def, step.id).includes(options.way)) {
     if (!options.reason?.trim()) return { ok: false, code: 'reason_required' };
+    // The person's notes of the round are answered first: going back leaves the round, and a note
+    // still unanswered would be lost with it.
+    if (facts.unanswered && facts.unanswered.length > 0)
+      return {
+        ok: false,
+        code: 'missing',
+        missing: [
+          {
+            ref: NOTES_REF,
+            name: NOTES_REF,
+            reason: 'missing',
+            fresh: false,
+            notes: [...facts.unanswered],
+          },
+        ],
+      };
     return { ok: true, to: { step: options.way, phase: 'doing' }, back: true };
   }
   const ways = waysOf(def, step.id, facts);
