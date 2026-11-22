@@ -2,6 +2,7 @@ import { createElement, Fragment } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ago, item, NOW, officialType } from '../../derive/fixtures.ts';
+import { textOf } from '../../html-text.ts';
 import { setLanguage } from '../../i18n/i18n.ts';
 import type { CollectionView, Item } from '../../types.ts';
 import { FoldButton, listaBlocks, type RowCtx } from './rows.tsx';
@@ -12,7 +13,7 @@ const fold = (open: boolean) =>
   renderToStaticMarkup(
     createElement(FoldButton, { item: item({ id: 'TAR-1' }), n: 2, open, onFold: () => {} }),
   );
-const said = (html: string) => html.replace(/<[^>]+>/g, '').trim();
+const said = (html: string) => textOf(html).trim();
 
 describe('the fold on a parent row', () => {
   it('says how many are inside, with no sign that reads as a subtraction', () => {

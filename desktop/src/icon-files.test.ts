@@ -34,6 +34,12 @@ describe('the icon files Otea ships', () => {
       expect(pngSize(png)).toEqual([sizes[index], sizes[index]]);
     }
     const builder = read('desktop/electron-builder.yml').toString();
-    expect(builder).toMatch(/win:\s+target: nsis\s+(#.*\s+)*icon: build\/icon\.ico/);
+    // The `win:` block, comments aside: nsis first, then the icon (read by line, so no pattern can backtrack).
+    const win = builder
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => !line.startsWith('#'));
+    const at = win.indexOf('win:');
+    expect(win.slice(at + 1, at + 3)).toEqual(['target: nsis', 'icon: build/icon.ico']);
   });
 });
