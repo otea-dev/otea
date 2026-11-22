@@ -574,21 +574,22 @@ function groupStateOf(group: Group, input: NextInput): GroupState | undefined {
   );
 }
 
-// A group's line, with its state as one compact JSON object under it, for a reader that parses.
+// Each group's line, then its state once more as one JSON object line, `groups: {…}`, in the style
+// of `fields: {…}`, for a reader that parses: by group name, how many it needs, how many hold a
+// file, the parts it picks from and the ones that do.
 function groupLines(def: BoardDefinition, step: Step, input: NextInput): string[] {
-  return (step.groups ?? []).flatMap((group) => {
+  const groups = step.groups ?? [];
+  const states: Record<string, GroupState> = {};
+  const lines = groups.map((group) => {
     const state = groupStateOf(group, input);
     const met = !input.missing.some(({ ref }) => ref === groupRef(group.id));
+    if (state) states[group.name] = state;
     const have = state
       ? ` (${state.have} attached${state.held.length ? `: ${state.held.join(', ')}` : ''})`
       : '';
-    const json = state
-      ? [
-          `      ${JSON.stringify({ group: group.name, min: state.min, have: state.have, of: state.parts, held: state.held })}`,
-        ]
-      : [];
-    return [`  ${met ? '✓' : '✗'} ${group.name}: ${groupWords(group, def)}${have}`, ...json];
+    return `  ${met ? '✓' : '✗'} ${group.name}: ${groupWords(group, def)}${have}`;
   });
+  return Object.keys(states).length === 0 ? lines : [...lines, `  groups: ${JSON.stringify(states)}`];
 }
 
 // What the step's "at least N of" groups mean for the one handing off, said once: pick what fits.
