@@ -31,18 +31,19 @@ export function attentionFrame({ yours, working }: Attention): AttentionFrame {
   return working ? 'working' : 'idle';
 }
 
-// The state never lives in the mark alone: the title carries the count, "(2) Otea". In a project
-// the title starts with its name, "standupo (2) · Otea". On the phone it is the project's name
-// alone: Chrome's «Add to Home screen» names the shortcut after the title, and offered «(1) Otea»
-// for every project (P7-13, P6-R2-6); the tab bar already counts what is yours.
+// The state never lives in the mark alone: the title carries the count, "Otea (2)". In a project
+// the title starts with the app's name, then the project and the count, "Otea · standupo (2)". On
+// the phone it is the project's name alone: Chrome's «Add to Home screen» names the shortcut after
+// the title, and offered «(1) Otea» for every project (P7-13, P6-R2-6); the tab bar already counts
+// what is yours.
 export function attentionTitle(
   { yours }: Attention,
   where: { project?: string | undefined; phone?: boolean } = {},
 ): string {
   const { project, phone = false } = where;
   if (phone) return project || 'Otea';
-  if (!project) return yours > 0 ? `(${yours}) Otea` : 'Otea';
-  return yours > 0 ? `${project} (${yours}) · Otea` : `${project} · Otea`;
+  if (!project) return yours > 0 ? `Otea (${yours})` : 'Otea';
+  return yours > 0 ? `Otea · ${project} (${yours})` : `Otea · ${project}`;
 }
 
 // Expiry writes nothing, so no change event arrives: when the working state has to be read again.
