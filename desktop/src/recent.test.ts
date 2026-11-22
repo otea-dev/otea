@@ -1,8 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { firstProject, forget, parseRecents, type Recent, remember } from './recent.ts';
+import { firstProject, forget, parseRecents, type Recent, recentRoot, remember } from './recent.ts';
 
 const a: Recent = { root: '/work/a', name: 'A', openedAt: 1 };
 const b: Recent = { root: '/work/b', name: 'B', openedAt: 2 };
+
+describe('a root from the picker page', () => {
+  it('is one of the stored recent roots, and nothing else', () => {
+    expect(recentRoot('/work/a', [a, b])).toBe('/work/a');
+    expect(recentRoot('/work/c', [a, b])).toBeUndefined();
+    expect(recentRoot('/work', [a, b])).toBeUndefined();
+    expect(recentRoot('', [a, b])).toBeUndefined();
+  });
+
+  it('is a string: a coerced value never matches', () => {
+    const odd: Recent = { root: '1,2', name: 'odd', openedAt: 1 };
+    expect(recentRoot(['1', '2'], [odd])).toBeUndefined();
+    expect(recentRoot({ toString: () => '/work/a' }, [a])).toBeUndefined();
+    expect(recentRoot(undefined, [{ ...a, root: 'undefined' }])).toBeUndefined();
+    expect(recentRoot(null, [a])).toBeUndefined();
+  });
+});
 
 describe('recent projects', () => {
   it('keeps the last opened first, once, and at most eight', () => {

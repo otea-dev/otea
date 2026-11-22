@@ -12,6 +12,12 @@ export function forget(list: readonly Recent[], root: string): Recent[] {
   return list.filter((each) => each.root !== root);
 }
 
+// A root the picker page sent: it counts only when it is a string equal to one of the stored
+// recent roots, so the page can reopen or forget a project it lists and name no other folder.
+export function recentRoot(arg: unknown, list: readonly Recent[]): string | undefined {
+  return typeof arg === 'string' && list.some(({ root }) => root === arg) ? arg : undefined;
+}
+
 function isRecent(value: unknown): value is Recent {
   const each = value as Partial<Recent> | null;
   return (

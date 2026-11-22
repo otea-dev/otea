@@ -17,13 +17,13 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import SCHIBSTED from '@fontsource-variable/schibsted-grotesk/files/schibsted-grotesk-latin-wght-normal.woff2';
 import {
   app,
   BrowserWindow,
   dialog,
-  type IpcMainInvokeEvent,
   ipcMain,
   Menu,
   type MenuItemConstructorOptions,
@@ -47,9 +47,11 @@ import { showNotice, whenAsked } from './front.ts';
 import { type Icons, loadIcons, type Theme } from './icons.ts';
 import { installing, untilInstalled } from './install-wait.ts';
 import { INSTALLING_GROUND, installingPage } from './installing-page.ts';
+import { wirePicker, wirePrefs } from './ipc.ts';
 import { type LaunchData, secondLaunchProject } from './launch.ts';
 import { type DeskNotice, type Snapshot, type Watch, watchItems, watchNotices } from './live.ts';
 import { FRAME_MS } from './marks.ts';
+import { externalUrl, navigationVerdict } from './navigation.ts';
 import type { NoticeView } from './notice.ts';
 import { type Answer, pickProject, type Question, samePath } from './pick.ts';
 import type { PickerState } from './picker.ts';
@@ -64,7 +66,7 @@ import {
   probeProject,
   sourceCli,
 } from './server.ts';
-import { booleanArg, fromServer, parseSettings, type Settings } from './settings.ts';
+import { fromServer, parseSettings, type Settings } from './settings.ts';
 import {
   badgeText,
   collectionLabel,
@@ -105,6 +107,8 @@ const ASKED_DIR =
 const PORT = typeof options.port === 'string' ? Number(options.port) : undefined;
 // CI starts the packaged app with OTEA_DESKTOP_SMOKE=1: it opens the project, says so and quits.
 const SMOKE = process.env.OTEA_DESKTOP_SMOKE === '1';
+// The picker page the window loads (build.mjs puts it beside main.mjs).
+const PICKER_URL = pathToFileURL(join(import.meta.dirname, 'picker.html')).href;
 const RELEASES_URL = 'https://github.com/otea-dev/otea/releases/latest';
 
 const APPLY_MS = 500; // at most twice a second per surface
@@ -343,8 +347,17 @@ class Shell {
     // The switcher opens another project in this window: the tray and the notices follow it.
     this.win.webContents.on('did-navigate', (_event, url) => this.follow(url));
     this.win.webContents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:/.test(url)) void shell.openExternal(url);
+      this.openOutside(url);
       return { action: 'deny' };
+    });
+    // The window stays on the project's server and the picker. A link, a redirect or `location=`
+    // that leaves for another origin never loads here, where the preload's bridge would follow it.
+    this.win.webContents.on('will-navigate', (event) => {
+      if (event.isMainFrame) this.keepInside(event, true);
+    });
+    this.win.webContents.on('will-redirect', (event) => {
+      // A redirect is not the person's click: it is held, and never opens the browser by itself.
+      if (event.isMainFrame) this.keepInside(event, false);
     });
     this.win.on('close', (event) => {
       if (this.quitting) return;
@@ -474,6 +487,23 @@ class Shell {
     );
   }
 
+  // A page of the window asks to go to `event.url`: only the project's server and the picker load.
+  private keepInside(event: { url: string; preventDefault(): void }, openBrowser: boolean): void {
+    const verdict = navigationVerdict(event.url, {
+      serverUrl: this.connection?.url,
+      pickerUrl: PICKER_URL,
+    });
+    if (verdict === 'allow') return;
+    event.preventDefault();
+    if (verdict === 'external' && openBrowser) this.openOutside(event.url);
+  }
+
+  // A web link opens in the system browser, and nothing else leaves the app (externalUrl).
+  private openOutside(url: string): void {
+    const link = externalUrl(url);
+    if (link !== undefined) void shell.openExternal(link);
+  }
+
   async showPicker(): Promise<void> {
     await this.win.loadFile(join(import.meta.dirname, 'picker.html'));
     this.show();
@@ -563,6 +593,10 @@ class Shell {
     }
   }
 
+  recentProjects(): readonly Recent[] {
+    return this.recents;
+  }
+
   openRecent(root: string): PickerState {
     void this.open(root);
     return this.pickerState();
@@ -629,6 +663,11 @@ class Shell {
   // the project's own server only (wirePrefs).
   fromServerPage(url: string | undefined): boolean {
     return fromServer(url, this.connection?.url);
+  }
+
+  // The picker's own page: the file the window loads, not any `file:` page.
+  fromPickerPage(url: string | undefined): boolean {
+    return url !== undefined && navigationVerdict(url, { pickerUrl: PICKER_URL }) === 'allow';
   }
 
   bringToFront(): boolean {
@@ -833,40 +872,6 @@ function wireUpdates(shellInstance: Shell): void {
   });
 }
 
-// The picker's calls, answered only for the picker's own page.
-function wirePicker(shellInstance: Shell): void {
-  const handle = (channel: string, run: (arg: string) => PickerState | Promise<PickerState>) =>
-    ipcMain.handle(channel, (event, arg: unknown) => {
-      if (event.senderFrame?.url.startsWith('file:') !== true) throw new Error('not the picker');
-      return run(String(arg));
-    });
-  handle('picker:state', () => shellInstance.pickerState());
-  handle('picker:open-folder', () => shellInstance.pickFolder(false));
-  handle('picker:create', () => shellInstance.pickFolder(true));
-  handle('picker:open-recent', (root) => shellInstance.openRecent(root));
-  handle('picker:forget', (root) => shellInstance.forgetRecent(root));
-  ipcMain.on('desktop:notice-act', () => shellInstance.actOnUpdate());
-  ipcMain.on('desktop:notice-dismiss', () => shellInstance.dismissNotice());
-}
-
-// Preferencias › Avisos asks for the one desktop preference the page shows, and changes it. The
-// page of the project's own server only; the argument must be a boolean.
-function wirePrefs(shellInstance: Shell): void {
-  const guard = (event: IpcMainInvokeEvent) => {
-    if (!shellInstance.fromServerPage(event.senderFrame?.url)) throw new Error('not the desk');
-  };
-  ipcMain.handle('prefs:get-front', (event) => {
-    guard(event);
-    return shellInstance.bringToFront();
-  });
-  ipcMain.handle('prefs:set-front', (event, arg: unknown) => {
-    guard(event);
-    const on = booleanArg(arg);
-    if (on === undefined) throw new Error('a boolean is expected');
-    return shellInstance.setBringToFront(on);
-  });
-}
-
 // A second launch hands the running app the folder it was asked for, resolved where it ran.
 const launchData: LaunchData =
   typeof options.project === 'string' ? { project: resolve(options.project) } : {};
@@ -893,8 +898,8 @@ else {
       await waitForInstaller(langOf(app.getLocale()), icons.app);
       shellInstance = new Shell(icons, langOf(app.getLocale()));
       shellInstance.start();
-      wirePicker(shellInstance);
-      wirePrefs(shellInstance);
+      wirePicker(ipcMain, shellInstance);
+      wirePrefs(ipcMain, shellInstance);
       wireUpdates(shellInstance);
       const first = firstProject({ asked: ASKED_DIR, recents: readRecents(), exists: existsSync });
       // The folder --project names may be no project yet; a recent one is.
