@@ -979,7 +979,7 @@ const FIELD_FILE = { multiple: true, placeholder: 'key=file' } as const;
 
 // What create and update --help add on the fields they take.
 const FIELD_DETAILS = [
-  `--description fills the board's description field, where it has one (Descripción on Errores); a board without one refuses it: give its fields by name with --field "<name>=<value>" (otea board <name> says what each takes).`,
+  `--description fills the board's description field (Descripción on Errores), or else the first long text its form asks; a board with neither refuses it: give its fields by name with --field "<name>=<value>" (otea board <name> says what each takes).`,
   '--field-file "<name>=<file>" takes a long or multi-line value from a file, or from stdin with <name>=-.',
 ].join('\n');
 

@@ -54,7 +54,7 @@ describe('--description on a board', () => {
       const { out } = await otea(name, '--help');
 
       expect(out).toContain(
-        "--description fills the board's description field, where it has one (Descripción on Errores); a board without one refuses it",
+        "--description fills the board's description field (Descripción on Errores), or else the first long text its form asks; a board with neither refuses it",
       );
       expect(out).toContain('--field-file');
     },

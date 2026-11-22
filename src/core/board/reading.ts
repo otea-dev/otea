@@ -102,15 +102,17 @@ function valueFor(part: Part, value: unknown): unknown {
 }
 
 // `--description` (and MCP's `description`) on a board with no field of that name: the long text
-// named Description in English or Spanish, else the board's only long text. Refuses, naming the
-// long texts, a board with several and none of them the description, or with none.
+// named Description in English or Spanish, else the first long text its creation form asks (what
+// the item is about leads the form of every template), else the board's only long text. Refuses,
+// naming the long texts, a board with several that its form does not ask, or with none.
 const DESCRIPTION = 'description';
 const DESCRIPTION_NAMES = new Set([DESCRIPTION, 'descripcion']);
 
 function descriptionOf(def: BoardDefinition): Part {
   const long = namedParts(def).filter((part) => part.kind === 'long');
   const named = long.filter((part) => DESCRIPTION_NAMES.has(fold(part.name)));
-  const pool = named.length > 0 ? named : long;
+  const asked = def.form.flatMap(({ ref }) => long.filter((part) => part.id === ref));
+  const pool = named.length > 0 ? named : asked.length > 0 ? asked.slice(0, 1) : long;
   if (pool.length === 1 && pool[0]) return pool[0];
   throw new OteaError(
     'invalid_fields',
