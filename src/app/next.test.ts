@@ -20,6 +20,7 @@ import {
   offerableTo,
   sendBackItem,
 } from './next.ts';
+import { pinItems, setOrder } from './priority.ts';
 import { linkItems } from './relations.ts';
 import { reassignItem } from './restart.ts';
 import { memoryContext } from './testing.ts';
@@ -341,6 +342,55 @@ describe('the order next offers work in', () => {
 
     expect(nextFor(ctx, 'kiln', {}, now).item).toBe(along.id);
     expect(old.id).not.toBe(along.id);
+  });
+
+  // Returned first, then approved work waiting on the agent, then new work; the Matrix order the
+  // person fixed decides inside each of them, and a pin (put on top) goes above the tiers.
+  describe('with an order the person fixed on the Matrix', () => {
+    // A new item the person put first in their order, and one that came back or was approved on.
+    function against(kind: 'returned' | 'approved') {
+      const ctx = memoryContext();
+      board(ctx);
+      const fresh = creature(ctx, 'Nueva');
+      const other = creature(ctx, 'Otra');
+      attach(ctx, other.id, 'eart');
+      handoffItem(ctx, { id: other.id, actor: quill, channel: 'cli' }, now);
+      if (kind === 'approved') approveItem(ctx, { id: other.id, actor: you, channel: 'ui' }, now);
+      else sendBackItem(ctx, { id: other.id, actor: you, channel: 'ui', reason: 'Más barro' }, now);
+      return { ctx, fresh, other };
+    }
+
+    it('offers a returned item before a new one that is first in the order', () => {
+      const { ctx, fresh, other } = against('returned');
+      setOrder(ctx, { collection: 'Criaturas', ids: [fresh.id], actor: you }, now);
+
+      expect(nextFor(ctx, 'quill', {}, now)).toMatchObject({ item: other.id });
+      expect(nextFor(ctx, 'quill', {}, now).sentBack).toBeDefined();
+    });
+
+    it('offers approved work before a new item that is first in the order', () => {
+      const { ctx, fresh, other } = against('approved');
+      setOrder(ctx, { collection: 'Criaturas', ids: [fresh.id], actor: you }, now);
+
+      expect(nextFor(ctx, 'kiln', {}, now).item).toBe(other.id);
+    });
+
+    it('keeps the person’s order inside a tier', () => {
+      const ctx = memoryContext();
+      board(ctx);
+      const first = creature(ctx, 'Primera');
+      const second = creature(ctx, 'Segunda');
+      setOrder(ctx, { collection: 'Criaturas', ids: [second.id, first.id], actor: you }, now);
+
+      expect(nextFor(ctx, 'quill', {}, now).item).toBe(second.id);
+    });
+
+    it('puts what the person put on top above approved work', () => {
+      const { ctx, fresh } = against('approved');
+      pinItems(ctx, { ids: [fresh.id], pinned: true, actor: you }, now);
+
+      expect(nextFor(ctx, 'kiln', {}, now).item).toBe(fresh.id);
+    });
   });
 
   it('offers work that can move on before a step that waits for what is still open', () => {

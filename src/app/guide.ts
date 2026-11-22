@@ -21,10 +21,12 @@ export type GuideEntry = {
 };
 
 // What `otea show` says to do now with the item: next's text on its board.
-export function hintFor(project: Project, item: ItemView, me: string): string {
+// `brief`: without what the agent read when it took the item (nextText's brief); show prints the
+// item's fields itself, so its hint leaves them out too.
+export function hintFor(project: Project, item: ItemView, me: string, brief = false): string {
   if (item.archived)
     return `${item.id} is on ${item.archived.board}, an archived board: it is read-only. Pick another item with otea next.`;
-  return itemNextText(project, item, me) ?? '';
+  return itemNextText(project, item, me, undefined, brief ? { fields: false } : undefined) ?? '';
 }
 
 export function guideCommand(collection: string): string {

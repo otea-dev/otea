@@ -666,10 +666,17 @@ export function itemNextText(
   item: ItemRecord,
   me?: string,
   now = systemClock,
+  brief?: NextInput['brief'],
 ): string | undefined {
   const board = liveBoardOf(ctx, item.collection);
   if (!board) return undefined;
-  return textFor(ctx, item, board.def, now(), me);
+  return textFor(ctx, item, board.def, now(), me, brief);
+}
+
+// Whether the agent holds the item now: it took it with the whole text, so what it reads again is
+// brief (an agent that lost it asks with --whole, or otea board).
+export function heldBy(item: ItemRecord, agent: string, at: string): boolean {
+  return activeLease(item.lease, at)?.holder === agent;
 }
 
 // The agent the person left a stuck item for (Reasignar), while no agent has claimed or moved it
@@ -870,6 +877,7 @@ function textFor(
   live: BoardDefinition,
   at: string,
   me?: string,
+  brief?: NextInput['brief'],
 ): string {
   const def = withHandIn(ctx, item, live, me);
   const on = itemOnBoard(ctx, item, def);
@@ -931,6 +939,7 @@ function textFor(
     ...(order && (order.pin !== undefined || order.rank !== undefined) ? { order } : {}),
     ...(handIn ? { handIn } : {}),
     ...(retaken === undefined ? {} : { retaken }),
+    ...(brief === undefined ? {} : { brief }),
   });
 }
 
@@ -1051,6 +1060,8 @@ export type NextAnswer = {
   notes?: ItemNote[];
   // Nothing on the boards is the agent's now: it waits for the next item.
   idle?: true;
+  // The text left out what the agent read when it took the item (see nextText's brief).
+  brief?: true;
 };
 
 // For this long after `next` offers an item to an agent, no other agent is offered it, so two
@@ -1153,6 +1164,12 @@ function progressOf(def: BoardDefinition, item: ItemRecord): { review: boolean; 
   };
 }
 
+// Work already handed on: it waits for a review, or an earlier step of its board was approved. New
+// work (the first step, not yet handed in) is not.
+function started({ review, along }: { review: boolean; along: number }): boolean {
+  return review || along > 0;
+}
+
 // Lower first; two items with no place in an order tie.
 function byOrder(a: number, b: number): number {
   return a === b ? 0 : a < b ? -1 : 1;
@@ -1251,7 +1268,7 @@ function heldElsewhere(
 export function nextFor(
   ctx: Context,
   agent: string,
-  options: { collection?: string; claim?: boolean } = {},
+  options: { collection?: string; claim?: boolean; brief?: boolean } = {},
   now = systemClock,
 ): NextAnswer {
   const { collection } = options;
@@ -1295,10 +1312,12 @@ export function nextFor(
     );
     // What the agent holds, then what the person left for it (Reasignar), then what was sent back
     // to it; then anything that can move on before a step that waits for its parts to be merged;
-    // then what the person put on top, then the order they fixed (app/priority.ts); then work
-    // already handed on comes before new work: a review, then the step furthest along (its earlier
-    // steps are approved), and only then the oldest. A step that waits for what is still open is
-    // never offered (isTheirs).
+    // then what the person put on top; then work already handed on before new work (an item
+    // approved into a later step, or waiting for a review: `started`), and inside each of those
+    // the order the person fixed on the Matrix (app/priority.ts): a ranked new item never goes
+    // before approved work. Then a review, then the step furthest along (its earlier steps are
+    // approved), and only then the oldest. A step that waits for what is still open is never
+    // offered (isTheirs).
     candidates.sort(
       (a, b) =>
         Number(b.held) - Number(a.held) ||
@@ -1306,6 +1325,7 @@ export function nextFor(
         Number(b.returned) - Number(a.returned) ||
         Number(a.merges) - Number(b.merges) ||
         byOrder(pinOf(a.item), pinOf(b.item)) ||
+        Number(started(b)) - Number(started(a)) ||
         byOrder(rankOf(a.item), rankOf(b.item)) ||
         Number(b.review) - Number(a.review) ||
         b.along - a.along ||
@@ -1357,14 +1377,18 @@ export function nextFor(
     if (!lease) saveOffer(ctx.db, { agent, item: item.id, state: item.state, at });
     const { sentBack, roundNotes } = itemOnBoard(ctx, item, board.def);
     const later = laterLine(ctx, item.id, agent);
+    // An item the agent already holds, it took with the whole text: it reads it brief unless it
+    // asks for the whole (--whole). What it takes now, it reads whole, claimed in this call or not.
+    const brief = options.brief ?? first.held;
     return {
       item: item.id,
       collection: board.collection,
       text: [
-        textFor(ctx, item, board.def, at, agent),
+        textFor(ctx, item, board.def, at, agent, brief ? { fields: true } : undefined),
         ...mergeLines(toMerge),
         ...(later === undefined ? [] : [later]),
       ].join('\n'),
+      ...(brief ? { brief: true as const } : {}),
       ...(sentBack === undefined ? {} : { sentBack }),
       ...(lease ? { lease } : {}),
       ...(roundNotes.length === 0 ? {} : { notes: roundNotes }),

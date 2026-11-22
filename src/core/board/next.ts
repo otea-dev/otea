@@ -127,6 +127,11 @@ export type NextInput = {
   handIn?: { after: string; command: string };
   // The line saying the person took the item up again after an agent set it aside (P5-R3-8).
   retaken?: string;
+  // Without what the agent read when it took the item and every call of the step repeats: the
+  // board's words, the step's "Before you hand it off" and the checklist lines that are met or
+  // not asked (otea board gives the whole). `fields: false` when the reader sees the item's fields
+  // elsewhere (show prints them below), so Starts with is left out too.
+  brief?: { fields: boolean };
 };
 
 // Another agent's say on the item keeps the asking agent off it: a live lease it does not hold, or
@@ -145,7 +150,9 @@ function heldElsewhere(input: NextInput): string | undefined {
 
 // Whether the asking agent holds the item, and until when; or that it claims it before it starts,
 // so no other agent takes it meanwhile.
-function holdLine({ id, holder, me }: NextInput): string {
+function holdLine({ id, holder, me, brief }: NextInput): string {
+  if (holder && holder.name === me && brief)
+    return `You hold it until ${timeText(holder.expiresAt)}.`;
   if (holder && holder.name === me)
     return `You hold it until ${timeText(holder.expiresAt)}; your otea calls keep it, and on a long step with none (a rebase, a test run), otea heartbeat ${id} every 90 seconds.`;
   if (holder) return `Held by ${holder.name} until ${timeText(holder.expiresAt)}.`;
@@ -544,7 +551,20 @@ function handLines(def: BoardDefinition, step: Step, input: NextInput): string[]
     ...notesHandLine(input.notes ?? []),
     ...waitLines(step, input),
   ];
-  return lines.length === 0 ? ['  nothing required'] : lines;
+  if (lines.length === 0) return ['  nothing required'];
+  return input.brief ? lacking(lines) : lines;
+}
+
+// A brief checklist keeps what the handoff still lacks (a ✗ line and the hint under it): the lines
+// met (✓), not asked (·) or optional are in the whole one.
+function lacking(lines: readonly string[]): string[] {
+  const kept: string[] = [];
+  let keep = false;
+  for (const line of lines) {
+    if (/^ {2}\S/.test(line)) keep = line.startsWith('  ✗');
+    if (keep) kept.push(line);
+  }
+  return kept.length === 0 ? ['  nothing lacks: hand it off'] : kept;
 }
 
 function partLines(def: BoardDefinition, hands: readonly Hand[], input: NextInput): string[] {
@@ -600,7 +620,7 @@ function estimateLines(def: BoardDefinition, input: NextInput): string[] {
   });
   return [
     `  The person weighs items by ${names}: estimate them (otea update ${input.id}${flags}); they correct you.`,
-    ...values,
+    ...(input.brief ? [] : values),
   ];
 }
 
@@ -706,7 +726,7 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
   if (!reviewing && input.sentBack) lines.push(...sentBackLines(input.sentBack));
   if (!reviewing && input.approved) lines.push(...approvedLines(input.approved));
   if (!reviewing) lines.push(...answersBlock(input.questions ?? [], input.me));
-  lines.push(...section('About this board', indent(aboutBrief(def))));
+  if (!input.brief) lines.push(...section('About this board', indent(aboutBrief(def))));
   if (input.chosen) lines.push(...section('The person chose', choiceLines(input.chosen)));
   if (input.parent) lines.push(...section('Part of', [`  ${parentLine(input.parent)}`]));
   if (input.implements?.length)
@@ -716,19 +736,21 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
         input.implements.map((it) => `  ${parentLine(it)}`),
       ),
     );
-  lines.push(
-    ...section(
-      'Starts with',
-      startsWith(def, step.id).flatMap(({ ref, from }) => {
-        const part = partOf(def, ref);
-        if (!part) return [];
-        // What an earlier step left empty (a deliverable asked only sometimes) is not there to read.
-        if (from && isEmpty(part, input)) return [];
-        const origin = from ? ` (from ${stepById(def, from)?.name ?? from})` : '';
-        return [`  ${part.name}${origin}: ${valueText(part, input)}`];
-      }),
-    ),
-  );
+  if (input.brief?.fields !== false) {
+    lines.push(
+      ...section(
+        'Starts with',
+        startsWith(def, step.id).flatMap(({ ref, from }) => {
+          const part = partOf(def, ref);
+          if (!part) return [];
+          // What an earlier step left empty (a deliverable asked only sometimes) is not there to read.
+          if (from && isEmpty(part, input)) return [];
+          const origin = from ? ` (from ${stepById(def, from)?.name ?? from})` : '';
+          return [`  ${part.name}${origin}: ${valueText(part, input)}`];
+        }),
+      ),
+    );
+  }
   if (def.split) lines.push(...section('Parts', partsLines(def, input)));
   const instruction = reviewing ? step.instructions.review : step.instructions.take;
   lines.push(
@@ -741,7 +763,7 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
   if (reviewing || !input.handIn) lines.push(...section('Handoff', handLines(def, step, input)));
   if (!reviewing) lines.push(...section('Estimate', estimateLines(def, input)));
   lines.push(...section('Branch', branchLines(def, step, position, input)));
-  if (!reviewing)
+  if (!reviewing && !input.brief)
     lines.push(
       ...section('Before you hand it off', indent(mentionText(def, step.instructions.before))),
     );
@@ -763,7 +785,7 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
       : `${names[0]}, once ${who} approves it`;
   }
   const others: string[] = [];
-  if (!reviewing) {
+  if (!reviewing && !input.brief) {
     for (const earlier of backWaysOf(def, step.id)) {
       const name = targetName(def, earlier);
       others.push(
@@ -780,6 +802,7 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
   if (handIn) {
     lines.push(...section('Next', [`  ${handIn.after}`]));
     lines.push(...section('When you finish', [`  ${handIn.command}`]));
+    if (input.brief) lines.push('', briefPointer(def));
     return lines.join('\n');
   }
   lines.push(...section('Next', [`  ${after}`, ...others]));
@@ -794,7 +817,13 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
         `  otea handoff ${id}${several && step.reviewer === 'none' ? ` --way ${choice} --reason "why"` : ''}${noteFlag(step, input)}`,
       ];
   lines.push(...section('When you finish', finish));
+  if (input.brief) lines.push('', briefPointer(def));
   return lines.join('\n');
+}
+
+// What a brief text ends with: where the words it left out are.
+function briefPointer(def: BoardDefinition): string {
+  return `Brief: the board's and the step's whole instructions are in otea board "${def.name}" (or --full on otea next and show).`;
 }
 
 const MISSING_NOTE: Readonly<Record<Missing['reason'], string>> = {

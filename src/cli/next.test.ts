@@ -127,6 +127,63 @@ describe('next and the board moves', () => {
     expect((await json('next', '--as', 'scout')).item).toBeNull();
   });
 
+  // What an agent reads once, on taking an item, is not repeated on every call: the board's words
+  // and the step's "Before you hand it off".
+  describe('brief', () => {
+    const board = 'Cada criatura del pantano.';
+    const before = 'Adjunta el';
+    const bytes = (text: string) => Buffer.byteLength(text);
+
+    it('gives a first contact the whole, and brief what the agent holds', async () => {
+      const offered = (await otea('next', '--as', 'quill')).out;
+      expect(offered).toContain(board);
+      expect(offered).toContain(before);
+
+      await otea('claim', 'CRI-1', '--as', 'quill');
+      const held = (await otea('next', '--as', 'quill')).out;
+      const shown = (await otea('show', 'CRI-1', '--as', 'quill')).out;
+
+      for (const text of [held, shown]) {
+        expect(text).not.toContain(board);
+        expect(text).not.toContain(before);
+        // What it does with the item stays: the step's words, what the handoff lacks, the command.
+        expect(text).toContain('Pinta desde la');
+        expect(text).toContain('✗ Arte conceptual');
+        expect(text).toContain('otea handoff CRI-1');
+        expect(text).toContain('otea board "Criaturas"');
+      }
+      expect(bytes(held)).toBeLessThan(bytes(offered) * 0.8);
+    });
+
+    it('claims with the whole text: what it takes now it has not read', async () => {
+      const claimed = (await otea('next', '--claim', '--as', 'quill')).out;
+
+      expect(claimed).toContain(board);
+      expect(claimed).toContain(before);
+    });
+
+    it('is asked for with --brief, and the whole again with --whole', async () => {
+      const brief = (await otea('next', '--brief', '--as', 'quill')).out;
+      const showBrief = (await otea('show', 'CRI-1', '--brief', '--as', 'quill')).out;
+      await otea('claim', 'CRI-1', '--as', 'quill');
+      const whole = (await otea('next', '--whole', '--as', 'quill')).out;
+      const showWhole = (await otea('show', 'CRI-1', '--whole', '--as', 'quill')).out;
+
+      expect(brief).not.toContain(board);
+      expect(showBrief).not.toContain(before);
+      expect(whole).toContain(board);
+      expect(showWhole).toContain(before);
+      expect(bytes(showBrief)).toBeLessThan(bytes(showWhole));
+      const both = await otea('next', '--brief', '--whole', '--as', 'quill');
+      expect(both.code).toBe(2);
+      expect(both.err).toContain('--brief and --whole say opposite things');
+    });
+
+    it('leaves the person’s reading whole', async () => {
+      expect((await otea('show', 'CRI-1')).out).toContain(before);
+    });
+  });
+
   it('lists the ways a step has when an agent names one it has not', async () => {
     const bad = await otea('handoff', 'CRI-1', '--way', 'Triar', '--as', 'quill');
 
