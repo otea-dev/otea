@@ -45,14 +45,22 @@ export function workingAgents(
   items: readonly Pick<Item, 'id' | 'asks'>[],
   now: number,
 ): string[] {
+  return (agents ?? []).filter((a) => isWorking(a, items, now)).map((a) => a.name);
+}
+
+// Whether one agent is at work: the one definition the pill, the menu and the queue note share. It
+// holds an item it works on (not one that only waits for your answer), or called Otea lately
+// without having just handed its work off, which the server says in `status` (an older one does
+// not: any recent call counts).
+export function isWorking(
+  a: Agent,
+  items: readonly Pick<Item, 'id' | 'asks'>[],
+  now: number,
+): boolean {
+  if (!a.live) return false;
   const asks = (id: string) => !!items.find((it) => it.id === id)?.asks;
-  return (agents ?? [])
-    .filter((a) => {
-      if (!a.live) return false;
-      if (a.holding.length > 0 && a.holding.some((id) => !asks(id))) return true;
-      return calledLately(a, now);
-    })
-    .map((a) => a.name);
+  if (a.holding.some((id) => !asks(id))) return true;
+  return calledLately(a, now) && (a.status === undefined || a.status === 'working');
 }
 
 // The agent that holds the item's live lease while it is no longer connected (P7-R3-10): its
@@ -100,7 +108,16 @@ export function silentHolder(
 // What the desk says beside a move that hands the item to an agent (P7-R2-9): nothing while an
 // agent waits (it hears it at once); while none does, that the agents at work will see it when
 // they wait again (calm), or, with none at work, that nobody is listening (the alarm).
-export type Hearing = { kind: 'unheard' } | { kind: 'working'; agents: string[] };
+export type Hearing =
+  | { kind: 'unheard' }
+  | { kind: 'nobody' }
+  | { kind: 'working'; agents: string[] };
+
+// Whether no agent is here at all (none connected, none silent on a lease): an empty room, which
+// the desk says calmly, never as a silence to fix. Before presence loads it is not.
+export function noAgents(agents: readonly Agent[] | null | undefined): boolean {
+  return !!agents && !agents.some((a) => a.live || a.status === 'silent');
+}
 
 export function hearing(
   agents: readonly Agent[] | null | undefined,
@@ -109,12 +126,18 @@ export function hearing(
 ): Hearing | null {
   if (anyoneWaits(agents)) return null;
   const working = workingAgents(agents, items, now);
-  return working.length > 0 ? { kind: 'working', agents: working } : { kind: 'unheard' };
+  if (working.length > 0) return { kind: 'working', agents: working };
+  return noAgents(agents) ? { kind: 'nobody' } : { kind: 'unheard' };
 }
 
 // What the desk says of an item nobody hears: «nadie está escuchando» (a warning), or, while an
-// agent is at work on another item, that it waits in the queue for it (calm).
-export function unheardWords(busy: readonly string[]): { text: string; calm: boolean } {
+// agent is at work on another item, that it waits in the queue for it (calm); with no agent
+// connected at all, that none is (calm).
+export function unheardWords(
+  busy: readonly string[],
+  nobody = false,
+): { text: string; calm: boolean } {
+  if (busy.length === 0 && nobody) return { text: t('listen.noAgents'), calm: true };
   if (busy.length === 0) return { text: t('listen.none'), calm: false };
   return { text: t('listen.busy', { count: busy.length, agent: busy[0] ?? '' }), calm: true };
 }
@@ -127,7 +150,7 @@ export function unheardLead(
   agents: readonly Agent[] | null | undefined,
   id: string,
 ): string {
-  if (busy.length === 0) return t('listen.lead');
+  if (busy.length === 0) return t(noAgents(agents) ? 'listen.noAgentsLead' : 'listen.lead');
   const elsewhere = busy.every((name) =>
     agents?.find((a) => a.name === name)?.holding.some((held) => held !== id),
   );

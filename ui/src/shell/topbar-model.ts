@@ -3,6 +3,7 @@ import { isStuck } from '../derive/toca.ts';
 import type { Connection } from '../hooks.ts';
 import { t } from '../i18n/i18n.ts';
 import { type Look, lookOf } from '../lanes/looks.ts';
+import { isWorking } from '../listening.ts';
 import { type Agent, type AgentProfile, liveAgents } from '../presence.ts';
 import { projectHref, waitingElsewhere, whereOf } from '../projects.ts';
 import type { Item, ProjectOverview, ProjectView } from '../types.ts';
@@ -159,8 +160,7 @@ export function agentRows(
       const quiet = stuck.length > 0;
       // An item whose question waits for you is not work: the agent waits for your answer. One
       // no longer connected works on nothing, whatever its lease still holds (P7-R3-10).
-      const working =
-        live.includes(a) && a.holding.some((id) => !items.find((each) => each.id === id)?.asks);
+      const working = live.includes(a) && isWorking(a, items, now);
       const state: AgentDoing = working ? 'work' : quiet ? 'quiet' : DOING[st.state];
       return {
         name: a.name,
@@ -240,14 +240,22 @@ export type PillExtra = { kind: 'quiet' | 'noProfile' | 'of'; n: number } | null
 export type PillSummary =
   | { kind: 'offline' }
   | { kind: 'none'; quiet?: number }
+  // Nobody connected, but an agent holds a live lease and gave no sign for a while: not an empty
+  // room, and not at work either.
+  | { kind: 'silent'; count: number }
   | { kind: 'working' | 'waiting' | 'connected'; count: number; extra: PillExtra };
 
 // What the pill says (mock §1): what happens, not how many there are. "2 trabajando" before "3
 // agentes"; with nobody working, how many wait; nobody connected; or that it cannot tell.
-export function pillSummary(connection: Connection, rows: readonly AgentRow[]): PillSummary {
+export function pillSummary(
+  connection: Connection,
+  rows: readonly AgentRow[],
+  // The agents with no sign for a while that still hold a live lease (status silent).
+  silent = 0,
+): PillSummary {
   if (connection === 'reconnecting') return { kind: 'offline' };
   const c = agentCounts(rows);
-  if (c.live === 0) return { kind: 'none' };
+  if (c.live === 0) return silent > 0 ? { kind: 'silent', count: silent } : { kind: 'none' };
   // Only agents gone quiet: nobody listens, as Te toca says; the pill still names the silence.
   if (c.holding === 0 && c.idle === 0 && c.connected === 0) return { kind: 'none', quiet: c.quiet };
   const working = c.holding > 0;

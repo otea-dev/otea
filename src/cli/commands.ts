@@ -104,6 +104,7 @@ import {
   nameFor,
   noteCall,
   offerName,
+  ownName,
   quietVoices,
   renewLeases,
   seeAgent,
@@ -3199,7 +3200,7 @@ const mcp: Command = {
     const newcomers = new Set<string>();
     // When each agent last called through this server: a subagent that stopped calling has ended,
     // and the beat stops hearing it (P1-11); the session's own agent is the one it was started as,
-    // else the first that called.
+    // else the first that called, then the one it renames itself to (ownName).
     const calls = new Map<string, number>();
     let own = agent;
     const heard = (name: string) => {
@@ -3210,7 +3211,7 @@ const mcp: Command = {
       heardBy(cwd, name, client, warn, false, fresh, note(name));
       voices.add(name);
       calls.set(name, Date.now());
-      own ??= name;
+      own = ownName(own, name);
     };
     const still = (name: string) => {
       claimedBy(cwd, name, false, client);

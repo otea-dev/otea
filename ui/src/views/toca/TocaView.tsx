@@ -10,9 +10,9 @@ import { Icon } from '../../kit/Icon.tsx';
 import { Swap } from '../../kit/Swap.tsx';
 import { LaneHead } from '../../lanes/LaneHead.tsx';
 import { LaneList } from '../../lanes/LaneList.tsx';
+import { noAgents } from '../../listening.ts';
 import { QueuedCaptures } from '../../offline/QueuedCaptures.tsx';
 import { discard, useQueue } from '../../offline/queue-store.ts';
-import { liveAgents } from '../../presence.ts';
 import type { Item } from '../../types.ts';
 import { AnsweredTopics } from '../topics/AnsweredTopics.tsx';
 import { dayLine, tocaBlocks, universeOf } from './blocks.tsx';
@@ -111,8 +111,7 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
   // The day's recap sits under the title, on Te toca.
   const recap = !atasco && !loading;
   // Nobody connected, on the desk: the way to connect one, over the lanes.
-  const lonely =
-    !atasco && !app.phone && !empty && !!app.agents && liveAgents(app.agents).length === 0;
+  const lonely = !atasco && !app.phone && !empty && noAgents(app.agents);
   // What was captured while the PC did not answer, until it goes.
   const queue = useQueue();
 

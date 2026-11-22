@@ -292,6 +292,7 @@ describe('agent presence', () => {
           holding: [],
           lastSeen: T0,
           live: true,
+          status: 'connected',
           listening: true,
           waiting: false,
           profile: null,
@@ -716,6 +717,12 @@ describe('agent presence', () => {
   // One status per agent for every surface: after a handoff the agent was still «trabajando» for the
   // listening window, and one working a long step over the command line read as nobody connected.
   describe('status', () => {
+    beforeEach(() => {
+      addCollection(ctx, { name: 'tasks' });
+      const task = { collection: 'tasks', fields: { description: 'Details' }, actor: ana };
+      createItem(ctx, { ...task, title: 'First' }, at(T0));
+    });
+
     it('is working while it holds an item', () => {
       seeAgent(ctx.db, { agent: 'claude', channel: 'cli', call: true }, at(T0));
       claimItem(ctx, { id: 'TASKS-1', actor: claude }, at(T0));
