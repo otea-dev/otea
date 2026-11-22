@@ -6,7 +6,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { OteaError } from '../core/errors.ts';
 import { assertIconName } from '../core/icons.ts';
 import { PROJECT_ID_RANDOM_BYTES, projectId } from '../core/project-id.ts';
-import { openDatabase, transaction } from '../store/database.ts';
+import { openWithSetup, transaction } from '../store/database.ts';
 import { migrate } from '../store/migrations.ts';
 import {
   insertProjectIdentity,
@@ -115,30 +115,25 @@ function ensureIdentity(db: DatabaseSync, identity: () => ProjectIdentity): Proj
 }
 
 function open(found: Found, env: Env, identity = () => newIdentity(found.root)): Project {
-  const db = openDatabase(databasePath(found.dataDir));
-  try {
+  return openWithSetup(databasePath(found.dataDir), (db) => {
     migrate(db);
-  } catch (error) {
-    // A database this build cannot open must not stay locked by the attempt.
-    db.close();
-    throw error;
-  }
-  const presets = loadPresets(found.dataDir);
-  nameImplicitTypes({ db, presets });
-  const project: Project = {
-    ...found,
-    db,
-    presets,
-    identity: ensureIdentity(db, identity),
-  };
-  // Published boards join the catalog as compiled presets (app/boards.ts); a collection still on a
-  // preset file is read as a published board, and every project has its Pedidos board.
-  syncBoardPresets(project);
-  // What it makes now, with no desk to ask, is in the language the person uses (app/language.ts).
-  const lang = defaultLang(env);
-  migrateProjectBoards(project, lang);
-  ensureRequestsBoard(project, lang);
-  return project;
+    const presets = loadPresets(found.dataDir);
+    nameImplicitTypes({ db, presets });
+    const project: Project = {
+      ...found,
+      db,
+      presets,
+      identity: ensureIdentity(db, identity),
+    };
+    // Published boards join the catalog as compiled presets (app/boards.ts); a collection still on a
+    // preset file is read as a published board, and every project has its Pedidos board.
+    syncBoardPresets(project);
+    // What it makes now, with no desk to ask, is in the language the person uses (app/language.ts).
+    const lang = defaultLang(env);
+    migrateProjectBoards(project, lang);
+    ensureRequestsBoard(project, lang);
+    return project;
+  });
 }
 
 // A common project's data lives apart from its folders, so it can go missing on its own.

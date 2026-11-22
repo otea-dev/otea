@@ -9,6 +9,19 @@ export function openDatabase(path: string): DatabaseSync {
   return db;
 }
 
+// Opens the database at `path` and runs `setup` on it (migrations and what depends on them). When
+// `setup` throws the connection is closed first, so a database that cannot be opened is not left
+// locked by the attempt.
+export function openWithSetup<T>(path: string, setup: (db: DatabaseSync) => T): T {
+  const db = openDatabase(path);
+  try {
+    return setup(db);
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
 export function transaction<T>(db: DatabaseSync, fn: () => T): T {
   db.exec('BEGIN IMMEDIATE');
   try {

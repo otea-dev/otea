@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import { openDatabase } from '../store/database.ts';
+import { openDatabase, openWithSetup } from '../store/database.ts';
 import {
   deleteLocalProject,
   type LocalProjectRow,
@@ -22,9 +22,10 @@ export const machineDir = (env: Env = process.env): string => oteaHome(env);
 export function openMachine(env: Env = process.env): DatabaseSync {
   const dir = machineDir(env);
   mkdirSync(dir, { recursive: true });
-  const db = openDatabase(join(dir, 'machine.db'));
-  migrateMachine(db);
-  return db;
+  return openWithSetup(join(dir, 'machine.db'), (db) => {
+    migrateMachine(db);
+    return db;
+  });
 }
 
 // A machine store that lives as long as its connection (tests, and a server given none).
