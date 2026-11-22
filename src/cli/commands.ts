@@ -212,11 +212,11 @@ import {
   UsageError,
 } from './command.ts';
 import {
+  ensureServer,
   forgetStale,
   inspectServer,
   type Launch,
   SERVE_LOG,
-  startServer,
   stopServer,
 } from './daemon.ts';
 import { installForge, removeForge } from './forge.ts';
@@ -454,7 +454,7 @@ const TEMPLATE_LIST = (() => {
 // itself and never starts the desk, which would close with its session (P4-R3-9).
 export const INIT_NEXT = [
   "Next: run otea serve in a terminal of your own, or open the Otea desktop app: the desk gives you the text to paste into your agent's chat (otea prompt prints it here).",
-  'An agent setting itself up runs otea connect --as <name> --model <id> --effort <level>; it never starts the desk for the person (if it must, otea serve start --no-open).',
+  'An agent setting itself up runs otea connect --as <name> --model <id> --effort <level>; it never starts the desk for the person (if it must, otea serve --no-open).',
 ];
 
 const init: Command = {
@@ -2828,6 +2828,9 @@ type Served = { url: string; signInUrl: string; attached?: true; phone?: PhoneSe
 type ServeOptions = {
   port: number;
   lan: boolean;
+  // Started by otea serve start: nobody reads this process's output and nobody is there to watch a
+  // network listener, so it neither opens the local network at start nor issues a pairing code.
+  unattended: boolean;
   tailscale: TailscaleCli;
   probe: Probe;
   warn: Input['warn'];
@@ -2883,7 +2886,7 @@ async function serveUntil(
   cwd: string,
   options: ServeOptions,
 ): Promise<Served> {
-  const { port, lan, tailscale, probe, warn, gitHook } = options;
+  const { port, lan, unattended, tailscale, probe, warn, gitHook } = options;
   const here = projectHere(cwd);
   const home = oteaHome();
   // One server per Otea home: a second otea serve points at the one running.
@@ -2918,7 +2921,7 @@ async function serveUntil(
     const listening = await listen(server, port);
     // Open to the local network when it was left open (Settings › Phone, otea phone lan --open),
     // or for this run only with --lan; if it cannot open, Otea still serves this computer.
-    if (lan || lanOpen(machine)) {
+    if (lan || (!unattended && lanOpen(machine))) {
       await server.lan.open().catch((error: unknown) => {
         warn(`Could not open Otea to the local network: ${(error as Error).message}`);
       });
@@ -2934,7 +2937,7 @@ async function serveUntil(
     signal.addEventListener('abort', stop, { once: true });
     const served = pages(listening.url, token, here);
     const door = server.phone.chosen();
-    if (!door) return served;
+    if (!door || unattended) return served;
     const urls = door.urls(listening.port);
     const code = server.phone.codes.issue();
     const first = urls[0];
@@ -3014,24 +3017,23 @@ function daemonLaunch(): Launch {
 
 const serveStart: Command = {
   name: 'serve start',
-  summary: `Start this computer's otea serve in the background, on its own: it keeps running after the terminal or the agent's session that started it ends, until otea serve stop. Answers once it serves (default port ${DEFAULT_PORT}), then opens this project's page signed in (--no-open prints the sign-in link instead). One server runs per Otea home: when it runs already, this only opens this project there, and --port and --lan wait for the next start. Its output is in serve.log in the Otea home`,
+  summary: `Start this computer's otea serve in the background, on its own: it keeps running after the terminal or the agent's session that started it ends, until otea serve stop. Answers once it serves (default port ${DEFAULT_PORT}), then opens this project's page signed in (--no-open prints the sign-in link instead). One server runs per Otea home: when it runs already, this only opens this project there, and --port waits for the next start. It never opens Otea to the local network at start, and --lan is refused: a phone needs the foreground otea serve --lan or the desktop app. Its output (no sign-in link) is in serve.log in the Otea home`,
   args: [],
   options: { port: {}, 'no-open': { flag: true }, lan: { flag: true } },
   execute: async (input) => {
-    const { cwd, option, flag } = input;
+    const { cwd, option, flag, warn } = input;
+    if (flag('lan')) {
+      throw new UsageError(
+        'otea serve start never opens Otea to the local network, so no listener runs there unattended: for a phone, run otea serve --lan in a terminal of your own, or open the Otea desktop app',
+      );
+    }
     const here = projectHere(cwd);
     const home = oteaHome();
-    let state = await inspectServer(home);
-    forgetStale(home, state);
-    const started = state.kind !== 'running';
-    if (state.kind !== 'running') {
-      state = await startServer(home, {
-        port: portFrom(option('port')),
-        lan: flag('lan'),
-        launch: daemonLaunch(),
-      });
-    }
-    if (state.kind !== 'running') throw new Error('otea serve did not start');
+    const { state, started } = await ensureServer(home, {
+      port: portFrom(option('port')),
+      launch: daemonLaunch(),
+      warn,
+    });
     const { url, signInUrl } = pages(state.url, state.token, here);
     const signIn = await signInLines(input, signInUrl);
     const { pid, port } = state;
@@ -3071,13 +3073,19 @@ const serveStop: Command = {
 const serveStatus: Command = {
   name: 'serve status',
   summary:
-    "Say whether this computer's otea serve runs, with its address and process id; exits 11 (not_running) when none does, and cleans up the record of one that ended",
+    "Say whether this computer's otea serve runs, with its address and process id; exits 11 (not_running) when none does, and cleans up the record of one that ended. A server whose process lives but did not answer in time exits 13 (timeout) and keeps its record",
   args: [],
   options: {},
   execute: async () => {
     const home = oteaHome();
     const state = await inspectServer(home);
     forgetStale(home, state);
+    if (state.kind === 'unresponsive') {
+      throw new CommandFailure(
+        'timeout',
+        `otea serve (pid ${state.info.pid}, port ${state.info.port}) is running but did not answer in time; its record is kept. Try again, or end it with otea serve stop`,
+      );
+    }
     if (state.kind !== 'running') {
       throw new CommandFailure('not_running', 'otea serve is not running; run "otea serve start"');
     }
@@ -3093,7 +3101,15 @@ const serve: Command = {
   name: 'serve',
   summary: `Serve the live UI of every project on this computer on 127.0.0.1 (default port ${DEFAULT_PORT}) until Ctrl+C, and open this project's page signed in; when this computer's otea serve runs already, it opens this project there instead. It also opens to phones on the same network when that was left open (Settings > Phone, otea phone lan --open), and --lan opens it for this run only; a phone on Tailscale (otea phone tailscale) pairs without it. It stops once the process that started it ends (a terminal closed, an agent's session over), saying so on stderr; otea serve start keeps it running on its own instead (--no-owner is what it runs with), and otea serve stop and otea serve status manage it`,
   args: [],
-  options: { port: {}, 'no-open': { flag: true }, 'no-owner': { flag: true }, lan: { flag: true } },
+  options: {
+    port: {},
+    'no-open': { flag: true },
+    'no-owner': { flag: true },
+    lan: { flag: true },
+    // What otea serve start runs it with: no sign-in link or pairing code in its output (it goes
+    // to a log), and the local network stays closed unless a person opens it.
+    daemon: { flag: true },
+  },
   execute: async (input) => {
     const { cwd, option, flag, signal, warn, tailscale, probe, home } = input;
     // A server whose starter is gone (an agent's session that ran it in the background ended)
@@ -3109,6 +3125,7 @@ const serve: Command = {
     const served = await serveUntil(owner?.signal ?? signal, cwd, {
       port: portFrom(option('port')),
       lan: flag('lan'),
+      unattended: flag('daemon'),
       tailscale,
       probe,
       warn,
@@ -3121,8 +3138,8 @@ const serve: Command = {
     if (served.attached) owner?.stop();
     const { url, signInUrl, phone, attached } = served;
     // With --no-open the person signs a browser in by hand, from a terminal or from what an agent
-    // that started the server relays.
-    const signIn = await signInLines(input, signInUrl);
+    // that started the server relays. A background server prints no link: its output is a file.
+    const signIn = flag('daemon') ? [] : await signInLines(input, signInUrl);
     const where = attached
       ? `Otea already runs on this computer: this project is at ${url}`
       : `Otea running at ${url}`;

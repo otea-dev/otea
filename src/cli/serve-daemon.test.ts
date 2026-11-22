@@ -1,9 +1,11 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { processAlive } from '../app/presence.ts';
+import { ensureUiToken } from '../server/token.ts';
+import { SERVE_LOG } from './daemon.ts';
 import { readServeFile, SERVE_FILE } from './serve-file.ts';
 import { spawnCli, type TempRepo, tempGitRepo, until } from './testing.ts';
 
@@ -73,17 +75,97 @@ describe('serve start, status and stop', () => {
       cwd: repo.dir,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    // The read of its output ends with 'close', once nothing holds the pipe.
+    // The read of its output ends with 'close', once nothing holds the pipe. The wait is long: a
+    // Windows runner takes half a minute over a start (PowerShell, then cmd, then the server) when
+    // it is busy, and a server that does hold the pipe never lets go, however long this waits.
     const returned = await new Promise<boolean>((resolve) => {
       child.on('close', () => resolve(true));
-      setTimeout(() => resolve(false), 40_000);
+      setTimeout(() => resolve(false), 100_000);
     });
     if (!returned) child.kill();
 
     expect(returned).toBe(true);
     const info = readServeFile(home());
     expect(processAlive(info?.pid ?? 0)).toBe(true);
+  }, 120_000);
+
+  it('keeps the sign-in key out of its log, which only its owner reads', async () => {
+    const started = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
+    expect(started.code).toBe(0);
+    // The command prints the link for the person or agent that ran it; the server does not.
+    const token = ensureUiToken(home());
+    expect(started.out).toContain(token);
+
+    const log = readFileSync(join(home(), SERVE_LOG), 'utf8');
+    expect(log).toContain('Otea running at');
+    expect(log).not.toContain(token);
+    expect(log).not.toMatch(/token=|pairing/i);
+    if (process.platform !== 'win32') {
+      expect(statSync(join(home(), SERVE_LOG)).mode & 0o777).toBe(0o600);
+    }
   }, 60_000);
+
+  it('refuses --lan: no listener on the network runs unattended', async () => {
+    const refused = await spawnCli(repo.dir, 'serve', 'start', '--lan');
+
+    expect(refused.code).toBe(2);
+    expect(refused.err).toContain('otea serve --lan');
+    expect(readServeFile(home())).toBeUndefined();
+  }, 60_000);
+
+  it('starts one server when two starts run at once, and both report it', async () => {
+    const [one, two] = await Promise.all([
+      spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0'),
+      spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0'),
+    ]);
+
+    const info = readServeFile(home());
+    expect([one.code, two.code]).toEqual([0, 0]);
+    expect(one.err + two.err).toBe('');
+    expect(one.out).toContain(`pid ${info?.pid}`);
+    expect(two.out).toContain(`pid ${info?.pid}`);
+    // One of them started it, the other found it running.
+    expect([one.out, two.out].filter((out) => out.includes('in the background'))).toHaveLength(1);
+  }, 120_000);
+
+  // A busy server may not answer a probe in time; a record of a live process is not stale for that.
+  it('keeps the record of a live server that does not answer in time, and ends it only on stop', async () => {
+    ensureUiToken(home());
+    // Accepts connections and never answers; its command line says it is an otea serve.
+    const hung = spawn(
+      process.execPath,
+      [
+        '-e',
+        "require('node:net').createServer(() => {}).listen(0, '127.0.0.1', function () { console.log(this.address().port); })",
+        'serve',
+      ],
+      { stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    try {
+      const port = await new Promise<number>((resolve) =>
+        hung.stdout.once('data', (chunk) => resolve(Number(String(chunk).trim()))),
+      );
+      const pid = hung.pid ?? 0;
+      writeFileSync(join(home(), SERVE_FILE), JSON.stringify({ port, pid }));
+
+      const status = await spawnCli(repo.dir, 'serve', 'status');
+      expect(status.code).toBe(13);
+      expect(status.err).toContain('did not answer in time');
+      expect(readServeFile(home())).toEqual({ port, pid });
+      expect(processAlive(pid)).toBe(true);
+
+      const again = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
+      expect(again.code).not.toBe(0);
+      expect(readServeFile(home())).toEqual({ port, pid });
+
+      const stopped = await spawnCli(repo.dir, 'serve', 'stop');
+      expect(stopped.out).toBe(`Stopped otea serve (pid ${pid}, port ${port})\n`);
+      await until(() => !processAlive(pid), 10_000);
+      expect(readServeFile(home())).toBeUndefined();
+    } finally {
+      hung.kill();
+    }
+  }, 120_000);
 
   it('runs one server per home: a second start reports the one running', async () => {
     await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
@@ -109,6 +191,36 @@ describe('serve start, status and stop', () => {
     const started = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
     expect(started.code).toBe(0);
     expect(readServeFile(home())?.pid).not.toBe(Number(gone.stdout));
+  }, 60_000);
+
+  it('never ends a live process on the recorded port that answers something else', async () => {
+    ensureUiToken(home());
+    // Another program that took the process id and the port: a web server of its own.
+    const other = spawn(
+      process.execPath,
+      [
+        '-e',
+        "require('node:http').createServer((q, r) => r.end('not otea')).listen(0, '127.0.0.1', function () { console.log(this.address().port); })",
+      ],
+      { stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    try {
+      const port = await new Promise<number>((resolve) =>
+        other.stdout.once('data', (chunk) => resolve(Number(String(chunk).trim()))),
+      );
+      const pid = other.pid ?? 0;
+      writeFileSync(join(home(), SERVE_FILE), JSON.stringify({ port, pid }));
+
+      const stopped = await spawnCli(repo.dir, 'serve', 'stop');
+
+      expect(stopped.code).toBe(0);
+      expect(stopped.out).toContain(`removed the record of ${pid}`);
+      expect(processAlive(pid)).toBe(true);
+      expect(await (await fetch(`http://127.0.0.1:${port}/`)).text()).toBe('not otea');
+      expect(existsSync(join(home(), SERVE_FILE))).toBe(false);
+    } finally {
+      other.kill();
+    }
   }, 60_000);
 
   it('never ends a process its record names that is no server of this home', async () => {
