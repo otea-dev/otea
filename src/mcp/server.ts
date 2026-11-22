@@ -65,8 +65,9 @@ export type McpContext = {
   heard?(agent: string): void;
   // An agent calls again: refused once another session took its name (claimName).
   still?(agent: string): void;
-  // An agent ran whoami or profile: the explicit way a session says what it is called now, which
-  // is how a rename mid-session is told (never guessed from the names of its calls).
+  // An agent ran whoami: the explicit way a session says what it is called now, which is how a
+  // rename mid-session is told (never guessed from the names of its calls, and not from profile:
+  // every subagent declares one).
   rebound?(agent: string): void;
   // An agent's first call on this server failed: the server forgets it, unless it is known.
   failed?(agent: string): void;
@@ -157,7 +158,9 @@ function inputFor(
     if (newSession) context.heard?.(agent);
     else context.still?.(agent);
     seen.add(agent);
-    if (command.name === 'whoami' || command.name === 'profile') context.rebound?.(agent);
+    // Only whoami is a session naming itself. A subagent declares its profile under its own name
+    // (guide rule 2), which says nothing of what the session is called.
+    if (command.name === 'whoami') context.rebound?.(agent);
   }
   return {
     cwd: context.cwd,
