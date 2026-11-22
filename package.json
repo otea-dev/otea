@@ -1,6 +1,6 @@
 {
   "name": "@otea/cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The asynchronous handoff surface between you and your AI agents.",
   "license": "AGPL-3.0-only",
   "author": "Federico Daniel Ara",
