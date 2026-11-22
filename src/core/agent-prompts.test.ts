@@ -76,10 +76,10 @@ describe('the start prompt', () => {
   // P4-R3-9: the agent ran otea serve in its own shell, so the desk died with its session.
   it('leaves the desk to the person, and says --no-open if the agent must start it', () => {
     expect(startPrompt('en')).toContain(
-      'Never start the desk (otea serve) yourself: I run it in a terminal of my own or open the Otea desktop app, since one you start closes with your session. If I ask you to start it anyway, run otea serve --no-open.',
+      'Never start the desk (otea serve) yourself: I run it in a terminal of my own or open the Otea desktop app, since otea serve closes with your session. If I ask you to start it anyway, run otea serve start --no-open: it keeps running on its own, and otea serve stop ends it.',
     );
     expect(startPrompt('es')).toContain(
-      'Nunca abras tú el escritorio (otea serve): lo abro yo en una terminal mía o con la app de escritorio de Otea, porque el que abres tú se cierra con tu sesión. Si igual te pido que lo abras, ejecuta otea serve --no-open.',
+      'Nunca abras tú el escritorio (otea serve): lo abro yo en una terminal mía o con la app de escritorio de Otea, porque otea serve se cierra con tu sesión. Si igual te pido que lo abras, ejecuta otea serve start --no-open: sigue funcionando solo, y otea serve stop lo cierra.',
     );
   });
 
