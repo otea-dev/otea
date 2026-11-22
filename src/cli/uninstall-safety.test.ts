@@ -13,10 +13,12 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, parse } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AGENTS_BLOCK, removeAgentsMd, writeAgentsMd } from '../app/agents.ts';
 import { oteaLauncher } from '../app/launcher.ts';
 import { processAlive } from '../app/presence.ts';
+import { migrateRegistry } from '../store/registry.ts';
 import { installGitHook, isOteaOwnHook } from './hooks.ts';
 import { run } from './run.ts';
 import { readServeFile } from './serve-file.ts';
@@ -37,6 +39,34 @@ vi.mock('node:os', async (importOriginal) => {
 const AUTHOR = ['-c', 'user.name=t', '-c', 'user.email=t@t'];
 
 const temp = (prefix: string) => realpathSync.native(mkdtempSync(join(tmpdir(), prefix)));
+
+// A registry that reads and lists nothing, as the mark of an Otea home.
+function emptyRegistry(dir: string) {
+  const db = new DatabaseSync(join(dir, 'registry.db'));
+  try {
+    migrateRegistry(db);
+  } finally {
+    db.close();
+  }
+}
+
+// Whether this computer lets the user make a link to a file, or to a folder (Windows asks for a
+// privilege the first and not the second); the tests that need one are skipped where it cannot.
+function canLink(kind: 'file' | 'junction'): boolean {
+  const dir = temp('otea-link-');
+  try {
+    writeFileSync(join(dir, 'target'), '');
+    mkdirSync(join(dir, 'folder'));
+    symlinkSync(join(dir, kind === 'file' ? 'target' : 'folder'), join(dir, 'link'), kind);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+const canLinkFile = canLink('file');
+const canLinkFolder = canLink('junction');
 
 // Every file under a folder with its bytes, to tell whether anything in it changed.
 function snapshot(dir: string): Record<string, string> {
@@ -109,35 +139,36 @@ describe('AGENTS.md block removal', () => {
     let target: string;
     const link = (to: string) => {
       target = join(dir, to);
-      try {
-        symlinkSync(target, path(), 'file');
-        return true;
-      } catch {
-        return false; // A computer that lets this user make no link has nothing to try.
-      }
+      symlinkSync(target, path(), 'file');
     };
 
-    it('takes the block out of the file it points to, and leaves the link a link', () => {
-      writeFileSync(join(dir, 'real.md'), `# Mine\n\n${AGENTS_BLOCK}\n`);
-      if (!link('real.md')) return;
+    it.skipIf(!canLinkFile)(
+      'takes the block out of the file it points to, and leaves the link a link',
+      () => {
+        writeFileSync(join(dir, 'real.md'), `# Mine\n\n${AGENTS_BLOCK}\n`);
+        link('real.md');
 
-      expect(removeAgentsMd(dir).action).toBe('removed');
+        expect(removeAgentsMd(dir).action).toBe('removed');
 
-      expect(lstatSync(path()).isSymbolicLink()).toBe(true);
-      expect(readFileSync(target, 'utf8')).toBe('# Mine\n');
-    });
+        expect(lstatSync(path()).isSymbolicLink()).toBe(true);
+        expect(readFileSync(target, 'utf8')).toBe('# Mine\n');
+      },
+    );
 
-    it('leaves the link and its file when only Otea’s block would be left, and says so', () => {
-      writeFileSync(join(dir, 'real.md'), `${AGENTS_BLOCK}\n`);
-      if (!link('real.md')) return;
+    it.skipIf(!canLinkFile)(
+      'leaves the link and its file when only Otea’s block would be left, and says so',
+      () => {
+        writeFileSync(join(dir, 'real.md'), `${AGENTS_BLOCK}\n`);
+        link('real.md');
 
-      const result = removeAgentsMd(dir);
+        const result = removeAgentsMd(dir);
 
-      expect(result.action).toBe('refused');
-      expect(result.action === 'refused' && result.reason).toContain('it is a link to');
-      expect(lstatSync(path()).isSymbolicLink()).toBe(true);
-      expect(readFileSync(target, 'utf8')).toBe(`${AGENTS_BLOCK}\n`);
-    });
+        expect(result.action).toBe('refused');
+        expect(result.action === 'refused' && result.reason).toContain('it is a link to');
+        expect(lstatSync(path()).isSymbolicLink()).toBe(true);
+        expect(readFileSync(target, 'utf8')).toBe(`${AGENTS_BLOCK}\n`);
+      },
+    );
   });
 
   it.each([
@@ -258,6 +289,27 @@ describe('what uninstall leaves alone', () => {
     }
   });
 
+  it('leaves a hook whose "Otea is gone" line was edited, keeping the mark', async () => {
+    installGitHook(repo.dir, launcher());
+    const written = readFileSync(hook(), 'utf8');
+    expect(written).toContain('if ! { [ -e ');
+
+    for (const edited of [
+      written.replace('if ! { [ -e ', 'if ! { [ -f '),
+      written.replace(/^(if ! \{ .*); \}; then$/m, '$1; rm -rf "$HOME"; }; then'),
+      written.replace(/^(if ! \{ .*); \}; then$/m, '$1 || true; }; then'),
+    ]) {
+      expect(edited).not.toBe(written);
+      writeFileSync(hook(), edited);
+
+      const result = await otea('uninstall', '--only', 'repos');
+
+      expect(result.code).toBe(0);
+      expect(readFileSync(hook(), 'utf8')).toBe(edited);
+      expect(result.out).toContain('Left the pre-push hook');
+    }
+  });
+
   it('warns, and still cleans this repo, when the registry cannot be read', async () => {
     const broken = temp('otea-broken-home-');
     try {
@@ -359,7 +411,7 @@ describe('the data purge', () => {
   beforeEach(() => {
     home = temp('otea-purge-home-');
     work = temp('otea-purge-work-');
-    writeFileSync(join(home, 'registry.db'), '');
+    emptyRegistry(home);
   });
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -422,11 +474,38 @@ describe('the data purge', () => {
     }
   });
 
+  it('refuses a home whose registry cannot be read, deleting nothing', async () => {
+    const broken = temp('otea-corrupt-home-');
+    try {
+      writeFileSync(join(broken, 'registry.db'), 'this is not a database '.repeat(40));
+      writeFileSync(join(broken, 'keep.txt'), 'x');
+      const repo = tempGitRepo();
+      try {
+        const result = await cliAt(repo.dir, { OTEA_HOME: broken })(
+          'uninstall',
+          '--only',
+          'machine',
+          '--purge-data',
+          '--yes',
+        );
+
+        expect(result.code).toBe(7);
+        expect(result.err).toContain('registry.db that cannot be read');
+        expect(existsSync(join(broken, 'registry.db'))).toBe(true);
+        expect(existsSync(join(broken, 'keep.txt'))).toBe(true);
+      } finally {
+        repo.remove();
+      }
+    } finally {
+      rmSync(broken, { recursive: true, force: true });
+    }
+  });
+
   it('resolves a relative home against the folder the command runs in', async () => {
     const repo = tempGitRepo();
     try {
       mkdirSync(join(repo.dir, 'rel-home'));
-      repo.write('rel-home/registry.db', '');
+      emptyRegistry(join(repo.dir, 'rel-home'));
       repo.write('rel-home/keep-me-not.txt', 'x');
       const at = cliAt(repo.dir, { OTEA_HOME: 'rel-home' });
 
@@ -461,21 +540,20 @@ describe('the data purge', () => {
     }
   });
 
-  it('compares real paths: a link to a folder that holds where it runs is refused', async () => {
-    const link = join(work, 'link');
-    try {
+  it.skipIf(!canLinkFolder)(
+    'compares real paths: a link to a folder that holds where it runs is refused',
+    () => {
+      const link = join(work, 'link');
       symlinkSync(home, link, 'junction');
-    } catch {
-      return; // A computer that lets this user make no link has nothing to try.
-    }
-    const inside = join(home, 'repo');
-    mkdirSync(inside);
+      const inside = join(home, 'repo');
+      mkdirSync(inside);
 
-    expect(() => dataTargets(link, inside, false)).toThrow('or holds the folder you are in');
-    expect(existsSync(join(home, 'registry.db'))).toBe(true);
-    // The same folder by the link is the folder: it is deleted as the one it is.
-    expect(dataTargets(link, work, false)).toEqual([home]);
-  });
+      expect(() => dataTargets(link, inside, false)).toThrow('or holds the folder you are in');
+      expect(existsSync(join(home, 'registry.db'))).toBe(true);
+      // The same folder by the link is the folder: it is deleted as the one it is.
+      expect(dataTargets(link, work, false)).toEqual([home]);
+    },
+  );
 
   it.runIf(process.platform === 'win32' || process.platform === 'darwin')(
     'compares case-insensitively where the file system does',

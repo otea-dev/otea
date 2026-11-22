@@ -2,8 +2,10 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { processAlive } from '../app/presence.ts';
+import { migrateRegistry } from '../store/registry.ts';
 import { readServeFile } from './serve-file.ts';
 import { type Cli, cliAt, spawnCli, tempGitRepo, until } from './testing.ts';
 
@@ -327,12 +329,16 @@ describe('uninstall', () => {
 
     it('never deletes a folder that holds the repo it runs in', async () => {
       vi.stubEnv('OTEA_HOME', repo.dir);
-      repo.write('registry.db', '');
+      // A registry that reads and lists nothing, so what refuses is where the command runs.
+      const registry = new DatabaseSync(join(repo.dir, 'registry.db'));
+      migrateRegistry(registry);
+      registry.close();
       mkdirSync(join(repo.dir, 'data'));
 
       const result = await otea('uninstall', '--purge-data', '--yes');
 
       expect(result.code).toBe(7);
+      expect(result.err).toContain('or holds the folder you are in');
       expect(existsSync(join(repo.dir, 'data'))).toBe(true);
       expect(existsSync(join(repo.dir, 'registry.db'))).toBe(true);
     });
