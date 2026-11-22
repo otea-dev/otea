@@ -5,13 +5,14 @@ import { OteaError } from '../core/errors.ts';
 import { insertEvidence, selectEvents } from '../store/queries.ts';
 import { createBoard, publishBoard, saveDraft } from './boards.ts';
 import type { Context } from './context.ts';
-import { createItem, getItem, listItems, showItem } from './items.ts';
+import { createItem, getItem, listItems, moveItem, showItem } from './items.ts';
 import { claimItem, releaseItem } from './leases.ts';
 import { handoffItem, itemNextText, nextFor } from './next.ts';
 import { endProcess, endWaiter, waitBeat } from './presence.ts';
 import { answerQuestion, answerWaiting, askQuestion, noteChatAnswer } from './questions.ts';
 import { restartItem } from './restart.ts';
 import { memoryContext } from './testing.ts';
+import { undoMove } from './undo.ts';
 
 const you = { kind: 'human' as const, name: 'fede' };
 const kiln = { kind: 'agent' as const, name: 'kiln' };
@@ -364,5 +365,18 @@ describe('the person answers', () => {
     expect(refusal(answer(you, ' ')).code).toBe('reason_required');
     answer(you)();
     expect(refusal(answer(you)).message).toContain('no question waits');
+  });
+});
+
+describe('a question after a move the person took back', () => {
+  it('still waits, and the person answers it', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+    ask(ctx, item.id);
+    const before = getItem(ctx, item.id, now).state;
+    moveItem(ctx, { id: item.id, to: 'dropped', actor: you, channel: 'ui', reason: 'no' }, now);
+    undoMove(ctx, { id: item.id, from: before, actor: you, channel: 'ui' }, now);
+
+    answerQuestion(ctx, { id: item.id, text: 'Con musgo', actor: you, channel: 'ui' }, now);
   });
 });

@@ -27,6 +27,7 @@ export type ItemQuestion = {
 };
 
 export type QuestionEvent = {
+  id?: number;
   type: string;
   actor: { kind: 'human' | 'agent'; name: string };
   at: string;
@@ -66,7 +67,13 @@ export function questionsOf(events: readonly QuestionEvent[]): ItemQuestion[] {
 // moved since. A move ends the round it was asked in, and with it the question.
 export function openQuestion(events: readonly QuestionEvent[]): ItemQuestion | undefined {
   let open: number | undefined;
-  for (const { type, data } of events) {
+  // A move taken back (its undo names it) never happened: it ends no question.
+  const undone = new Set<number>();
+  for (const { id, data } of events) {
+    if (typeof data.undoes === 'number' && id !== undefined) undone.add(data.undoes).add(id);
+  }
+  for (const { id, type, data } of events) {
+    if (id !== undefined && undone.has(id)) continue;
     if (type === 'transitioned') open = undefined;
     else if (type === QUESTION_ASKED && typeof data.question === 'number') open = data.question;
     else if (type === QUESTION_ANSWERED && data.question === open) open = undefined;
