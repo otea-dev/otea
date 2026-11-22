@@ -306,6 +306,8 @@ Questions and bugs go to [GitHub Issues](https://github.com/otea-dev/otea/issues
 
 Otea is free software under the [GNU Affero General Public License v3.0](LICENSE). You can use, study, modify and share it. If you distribute a modified version, or let people use it over a network, you must publish its source under the same license, keeping the copyright notices.
 
+**Using Otea inside a company.** Running it, unmodified or modified, on your own team's computers for your own work asks nothing of you, as long as you do not distribute it or offer it as a network service to people outside your organization. The AGPL's duties start when you give copies to others, or let others use your modified version over a network. That is a plain reading of the license, not legal advice: [SECURITY.md](SECURITY.md#using-otea-inside-a-company-the-agpl) has the detail, and the [license](LICENSE) is what governs.
+
 **Commercial license.** If the AGPL does not fit your use (for example, embedding Otea in a closed product), a commercial license is available. Open an issue or contact Federico Daniel Ara ([@Lartweib](https://github.com/Lartweib)).
 
 **Name.** "Otea" and its logo identify this project. Forks are welcome under the AGPL, but must use a different name.
@@ -323,4 +325,5 @@ Contributions are accepted under the [Contributor License Agreement](CLA.md); se
 - [Topics](docs/topics.md): the side questions agents keep as short conversations.
 - [The desk](docs/desk.md): `otea serve`, the web UI, and its API for agents at work and notes.
 - [Several projects and a phone](docs/phone.md): one server for every project, the phone on the local network or Tailscale, and notifications.
+- [Security and data](docs/security.md): where Otea keeps its data, what listens and where, what leaves the machine, what it writes in your repos, and how to remove it.
 - [Development](docs/development.md): tests, `npm run dev:ui` and the token budget.
