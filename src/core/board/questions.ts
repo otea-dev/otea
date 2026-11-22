@@ -34,8 +34,31 @@ export type QuestionEvent = {
   data: Record<string, unknown>;
 };
 
+// The events as they stand once the moves the person took back are gone, as the item's history
+// reads them (core/board/history.ts withoutUndone): a move and its undo (which names it by id) are
+// dropped, and with them every question asked or answered between them, in a round that never
+// happened. Needs the events' ids: an undo among events without them is no history to read, so it
+// fails loudly rather than leaving a question open or closed by a move that was undone.
+function liveEvents(events: readonly QuestionEvent[]): readonly QuestionEvent[] {
+  const spans: Array<[number, number]> = [];
+  for (const { id, data } of events) {
+    if (typeof data.undoes !== 'number') continue;
+    if (id === undefined) throw new Error('an undo event without its id cannot be read');
+    spans.push([data.undoes, id]);
+  }
+  if (spans.length === 0) return events;
+  return events.filter(({ id, type }) => {
+    if (id === undefined) throw new Error('an event without its id cannot be read next to an undo');
+    return !spans.some(
+      ([from, to]) =>
+        id === from || id === to || (id > from && id < to && type.startsWith('question_')),
+    );
+  });
+}
+
 // The item's questions, oldest first, each with its answer once there is one.
-export function questionsOf(events: readonly QuestionEvent[]): ItemQuestion[] {
+export function questionsOf(all: readonly QuestionEvent[]): ItemQuestion[] {
+  const events = liveEvents(all);
   const out = new Map<number, ItemQuestion>();
   for (const { type, actor, at, data } of events) {
     if (typeof data.question !== 'number') continue;
@@ -65,15 +88,10 @@ export function questionsOf(events: readonly QuestionEvent[]): ItemQuestion[] {
 
 // The question an item's events leave open (oldest first): asked, not answered, and the item not
 // moved since. A move ends the round it was asked in, and with it the question.
-export function openQuestion(events: readonly QuestionEvent[]): ItemQuestion | undefined {
+export function openQuestion(all: readonly QuestionEvent[]): ItemQuestion | undefined {
+  const events = liveEvents(all);
   let open: number | undefined;
-  // A move taken back (its undo names it) never happened: it ends no question.
-  const undone = new Set<number>();
-  for (const { id, data } of events) {
-    if (typeof data.undoes === 'number' && id !== undefined) undone.add(data.undoes).add(id);
-  }
-  for (const { id, type, data } of events) {
-    if (id !== undefined && undone.has(id)) continue;
+  for (const { type, data } of events) {
     if (type === 'transitioned') open = undefined;
     else if (type === QUESTION_ASKED && typeof data.question === 'number') open = data.question;
     else if (type === QUESTION_ANSWERED && data.question === open) open = undefined;

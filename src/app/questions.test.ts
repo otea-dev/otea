@@ -3,11 +3,19 @@ import { sequenceIds } from '../core/board/ids.ts';
 import { creatures } from '../core/board/testing.ts';
 import { OteaError } from '../core/errors.ts';
 import { insertEvidence, selectEvents } from '../store/queries.ts';
+import { askingItem } from './asking.ts';
 import { createBoard, publishBoard, saveDraft } from './boards.ts';
 import type { Context } from './context.ts';
 import { createItem, getItem, listItems, moveItem, showItem } from './items.ts';
 import { claimItem, releaseItem } from './leases.ts';
-import { handoffItem, itemNextText, nextFor } from './next.ts';
+import {
+  approveItem,
+  handoffItem,
+  itemNextText,
+  itemOnBoard,
+  liveBoardOf,
+  nextFor,
+} from './next.ts';
 import { endProcess, endWaiter, waitBeat } from './presence.ts';
 import { answerQuestion, answerWaiting, askQuestion, noteChatAnswer } from './questions.ts';
 import { restartItem } from './restart.ts';
@@ -378,5 +386,29 @@ describe('a question after a move the person took back', () => {
     undoMove(ctx, { id: item.id, from: before, actor: you, channel: 'ui' }, now);
 
     answerQuestion(ctx, { id: item.id, text: 'Con musgo', actor: you, channel: 'ui' }, now);
+
+    expect(askingItem(ctx.db, item.id)).toBeUndefined();
+    expect(getItem(ctx, item.id, now).state).toBe(before);
+  });
+
+  it('forgets a question asked inside the round the person took back', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+    attach(ctx, item.id);
+    handoffItem(ctx, { id: item.id, actor: kiln, channel: 'cli' }, now);
+    const review = getItem(ctx, item.id, now).state;
+    approveItem(ctx, { id: item.id, actor: you, channel: 'ui' }, now);
+    claimItem(ctx, { id: item.id, actor: kiln }, now);
+    ask(ctx, item.id, '¿Bucle corto o largo?');
+    expect(askingItem(ctx.db, item.id)?.text).toBe('¿Bucle corto o largo?');
+
+    undoMove(ctx, { id: item.id, from: review, actor: you, channel: 'ui' }, now);
+
+    expect(askingItem(ctx.db, item.id)).toBeUndefined();
+    approveItem(ctx, { id: item.id, actor: you, channel: 'ui' }, now);
+    expect(askingItem(ctx.db, item.id)).toBeUndefined();
+    const board = liveBoardOf(ctx, item.collection);
+    const on = board && itemOnBoard(ctx, getItem(ctx, item.id), board.def);
+    expect(on?.questions).toEqual([]);
   });
 });

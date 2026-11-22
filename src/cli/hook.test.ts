@@ -257,21 +257,50 @@ describe('hook', () => {
 
       // An Otea that is gone (uninstalled, a checkout moved) is not one that failed: the push goes
       // through with one stderr line from the hook, never a Node stack trace.
-      it.each([
-        ['a checkout, on Node', { execPath: 'node' }],
-        ['the desktop app', { execPath: join('gone', 'Otea.exe'), electron: '45.2.1' }],
-      ])('lets the push through, quietly, when Otea is gone: %s', (_, runtime) => {
-        installGitHook(repo.dir, oteaLauncher(join(repo.dir, 'gone', 'main.ts'), runtime));
-
-        const pushed = spawnSync('git', ['push', remote.dir, 'HEAD:refs/heads/frozen'], {
+      const pushFrozen = () =>
+        spawnSync('git', ['push', remote.dir, 'HEAD:refs/heads/frozen'], {
           cwd: repo.dir,
           encoding: 'utf8',
         });
+
+      it.each([
+        [
+          'the main script',
+          () => oteaLauncher(join(repo.dir, 'gone', 'main.ts'), { execPath: 'node' }),
+        ],
+        [
+          'the desktop exe',
+          () =>
+            oteaLauncher(join(repo.dir, 'otea.mjs'), {
+              execPath: join(repo.dir, 'gone', 'Otea.exe'),
+              electron: '45.2.1',
+            }),
+        ],
+      ])('lets the push through, quietly, when %s is gone', (_, launcher) => {
+        installGitHook(repo.dir, launcher());
+
+        const pushed = pushFrozen();
 
         expect(pushed.status).toBe(0);
         const said = pushed.stderr.split('\n').filter((line) => line.startsWith('otea:'));
         expect(said).toHaveLength(1);
         expect(pushed.stderr).not.toMatch(/Error|\bat .*:\d+/);
+        expect(existsSync(join(repo.dir, 'asked.log'))).toBe(false);
+      });
+
+      // A bare command that is not on the PATH of this push (a GUI client, a shell without nvm, an
+      // agent running env PATH=...) is no Otea gone: the push stays refused.
+      it('refuses the push when node is not on the PATH, though the main script is there', () => {
+        installGitHook(repo.dir, {
+          command: 'node-not-on-this-path',
+          args: [join(repo.dir, 'otea.mjs')],
+        });
+
+        const pushed = pushFrozen();
+
+        expect(pushed.status).not.toBe(0);
+        expect(pushed.stderr).not.toContain('otea: not found');
+        expect(pushed.stderr).toContain('Otea could not check this push of frozen');
         expect(existsSync(join(repo.dir, 'asked.log'))).toBe(false);
       });
 
@@ -293,9 +322,10 @@ describe('hook', () => {
           'the desktop app, on its own runtime',
           (main: string) => oteaLauncher(main, { execPath: process.execPath, electron: '45.2.1' }),
         ],
-      ])('runs Otea from a path with spaces: %s', (_, launcherOf) => {
-        const main = join(repo.dir, 'Program Files', 'Otea app', 'otea.mjs');
-        repo.write(join('Program Files', 'Otea app', 'otea.mjs'), read('otea.mjs'));
+      ])('runs Otea from a path with spaces and a dollar: %s', (_, launcherOf) => {
+        const folder = join('Program Files', 'Otea $app `x`');
+        const main = join(repo.dir, folder, 'otea.mjs');
+        repo.write(join(folder, 'otea.mjs'), read('otea.mjs'));
         installGitHook(repo.dir, launcherOf(main));
 
         expect(push('HEAD:refs/heads/frozen')).toBe(1);

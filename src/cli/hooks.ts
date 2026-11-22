@@ -1,8 +1,8 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, posix, win32 } from 'node:path';
 import { repoOfItem } from '../app/gates.ts';
 import type { Item } from '../app/items.ts';
-import { type Launcher, shellLine } from '../app/launcher.ts';
+import { type Launcher, shellLine, word } from '../app/launcher.ts';
 import type { Project } from '../app/project.ts';
 import { checkoutsOf } from '../app/repos.ts';
 import { CommandFailure } from './command.ts';
@@ -75,16 +75,19 @@ function preHook(otea: Launcher): string {
 
 // When the Otea this hook runs is gone (uninstalled, a checkout moved), the push goes through with
 // one line on stderr rather than failing on a Node stack trace: a missing Otea checks nothing, and
-// is not a check that failed. Looks at the command and at each argument that is a path.
+// is not a check that failed. Only a file this hook itself names can be gone: the absolute command
+// (the desktop exe) and the absolute main script, its last argument. A bare command (node, otea)
+// that is not on this push's PATH is no Otea gone, and stays a failed check that refuses the push:
+// a PATH is not the way past the gate.
 function missingOteaLines(otea: Launcher): string[] {
-  const isPath = (part: string) => /[\\/]/.test(part);
-  const tests = [otea.command, ...otea.args].flatMap((part) => {
-    if (isPath(part)) return [`[ -e "${part}" ]`];
-    return part === otea.command ? [`command -v ${part} > /dev/null 2>&1`] : [];
-  });
-  if (tests.length === 0) return [];
+  const absolute = (part: string) => win32.isAbsolute(part) || posix.isAbsolute(part);
+  const main = otea.args.at(-1);
+  const files = [otea.command, ...(main === undefined ? [] : [main])].filter(
+    (part, index) => absolute(part) && (index === 0 || part !== otea.command),
+  );
+  if (files.length === 0) return [];
   return [
-    `if ! { ${tests.join(' && ')}; }; then`,
+    `if ! { ${files.map((file) => `[ -e ${word(file)} ]`).join(' && ')}; }; then`,
     '  echo "otea: not found, so this push is not checked by Otea (run otea hook install --git to update the hook, or otea hook remove --git)" >&2',
     '  exit 0',
     'fi',
