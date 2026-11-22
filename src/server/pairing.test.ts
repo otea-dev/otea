@@ -382,7 +382,7 @@ describe('LAN access', () => {
     const desk = (path: string, call_: Call = {}) =>
       call(path, { host: LOCAL_HOST, from: '127.0.0.1', cookie: SESSION_COOKIE, ...call_ });
 
-    it('works from localhost as before', async () => {
+    it('reads from localhost, over IPv4 or an IPv4-mapped address, once signed in', async () => {
       expect((await desk('/p/memory-aaaaaa/api/items')).status).toBe(200);
       expect((await desk('/p/memory-aaaaaa/api/items', { from: '::ffff:127.0.0.1' })).status).toBe(
         200,
