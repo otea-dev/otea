@@ -72,6 +72,7 @@ export const CLI_ONLY_COMMANDS = [
   'check',
   'hook install',
   'hook remove',
+  'uninstall',
   'serve',
   'serve start',
   'serve stop',
