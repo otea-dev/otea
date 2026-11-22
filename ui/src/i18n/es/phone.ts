@@ -312,6 +312,9 @@ export const phone = {
   'notify.off': 'Desactivar en este teléfono',
   'notify.desktopNote':
     'Como avisos del sistema, también con la ventana cerrada. Varios seguidos llegan en uno.',
+  'notify.front': 'Traer Otea al frente cuando un agente pregunta',
+  'notify.frontHint':
+    'En ambos casos, Otea avisa con una notificación y el número en la barra de tareas o el Dock.',
   'notify.needsHttps':
     'Los avisos llegan al teléfono solo por HTTPS: conéctalo por Tailscale (Configuración, en el equipo).',
   'notify.needsHome':

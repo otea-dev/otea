@@ -303,6 +303,9 @@ export const phone = {
   'notify.off': 'Turn off on this phone',
   'notify.desktopNote':
     'As the system’s notifications, with the window closed too. A burst comes as one.',
+  'notify.front': 'Bring Otea to the front when an agent asks',
+  'notify.frontHint':
+    'Either way, Otea signals with a notification and the count on the taskbar or Dock.',
   'notify.needsHttps':
     'Notifications reach the phone over HTTPS only: connect it through Tailscale (Settings, on the computer).',
   'notify.needsHome':

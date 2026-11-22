@@ -23,4 +23,11 @@ if (location.protocol === 'file:') {
     openRecent: (root: string) => ipcRenderer.invoke('picker:open-recent', root),
     forget: (root: string) => ipcRenderer.invoke('picker:forget', root),
   });
+} else {
+  // The desk's Preferencias › Avisos: the one desktop preference it shows. The main process
+  // answers only the page of the project's own server, and only a boolean.
+  contextBridge.exposeInMainWorld('oteaDesktopPrefs', {
+    bringToFront: (): Promise<boolean> => ipcRenderer.invoke('prefs:get-front'),
+    setBringToFront: (on: boolean): Promise<boolean> => ipcRenderer.invoke('prefs:set-front', on),
+  });
 }

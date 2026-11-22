@@ -6,6 +6,7 @@ import type { Platform } from '../home-screen.ts';
 import { language, type PlainKey, t } from '../i18n/i18n.ts';
 import { Icon } from '../kit/Icon.tsx';
 import { useSync } from '../offline/sync-state.ts';
+import { desktopPrefs } from './desktop-prefs.ts';
 import { type NotifyOffer, type NotifyView, notifyOffer } from './offer.ts';
 import {
   blockedHereOf,
@@ -171,6 +172,9 @@ export type NotifyBodyProps = {
   onRecheck?: () => void;
   // This browser lost its subscription and the server dropped it (TS-3): turn them on again.
   lost?: boolean;
+  // In the desktop app: bring Otea to the front when an agent asks. Null until the app answers.
+  front?: boolean | null;
+  onFront?: (on: boolean) => void;
 };
 
 // Where to allow them again, with a way to read it again once allowed.
@@ -217,6 +221,8 @@ export function NotifyBody({
   onTest,
   onRecheck,
   lost = false,
+  front = null,
+  onFront,
 }: NotifyBodyProps) {
   if (offer === 'blocked')
     return <Blocked platform={platform} lost={false} onRecheck={onRecheck} />;
@@ -251,6 +257,14 @@ export function NotifyBody({
       ) : null}
       <NotifyChoices prefs={view.prefs} projects={projects} onChange={onPrefs} />
       {offer === 'desktop' ? <p className="gnote">{t('notify.desktopNote')}</p> : null}
+      {offer === 'desktop' && front !== null && onFront ? (
+        <div className="nchoices">
+          <Toggle on={front} onChange={onFront}>
+            {t('notify.front')}
+            <small>{t('notify.frontHint')}</small>
+          </Toggle>
+        </div>
+      ) : null}
       {failed}
       {offer === 'push' ? (
         <>
@@ -298,6 +312,8 @@ export function NotifyGroup() {
   const [projects, setProjects] = useState<NotifyProject[]>([]);
   const [testing, setTesting] = useState(false);
   const [tested, setTested] = useState<string | null>(null);
+  // The desktop app's own preference: bring Otea to the front when an agent asks.
+  const [front, setFront] = useState<boolean | null>(null);
   // The server dropped a subscription this browser had lost (TS-3): it says so until turned on.
   const [lost, setLost] = useState(() => lostPrefs() !== null);
   // What this browser holds: its permission, and whether it still has a push subscription. Read as
@@ -341,6 +357,20 @@ export function NotifyGroup() {
       .catch(() => undefined);
     return () => controller.abort();
   }, [loaded, offline]);
+  useEffect(() => {
+    const prefs = desktopPrefs();
+    if (!prefs) return undefined;
+    let live = true;
+    prefs
+      .bringToFront()
+      .then((on) => {
+        if (live) setFront(on);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
   // The server still pushes to a subscription this browser lost: it is told, and drops it.
   useEffect(() => {
     if (!view || !here || here.at < changedAt.current) return;
@@ -425,6 +455,17 @@ export function NotifyGroup() {
               .finally(() => setTesting(false));
           }}
           onRecheck={() => setChecks((n) => n + 1)}
+          front={front}
+          onFront={(next) => {
+            setFront(next);
+            void desktopPrefs()
+              ?.setBringToFront(next)
+              .then(setFront)
+              .catch(() => {
+                setFront(!next);
+                setProblem('notify.saveFailed');
+              });
+          }}
           onPrefs={(prefs) => {
             const before = view;
             setView({ ...view, prefs });
