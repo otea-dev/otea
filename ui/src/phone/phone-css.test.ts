@@ -78,8 +78,11 @@ describe('the bottom buttons', () => {
 
   it('keeps the last row clear of them on every page', () => {
     expect(rules(phone, '.view > *')).toMatch(
-      /padding-bottom:\s*calc\(90px \+ env\(safe-area-inset-bottom/,
+      /padding-bottom:\s*calc\(var\(--tabbar-h\) \+ 16px \+ var\(--install-h, 0px\)\)/,
     );
+    // The tab bar's height is one number: the pages and the install banner above it share it.
+    expect(rules(phone, '.tabbar')).toMatch(/min-height:\s*var\(--tabbar-h\)/);
+    expect(rules(phone, '.install-banner')).toMatch(/bottom:\s*calc\(var\(--tabbar-h\)/);
   });
 });
 
