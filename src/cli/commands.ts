@@ -3464,7 +3464,7 @@ const start: Command = {
       choose: async () =>
         (
           await input.ask(
-            `${TEMPLATE_LIST}\nA first board? Its key, or Enter to let your agent design the boards with you: `,
+            `${TEMPLATE_LIST}\nA first board? changes is for code, todos for anything else. Its key, or Enter to let your agent design the boards with you: `,
           )
         )
           ?.trim()
@@ -3510,7 +3510,7 @@ const start: Command = {
           : // Nothing was asked of a person (no terminal, so no one chose): no board is made for them.
             // They leave with the way to one: the agent designs it with them, or the command for a
             // template, with the keys it takes.
-            `Boards: none yet. Your agent designs them with you from the text below, or start from a template now: otea start --template <key> (${TEMPLATE_KEYS})`;
+            `Boards: none yet. Pick one now: otea start --template changes (code, one branch per change) or otea start --template todos (anything that is not code); or paste the text below and your agent designs them with you (otea start --help lists every template)`;
     const deskLine = started
       ? `Desk: running in the background at ${url} (pid ${pid}; stop it with otea serve stop)`
       : `Desk: already running at ${url} (pid ${pid})`;
