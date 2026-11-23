@@ -10,9 +10,24 @@ const ServeInfo = z.object({
   port: z.number().int(),
   pid: z.number().int(),
   links: z.boolean().optional(),
+  // The Otea version that runs the server. A server started by 0.4.0 or earlier says nothing, and
+  // is taken as older than any that does.
+  version: z.string().optional(),
 });
 
 export type ServeInfo = z.infer<typeof ServeInfo>;
+
+// A server keeps running its old code after the package under it is upgraded. What to tell a person
+// when the server they reach is not the installed version (or says nothing of its own); nothing
+// when it is. Never a restart of its own: ending the server is the person's to do.
+export function serverVersionNote(
+  info: ServeInfo | undefined,
+  installed: string,
+): string | undefined {
+  if (!info || info.version === installed) return undefined;
+  const runs = info.version ? `Otea ${info.version}` : 'an older Otea (it recorded no version)';
+  return `The server running here (pid ${info.pid}) is ${runs}, and ${installed} is installed: to use the installed one, run otea serve stop, then otea serve start`;
+}
 
 // The port the background server of this home last ran on, by the port it was asked for. serve.json
 // goes with the server; this stays, so the next `otea serve start` comes back on the same port

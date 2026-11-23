@@ -3,6 +3,7 @@ import { createServer, type Server } from 'node:net';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type Cli, cliAt, presetCollection, removeOnceReleased, tempGitRepo } from './testing.ts';
+import { OTEA_VERSION } from './version.ts';
 
 // `Otea running at <origin>/p/<project id>/`: every project has its page on the one server.
 const URL_LINE = /^Otea running at (http:\/\/127\.0\.0\.1:\d+)\/p\/([a-z0-9-]+)\/\n$/;
@@ -182,6 +183,7 @@ describe('serve', () => {
       port,
       pid: process.pid,
       links: true,
+      version: OTEA_VERSION,
     });
     expect(existsSync(join(repo.dir, '.otea', 'serve.json'))).toBe(false);
 

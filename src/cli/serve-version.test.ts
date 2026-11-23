@@ -105,5 +105,15 @@ describe('a server started by another version of Otea', () => {
       expect(out).toContain(said);
       expect(out).toContain(fix);
     });
+
+    it('open --no-open says so too, after the link', async () => {
+      await serveAs(version);
+
+      const { out } = await run('open', '--no-open');
+
+      expect(out).toContain('Sign a browser in at');
+      expect(out).toContain(said);
+      expect(out).toContain(fix);
+    });
   });
 });

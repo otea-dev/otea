@@ -366,9 +366,11 @@ On Windows write the paths with `/` or doubled `\\` inside JSON (and inside a TO
 ```sh
 otea --version          # the version you run now
 npm i -g @otea/cli      # npm: installs the latest
+otea serve stop         # if the background server runs: it keeps the old version until restarted
+otea serve start
 ```
 
-- **npm:** run `npm i -g @otea/cli` again. Once a day, when you run `otea` in a terminal, it asks the npm registry whether there is a newer version and prints one line if there is. It never runs in CI, under `--json`, in a pipe, for an agent (`--as` or `OTEA_AGENT`), for the MCP server, the hook or `otea uninstall`, waits at most about a second, and says nothing offline. `OTEA_NO_UPDATE_CHECK=1` turns it off. The answer is kept in `update-check.json` in the Otea home.
+- **npm:** run `npm i -g @otea/cli` again. The background server (`otea serve start`, which `otea start` also uses) keeps running the old version after an upgrade: `otea serve status` says which version it runs, and `otea serve stop` then `otea serve start` restarts it on the new one. `otea start`, `otea open` and `otea serve start` tell you when the server they reach is not the installed version; none of them restarts it for you. Once a day, when you run `otea` in a terminal, it asks the npm registry whether there is a newer version and prints one line if there is. It never runs in CI, under `--json`, in a pipe, for an agent (`--as` or `OTEA_AGENT`), for the MCP server, the hook or `otea uninstall`, waits at most about a second, and says nothing offline. `OTEA_NO_UPDATE_CHECK=1` turns it off. The answer is kept in `update-check.json` in the Otea home.
 - **Desktop app:** Windows and Linux (`.deb`) update themselves; on macOS you download each new version. The app does not run the check above.
 - Your projects, boards and history live in the Otea home (`~/.otea`, or `$OTEA_HOME`), and an upgrade keeps them.
 
