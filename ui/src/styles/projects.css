@@ -854,6 +854,52 @@
   stroke-linejoin: round;
 }
 
+/* ───────── which Otea this is (VersionLine): a quiet line, last on Configuración, under Acerca de ───────── */
+.pj-about {
+  border-top: 1px solid var(--rule);
+  padding: 14px 0 30px;
+}
+.ver {
+  min-width: 0;
+}
+.about + .ver {
+  margin-top: 8px;
+}
+.ver-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  min-height: 26px;
+  font: 400 12.5px / 1 var(--mono);
+  color: var(--ink-3);
+}
+.ver-num {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.ver-copy {
+  margin-left: -2px;
+}
+.ver-stale {
+  max-width: 64ch;
+  margin: 8px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--warn);
+  font: 400 italic 15px / 1.45 var(--serif);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+/* A finger: the copy button is 44px, kept inside the line's height by its negative margin. */
+@media (pointer: coarse), (max-width: 720px) {
+  .ver-copy {
+    width: 44px;
+    height: 44px;
+    margin-block: -9px;
+    margin-left: -10px;
+  }
+}
+
 /* ───────── a project with no items yet (the empty-big grammar) ───────── */
 .pj-empty-project {
   position: relative;

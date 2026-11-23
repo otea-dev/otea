@@ -719,6 +719,10 @@ class Shell {
     return this.settings.bringToFront;
   }
 
+  appVersion(): string {
+    return app.getVersion();
+  }
+
   setBringToFront(on: boolean): boolean {
     this.settings = { ...this.settings, bringToFront: on };
     writeSettings(this.settings);

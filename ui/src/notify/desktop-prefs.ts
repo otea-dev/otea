@@ -5,6 +5,8 @@ export type DesktopPrefs = {
   // Bring Otea to the front when an agent asks. Off unless chosen.
   bringToFront(): Promise<boolean>;
   setBringToFront(on: boolean): Promise<boolean>;
+  // The desktop app's own version, which the report in Settings names.
+  appVersion(): Promise<string>;
 };
 
 export function desktopPrefs(): DesktopPrefs | undefined {

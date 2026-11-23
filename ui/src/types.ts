@@ -160,6 +160,9 @@ export type ItemView = Omit<ItemWithEvents, 'relations'> & {
 // canConfigure: the same browser; it alone changes the project's paths, presets and boards.
 export type Session = { canWrite: boolean; canManageDevices?: boolean; canConfigure?: boolean };
 
+// The Otea a server runs (its package's version) and the system it runs on (Node's process.platform).
+export type ServerVersion = { version: string; platform: string };
+
 // A phone or tablet paired over the LAN; hint is the end of its token's hash.
 export type Device = {
   id: string;

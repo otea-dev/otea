@@ -31,5 +31,7 @@ if (location.protocol === 'file:') {
   contextBridge.exposeInMainWorld('oteaDesktopPrefs', {
     bringToFront: (): Promise<boolean> => ipcRenderer.invoke('prefs:get-front'),
     setBringToFront: (on: boolean): Promise<boolean> => ipcRenderer.invoke('prefs:set-front', on),
+    // The app's own version, for the report Settings lets a person copy.
+    appVersion: (): Promise<string> => ipcRenderer.invoke('prefs:get-version'),
   });
 }

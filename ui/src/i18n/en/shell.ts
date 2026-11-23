@@ -100,6 +100,11 @@ export const shell = {
   'prefs.sec.app': 'App',
   'prefs.sec.session': 'Session',
   'prefs.sec.about': 'About',
+  // The version line (Settings and Preferences › About)
+  'version.copy': 'Copy the version and system, for a bug report',
+  'version.copied': 'copied',
+  'version.stale':
+    'This page is Otea {page}, but the server runs {server}. Reload it to update; if it stays the same, close and reopen the app.',
 
   // The note of the first run, when the browser picked a language other than English
   'languageNote.label': 'Language',

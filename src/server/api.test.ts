@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ensureRequestsBoard } from '../app/boards.ts';
 import { addCollection, setCollectionIcon } from '../app/collections.ts';
@@ -10,7 +11,7 @@ import type { Actor } from '../core/item.ts';
 import { parsePreset } from '../core/preset.ts';
 import { insertProjectIdentity } from '../store/queries.ts';
 import { createServer, type OteaServer } from './server.ts';
-import { LOCAL_HOST, memoryProject, request, SESSION_COOKIE, TOKEN } from './testing.ts';
+import { anonymous, LOCAL_HOST, memoryProject, request, SESSION_COOKIE, TOKEN } from './testing.ts';
 
 const ana: Actor = { kind: 'human', name: 'ana' };
 const bot: Actor = { kind: 'agent', name: 'claude' };
@@ -56,6 +57,19 @@ describe('api', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ...project.identity, icon: null });
+  });
+
+  // The page that shows the version asks the server what it runs: the number is the package's own,
+  // read from its package.json, and it is shown only to a signed-in browser or a paired device.
+  it('GET /api/version says the version of the running package, to a signed-in browser only', async () => {
+    const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
+
+    for (const path of ['/api/version', '/p/memory-aaaaaa/api/version']) {
+      const response = await get(path);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ version, platform: process.platform });
+      expect((await anonymous(server, path)).status).toBe(401);
+    }
   });
 
   // The installed app's cache keeps one project's answers at a time: every answer says whose it is.

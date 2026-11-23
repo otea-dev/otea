@@ -18,6 +18,7 @@ import { CopyGlyph } from './CopyCommand.tsx';
 import { PageSection as Section } from './PageSection.tsx';
 import { PhoneTransport } from './PhoneTransport.tsx';
 import { settingsSectionId, takeSettingsFocus } from './settings-focus.ts';
+import { VersionLine } from './VersionLine.tsx';
 
 type PathSettings = Settings['paths'][number];
 
@@ -407,6 +408,7 @@ export function ProjectSettings({ version, connection, canWrite }: ProjectSettin
         onChanged={changed}
         onPreferences={() => app.go({ view: 'preferences' })}
         you={<TopicsSetting canWrite={canWrite} />}
+        about={<VersionLine />}
         phone={
           <PhoneTransport
             canWrite={canWrite}
@@ -428,6 +430,7 @@ export function SettingsBody({
   onPreferences,
   you,
   phone,
+  about,
 }: {
   value: Settings;
   canWrite: boolean;
@@ -435,6 +438,8 @@ export function SettingsBody({
   onPreferences: () => void;
   you: ReactNode;
   phone: ReactNode;
+  // The version line, last and quiet: not a section of its own.
+  about?: ReactNode;
 }) {
   const repos = value.paths.flatMap((path) => path.repos);
   return (
@@ -503,6 +508,7 @@ export function SettingsBody({
           <Advanced settings={value} repos={repos} canWrite={canWrite} />
         </TechDetails>
       </Section>
+      {about ? <div className="pj-about">{about}</div> : null}
     </div>
   );
 }
