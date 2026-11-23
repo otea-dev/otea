@@ -230,13 +230,15 @@ function isEmpty(part: Part, input: NextInput): boolean {
   return Array.isArray(value) ? value.length === 0 : String(value).trim() === '';
 }
 
-function valueText(part: Part, input: NextInput): string {
+function valueText(part: Part, input: NextInput, lang: Lang): string {
   if (isEvidence(part)) {
     const count = input.evidence[part.id] ?? 0;
     return count === 0 ? 'none yet' : count === 1 ? '1 file' : `${count} files`;
   }
   const value = part.id === 'title' ? input.title : input.fields[part.id];
   if (value === undefined || value === null || value === '') return '(empty)';
+  // A level is stored as its key (low) and read as the board says it (baja), as show reads it.
+  if (part.kind === 'level') return LEVEL_SAID[lang][String(value)] ?? String(value);
   if (['choice', 'multi', 'check'].includes(part.kind)) return choiceNames(part, value);
   const text = String(value).trimEnd();
   const whole =
@@ -845,11 +847,11 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
         ? starts.length === 0
           ? []
           : [
-              `  fields: ${JSON.stringify(Object.fromEntries(starts.map(({ part }) => [part.name, valueText(part, input)])))}`,
+              `  fields: ${JSON.stringify(Object.fromEntries(starts.map(({ part }) => [part.name, valueText(part, input, boardLangOf(def))])))}`,
             ]
         : starts.map(({ part, from }) => {
             const origin = from ? ` (from ${stepById(def, from)?.name ?? from})` : '';
-            return `  ${part.name}${origin}: ${valueText(part, input)}`;
+            return `  ${part.name}${origin}: ${valueText(part, input, boardLangOf(def))}`;
           });
     lines.push(...section('Starts with', given));
   }
