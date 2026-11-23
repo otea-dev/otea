@@ -8,7 +8,9 @@ import { claimItem } from '../app/leases.ts';
 import { liveBoardOf } from '../app/next.ts';
 import { hearAgent } from '../app/presence.ts';
 import type { Project } from '../app/project.ts';
+import { setProjectLanguage } from '../app/project-language.ts';
 import { designPrompt, startPrompt } from '../core/agent-prompts.ts';
+import { insertProjectIdentity } from '../store/queries.ts';
 import { createServer, type OteaServer } from './server.ts';
 import { LOCAL_HOST, memoryProject, SESSION_COOKIE, TOKEN } from './testing.ts';
 
@@ -18,7 +20,12 @@ describe('GET /api/agent-prompt', () => {
   let project: Project;
   let server: OteaServer;
 
-  const get = async (query: string) => {
+  // The prompt is in the project's language and the screen's language (`?lang=`) words the list
+  // beside it. Most cases want both the same, so the project takes the screen's unless told.
+  const get = async (query: string, inProject?: 'en' | 'es') => {
+    const screen = /lang=(en|es)/.exec(query)?.[1] as 'en' | 'es' | undefined;
+    const lang = inProject ?? screen;
+    if (lang !== undefined) setProjectLanguage(project, lang);
     const response = await server.app.request(`/p/memory-aaaaaa/api/agent-prompt${query}`, {
       headers: { host: LOCAL_HOST, cookie: SESSION_COOKIE },
     });
@@ -27,6 +34,8 @@ describe('GET /api/agent-prompt', () => {
 
   beforeEach(() => {
     project = memoryProject();
+    // A project has its identity row (where its language is kept) from the day it is opened.
+    insertProjectIdentity(project.db, project.identity);
     server = createServer(project, { token: TOKEN });
   });
 
@@ -41,6 +50,9 @@ describe('GET /api/agent-prompt', () => {
       // A folder with no git repository: its first contact is written for files, not for code.
       body: { kind: 'start', prompt: startPrompt('es', false), code: false, boards: [] },
     });
+    // The prompt is in the project's language; the screen's only words the list beside it.
+    expect((await get('?lang=en', 'es')).body.prompt).toBe(startPrompt('es', false));
+    expect((await get('?lang=es', 'en')).body.prompt).toBe(startPrompt('en', false));
     expect((await get('?lang=en')).body.prompt).toBe(startPrompt('en', false));
   });
 

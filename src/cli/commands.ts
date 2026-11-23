@@ -623,7 +623,14 @@ const projectsLang: Command = {
     "Show the project's language, or change it with en or es: the language of what Otea makes for the project with no desk to ask (otea start, prompt, board add, board draft, a Pedido's title). It affects only what is made from then on; boards that exist keep their words, and the desk keeps its own language for its screen",
   args: ['lang?'],
   options: {},
-  execute: ({ cwd, args: [asked] }) => {
+  execute: ({ cwd, args: [asked], agent }) => {
+    // The project's language is the person's choice: an agent that names itself only reads it.
+    if (asked !== undefined && agent !== undefined) {
+      throw new OteaError(
+        'forbidden',
+        `otea projects lang ${asked} changes the project's language, which is the person's choice. An agent reads it with otea projects lang, and asks the person with otea ask <id> "<question>" --as ${agent}`,
+      );
+    }
     if (asked !== undefined && !isLang(asked)) throw new UsageError('The language is en or es');
     return withProject(cwd, (project) => {
       const lang =
