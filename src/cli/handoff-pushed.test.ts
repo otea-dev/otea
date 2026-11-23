@@ -374,6 +374,23 @@ describe('a handoff of a branch', () => {
       }
     });
 
+    // A worktree whose folder was deleted still lists the branch until git prunes it: nobody works
+    // there any more, so it must not stand for a checkout of the branch.
+    it('refuses over MCP a Rama only a worktree whose folder is gone has checked out', async () => {
+      git('checkout', '-q', '-b', 'probe/badge');
+      const parent = mkdtempSync(join(tmpdir(), 'otea-worktree-'));
+      try {
+        git('worktree', 'add', '-q', join(parent, 'sub'), BRANCH);
+        rmSync(join(parent, 'sub'), { recursive: true, force: true });
+        expect(git('worktree', 'list', '--porcelain')).toContain(`branch refs/heads/${BRANCH}`);
+        const reply = await overMcp();
+        expect(reply.isError, reply.text).toBe(true);
+        expect(reply.text).toContain('no checkout of this repository is on it');
+      } finally {
+        rmSync(parent, { recursive: true, force: true });
+      }
+    });
+
     it('takes over MCP a repository whose checkout is detached, as the CLI does', async () => {
       git('checkout', '-q', '--detach');
       const handed = await overMcp();
