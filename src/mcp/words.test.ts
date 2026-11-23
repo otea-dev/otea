@@ -66,6 +66,78 @@ describe('mcpWords', () => {
     );
   });
 
+  // The flags below are names of Otea options too (check, all, since, limit): the same flag in
+  // prose reads as an argument (the control), and in another tool's command line, whichever the
+  // tool, it is left alone. Removing the check turns every one of these red.
+  describe('a command line that is not Otea’s', () => {
+    const others = [
+      '`cargo fmt --check`',
+      '`docker ps --all`',
+      '`uv run ruff format --check`',
+      '`git log --since "2 days ago"`',
+      '`gh pr list --limit 5`',
+      '`kubectl get pods --all`',
+      '$ make lint --check',
+      '  $ git log --since "2 days ago"',
+    ];
+
+    it('knows those flags as Otea options', () => {
+      expect(words('with --check')).toBe('with { check }');
+      expect(words('with --all')).toBe('with { all }');
+      expect(words('with --since "5m"')).toBe('with { since: "5m" }');
+      expect(words('with --limit "5"')).toBe('with { limit: "5" }');
+    });
+
+    it('leaves the flags of a backtick span, a $ line and a fenced line as they are', () => {
+      for (const line of others) {
+        const text = line.startsWith('`') ? `Run it: ${line} before you hand it off.` : line;
+        expect(words(text)).toBe(text);
+      }
+      const fenced = 'Run:\n```\ncargo fmt --check\ndocker ps --all\n```\nthen pass --check.';
+      expect(words(fenced)).toBe(
+        'Run:\n```\ncargo fmt --check\ndocker ps --all\n```\nthen pass { check }.',
+      );
+    });
+
+    it('still reads the flag of the prose around it, and of a span that holds only a flag', () => {
+      expect(words('Run `cargo fmt --check`, then pass --check.')).toBe(
+        'Run `cargo fmt --check`, then pass { check }.',
+      );
+      expect(words('Say why with `--reason`, not `git log --since "1 day ago"`.')).toBe(
+        'Say why with `{ reason }`, not `git log --since "1 day ago"`.',
+      );
+      expect(words('Name it with `--as <name>`.')).toBe('Name it with `{ as: <name> }`.');
+    });
+
+    it('does not take a word like node or git in prose for a command line', () => {
+      expect(words('Give the node name with --as <name>')).toBe(
+        'Give the node name with { as: <name> }',
+      );
+      expect(words('Check the git history first, then pass --check.')).toBe(
+        'Check the git history first, then pass { check }.',
+      );
+      expect(words('Pon el nombre del nodo con --as <nombre>, luego git log y --check')).toBe(
+        'Pon el nombre del nodo con { as: <nombre> }, luego git log y { check }',
+      );
+    });
+
+    it('reads a step written in Spanish the same way', () => {
+      const step =
+        'Revisa los cambios con `git log --since "2 days ago"` y con `cargo fmt --check`; después usa --as <nombre> y otea next --claim.';
+      expect(words(step)).toBe(
+        'Revisa los cambios con `git log --since "2 days ago"` y con `cargo fmt --check`; después usa { as: <nombre> } y next { claim: true }.',
+      );
+    });
+  });
+
+  // A tool call has no --field-file (the tool omits it), so the words do not make it a parameter.
+  it('leaves an option the tool does not take as it is', () => {
+    expect(words('Nothing to update; pass --title, --description, --field or --field-file')).toBe(
+      'Nothing to update; pass { title }, { description }, { field } or --field-file',
+    );
+    expect(words('otea update CAM-1 --field-file "What=notes.md"')).not.toContain('field_file');
+  });
+
   // P8-F3: a repeated option is one array argument, as the tool's schema asks.
   it('names a repeated option as an array, one value or several', () => {
     expect(words('Fill it with otea update CAM-1 --field "Branch=<branch>".')).toBe(
