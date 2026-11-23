@@ -118,6 +118,20 @@ describe('the projects api', () => {
       expect(other?.paths[0]?.missing).toBe(false);
     });
 
+    // P6-F3: Rendimiento over every project this server serves. A board filter means nothing
+    // there (one board name is two boards), so it is left out rather than refused.
+    it('GET /api/performance?projects=all reads every project together', async () => {
+      const read = (query: string) =>
+        server.app.request(`/p/${here.identity.id}/api/performance?${query}`, {
+          headers: { host: LOCAL_HOST, cookie: SESSION_COOKIE },
+        });
+      expect((await read('board=Nada')).status).toBe(404);
+      const all = await read('projects=all&board=Nada');
+      expect(all.status).toBe(200);
+      expect(await all.json()).toEqual(expect.objectContaining({ rows: [], since: null }));
+      expect((await read('projects=all&since=soon')).status).toBe(400);
+    });
+
     it('GET /api/project/settings names its paths, repos, gate and storage', async () => {
       const settings = await get<ProjectSettings>('/api/project/settings');
       expect(settings.registered).toBe(true);

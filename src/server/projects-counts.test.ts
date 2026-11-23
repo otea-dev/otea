@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { addCollection } from '../app/collections.ts';
 import { createItem, moveItem } from '../app/items.ts';
 import { claimItem } from '../app/leases.ts';
+import { seeAgent } from '../app/presence.ts';
 import { addTopic, answerTopic, setTopicsOn } from '../app/topics.ts';
 import type { Actor } from '../core/item.ts';
 import { countsOf } from './projects.ts';
@@ -72,5 +73,26 @@ describe('what waits for you in a project', () => {
       },
     ]);
     expect(counts.waiting).toEqual([]);
+  });
+});
+
+// P6-F7: the switcher says what each project has going on: which agents are there and what each
+// is doing, in the server's own words (status), never derived by the page.
+describe('the agents of a project, as the switcher says them', () => {
+  it('lists the agents that are not away with the server’s status, and none for a quiet project', () => {
+    const project = memoryProject();
+    expect(countsOf(project).agents).toEqual([]);
+
+    addCollection(project, { name: 'tasks' });
+    const { id } = createItem(project, {
+      collection: 'tasks',
+      title: 'Work',
+      fields: { description: 'x' },
+      actor: bot,
+    });
+    seeAgent(project.db, { agent: 'claude', channel: 'cli', call: true });
+    claimItem(project, { id, actor: bot });
+
+    expect(countsOf(project).agents).toEqual([{ name: 'claude', status: 'working', holding: 1 }]);
   });
 });

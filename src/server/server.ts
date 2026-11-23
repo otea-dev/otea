@@ -29,7 +29,7 @@ import { boardRoundOf, liveBoards, rowFactsOf } from '../app/next.ts';
 import { editNote, leaveNote, notesSummary, notesView, withdrawNote } from '../app/notes.ts';
 import { listTargets } from '../app/notify-targets.ts';
 import { markOpened, openedFiles } from '../app/opened.ts';
-import { performanceOf } from '../app/performance.ts';
+import { performanceAcross, performanceOf } from '../app/performance.ts';
 import {
   adoptTailscale,
   choosePhoneTransport,
@@ -547,9 +547,17 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       })
       // How each model performs (Rendimiento): per model family and effort, for a board and a period.
       .get('/performance', (c) => {
-        const { board, since = 'all' } = c.req.query();
+        const { board, since = 'all', projects } = c.req.query();
         if (!parsePeriod(since, new Date().toISOString())) {
           throw new InvalidQuery(`since takes ${PERIOD_HINT}`);
+        }
+        // `projects=all`: every project this server serves, read together (a board filter has no
+        // meaning there: the same board name is two boards).
+        if (projects === 'all') {
+          const served = doors.source
+            .list()
+            .flatMap(({ id, name, project: each }) => (each ? [{ id, name, ctx: each }] : []));
+          return c.json(performanceAcross(served, { since }));
         }
         return c.json(performanceOf(project, { board, since }));
       })

@@ -16,11 +16,13 @@ import {
 import { type Item, listItems } from '../app/items.ts';
 import type { Launcher } from '../app/launcher.ts';
 import { liveBoards } from '../app/next.ts';
+import { listAgents } from '../app/presence.ts';
 import { addPathToProject, databasePath, type Env, type Project } from '../app/project.ts';
 import { identityAt, listRepos, type Repo, readReposAtFolder, reposInside } from '../app/repos.ts';
 import { listTopics } from '../app/topics.ts';
 import { CommandFailure } from '../cli/command.ts';
 import { hasOteaGitHook, hasOutdatedGitHook, installGitHook } from '../cli/hooks.ts';
+import type { AgentStatus } from '../core/agent-status.ts';
 import { OteaError } from '../core/errors.ts';
 import { stateLabel } from '../core/workflow.ts';
 import type { Storage } from '../store/registry.ts';
@@ -43,10 +45,15 @@ export type ProjectOverview = {
   topics: AnsweredTopic[];
   // Open items on an agent's turn.
   withAgents: number;
+  // The agents there that are not away, each with the server's own word for what it is doing now
+  // (core/agent-status.ts): the switcher and «Todos los proyectos» say it as it is, never derive it.
+  agents: AgentGlimpse[];
   open: number;
   // Why its items could not be read (its data is missing, say).
   unavailable?: string;
 };
+
+export type AgentGlimpse = { name: string; status: AgentStatus; holding: number };
 
 // `stateName`: the step it is on in words (a board's steps are hidden ids), as its type names it.
 export type WaitingItem = Item & { icon?: string; stateName: string };
@@ -79,7 +86,7 @@ function answeredTopics(project: Project): AnsweredTopic[] {
     }));
 }
 
-type Counts = Pick<ProjectOverview, 'waiting' | 'topics' | 'withAgents' | 'open'>;
+type Counts = Pick<ProjectOverview, 'waiting' | 'topics' | 'withAgents' | 'agents' | 'open'>;
 
 // What waits for you is what Te toca lists: your turn, and the work of an agent that went quiet
 // (its lease ran out), yours to restart or reassign (ONB3-5).
@@ -92,11 +99,14 @@ export function countsOf(project: Project): Counts {
     waiting: open.filter(yours).map((item) => withIcon(project, item)),
     topics: answeredTopics(project),
     withAgents: open.filter((item) => !yours(item)).length,
+    agents: listAgents(project.db)
+      .filter((agent) => agent.status !== 'away')
+      .map((agent) => ({ name: agent.name, status: agent.status, holding: agent.holding.length })),
     open: open.length,
   };
 }
 
-const NOTHING: Counts = { waiting: [], topics: [], withAgents: 0, open: 0 };
+const NOTHING: Counts = { waiting: [], topics: [], withAgents: 0, agents: [], open: 0 };
 
 function overviewOf(served: ServedProject, currentId: string): ProjectOverview {
   const { id, name, storage, paths, project } = served;

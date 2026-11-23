@@ -34,20 +34,60 @@ export function performanceOf(
   if (only && boards.length === 0) {
     throw new OteaError('not_found', `Board "${only}" is not published yet`);
   }
-  const trails = boards.flatMap(({ collection, def }) =>
+  return {
+    ...modelPerformance(trailsOf(ctx, boards), period),
+    boards: boards.map(({ collection }) => collection),
+    since: period.since ?? null,
+  };
+}
+
+type LiveBoard = ReturnType<typeof liveBoards>[number];
+
+// The trails of the items on the boards given. `label` names a board and `own` an item where two
+// projects are read together: ids and board names repeat from one project to the next.
+function trailsOf(
+  ctx: Context,
+  boards: readonly LiveBoard[],
+  label: (board: string) => string = (board) => board,
+  own: (item: string) => string = (item) => item,
+): ItemTrail[] {
+  return boards.flatMap(({ collection, def }) =>
     selectItems(ctx.db, { collection }).map(
       (item): ItemTrail => ({
-        item: item.id,
-        board: collection,
+        item: own(item.id),
+        board: label(collection),
         def,
         events: selectEvents(ctx.db, item.id),
         start: { initial: def.steps[0]?.id ?? item.state, createdAt: item.createdAt },
       }),
     ),
   );
+}
+
+// How each model performs over every project given (P6-F3): the same report, read from all their
+// boards at once, so a model's numbers are one row whichever project it worked in. A board goes by
+// «Project / board», an item by its project, for neither repeats in the other.
+export function performanceAcross(
+  projects: readonly { id: string; name: string; ctx: Context }[],
+  input: { since?: string | undefined },
+  now: Clock = systemClock,
+): PerformanceView {
+  const period = parsePeriod(input.since ?? 'all', now());
+  if (!period) throw new OteaError('invalid_fields', `--since takes ${PERIOD_HINT}`);
+  const read = projects.map(({ id, name, ctx }) => {
+    const boards = liveBoards(ctx);
+    const label = (board: string) => `${name} / ${board}`;
+    return {
+      boards: boards.map(({ collection }) => label(collection)),
+      trails: trailsOf(ctx, boards, label, (item) => `${id}:${item}`),
+    };
+  });
   return {
-    ...modelPerformance(trails, period),
-    boards: boards.map(({ collection }) => collection),
+    ...modelPerformance(
+      read.flatMap(({ trails }) => trails),
+      period,
+    ),
+    boards: read.flatMap(({ boards }) => boards),
     since: period.since ?? null,
   };
 }
