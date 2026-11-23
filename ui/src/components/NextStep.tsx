@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../app/context.tsx';
+import { useBoards } from '../board-studio/home/boards-store.ts';
 import { openNewBoard } from '../board-studio/home/studio-dialogs.ts';
 import { t } from '../i18n/i18n.ts';
 import { Button } from '../kit/Button.tsx';
@@ -16,7 +17,14 @@ export function NextStep() {
   const project = app.project?.id;
   const [gone, setGone] = useState(() => project === undefined || nextStepDismissed(project));
   const [leaving, setLeaving] = useState(false);
-  if (gone || !firstFinishedRecently(app.all, app.now)) return null;
+  const boards = useBoards(app.version);
+  // Until the boards are known, nothing says which items are the person's work, not a board
+  // request (a Pedido), so the card waits.
+  if (gone || boards.status !== 'ready') return null;
+  const requests = new Set(
+    boards.boards.flatMap((b) => (b.builtin && b.collection ? [b.collection] : [])),
+  );
+  if (!firstFinishedRecently(app.all, app.now, requests)) return null;
 
   const put = () => {
     if (project !== undefined) dismissNextStep(project);

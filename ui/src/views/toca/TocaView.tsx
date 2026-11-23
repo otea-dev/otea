@@ -163,7 +163,6 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
           <EmptyProject />
         ) : (
           <>
-            {atasco ? null : <NextStep key={app.project?.id} />}
             {lonely ? <NoAgents items={app.all} now={app.now} onConnect={app.openConnect} /> : null}
             <LaneHead />
             <LaneList
@@ -177,6 +176,8 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
               drawInOnMount
               onRow={open}
             />
+            {/* Under the queue: what waits for an answer comes first, never pushed out of view. */}
+            {atasco ? null : <NextStep key={app.project?.id} />}
             {atasco ? null : <AnsweredTopics />}
           </>
         )}
