@@ -1,7 +1,7 @@
 {
   "name": "otea-desktop",
   "productName": "Otea",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "The Otea desktop app: the UI of otea serve in a window, its state on the taskbar, the Dock and the tray, and the otea command on PATH.",
   "author": "Federico Daniel Ara",
