@@ -1,5 +1,76 @@
 # Changelog
 
+## [0.4.0](https://github.com/otea-dev/otea/compare/v0.3.0...v0.4.0) (2026-11-23)
+
+
+### Features
+
+* **cli:** otea start, the first minutes in one command ([1c54ba0](https://github.com/otea-dev/otea/commit/1c54ba0267219cd0f5e38f624ec704a2a8df702c))
+* **cli:** start says how to get a board, init knows a desk runs, --lang on start and init ([5c45420](https://github.com/otea-dev/otea/commit/5c45420ce774a1facdb64c3810057b0746e0a95b))
+* **handoff:** the handoff line says when a new file has the bytes of the round before ([a0552ae](https://github.com/otea-dev/otea/commit/a0552ae5ca66c88f2425f747f94a883d660da78a))
+* **prompts:** lay the first-contact prompt out as steps with a line for each thing to do ([0969930](https://github.com/otea-dev/otea/commit/09699302062747164d33c080aca0968504fb0161))
+* **repos:** next and claim say a remote was added after init, with the command ([21cff02](https://github.com/otea-dev/otea/commit/21cff0262a28382950ed05dd0ed98d17044c957e))
+* **server:** agents per project in the overview, Rendimiento across projects ([9d1dc20](https://github.com/otea-dev/otea/commit/9d1dc20d80573e0032d17bd5e5b24c6c691c14ef))
+* **start:** say which template to pick when no board was made ([a1b1c70](https://github.com/otea-dev/otea/commit/a1b1c70a8cbd469f32825c2c7689d404d3d4ce75))
+* **ui:** a calm next step after the first finished item ([3d8a0f6](https://github.com/otea-dev/otea/commit/3d8a0f6e032dad8788adc32d18555dfc1a3c4db0))
+* **ui:** Configuracion in plain sections, jargon behind Avanzado ([0d700c4](https://github.com/otea-dev/otea/commit/0d700c4cd5de2428e0a840dc30d2540498702210))
+* **ui:** per-project state in the switcher, agents and Rendimiento across projects ([b37310b](https://github.com/otea-dev/otea/commit/b37310b5ee776d155e4f61a988cbd76c716ea332))
+* **ui:** plain words in Connect an agent, technical detail behind a disclosure ([c3da430](https://github.com/otea-dev/otea/commit/c3da4306828d77661f4d1382be1126edec8beb9b))
+* **ui:** search the items on the phone; keep the install banner off the next-step card ([6b1a45e](https://github.com/otea-dev/otea/commit/6b1a45e9de73d575fdebf3560a898fbde773562d))
+* **ui:** the create button reads as an action ([6a2a64a](https://github.com/otea-dev/otea/commit/6a2a64ad9610249a966f5715a00340b2dda28ce1))
+
+
+### Bug fixes
+
+* a connected agent whose lease lapsed reads connected, the lease keeps its own word ([6e9706f](https://github.com/otea-dev/otea/commit/6e9706f05d939fdb6f0fa15b808400136d835856))
+* **boards:** evidence groups new each round, plural counts, short-group approval, reader framing ([d1e640a](https://github.com/otea-dev/otea/commit/d1e640a1df80ecd5c5e22f73aa85d7781290481c))
+* **boards:** review of the evidence-groups PR (confirm resets, reader flow, group invariants) ([15bdd5d](https://github.com/otea-dev/otea/commit/15bdd5da70e74c71b4b9a03103fb309bfa03cc28))
+* **cli:** boards made from the command line follow the person's language ([5b1440c](https://github.com/otea-dev/otea/commit/5b1440c36520dfae127a5c77bc1ae413f1040b42))
+* **cli:** daemon port memory, single-use sign-in links, wait units, MCP schemas, connect --cli ([4bdaba5](https://github.com/otea-dev/otea/commit/4bdaba569c73803edcb6c58284ee859b62b23e18))
+* **cli:** fail toward git in the .git walk, ship every bundled license, try the packed package in CI ([2827d43](https://github.com/otea-dev/otea/commit/2827d43ab46c8cca5d27123cd4abe95222da3e66))
+* **cli:** init takes no --lang, as its contract says ([11a0854](https://github.com/otea-dev/otea/commit/11a08541de16ce5958dcc27dda4aaaba8f485feb))
+* **cli:** review of the single-use link, hook refresh, MCP params and port memory ([e73037c](https://github.com/otea-dev/otea/commit/e73037c30f14e4fa19c7802c7fdb79574d06da15))
+* **connect:** say each thing once and the PATH difference as a note ([5105fd9](https://github.com/otea-dev/otea/commit/5105fd9e9e69e251537ca7a6ac54c012f1af2888))
+* **desk:** keep «sin señal» for a silent agent, show silent and away together, say it on the sheet ([d7d366e](https://github.com/otea-dev/otea/commit/d7d366e25cf86c7967da42050f54a775497f9898))
+* **desk:** one word for an agent whose lease ran out, a plain line for a connected one ([5e5fc85](https://github.com/otea-dev/otea/commit/5e5fc85022f05d4afc592ee32d1ee089c28a753f))
+* **gates:** a write on an item waits its turn to land like the claim ([39c7195](https://github.com/otea-dev/otea/commit/39c7195ec2fc23ec2838a3c6f4a6273957f80b1d))
+* **gates:** close the last holes of the landed-commit check and of main ([1e9c58d](https://github.com/otea-dev/otea/commit/1e9c58d3df64a52672b55dca85c420f165516283))
+* **gates:** Code on main takes one agent at a time, adapts to no remote, checks the commit ([b57a589](https://github.com/otea-dev/otea/commit/b57a5890439e0337e1f088cb151203909daffa47))
+* **gates:** count only landed items as owners, and tell the item's own commit by what the base held at its claim ([4190c4a](https://github.com/otea-dev/otea/commit/4190c4a3f3d852b7355aa932d7ab12878538013a))
+* **gates:** only the item's first claim tells what the base held, and git runs before the claim's transaction ([738fcb3](https://github.com/otea-dev/otea/commit/738fcb33fea9f0121c8e12e138c7c22684e5ae93))
+* **gates:** read git's messages in English when checking the landed commit ([0611442](https://github.com/otea-dev/otea/commit/0611442555972510bccd409c24c20896f4e1db29))
+* **gates:** review of the gates (way Done, approved work, fetch, one change on main, write over a running holder) ([4c3f795](https://github.com/otea-dev/otea/commit/4c3f79520d3f9bdae9df7560e9a658ed19e58c60))
+* **gates:** the landed commit must be the item's own ([577c794](https://github.com/otea-dev/otea/commit/577c794de342dba6f3e8eff99eb2b1b211f8615f))
+* **mcp:** keep other tools' flags and JSON drafts whole, name repeated options as arrays ([f42a986](https://github.com/otea-dev/otea/commit/f42a9869302eaee24690cfb10faec2ba713d3dd4))
+* **mcp:** rewrite a flag only outside other tools' command lines, leave --field-file, point file - to definition ([391e040](https://github.com/otea-dev/otea/commit/391e0401e3d000d091d3c94a082e05547c9c59bc))
+* one agent vocabulary on every surface, calm between rounds ([f59a1d7](https://github.com/otea-dev/otea/commit/f59a1d71e8bc73f2dc5672ea6c1a5840a5851c09))
+* **phone:** review of round-5 phone fixes (draft lifecycle, handed fields, install flicker) ([26fe8e9](https://github.com/otea-dev/otea/commit/26fe8e932f3fa5d5c0a279241a015e3b4f4b83fa))
+* **phone:** unreadable photo and install feedback, log search fit, closed item rounds, Studio why ([966f377](https://github.com/otea-dev/otea/commit/966f377f65d9fb5d820d487b05881e24d6b61870))
+* **project:** answer the path git answers when the folder is reached through a link ([2aa1662](https://github.com/otea-dev/otea/commit/2aa166240928cb6515af082af199df659948f760))
+* **relay:** approvals that land or close are the person's, and relayed words show as relayed everywhere ([5ac46f2](https://github.com/otea-dev/otea/commit/5ac46f2fc1d3f0748408c995aa8e392671a7d2e0))
+* **relay:** show a relayed decision as relayed, never the person's own, and let a board turn relay off ([9f86db7](https://github.com/otea-dev/otea/commit/9f86db7165b58effa3dd60ec930934f63358d40f))
+* review of first contact (note vs prompt, prompt language, start edge cases, card age) ([cbae4a0](https://github.com/otea-dev/otea/commit/cbae4a0d60dc58f5a9b14d692003ddbb8bcbaffc))
+* review of settings and projects (approvals after publish, typed status, safer cross-project reads, throttled picker, folder path, table width) ([c89e6cb](https://github.com/otea-dev/otea/commit/c89e6cb7bbc4ea9e9ac8b785fcc872eb38df9ad0))
+* review of the first-contact PR (language rule, card race, start report, tests) ([717ebed](https://github.com/otea-dev/otea/commit/717ebedad241c113250d50ffa991e23d79736dd4))
+* review of the remote-added notice, connect and README ([b7c6d5d](https://github.com/otea-dev/otea/commit/b7c6d5d6c26cf8a09122db4b898f7ef04f449549))
+* **review:** say when a round attached the same file as the round before ([f877fcb](https://github.com/otea-dev/otea/commit/f877fcb178502eb22b183e55e9cd8cb7c438e774))
+* **signin:** keep the sign-in going when removing a redeemed link's file is refused ([d6548f6](https://github.com/otea-dev/otea/commit/d6548f60bd8686291cc11421d5f3fc7ae03ea6f5))
+* **signin:** use a sign-in link up by creating a mark file that only one process can create ([b57946b](https://github.com/otea-dev/otea/commit/b57946b9e1ad9b71a0e69d738a6f4ee393ea9565))
+* **triage:** approving with a group short asks once, by press and by swipe ([5f9217f](https://github.com/otea-dev/otea/commit/5f9217f771752de181e488375116dff7951b8309))
+* **ui:** classify a refused read before noting it ([c8f94ef](https://github.com/otea-dev/otea/commit/c8f94efd6a69a9656e20a6a9eec5bc7d6ee4ff65))
+* **ui:** count only approvals of an agent's work in the day's recap ([42ecb44](https://github.com/otea-dev/otea/commit/42ecb44cc41e7415c8a58c232c5965d7a5297e61))
+* **ui:** keep the stuck row's mark short beside «reserva vencida» ([3727567](https://github.com/otea-dev/otea/commit/3727567dcd464a27494231a32b0ab20e80c012ed))
+* **ui:** review round on the phone search and the signed-out page ([a168d04](https://github.com/otea-dev/otea/commit/a168d04ad672d543ee8e03bc4d516cb919091232))
+* **ui:** say the session ran out instead of showing an empty desk ([aef2d5d](https://github.com/otea-dev/otea/commit/aef2d5d8114f96bfe9fd6a831aeff1456ab0efee))
+* **ui:** the next-step card counts only real work and rests below the queue ([ba1d6b0](https://github.com/otea-dev/otea/commit/ba1d6b0b7714c3ef8eeb632e1595831050d7696a))
+
+
+### Performance
+
+* **cli:** bundle the CLI with esbuild and answer --version before the commands load ([d066d91](https://github.com/otea-dev/otea/commit/d066d91ba9452bf4bb15c883103d75b522252eaf))
+* **cli:** read the checkout kind and the branch from .git instead of spawning git ([f29ddc0](https://github.com/otea-dev/otea/commit/f29ddc02bcd26e850af0fe0bfdf7a291e1ee41bc))
+* **project:** find the git common dir by walking up to .git instead of spawning git ([31073af](https://github.com/otea-dev/otea/commit/31073af8711a6b0c45dff11d45651a888be4cdf6))
+
 ## [0.3.0](https://github.com/otea-dev/otea/compare/v0.2.0...v0.3.0) (2026-11-22)
 
 
