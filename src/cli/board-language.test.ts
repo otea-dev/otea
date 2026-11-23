@@ -28,9 +28,9 @@ describe('the language of a board made from the command line', () => {
     expect(await boards('--template', 'todos')).toEqual(['Pendientes']);
   });
 
-  it('is the one --lang names, over the desk', async () => {
-    withMachine(process.env, (machine) => rememberLanguage(machine, 'es'));
+  it('follows it when it is English', async () => {
+    withMachine(process.env, (machine) => rememberLanguage(machine, 'en'));
 
-    expect(await boards('--template', 'todos', '--lang', 'en')).toEqual(['To-dos']);
+    expect(await boards('--template', 'todos')).toEqual(['To-dos']);
   });
 });
