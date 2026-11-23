@@ -11,7 +11,7 @@ import {
   fetchSession,
 } from '../api.ts';
 import { currentProjectId } from '../base.ts';
-import { type Connection, useBeat, useLive, useRemote } from '../hooks.ts';
+import { type Connection, useBeat, useLive, useRemote, useThrottled } from '../hooks.ts';
 import { flushQueue, queueAvailable } from '../offline/queue-store.ts';
 import { type SyncState, useSync } from '../offline/sync-state.ts';
 import type { Agent } from '../presence.ts';
@@ -99,6 +99,9 @@ export function canCaptureNow({
   return queue && canWrite !== false;
 }
 
+// At most one read of every project's state in this many ms, however fast the items change.
+export const PROJECTS_READ_MS = 5_000;
+
 export function useAppData(): LoadedData {
   const { connection, version, presence, retry } = useLive();
   const beat = useBeat(30_000);
@@ -111,7 +114,9 @@ export function useAppData(): LoadedData {
   const presets = useRemote(fetchPresets, boards, connection);
   const project = useRemote(fetchProject, 0, connection);
   // Other projects are not on this server's stream: read again as this one changes, and on the beat.
-  const projects = useRemote(fetchProjects, version * 1000 + beat, connection);
+  // The read looks at every project (its items, its agents), so a burst of changes asks once.
+  const projectsVersion = useThrottled(version, PROJECTS_READ_MS);
+  const projects = useRemote(fetchProjects, projectsVersion * 1000 + beat, connection);
   const agents = useAgents(version, presence, connection);
   const feed = useFeed(version);
   const studioChanged = useCallback(() => setStudioWrites((n) => n + 1), []);

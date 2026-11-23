@@ -11,7 +11,7 @@ export const shell = {
   'shell.unavailable': 'cannot be read now',
   'shell.waitingThere': { one: '{count} waits for you', other: '{count} wait for you' },
   'shell.nothingThere': 'nothing waits for you',
-  'shell.pathMissing': 'a path is missing',
+  'shell.pathMissing': 'folder missing',
   'shell.settingsOf': '{project} settings',
   'shell.otherProjects': { one: '{count} other project', other: '{count} other projects' },
   'shell.elsewhere': {

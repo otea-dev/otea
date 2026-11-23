@@ -127,6 +127,15 @@ describe('performanceAcross: the same report over several projects', () => {
     expect(report.boards).toEqual(['Alfa / Criaturas', 'Beta / Criaturas']);
   });
 
+  // One project whose data is gone must not fail Rendimiento for the others.
+  it('leaves out a project it cannot read and sums the rest', () => {
+    const broken = { id: 'gone-abc123', name: 'Gone', ctx: { db: {} } as unknown as Context };
+    const report = performanceAcross([project('Alfa'), broken, project('Beta')], {}, clock);
+
+    expect(report.rows[0]?.handoffs).toBe(4);
+    expect(report.boards).toEqual(['Alfa / Criaturas', 'Beta / Criaturas']);
+  });
+
   it('refuses a period it cannot read, as one project does', () => {
     expect(() => performanceAcross([project('Alfa')], { since: 'soon' }, clock)).toThrow(OteaError);
   });

@@ -68,9 +68,21 @@
 .perf-table th:first-child {
   padding-left: 0;
 }
+/* The last column ends on the section's rule, not 12px past it. */
+.perf-table th:last-child,
+.perf-table td:last-child {
+  padding-right: 0;
+}
+/* A project's name makes a board's name long (all projects): its steps may wrap, not overflow. */
+.perf-table .perf-sub th {
+  white-space: normal;
+}
 .perf-table thead th {
   height: 32px;
-  font: 600 10.5px / 1 var(--sans);
+  white-space: normal;
+  vertical-align: bottom;
+  padding-block: 6px;
+  font: 600 10.5px / 1.25 var(--sans);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-3);

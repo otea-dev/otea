@@ -64,14 +64,15 @@ export function todayCounts(feed: readonly FeedEvent[], ctx: TodayContext): Toda
     const doneByAgent = e.actor.kind === 'agent' && typeof e.data.via !== 'string';
     if (e.type === 'created') enteredBy.set(e.itemId, doneByAgent ? 'agent' : 'you');
     if (e.type !== 'transitioned') continue;
+    // Otea reading an item onto its board is nobody's approval or send-back, and it changes
+    // nobody's hand on the item: it is not recorded either.
+    if (e.data.reason === 'migrate') continue;
+    // Nor is publishing a board: the items it moves to their new steps, and the Pedido it closes.
+    if (e.data.reason === 'publish' || typeof e.data.published_board === 'string') continue;
     // A relayed move is your word carried by an agent, on work that agent did.
     const mine = enteredBy.get(e.itemId) === 'you' && typeof e.data.via !== 'string';
     enteredBy.set(e.itemId, doneByAgent ? 'agent' : 'you');
     if (Date.parse(e.at) < from) continue;
-    // Otea reading an item onto its board is nobody's approval or send-back.
-    if (e.data.reason === 'migrate') continue;
-    // Nor is publishing a board: the items it moves to their new steps, and the Pedido it closes.
-    if (e.data.reason === 'publish' || typeof e.data.published_board === 'string') continue;
     const to = stateOf(e.itemId, String(e.data.to));
     if (!to) continue;
     // A relayed move is the person's words, carried by an agent.

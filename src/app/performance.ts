@@ -74,13 +74,20 @@ export function performanceAcross(
 ): PerformanceView {
   const period = parsePeriod(input.since ?? 'all', now());
   if (!period) throw new OteaError('invalid_fields', `--since takes ${PERIOD_HINT}`);
-  const read = projects.map(({ id, name, ctx }) => {
-    const boards = liveBoards(ctx);
-    const label = (board: string) => `${name} / ${board}`;
-    return {
-      boards: boards.map(({ collection }) => label(collection)),
-      trails: trailsOf(ctx, boards, label, (item) => `${id}:${item}`),
-    };
+  // A project whose data cannot be read is left out of the sum rather than failing it for all.
+  const read = projects.flatMap(({ id, name, ctx }) => {
+    try {
+      const boards = liveBoards(ctx);
+      const label = (board: string) => `${name} / ${board}`;
+      return [
+        {
+          boards: boards.map(({ collection }) => label(collection)),
+          trails: trailsOf(ctx, boards, label, (item) => `${id}:${item}`),
+        },
+      ];
+    } catch {
+      return [];
+    }
   });
   return {
     ...modelPerformance(

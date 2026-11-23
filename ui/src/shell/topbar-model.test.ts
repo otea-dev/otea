@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import type { AgentStatus } from '../../../src/core/agent-status.ts';
 import { agent as actor, ago, inMinutes, item, moved, NOW } from '../derive/fixtures.ts';
 import { setLanguage } from '../i18n/i18n.ts';
 import type { Agent } from '../presence.ts';
@@ -80,7 +81,11 @@ describe('the project menu’s rows', () => {
   // P6-F7: every row says what is going on there, in the server's words for each agent.
   it('says in each row what waits for you and how many agents work, in the server’s words', () => {
     setLanguage('es');
-    const agent = (name: string, status: string) => ({ name, status, holding: 1 });
+    const agent = (name: string, status: AgentStatus): ProjectAgent => ({
+      name,
+      status,
+      holding: 1,
+    });
     const { rows } = projectRows(
       here,
       [
@@ -92,11 +97,11 @@ describe('the project menu’s rows', () => {
             agent('quill', 'working'),
             agent('mender', 'silent'),
             agent('scout', 'listening'),
-          ] as ProjectAgent[],
+          ],
         }),
         overview({
           id: 'calm',
-          agents: [agent('scout', 'listening')] as ProjectAgent[],
+          agents: [agent('scout', 'listening')],
         }),
         overview({ id: 'old' }),
       ],
@@ -119,20 +124,18 @@ describe('the project menu’s rows', () => {
     });
   });
 
-  it('says when a path is missing', () => {
-    const { rows } = projectRows(
-      here,
-      [
-        overview({
-          id: 'gone',
-          paths: [{ path: '/old', missing: true }] as ProjectOverview['paths'],
-        }),
-      ],
-      0,
-    );
-    expect(rows.find((r) => r.id === 'gone')?.line).toBe(
-      'a path is missing · nothing waits for you',
-    );
+  // The path is in the row's own line, on the phone too: a tooltip is nothing there.
+  it('says when a folder is missing, with its path, on the computer and on the phone', () => {
+    const gone = overview({
+      id: 'gone',
+      paths: [{ path: '/old', missing: true }] as ProjectOverview['paths'],
+    });
+    const line = (phone: boolean) =>
+      projectRows(here, [gone], 0, phone).rows.find((r) => r.id === 'gone')?.line;
+    expect(line(false)).toBe('folder missing · /old');
+    expect(line(true)).toBe('folder missing · /old');
+    setLanguage('es');
+    expect(line(false)).toBe('falta la carpeta · /old');
   });
 
   // P6-17: a folder on the computer means nothing on the phone, and a Windows path is noise there.
