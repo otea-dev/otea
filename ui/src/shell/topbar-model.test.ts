@@ -110,6 +110,18 @@ describe('the project menu’s rows', () => {
     expect(rows.find((r) => r.id === 'busy')?.line).toBe(
       '2 te esperan · 2 trabajando · 1 sin señal',
     );
+    // An away agent (it left an item stuck) says «ausente», apart from «sin señal».
+    const away = projectRows(
+      here,
+      [
+        overview({
+          id: 'gone',
+          agents: [agent('mender', 'silent'), agent('ghost', 'away'), agent('scout', 'listening')],
+        }),
+      ],
+      0,
+    ).rows.find((r) => r.id === 'gone');
+    expect(away?.line).toBe('1 sin señal · 1 ausente');
     // Listening is not at work: nothing to report; an older server that sends no agents is the same.
     expect(rows.find((r) => r.id === 'calm')?.line).toBe('nada te espera');
     expect(rows.find((r) => r.id === 'old')?.line).toBe('nada te espera');
@@ -294,10 +306,25 @@ describe('the agents menu’s rows', () => {
       expect.objectContaining({
         name: 'Kiln',
         silent: true,
+        quiet: true,
         state: 'silent',
         held: [{ id: 'CRE-44', title: 'Tortuga musgosa', look: 'stuck' }],
       }),
     ]);
+    expect(agentCounts(rows)).toMatchObject({ silent: 0, away: 1 });
+  });
+
+  // An agent with no signal on a live lease keeps «sin señal», though it also left an item stuck
+  // from an earlier lease: only the server's `away` status is «ausente».
+  it('keeps «sin señal» for a silent agent that also left an item stuck', () => {
+    const rows = agentRows(
+      [agent('Kiln', { live: false, status: 'silent', holding: ['ERR-231'], lastSeen: ago(12) })],
+      items,
+      NOW,
+    );
+    expect(rows[0]).toMatchObject({ silent: true, quiet: false, state: 'silent' });
+    expect(agentCounts(rows)).toMatchObject({ silent: 1, away: 0 });
+    expect(pillSummary('live', rows)).toEqual({ kind: 'silent', count: 1 });
   });
 
   it('says an agent waits for your answer when its last handoff asks you something', () => {
@@ -389,6 +416,30 @@ describe('the agents pill', () => {
     const quiet = agentRows([agent('q', { live: false, lastSeen: ago(12) })], stuck, NOW);
     expect(pillSummary('live', quiet)).toEqual({ kind: 'away', count: 1 });
     expect(pillMark('live', quiet)).toBe('none');
+  });
+
+  // One with no signal and one away at once: both show, within two data, and the profile datum
+  // (or the total) is what gives way.
+  it('shows both a silent and an away agent, dropping the profile datum first', () => {
+    const held = item({ id: 'Y', turn: 'agent', lease: { holder: 's', expiresAt: inMinutes(9) } });
+    const mixed = agentRows(
+      [
+        agent('a', { profile: opus }),
+        agent('n', { profile: null }),
+        agent('s', { live: false, status: 'silent', holding: ['Y'], lastSeen: ago(12) }),
+        agent('q', { live: false, lastSeen: ago(12) }),
+      ],
+      [...stuck, held],
+      NOW,
+    );
+    expect(pillSummary('live', mixed)).toEqual({
+      kind: 'waiting',
+      count: 2,
+      extra: { kind: 'silentAway', n: 1, away: 1 },
+    });
+    // Nobody connected: the pill still names both.
+    const alone = mixed.filter((r) => r.silent);
+    expect(pillSummary('live', alone)).toEqual({ kind: 'silent', count: 1, away: 1 });
   });
 
   // The word for a live lease that gave no sign stays «sin señal»; only a lapsed lease is away.

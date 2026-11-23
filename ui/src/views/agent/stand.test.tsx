@@ -52,4 +52,27 @@ describe('what the agent sheet says of an agent whose lease ran out', () => {
     expect(html).toContain('<em>Tortuga musgosa</em>');
     expect(html).not.toContain('Conectado');
   });
+
+  // An agent with no signal on a live lease is «sin señal» on its sheet too, never idle text.
+  it('says «sin señal» of one that holds a live lease and gave no sign', () => {
+    setLanguage('es');
+    const live = item({
+      id: 'CRE-45',
+      title: 'Cangrejo',
+      turn: 'agent',
+      lease: { holder: 'Kiln', expiresAt: ago(-9) },
+    });
+    const presence = kiln({ status: 'silent', live: false, holding: ['CRE-45'], lastSeen: ago(4) });
+    const row = agentRows([presence], [live], NOW)[0];
+    const html = renderToStaticMarkup(<Stand row={row} presence={presence} now={NOW} />);
+    expect(html).toMatch(/^Sin señal desde las \d\d:\d\d: tiene <em>Cangrejo<\/em> en la mano\.$/);
+    expect(html).not.toContain('Ausente');
+  });
+
+  it('says «ausente» of an agent the sheet has no row for', () => {
+    setLanguage('es');
+    const presence = kiln({ status: 'away', live: false, lastSeen: ago(30) });
+    const html = renderToStaticMarkup(<Stand row={undefined} presence={presence} now={NOW} />);
+    expect(html).toMatch(/^Ausente: su última señal fue /);
+  });
 });
