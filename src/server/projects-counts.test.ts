@@ -95,4 +95,24 @@ describe('the agents of a project, as the switcher says them', () => {
 
     expect(countsOf(project).agents).toEqual([{ name: 'claude', status: 'working', holding: 1 }]);
   });
+
+  // P6-F1: an agent whose lease ran out is `away` in the API and was dropped here, so «Todos los
+  // proyectos» lost it while its own project listed it. It stays, with the same status, while it
+  // has an item stuck; an away agent that left nothing behind is still left out.
+  it('keeps an away agent that left an item stuck, and leaves out one that left nothing', () => {
+    const project = memoryProject();
+    addCollection(project, { name: 'tasks' });
+    const { id } = createItem(project, {
+      collection: 'tasks',
+      title: 'Stuck',
+      fields: { description: 'x' },
+      actor: bot,
+    });
+    const past = () => '2020-01-01T00:00:00.000Z';
+    seeAgent(project.db, { agent: 'claude', channel: 'cli', call: true }, past);
+    seeAgent(project.db, { agent: 'ghost', channel: 'cli', call: true }, past);
+    claimItem(project, { id, actor: bot, ttlMs: 1 }, past);
+
+    expect(countsOf(project).agents).toEqual([{ name: 'claude', status: 'away', holding: 0 }]);
+  });
 });
