@@ -271,7 +271,7 @@ export const surfaces = {
   'connect.ledeJoin':
     'Para sumar un agente más, pega esto en su chat. Trabajará junto a los demás, sin quitarles lo que ya tienen entre manos.',
   'connect.whereCode':
-    'Cada agente trabaja en su propia copia de tu código, así que no pisa lo tuyo ni lo de otro.',
+    'Cada agente trabaja en su propia copia del proyecto, así que no pisa lo tuyo ni lo de otro.',
   'connect.whereFiles':
     'Cada agente trabaja en los archivos de esta carpeta, sin tocar los que otro está cambiando.',
   'connect.boards': 'Hará estos pasos:',

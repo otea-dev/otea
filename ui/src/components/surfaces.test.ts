@@ -434,7 +434,7 @@ describe('dialogs', () => {
     expect(html).toContain('Para sumar un agente más');
     // The boards it will work, in the board's own words, and where it works.
     expect(html).toContain('<b>Cambios</b><span>Aclarar · Hacerlo</span>');
-    expect(html).toContain('su propia copia de tu código');
+    expect(html).toContain('su propia copia del proyecto');
     expect(html).toContain('(claude)');
     expect(html).toContain('- Cambios: Aclarar, Hacerlo (2 esperan a un agente ahora)');
     expect(html).not.toContain('otea board draft');

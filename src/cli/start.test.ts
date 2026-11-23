@@ -1,5 +1,6 @@
-import { spawn } from 'node:child_process';
-import { rmSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -49,6 +50,7 @@ async function stopWhatRuns(cwd: string) {
 
 describe('otea start', () => {
   let repo: TempRepo;
+  const folders: string[] = [];
 
   beforeEach(() => {
     repo = tempGitRepo();
@@ -59,7 +61,13 @@ describe('otea start', () => {
     rmSync(join(home(), SERVE_FILE), { force: true });
     rmSync(join(home(), SERVE_LOG), { force: true });
     repo.remove();
+    for (const folder of folders.splice(0)) {
+      rmSync(folder, { recursive: true, force: true, maxRetries: 10 });
+    }
   });
+
+  const gitStatus = (dir: string) =>
+    execFileSync('git', ['status', '--porcelain'], { cwd: dir, encoding: 'utf8' });
 
   // The first minutes in one command: the project, a board from a template, the background desk and
   // what to paste into the agent. Run again it looks before it acts and reports what was there.
@@ -125,6 +133,15 @@ describe('otea start', () => {
     expect((await cliAt(repo.dir)('projects', 'current')).code).not.toBe(0);
   });
 
+  it('refuses an agent that names itself with --as, before it makes anything', async () => {
+    const refused = await cliAt(repo.dir)('start', '--as', 'claude', '--no-open');
+
+    expect(refused.code).not.toBe(0);
+    expect(refused.err).toContain('otea start is for the person');
+    expect(readServeFile(home())).toBeUndefined();
+    expect((await cliAt(repo.dir)('projects', 'current')).code).not.toBe(0);
+  });
+
   it('fails on a template it does not know before it makes anything', async () => {
     const result = await cliAt(repo.dir)('start', '--no-open', '--template', 'nope');
 
@@ -133,4 +150,104 @@ describe('otea start', () => {
     expect((await cliAt(repo.dir)('projects', 'current')).code).not.toBe(0);
     expect(readServeFile(home())).toBeUndefined();
   });
+
+  // What is typed at the prompt is checked like the option: a typo leaves no project behind.
+  it('fails on a template typed at the prompt before the project is made', async () => {
+    const asked: string[] = [];
+    const typo = cliAt(repo.dir, {}, undefined, undefined, async (question) => {
+      asked.push(question);
+      return 'nope';
+    });
+
+    const result = await typo('start', '--no-open', '--port', '0');
+
+    expect(asked).toHaveLength(1);
+    expect(result.code).not.toBe(0);
+    expect(result.err).toContain('There is no template nope');
+    expect((await cliAt(repo.dir)('projects', 'current')).code).not.toBe(0);
+    expect(readServeFile(home())).toBeUndefined();
+  });
+
+  // The project lives in the Otea home: the repo is the person's, and start writes nothing in it.
+  it('leaves the repository untouched: no AGENTS.md, no hook, no .otea, a clean status', async () => {
+    repo.write('README.md', '# shop\n');
+    execFileSync('git', ['add', '.'], { cwd: repo.dir });
+    execFileSync(
+      'git',
+      ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--quiet', '-m', 'first'],
+      { cwd: repo.dir },
+    );
+    const before = readdirSync(repo.dir).sort();
+
+    const started = await person(
+      repo.dir,
+      'start',
+      '--no-open',
+      '--port',
+      '0',
+      '--template',
+      'todos',
+    );
+
+    expect(started.code).toBe(0);
+    expect(readdirSync(repo.dir).sort()).toEqual(before);
+    expect(existsSync(join(repo.dir, 'AGENTS.md'))).toBe(false);
+    expect(existsSync(join(repo.dir, '.otea'))).toBe(false);
+    expect(existsSync(join(repo.dir, '.git', 'hooks', 'pre-push'))).toBe(false);
+    expect(gitStatus(repo.dir)).toBe('');
+  }, 120_000);
+
+  it('starts a folder that is no git repository, with a first contact that speaks of no git', async () => {
+    const folder = realpathSync.native(mkdtempSync(join(tmpdir(), 'otea-folder-')));
+    folders.push(folder);
+
+    const started = await person(folder, 'start', '--no-open', '--port', '0', '--json');
+
+    expect(started.code).toBe(0);
+    const data = json(started);
+    expect(data.project.created).toBe(true);
+    expect(data.prompt).toContain('otea board draft');
+    expect(data.prompt).not.toMatch(/\bgit\b/i);
+    expect(existsSync(join(folder, '.git'))).toBe(false);
+  }, 120_000);
+
+  // A person who left the boards to their agent is not asked again on the next run.
+  it('asks about a first board once, when the project is made, and never on a second run', async () => {
+    const asked: string[] = [];
+    const answer = async (question: string) => {
+      asked.push(question);
+      return '';
+    };
+    const terminal = () => cliAt(repo.dir, {}, undefined, undefined, answer);
+
+    const first = await terminal()('start', '--no-open', '--port', '0', '--json');
+    expect(first.code).toBe(0);
+    expect(asked).toHaveLength(1);
+    expect(json(first).boards.all).toEqual([]);
+
+    const second = await terminal()('start', '--no-open', '--json');
+    expect(second.code).toBe(0);
+    expect(asked).toHaveLength(1);
+    expect(json(second).project.created).toBe(false);
+
+    // And with no terminal at all (a pipe) it never asks: it makes no board and moves on.
+    const piped = await person(repo.dir, 'start', '--no-open', '--json');
+    expect(piped.code).toBe(0);
+    expect(json(piped).boards.all).toEqual([]);
+  }, 120_000);
+
+  // The sign-in link holds this computer's key: it must not travel with the agent's text.
+  it('prints the sign-in link in a block of its own, apart from the text for the agent', async () => {
+    const started = await person(repo.dir, 'start', '--no-open', '--port', '0');
+
+    const lines = started.out.split('\n');
+    const link = lines.findIndex((line) => line.includes('/auth?token='));
+    const paste = lines.findIndex((line) => line.startsWith('Next, paste this'));
+    expect(link).toBeGreaterThan(-1);
+    expect(paste).toBeGreaterThan(link);
+    // On its own line, a blank line between it and the agent's text, and nothing after it but that.
+    expect(lines[link]?.trim()).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/auth\?token=/);
+    expect(lines.slice(link + 1, paste).every((line) => line === '')).toBe(true);
+    expect(lines.slice(paste).join('\n')).not.toContain('token=');
+  }, 120_000);
 });

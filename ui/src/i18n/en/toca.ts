@@ -80,7 +80,7 @@ export const toca = {
   'next.agent': 'Invite another agent',
   'next.agentNote': 'More hands at once, each on its own work.',
   'next.dismiss': 'Not now',
-  'next.once': 'This will not show again.',
+  'next.once': 'This will not show again on this device.',
 
   // No agent connected
   'toca.noAgents.title': 'No agent connected',

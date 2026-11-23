@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppTestProvider } from '../app/context.tsx';
-import { item } from '../derive/fixtures.ts';
+import { ago, item } from '../derive/fixtures.ts';
 import { setLanguage } from '../i18n/i18n.ts';
 import { testApp } from '../shell/test-app.ts';
 import { buttonNamed, type Mounted, mount, press } from '../test-dom.tsx';
@@ -12,8 +12,9 @@ import { NextStep } from './NextStep.tsx';
 // After a project's first finished item nothing said what comes next: a calm card does, once per
 // project, and a press of «Ahora no» (or of anything it offers) puts it away for good.
 
-const closed = (id: string): Item => ({
-  ...item({ id, state: 'done', turn: 'none' }),
+// An item that reached the last step `days` days before the desk's now (a few minutes by default).
+const closed = (id: string, days = 0): Item => ({
+  ...item({ id, state: 'done', turn: 'none', enteredAt: ago(days * 1440 + 30) }),
   closes: 'done',
 });
 const open = item({ id: 'B-1', state: 'doing', turn: 'agent' });
@@ -53,6 +54,27 @@ describe('the next-step card', () => {
     mounted = drawn('p1', [open]);
 
     expect(mounted.root.textContent).toBe('');
+  });
+
+  // On the release that brings the card, every project with finished work is an old one.
+  it('is for a first finished item that is recent, not for a project that finished one long ago', () => {
+    mounted = drawn('old', [closed('A-1', 30)]);
+    expect(mounted.root.textContent).toBe('');
+    mounted.unmount();
+
+    // A recent item is not the project's first one when an older one came before.
+    mounted = drawn('older', [closed('A-1', 30), closed('A-2')]);
+    expect(mounted.root.textContent).toBe('');
+    mounted.unmount();
+
+    mounted = drawn('week', [closed('A-1', 6)]);
+    expect(mounted.root.textContent).toContain('Tu primer ítem está terminado');
+  });
+
+  it('says it is remembered on this device', () => {
+    mounted = drawn('p0', [closed('A-1')]);
+
+    expect(mounted.root.textContent).toContain('No volverá a aparecer en este dispositivo');
   });
 
   it('shows once per project: put away, it never comes back, in that project', async () => {
