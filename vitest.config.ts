@@ -20,6 +20,7 @@ const SPAWNS_PROCESSES = [
   'src/server/diff-tip.test.ts',
   'src/server/diff-files.test.ts',
   'src/server/merged-outside.test.ts',
+  'src/server/signin-links.test.ts',
   'desktop/src/shims.test.ts',
 ];
 
