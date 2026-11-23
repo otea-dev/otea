@@ -172,13 +172,16 @@ describe('the processes that own a command', () => {
     // there the watch reads the system's own process before the fix and never stops.
     it('takes the parent the process started under, so one that ended before the watch began is gone', async () => {
       const dir = mkdtempSync(join(tmpdir(), 'otea-owner-'));
-      const [go, done, script] = ['go', 'done', 'child.mjs'].map((name) => join(dir, name));
+      const [go, done, ready, quit, script] = ['go', 'done', 'ready', 'quit', 'child.mjs'].map(
+        (name) => join(dir, name),
+      );
       writeFileSync(
         script as string,
         `import { existsSync, writeFileSync } from 'node:fs';
-const [, , owner, go, done] = process.argv;
+const [, , owner, go, done, ready] = process.argv;
 // The command's start-up: its modules load, then it has other work before it watches its parent.
 const { watchOwner } = await import(owner);
+writeFileSync(ready, '');
 while (!existsSync(go)) await new Promise((resolve) => setTimeout(resolve, 20));
 const watch = watchOwner(new AbortController().signal, { list: async () => undefined, everyMs: 50 });
 watch.signal.addEventListener('abort', () => { writeFileSync(done, 'gone'); process.exit(0); });
@@ -186,16 +189,21 @@ setTimeout(() => { writeFileSync(done, 'never'); process.exit(0); }, 8000);
 `,
       );
       const owner = pathToFileURL(fileURLToPath(new URL('./owner.ts', import.meta.url))).href;
-      // The parent starts the command and ends at once, as a shell that ran it in the background.
+      // The parent starts the command and stays until the command has loaded, then ends, as a shell
+      // that ran it in the background does; the command is still in its start-up work.
+      const args = [script, owner, go, done, ready].map((arg) => JSON.stringify(arg)).join(', ');
       const parent = spawn(
         process.execPath,
         [
           '-e',
-          `require('node:child_process').spawn(process.execPath, ['--disable-warning=ExperimentalWarning', ${JSON.stringify(script)}, ${JSON.stringify(owner)}, ${JSON.stringify(go)}, ${JSON.stringify(done)}], { detached: true, stdio: 'ignore', windowsHide: true }).unref()`,
+          `require('node:child_process').spawn(process.execPath, ['--disable-warning=ExperimentalWarning', ${args}], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+setInterval(() => { if (require('node:fs').existsSync(${JSON.stringify(quit)})) process.exit(0); }, 20);`,
         ],
         { stdio: 'ignore', windowsHide: true },
       );
       try {
+        await until(() => existsSync(ready as string), 20_000);
+        writeFileSync(quit as string, '');
         await new Promise((resolve) => parent.once('exit', resolve));
         writeFileSync(go as string, '');
         await until(() => existsSync(done as string), 20_000);
