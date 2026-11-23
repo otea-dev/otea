@@ -220,7 +220,7 @@ export const surfaces = {
     'Otea can’t find this folder. Its items keep their repo; agents can’t work in it until you relink it or it comes back.',
   'settings.relink': 'Relink…',
   'settings.forget': 'Remove…',
-  'settings.repoName': 'repo name',
+  'settings.repoName': 'name',
   'settings.inFolder': 'in the folder',
   'settings.gate': 'gate',
   'settings.items': 'items',

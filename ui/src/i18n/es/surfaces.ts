@@ -226,7 +226,7 @@ export const surfaces = {
     'Otea no encuentra esta carpeta. Sus ítems conservan su repositorio; los agentes no pueden trabajar en ella hasta que la vuelvas a vincular o reaparezca.',
   'settings.relink': 'Volver a vincular…',
   'settings.forget': 'Quitar…',
-  'settings.repoName': 'repositorio',
+  'settings.repoName': 'nombre',
   'settings.inFolder': 'en la carpeta',
   'settings.gate': 'control',
   'settings.items': 'ítems',
