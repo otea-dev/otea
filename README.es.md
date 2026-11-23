@@ -17,6 +17,17 @@
 
 Esta es la guía corta en español: instalar y empezar a usar Otea. Todo lo demás está en el [README en inglés](README.md) y en [`docs/`](docs/) (ver [Más información](#más-información)).
 
+## Empezar en un minuto
+
+En la carpeta que quieres seguir, normalmente un repositorio:
+
+```sh
+npm i -g @otea/cli   # necesita Node.js 22.18 o posterior
+otea start
+```
+
+`otea start` crea el proyecto, abre el escritorio en tu navegador e imprime el texto que le pegas a tu agente (el [paso 2](#2-crear-el-proyecto) lo explica). ¿Sin Node, o prefieres Otea en su propia ventana? Instala la app de escritorio: la sección siguiente tiene las dos formas.
+
 ## 1. Instalar
 
 Hay dos formas de instalar Otea: la **app de escritorio** o el **comando `otea` desde npm**. Las dos son el mismo Otea, con los mismos tableros, el mismo teléfono y los mismos agentes.
@@ -108,7 +119,7 @@ npm link            # deja el comando otea disponible en tu terminal
 otea --version
 ```
 
-`npm link` instala un comando de verdad, así que también lo encuentra la terminal de tu agente. Si `otea` no aparece, `npm prefix -g` te dice dónde quedó: agrega esa carpeta a tu PATH (en macOS y Linux, su `bin`). Para actualizar, corre `git pull`, `npm ci` y `npm run build:ui` otra vez. Para armar la app de escritorio desde el código, mira [`desktop/README.md`](desktop/README.md) (en inglés).
+`npm link` instala un comando de verdad, así que también lo encuentra la terminal de tu agente. Si `otea` no aparece, `npm prefix -g` te dice dónde quedó: agrega esa carpeta a tu PATH (en macOS y Linux, su `bin`). Para actualizar, corre `git pull`, `npm ci` y `npm run build:ui` otra vez. Para armar la app de escritorio desde el código, mira [`desktop/README.md`](https://github.com/otea-dev/otea/blob/main/desktop/README.md) (en inglés).
 
 ## 2. Crear el proyecto
 
@@ -168,7 +179,7 @@ Git Bash convierte en ruta un argumento que empieza con `/`. Otea lo corrige en 
 
 ## Estado
 
-Otea está en su versión 0.1.0: ya se puede usar, pero todavía es temprana y cambia rápido. La definición del producto está en [`docs/otea-product-definition.md`](docs/otea-product-definition.md) (en inglés).
+Otea es temprana y cambia rápido, pero ya se puede usar. El [registro de cambios](https://github.com/otea-dev/otea/blob/main/CHANGELOG.md) (en inglés) dice qué cambió en cada versión, y la definición del producto está en [`docs/otea-product-definition.md`](docs/otea-product-definition.md) (en inglés).
 
 ## Por qué Otea, y cuándo no
 
@@ -198,7 +209,7 @@ Otea es software libre bajo la [GNU Affero General Public License v3.0](LICENSE)
 
 **Nombre.** «Otea» y su logo identifican este proyecto. Los forks son bienvenidos bajo la AGPL, pero deben usar otro nombre.
 
-Las contribuciones se aceptan bajo el [Acuerdo de Licencia de Colaborador](CLA.md) (CLA, en inglés); mira [CONTRIBUTING.md](CONTRIBUTING.md).
+Las contribuciones se aceptan bajo el [Acuerdo de Licencia de Colaborador](https://github.com/otea-dev/otea/blob/main/CLA.md) (CLA, en inglés); mira [CONTRIBUTING.md](https://github.com/otea-dev/otea/blob/main/CONTRIBUTING.md).
 
 ## Más información
 

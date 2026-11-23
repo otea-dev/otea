@@ -22,6 +22,8 @@
     "ui/dist",
     "presets",
     "schemas",
+    "docs",
+    "SECURITY.md",
     "THIRD_PARTY_NOTICES.md"
   ],
   "publishConfig": {

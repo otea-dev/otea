@@ -63,9 +63,20 @@ The same change on a phone, with the agent's note and your two moves.
 
 **Answer your agents from your phone.** A question from an agent reaches your phone; you answer there, and the desk shows the agent going on.
 
+## Start in a minute
+
+In the folder you want to track, usually a repository:
+
+```sh
+npm i -g @otea/cli   # needs Node.js 22.18 or later
+otea start
+```
+
+`otea start` makes the project, opens the desk in your browser and prints the text to paste into your agent's chat. [Get started](#from-the-terminal-npm-or-source) says what it does, step by step. No Node, or you prefer Otea in its own window? Install the desktop app instead: [Install](#install) has both ways.
+
 ## Status
 
-Early: version 0.1.0 is out and usable, and still changing fast. The product definition lives in [`docs/otea-product-definition.md`](docs/otea-product-definition.md).
+Early and still changing fast, but usable. The [changelog](https://github.com/otea-dev/otea/blob/main/CHANGELOG.md) says what each release changed, and the product definition lives in [`docs/otea-product-definition.md`](docs/otea-product-definition.md).
 
 ## Install
 
@@ -158,7 +169,7 @@ npm link            # puts the otea command on your PATH
 otea --version
 ```
 
-`npm link` installs a real command, not an alias: a symlink in npm's global `bin` on macOS and Linux, and `otea.cmd`, `otea.ps1` and a shell script in npm's global folder on Windows. Every shell finds it, so an agent's own shell (Claude Code's, OpenCode's, a script's) runs `otea` the same as your terminal. Run `npm prefix -g` to see where it went; if `otea` is not found, add that folder (on macOS and Linux, its `bin`) to your PATH. To update, `git pull`, `npm ci` and `npm run build:ui` again; `npm unlink -g @otea/cli` takes the command away. To build the desktop app from source, see [`desktop/README.md`](desktop/README.md).
+`npm link` installs a real command, not an alias: a symlink in npm's global `bin` on macOS and Linux, and `otea.cmd`, `otea.ps1` and a shell script in npm's global folder on Windows. Every shell finds it, so an agent's own shell (Claude Code's, OpenCode's, a script's) runs `otea` the same as your terminal. Run `npm prefix -g` to see where it went; if `otea` is not found, add that folder (on macOS and Linux, its `bin`) to your PATH. To update, `git pull`, `npm ci` and `npm run build:ui` again; `npm unlink -g @otea/cli` takes the command away. To build the desktop app from source, see [`desktop/README.md`](https://github.com/otea-dev/otea/blob/main/desktop/README.md).
 
 ### On Windows, in Git Bash
 
@@ -202,7 +213,7 @@ Then [give your agent the text](#give-your-agent-the-text).
 
    ```text
    Project: set up "tienda-web" (data in ~/.otea/data/tienda-web-yafrhx)
-   Boards: none yet; your agent designs them with you (otea start --template <key> starts from a template instead)
+   Boards: none yet. Your agent designs them with you from the text below, or start from a template now: otea start --template <key> (todos, ideas, ...)
    Desk: running in the background at http://127.0.0.1:4400/p/tienda-web-yafrhx/ (pid 4120; stop it with otea serve stop)
 
    Next, paste this into your agent's chat (otea prompt prints it again):
@@ -223,7 +234,7 @@ Both paths meet here. Paste the text into your agent's chat (Claude Code, OpenCo
 
 ### MCP config for your harness
 
-An agent over MCP adds Otea's server to its own harness, for this project only. `otea connect` prints the exact `command`, `args` and `env` to use. Copy them as printed: the `otea` on your `PATH` when it is the same install as the one running `connect`, otherwise the absolute paths of the running one, with a warning line saying which `otea` is on `PATH`. The same entry in the config shape of three harnesses, shown for the desktop app (one leading arg, and the `env` that makes its Electron run as Node; without it the app opens its window instead of the server). From npm or a checkout `connect` prints `--disable-warning=ExperimentalWarning` before the main path, and prints `env` only when you set `OTEA_HOME`; with `otea` on `PATH`, the command is `otea` and the args are `mcp --project <id>`.
+An agent over MCP adds Otea's server to its own harness, for this project only. `otea connect` prints the exact `command`, `args` and `env` to use. Copy them as printed: the `otea` on your `PATH` when it is the same install as the one running `connect`, otherwise the absolute paths of the running one, with a warning line saying which `otea` is on `PATH`. The same entry in the config shape of six harnesses. The examples show `command` and `args` only; add an `env` object (in Codex's TOML, an `[mcp_servers.otea.env]` table) only when `connect` prints one. It does for the desktop app (one leading arg, and the `env` that makes its Electron run as Node; without it the app opens its window instead of the server), and for npm or a checkout when you set `OTEA_HOME`. From npm or a checkout `connect` also prints `--disable-warning=ExperimentalWarning` before the main path; with `otea` on `PATH`, the command is `otea` and the args are `mcp --project <id>`.
 
 - Cursor, in `.cursor/mcp.json` of the project:
 
@@ -232,8 +243,7 @@ An agent over MCP adds Otea's server to its own harness, for this project only. 
     "mcpServers": {
       "otea": {
         "command": "<command>",
-        "args": ["<main>", "mcp", "--project", "<project-id>"],
-        "env": { "<NAME>": "<value>" }
+        "args": ["<main>", "mcp", "--project", "<project-id>"]
       }
     }
   }
@@ -247,8 +257,7 @@ An agent over MCP adds Otea's server to its own harness, for this project only. 
       "otea": {
         "type": "stdio",
         "command": "<command>",
-        "args": ["<main>", "mcp", "--project", "<project-id>"],
-        "env": { "<NAME>": "<value>" }
+        "args": ["<main>", "mcp", "--project", "<project-id>"]
       }
     }
   }
@@ -261,14 +270,52 @@ An agent over MCP adds Otea's server to its own harness, for this project only. 
     "mcpServers": {
       "otea": {
         "command": "<command>",
-        "args": ["<main>", "mcp", "--project", "<project-id>"],
-        "env": { "<NAME>": "<value>" }
+        "args": ["<main>", "mcp", "--project", "<project-id>"]
       }
     }
   }
   ```
 
-On Windows write the paths with `/` or doubled `\\` inside JSON. Then reload the harness and run `otea connect --check`.
+- OpenCode, in `opencode.json` (or `opencode.jsonc`) in the project folder or its `.opencode` folder; `~/.config/opencode/opencode.json` is the global one (its [MCP docs](https://opencode.ai/docs/mcp-servers/)). `command` is one array with the program first, then its args, and `type` is required:
+
+  ```json
+  {
+    "$schema": "https://opencode.ai/config.json",
+    "mcp": {
+      "servers": {
+        "otea": {
+          "type": "local",
+          "command": ["<command>", "<main>", "mcp", "--project", "<project-id>"]
+        }
+      }
+    }
+  }
+  ```
+
+  Where `connect` prints `env`, the key is `"environment"` here, with the same name and value.
+
+- Codex, in `.codex/config.toml` of the project (read only once you trust the project), or `~/.codex/config.toml` for every project (its [MCP docs](https://developers.openai.com/codex/mcp)). It is TOML, not JSON:
+
+  ```toml
+  [mcp_servers.otea]
+  command = "<command>"
+  args = ["<main>", "mcp", "--project", "<project-id>"]
+  ```
+
+- Gemini CLI, in `.gemini/settings.json` of the project, or `~/.gemini/settings.json` for every project (its [MCP docs](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md)):
+
+  ```json
+  {
+    "mcpServers": {
+      "otea": {
+        "command": "<command>",
+        "args": ["<main>", "mcp", "--project", "<project-id>"]
+      }
+    }
+  }
+  ```
+
+On Windows write the paths with `/` or doubled `\\` inside JSON (and inside a TOML basic string). Then reload the harness and run `otea connect --check`.
 
 ## Everyday commands
 
@@ -361,7 +408,7 @@ Otea is free software under the [GNU Affero General Public License v3.0](LICENSE
 
 **Name.** "Otea" and its logo identify this project. Forks are welcome under the AGPL, but must use a different name.
 
-Contributions are accepted under the [Contributor License Agreement](CLA.md); see [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions are accepted under the [Contributor License Agreement](https://github.com/otea-dev/otea/blob/main/CLA.md); see [CONTRIBUTING.md](https://github.com/otea-dev/otea/blob/main/CONTRIBUTING.md).
 
 ## Docs
 
