@@ -1,3 +1,4 @@
+import { LISTEN_WINDOW_MS } from '../../src/core/agent-status.ts';
 import { isClosed, isLandStep, positionOf } from '../../src/core/board/engine.ts';
 import type { BoardDefinition } from '../../src/core/board/model.ts';
 import { activeLease } from './active-lease.ts';
@@ -8,10 +9,6 @@ import type { Item, ItemEvent } from './types.ts';
 // Whether the desk is heard (PLAN5 G3): only an agent waiting in otea wait wakes for what the person
 // does here. One idle in its chat, even with its MCP server open, hears nothing until it is told to
 // go on, so an approval or an answer would sit there with the item reading as on its way.
-
-// How long a holder gets to pick up an answer before the desk says it went quiet on it: the
-// server's listening window.
-const AT_WORK_MS = 150_000;
 
 // Whether any agent waits now (the server's status listening). Before presence loads, or from a
 // server that does not say, it is taken as yes: the desk never warns of a silence it cannot tell.
@@ -85,7 +82,8 @@ export function silentHolder(
 ): { agent: string; since: string } | null {
   const lease = activeLease(item.lease, now);
   const holder = lease ? agents?.find((a) => a.name === lease.holder) : undefined;
-  if (!holder || hearsDesk(holder)) return null;
+  // The server's status says whether it listens or is still connected: one gone has goneHolder.
+  if (!holder || hearsDesk(holder) || !isConnected(holder)) return null;
   const asked = new Set(
     events
       .filter((e) => e.type === 'question_asked' && e.actor.name === holder.name)
@@ -96,7 +94,7 @@ export function silentHolder(
   );
   if (!answer) return null;
   const since = Date.parse(answer.at) || 0;
-  if (now - since < AT_WORK_MS) return null;
+  if (now - since < LISTEN_WINDOW_MS) return null;
   if (holder.actedAt && (Date.parse(holder.actedAt) || 0) >= since) return null;
   return { agent: holder.name, since: answer.at };
 }

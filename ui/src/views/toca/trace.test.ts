@@ -139,6 +139,21 @@ describe('agentState', () => {
     });
   });
 
+  // The server's status says whether it works or went quiet; its leases alone do not.
+  it('reads the server’s status: a connected agent is neither working nor quiet on its leases', () => {
+    const lapsed = item({
+      id: 'A',
+      turn: 'agent',
+      state: 'fixing',
+      expiredLease: { holder: 'kiln', expiresAt: ago(12) },
+    });
+    expect(agentState('kiln', [lapsed], [], NOW, undefined, 'connected').state).toBe('free');
+    expect(agentState('kiln', [lapsed], [], NOW, undefined, 'away').state).toBe('quiet');
+    const held = item({ id: 'B', lease: { holder: 'kiln', expiresAt: inMinutes(10) } });
+    expect(agentState('kiln', [held], [], NOW, undefined, 'silent').state).toBe('free');
+    expect(agentState('kiln', [held], [], NOW, undefined, 'working').state).toBe('work');
+  });
+
   it('waits for your answer while its question (otea ask) waits, on an item it still holds', () => {
     const it0 = item({
       id: 'A',

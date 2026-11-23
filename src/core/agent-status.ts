@@ -15,6 +15,10 @@
 //
 // An agent whose open question waits for the person (otea ask) is not working, whatever it holds:
 // it waits for the answer, and reads as listening or connected like any agent between two steps.
+// How long an agent counts as listening or connected after its last beat or otea command. The server
+// works the statuses out by it; the desk grants a holder the same moment to pick up an answer.
+export const LISTEN_WINDOW_MS = 150_000;
+
 export const AGENT_STATUSES = ['working', 'listening', 'connected', 'silent', 'away'] as const;
 
 export type AgentStatus = (typeof AGENT_STATUSES)[number];

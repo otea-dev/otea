@@ -15,7 +15,7 @@ import {
 } from '../presence.ts';
 import { projectHref, waitingElsewhere, whereOf } from '../projects.ts';
 import type { Item, ProjectOverview, ProjectView } from '../types.ts';
-import { type AgentStateName, agentState } from '../views/toca/trace.ts';
+import { agentState } from '../views/toca/trace.ts';
 
 // What the topbar's two menus list (SPEC §7.1, mock:3370-3393), worked out from the data alone.
 
@@ -140,6 +140,9 @@ export type AgentRow = {
   // A lease of its ran out with nobody releasing it, and it is not connected: it left its item
   // stuck. Said as any agent with no signal.
   quiet: boolean;
+  // It is connected, and the lease on an item of its ran out (the item is stuck): the agent may
+  // still be at work on it, so it is no silence, and the row names the item instead of «libre».
+  lapsed: { id: string; title: string; at: number } | null;
   // No signal: it holds a live lease and gave no sign for a while with nothing saying its session
   // ended, or its lease ran out on an item it left stuck: not connected, not at work («sin señal»).
   silent: boolean;
@@ -165,13 +168,6 @@ export function harnessOf(a: Pick<Agent, 'harness' | 'profile'>): string | null 
   if (a.harness && a.harness.toLowerCase() !== 'cli') return a.harness;
   return a.profile?.harness || a.harness;
 }
-
-const DOING: Record<AgentStateName, AgentDoing> = {
-  quiet: 'silent',
-  work: 'work',
-  wait: 'wait',
-  free: 'idle',
-};
 
 // The agents of the menu: the connected ones, then any agent gone quiet on an item it left stuck,
 // so the menu says where the silence is; what asks for attention first (quiet, working, waiting
@@ -201,23 +197,24 @@ export function agentRows(
     const stuck = stuckBy(a.name).map(
       (it): HeldItem => ({ id: it.id, title: it.title, look: 'stuck' }),
     );
-    const st = agentState(a.name, items, feed, now, a.lastSeen);
+    const st = agentState(a.name, items, feed, now, a.lastSeen, statusOf(a));
     // Not connected, and its lease ran out on an item it left stuck: no signal, as any other. One
-    // still connected is whatever the server says it is, whatever it left stuck.
+    // still connected is whatever the server says it is: its lease on that item ran out, which
+    // says nothing of the agent, and it may still be at work on it (lease-take.ts).
     const connected = live.includes(a);
     const quiet = !connected && stuck.length > 0;
+    const lapsedItem = connected ? stuck.at(0) : undefined;
     // An item whose question waits for you is not work: the agent waits for your answer. One
     // no longer connected works on nothing, whatever its lease still holds (P7-R3-10).
     const working = connected && isWorking(a);
     const isSilent = silent.includes(a) || quiet;
-    const mapped = DOING[st.state];
     const state: AgentDoing = working
       ? 'work'
       : isSilent
         ? 'silent'
-        : connected && st.state === 'quiet'
-          ? 'idle'
-          : mapped;
+        : st.state === 'wait'
+          ? 'wait'
+          : 'idle';
     return {
       name: a.name,
       harness: harnessOf(a),
@@ -226,6 +223,16 @@ export function agentRows(
       changedAt: a.profileChangedAt ?? null,
       held: [...holding, ...stuck.filter((s) => !holding.some((h) => h.id === s.id))],
       quiet,
+      lapsed: lapsedItem
+        ? {
+            id: lapsedItem.id,
+            title: lapsedItem.title,
+            at:
+              Date.parse(
+                items.find((it) => it.id === lapsedItem.id)?.expiredLease?.expiresAt ?? '',
+              ) || now,
+          }
+        : null,
       silent: isSilent,
       working,
       waiting: hearsDesk(a),

@@ -314,6 +314,18 @@ export function PillWords({ summary }: { summary: PillSummary }) {
 // What the agent does now, under its profile: the mini node, the verb, the item.
 function RowDoing({ row, now }: { row: AgentRow; now: number }) {
   const it = row.item;
+  // Connected, and the lease on one of its items ran out: said with its status, never «libre»; it
+  // may still be at work on that item.
+  if (row.state === 'idle' && row.lapsed) {
+    const word = t(row.waiting ? 'agent.status.listening' : 'agent.status.connected');
+    return (
+      <span className="held">
+        <NodeGlyph look="stuck" size={14} />
+        <span className="verb">{`${word} · ${t('shell.row.lapsed', { id: row.lapsed.id })}`}</span>
+        <span className="tx">{row.lapsed.title}</span>
+      </span>
+    );
+  }
   if (!row.profile && row.state === 'idle') {
     return (
       <span className="held wrap">

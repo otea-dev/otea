@@ -261,6 +261,32 @@ describe('the agents menu’s rows', () => {
     expect(agentRows([agent('Ivy', { harness: 'cli' })], items, NOW)[0]?.harness).toBe('cli');
   });
 
+  // Review of #605: a connected agent whose lease lapsed mid-step may still be at work (lease-take.ts
+  // refuses to take the item while its session runs). It is neither «libre» nor «sin señal»: the
+  // server says it is connected, and the row names the item whose lease ran out.
+  it('keeps a connected agent whose lease ran out connected, naming the stuck item', () => {
+    const kiln = agent('Kiln', { status: 'connected', waiting: false, lastSeen: ago(0.5) });
+    const rows = agentRows([kiln], items, NOW);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        name: 'Kiln',
+        state: 'idle',
+        silent: false,
+        quiet: false,
+        working: false,
+        lapsed: { id: 'CRE-44', title: 'Tortuga musgosa', at: Date.parse(ago(12)) },
+      }),
+    ]);
+    expect(agentCounts(rows)).toMatchObject({ connected: 1, silent: 0, live: 1 });
+    expect(pillSummary('live', rows)).toMatchObject({ kind: 'connected', count: 1 });
+    // Listening in otea wait, it reads listening, with the same lapsed lease.
+    const waits = agentRows([{ ...kiln, status: 'listening', waiting: true }], items, NOW);
+    expect(waits[0]).toMatchObject({ state: 'idle', waiting: true, lapsed: { id: 'CRE-44' } });
+    // One that is not connected is the silent one, and has no lapsed lease of its own to defend.
+    const gone = agentRows([agent('Kiln', { live: false, lastSeen: ago(12) })], items, NOW);
+    expect(gone[0]).toMatchObject({ silent: true, lapsed: null });
+  });
+
   // P6-F2: an agent whose lease ran out reads «sin señal» like any silent one, never a word of its own.
   it('keeps an agent with no signal on its expired lease, its item stuck', () => {
     const rows = agentRows([agent('Kiln', { live: false, lastSeen: ago(12) })], items, NOW);

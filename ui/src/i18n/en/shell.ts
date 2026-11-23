@@ -31,6 +31,8 @@ export const shell = {
   'shell.row.open': '{agent}: open its sheet',
   'shell.row.work': 'working on',
   'shell.row.quiet': 'no signal since {time} ·',
+  // Connected, and the lease on one of its items ran out: it may still be at work (said with its status)
+  'shell.row.lapsed': 'its lease on {id} ran out',
   'shell.row.wait': 'waits for your answer ·',
   'shell.row.idle': 'listening · free since {time}',
   'shell.row.connected': 'connected · not listening now: not waiting for new work',

@@ -158,7 +158,7 @@ describe('Te toca', () => {
     });
     const out = html(rows(tocaBlocks(app([stuck]), true))[0]);
     expect(out).toContain(
-      '<span class="mpt"><span class="sep">·</span><span class="warn">Kiln sin señal · 12 min</span></span>',
+      '<span class="mpt"><span class="sep">·</span><span class="warn">Kiln: reserva vencida · 12 min</span></span>',
     );
     expect(out).toContain(
       '<div class="a warn" data-leaf="">Retomar o reasignar<small>lo tiene <b>Kiln</b></small></div>',

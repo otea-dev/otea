@@ -43,8 +43,20 @@ describe('the catalogs', () => {
       expect(es[`agent.status.${status}` as keyof typeof es], status).toBeTruthy();
       expect(en[`agent.status.${status}` as keyof typeof en], status).toBeTruthy();
     }
+    // Spanish: no «callado»; «vencida» and «venció» only ever say a lease («su reserva venció»).
     for (const [key, message] of Object.entries(es)) {
-      expect(forms(message).join(' '), key).not.toMatch(/callad|vencid/i);
+      const text = forms(message).join(' ');
+      expect(text, key).not.toMatch(/callad/i);
+      if (/venci[dó]/i.test(text)) expect(text, key).toMatch(/reserva/i);
+    }
+    // English: no «quiet» for an agent (the exceptions are the item lines of Atasco), and «expired»
+    // or «ran out» only ever say a lease.
+    for (const [key, message] of Object.entries(en)) {
+      const text = forms(message).join(' ');
+      if (!key.startsWith('toca.dekStuck'))
+        expect(text, key).not.toMatch(/gone quiet|went quiet|quiet since/i);
+      if (/expired|ran out/i.test(text) && !key.startsWith('pair.error'))
+        expect(text, key).toMatch(/lease/i);
     }
   });
 
@@ -183,7 +195,7 @@ describe('times and lists in Spanish', () => {
     expect(agoLabel(ago(5 * 1440), now)).toBe('hace 5 d');
     const lease = { holder: 'claude', expiresAt: new Date(now + 12 * 60_000).toISOString() };
     expect(leaseLeft(lease, now)).toBe('quedan 12 min');
-    expect(leaseLeft({ ...lease, expiresAt: ago(1) }, now)).toBe('sin señal');
+    expect(leaseLeft({ ...lease, expiresAt: ago(1) }, now)).toBe('reserva vencida');
     expect(momentLabel('2026-10-28T12:31:00.000Z', now, 'UTC')).toBe('28 oct, 12:31');
     expect(momentLabel('2025-01-02T09:05:00.000Z', now, 'UTC')).toBe('2 ene 2025, 09:05');
     expect(listOf(['A', 'B', 'C'])).toBe('A, B y C');
