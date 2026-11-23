@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it } from 'vitest';
 import { setLanguage } from '../i18n/i18n.ts';
 import type { QueuedCapture } from './capture-queue.ts';
+import { InstallBannerView } from './InstallBanner.tsx';
 import { InstallLine, installLineWanted } from './InstallHint.tsx';
 import { downWords, OfflineBar, syncedTime } from './OfflineBar.tsx';
 import { QueuedCaptures } from './QueuedCaptures.tsx';
@@ -175,6 +176,28 @@ describe('the queue in Te toca', () => {
     expect(
       renderToStaticMarkup(createElement(QueuedCaptures, { captures: [], onDiscard: () => {} })),
     ).toBe('');
+  });
+});
+
+// P7-F3: when Instalar finds no browser prompt, the banner stays and says how to do it by hand.
+describe('the install banner', () => {
+  const banner = (props: { offer: 'prompt' | 'android'; manual?: boolean }) =>
+    renderToStaticMarkup(
+      createElement(InstallBannerView, { onInstall: () => {}, onDismiss: () => {}, ...props }),
+    );
+
+  it('offers Install with the browser prompt behind it', () => {
+    const html = banner({ offer: 'prompt' });
+    expect(html).toContain('>Install<');
+    expect(html).not.toContain('role="status"');
+  });
+
+  it('says it cannot install in one tap and gives the steps, with no dead button', () => {
+    const html = banner({ offer: 'android', manual: true });
+    expect(html).toContain('role="status"');
+    expect(html).toContain('install it with one tap here. Do it by hand:');
+    expect(html).toContain('Add to Home screen');
+    expect(html).not.toContain('>Install<');
   });
 });
 

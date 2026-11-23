@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { launchGoesTo, moveTo, whenInFront } from './register.ts';
+import { launchGoesTo, moveTo, promptInstall, whenInFront } from './register.ts';
+
+// P7-F3: Instalar with no browser prompt behind it did nothing the person could see.
+describe('promptInstall', () => {
+  it('says there was no browser prompt to open, so the banner can give the steps', async () => {
+    await expect(promptInstall()).resolves.toBe(false);
+  });
+});
 
 const HERE = 'https://desk.tail1.ts.net/p/alpha-aaaaaa/#/';
 

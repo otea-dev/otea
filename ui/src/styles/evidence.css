@@ -932,21 +932,29 @@
     flex: 1 1 100%;
     justify-content: flex-start;
   }
+  /* The field takes the first line; the count and the two steps wrap to a second, so none of them
+     is cut at 390 px or breaks "1 of 1" in two. */
   .ev-find {
     flex: 1 1 100%;
+    flex-wrap: wrap;
+    min-width: 0;
   }
   .ev-find-input.input {
-    flex: 1 1 auto;
+    flex: 1 1 100%;
     min-width: 0;
     width: auto;
     min-height: 44px;
     font-size: 16px;
+  }
+  .ev-find-count {
+    flex: 1 1 auto;
   }
 }
 
 .ev-find-count {
   min-width: 5ch;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .ev-line[data-error="true"] {

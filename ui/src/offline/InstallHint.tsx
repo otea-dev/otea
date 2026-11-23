@@ -68,7 +68,7 @@ export function InstallHint() {
       prompt={prompt}
       offline={offlineCapable(here())}
       onPrompt={() => {
-        promptInstall();
+        void promptInstall();
       }}
     />
   );

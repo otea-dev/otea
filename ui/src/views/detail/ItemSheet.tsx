@@ -525,7 +525,10 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   };
 
   // ---- the reader: the round's files one at a time, opened from the evidence (review mock) ----
-  const readerStep = stepId ?? journey.find(({ open }) => open)?.step ?? null;
+  // Closed, the phone reads the last round handed off (the rounds it draws, see PhoneItem); the
+  // desk, the step its history opens on.
+  const readerStep =
+    stepId ?? (app.phone ? null : (journey.find(({ open }) => open)?.step ?? null));
   const readerRounds = useMemo(() => {
     const on = live ? { def: live, ...(readerStep ? { step: readerStep } : {}) } : undefined;
     const read = roundsOf(item.events, item.evidence, type?.states ?? [], on);
@@ -796,8 +799,9 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
               type={type}
               board={
                 live
-                  ? // Closed, the rounds read are those of the step the history opens on.
-                    { def: live, step: stepId ?? journey.find(({ open }) => open)?.step ?? null }
+                  ? // Closed, the rounds read are the last handed off (P5-F11): the step the history
+                    // opens on can be one that never handed anything, and showed no evidence.
+                    { def: live, step: stepId }
                   : undefined
               }
               look={look}

@@ -34,6 +34,14 @@ describe('DeskOnly', () => {
     expect(html).toMatch(/<button[^>]*>Go to Your turn<\/button>/);
   });
 
+  // P7-F7: a board an agent drew is published on the computer; the phone says why and where.
+  it('tells on Studio why the first board is published on the computer', () => {
+    const html = render('studio');
+    expect(html).toContain('waits there as a draft');
+    expect(html).toContain('Open Otea on your computer to publish it.');
+    expect(render('settings')).not.toContain('waits there as a draft');
+  });
+
   it('names Settings and the catalog too, and speaks Spanish', () => {
     expect(render('settings')).toContain('Settings is on the computer.');
     expect(render('modules')).toContain('The module catalog is on the computer.');

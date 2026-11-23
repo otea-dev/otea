@@ -5,6 +5,7 @@ import { isErrorLine, logMatches, type SideRow, sideBySide } from '../../evidenc
 import { t } from '../../i18n/i18n.ts';
 import { Button, Icon } from '../../kit/index.ts';
 import type { Evidence } from '../../types.ts';
+import { centerLine } from './center-line.ts';
 import { FileMeta } from './FileMeta.tsx';
 
 // Line numbers take the width of the largest, so every line starts in one column.
@@ -359,9 +360,8 @@ export function LogView({ evidence }: { evidence: Evidence }) {
   const box = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (current === null) return;
-    box.current
-      ?.querySelector<HTMLElement>(`[data-line="${current}"]`)
-      ?.scrollIntoView?.({ block: 'center' });
+    const line = box.current?.querySelector<HTMLElement>(`[data-line="${current}"]`);
+    if (box.current && line) centerLine(box.current, line);
   }, [current]);
   if (state.status !== 'ready') return <TextState state={state} evidence={evidence} />;
   const whole = logView(state.text, true).head;

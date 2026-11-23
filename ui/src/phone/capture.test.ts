@@ -5,6 +5,7 @@ import {
   captureNow,
   capturePayload,
   closeCapture,
+  keepDraft,
   landsStep,
   lastBoard,
   noteField,
@@ -12,7 +13,9 @@ import {
   photoName,
   photoPlaces,
   pickBoard,
+  readable,
   rememberBoard,
+  takeDraft,
 } from './capture.ts';
 
 const LAYOUT: Layout = {
@@ -301,6 +304,58 @@ describe('the last board used on this device', () => {
     });
     expect(() => rememberBoard('p1', 'Pedidos')).not.toThrow();
     expect(lastBoard('p1')).toBeUndefined();
+  });
+});
+
+// P7-F5: a save with a photo the phone could no longer read hung with no word, and the words typed
+// were lost on reload.
+describe('a photo the phone can no longer read', () => {
+  it('is told before the upload', async () => {
+    const gone = new Blob(['x']);
+    vi.spyOn(gone, 'slice').mockReturnValue({
+      arrayBuffer: () => Promise.reject(new DOMException('gone', 'NotFoundError')),
+    } as unknown as Blob);
+    await expect(readable(gone)).resolves.toBe(false);
+    await expect(readable(new Blob(['png']))).resolves.toBe(true);
+  });
+});
+
+describe('the words of a save that failed', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const stub = () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => store.set(k, v),
+      removeItem: (k: string) => store.delete(k),
+    });
+  };
+
+  it('come back once, for that project', () => {
+    stub();
+    keepDraft('p1', { title: 'Item con foto', note: 'nota' });
+    expect(takeDraft('p2')).toBeUndefined();
+    expect(takeDraft('p1')).toEqual({ title: 'Item con foto', note: 'nota' });
+    expect(takeDraft('p1')).toBeUndefined();
+  });
+
+  it('are not kept blank, and storage that throws loses nothing else', () => {
+    stub();
+    keepDraft('p1', { title: ' ', note: '' });
+    expect(takeDraft('p1')).toBeUndefined();
+    vi.stubGlobal('localStorage', {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('blocked');
+      },
+      removeItem: () => {
+        throw new Error('blocked');
+      },
+    });
+    expect(() => keepDraft('p1', { title: 'a', note: '' })).not.toThrow();
+    expect(takeDraft('p1')).toBeUndefined();
   });
 });
 
