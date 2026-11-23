@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { processAlive } from '../app/presence.ts';
+import { isListedKey } from '../core/board/templates.ts';
 import { SERVE_LOG } from './daemon.ts';
 import { readServeFile, SERVE_FILE } from './serve-file.ts';
 import { cliAt, type Result, type TempRepo, tempGitRepo, until } from './testing.ts';
@@ -156,9 +157,14 @@ describe('otea start', () => {
   it('says how to get a board when none was made, and init does not say to start a running desk', async () => {
     const started = await person(repo.dir, 'start', '--no-open', '--port', '0');
     expect(started.code).toBe(0);
-    expect(started.out).toContain('Boards: none yet. Your agent designs them with you');
-    expect(started.out).toContain('otea start --template <key> (');
-    expect(started.out).toContain('todos');
+    // A choice in one line, by what the person does: the two templates a first session is likely to
+    // want (a simple dev has no way to know which to pick), each a real key, or the agent's design.
+    const boards = started.out.split('\n').find((line) => line.startsWith('Boards:')) ?? '';
+    expect(boards).toContain('none yet');
+    expect(boards).toContain('otea start --template changes (code');
+    expect(boards).toContain('--template todos (anything that is not code');
+    expect(boards).toContain('your agent designs them with you');
+    expect(isListedKey('changes') && isListedKey('todos')).toBe(true);
 
     const init = await person(repo.dir, 'init');
     expect(init.out).toContain('the desk already runs at');
