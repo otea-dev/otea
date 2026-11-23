@@ -9,6 +9,7 @@ import {
   stepById,
   TITLE,
 } from '../../../../src/core/board/model.ts';
+import { boardSpeech, lower } from '../../board-words.ts';
 import { t } from '../../i18n/i18n.ts';
 import type { Look } from '../../lanes/looks.ts';
 
@@ -104,7 +105,7 @@ export function sampleItems(def: BoardDefinition): SampleItem[] {
 export function sampleValue(part: Part, seed = 0): string {
   switch (part.kind) {
     case 'level':
-      return t(`bs.level.${LEVELS[seed % LEVELS.length] ?? 'low'}` as 'bs.level.low');
+      return boardSpeech().level(LEVELS[seed % LEVELS.length] ?? 'low');
     case 'choice':
     case 'multi':
       return part.options[seed % Math.max(1, part.options.length)]?.name ?? '—';
@@ -117,8 +118,8 @@ export function sampleValue(part: Part, seed = 0): string {
     case 'yesno':
       // The value the board starts it with, when it gives one (P5-R3-16).
       if (part.initial === 'yes' || part.initial === 'no')
-        return t(part.initial === 'no' ? 'bs.no' : 'bs.yes');
-      return t(seed % 2 ? 'bs.no' : 'bs.yes');
+        return lower(part.initial === 'no' ? boardSpeech().no : boardSpeech().yes);
+      return lower(seed % 2 ? boardSpeech().no : boardSpeech().yes);
     case 'url':
       return 'example.com/docs';
     case 'branch':

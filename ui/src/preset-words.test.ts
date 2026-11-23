@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { boardSpeech } from './board-words.ts';
 import { setLanguage } from './i18n/i18n.ts';
 import {
   fieldWord,
@@ -86,16 +87,28 @@ describe('preset words', () => {
 describe('keptStateWord', () => {
   afterEach(() => setLanguage('en'));
 
-  it('says the state name an event kept in the language on screen, never Otea’s English words', () => {
+  // A Spanish desk on an English board: Done, Dropped and a review read as the board's agent reads
+  // them, not in the screen's language.
+  it('says a kept state name in the board’s language, whatever the screen’s', () => {
     setLanguage('es');
+    const english = boardSpeech({ lang: 'en', title: 'Title' });
+    expect(keptStateWord('Done', english)).toBe('Done');
+    expect(keptStateWord('Dropped', english)).toBe('Dropped');
+    expect(keptStateWord('Dropped (Duplicate)', english)).toBe('Duplicate');
+    expect(keptStateWord('Refine (in review)', english)).toBe('Refine (in review)');
+    expect(keptStateWord('Refine (en revisión)', english)).toBe('Refine (in review)');
+    expect(keptStateWord('Refine', english)).toBe('Refine');
+    setLanguage('en');
+    const spanish = boardSpeech({ lang: 'es', title: 'Título' });
+    expect(keptStateWord('Done', spanish)).toBe('Hecho');
+    expect(keptStateWord('Dropped', spanish)).toBe('Descartado');
+    expect(keptStateWord('Refinar (in review)', spanish)).toBe('Refinar (en revisión)');
+  });
+
+  it('keeps a review as it was kept, and says Done and Dropped in the screen’s, when no board is at hand', () => {
+    setLanguage('es');
+    expect(keptStateWord('Refine (in review)')).toBe('Refine (in review)');
     expect(keptStateWord('Done')).toBe('Hecho');
     expect(keptStateWord('Dropped')).toBe('Descartado');
-    expect(keptStateWord('Dropped (Duplicado)')).toBe('Duplicado');
-    expect(keptStateWord('Refinar (in review)')).toBe('Refinar · en revisión');
-    expect(keptStateWord('Refinar')).toBe('Refinar');
-    setLanguage('en');
-    expect(keptStateWord('Refinar (in review)')).toBe('Refinar · in review');
-    expect(keptStateWord('Refinar (en revisión)')).toBe('Refinar · in review');
-    expect(keptStateWord('Done')).toBe('Done');
   });
 });

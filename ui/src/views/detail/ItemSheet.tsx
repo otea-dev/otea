@@ -5,6 +5,7 @@ import { waitsOf } from '../../actions.ts';
 import type { NoteAnchorInput } from '../../api.ts';
 import { typeOfItem, useApp } from '../../app/context.tsx';
 import { boardOfCollection, boardsOf, useBoards } from '../../board-studio/home/boards-store.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { DeskReader } from '../../components/evidence/DeskReader.tsx';
 import { EvidenceReader, type ReaderNote } from '../../components/evidence/EvidenceViewer.tsx';
 import { ItemEvidence, ItemReview } from '../../components/evidence/item-evidence.ts';
@@ -167,7 +168,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
     () =>
       live
         ? boardItemOf(live, item, {
-            done: t('bs.done'),
+            done: boardSpeech(live).done,
             dip: (n, at) => t('sheet.dip', { n, when: at ? dipWhen(at, now) : '' }),
             redone: (n) => t('sheet.dipRedone', { n }),
             reopen: (at) => t('sheet.reopenDip', { when: at ? dipWhen(at, now) : '' }),
@@ -197,7 +198,8 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   });
   const nameOf = (r: RelatedItem) => {
     const types = app.collectionOf(r.collection)?.types ?? [];
-    const step = r.closes === 'done' ? t('bs.done') : stateWordIn(types, r.state);
+    const said = stateWordIn(types, r.closes === 'done' ? 'done' : r.state);
+    const step = said === 'done' ? t('bs.done') : said;
     return { board: r.collection, step };
   };
   const links = live ? linksOf({ relations: item.relations, board: block }, nameOf) : null;

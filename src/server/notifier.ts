@@ -11,7 +11,6 @@ import {
   type NotifyTarget,
 } from '../app/notify-targets.ts';
 import type { Project } from '../app/project.ts';
-import { inLanguage } from '../app/reading-lang.ts';
 import { setAsideOf } from '../app/set-aside.ts';
 import { localMinuteOfDay, type Notice, Planner } from '../core/notify/planner.ts';
 import { freshSignals, type NotifyFacts, signalsOf } from '../core/notify/signals.ts';
@@ -123,11 +122,7 @@ export function createNotifier(
     return targets;
   };
 
-  // A scan is nobody's request: it reads each board in the language it was made in, even when the
-  // timer or the feed that runs it was started while a desk's request was being answered.
-  const scan = (): void => inLanguage(undefined, () => scanNow());
-
-  const scanNow = () => {
+  const scan = () => {
     const at = now();
     let signals: ReturnType<typeof signalsOf>;
     try {

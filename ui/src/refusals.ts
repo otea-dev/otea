@@ -1,7 +1,7 @@
 import type { Linked, Missing } from '../../src/core/board/engine.ts';
 import type { RefusalDetails } from '../../src/core/refusal.ts';
 import { freshWords } from './fresh-words.ts';
-import { language, listOf, listOr, t } from './i18n/i18n.ts';
+import { language, listOf, listOr, quoted, t } from './i18n/i18n.ts';
 
 // A refusal from the server in the language on screen, worded from its code and details. The
 // server's message is English, for agents and the CLI: it is shown only for a refusal this UI does
@@ -11,12 +11,13 @@ const NOTE = 'note';
 const PARTS = 'wait:parts';
 const BLOCKERS = 'wait:blockers';
 
-// "TAR-6 (Implementar)"; with the board, "ERR-4 (Errores, Arreglar)".
+// "TAR-6 («Implementar»)"; with the board, "ERR-4 («Errores», «Arreglar»)": the board's words are
+// quoted, so they read as its own inside the desk's sentence.
 function named(open: readonly Linked[], board = false): string {
   return listOf(
     open.map(({ id, board: on, step, unmerged }) => {
-      const at = step ?? (unmerged ? t('link.unmerged') : '');
-      const where = [board ? on : '', at].filter(Boolean).join(', ');
+      const at = step ? quoted(step) : unmerged ? t('link.unmerged') : '';
+      const where = [board ? quoted(on) : '', at].filter(Boolean).join(', ');
       return where ? `${id} (${where})` : id;
     }),
   );
@@ -52,7 +53,7 @@ function handoffWhy(missing: readonly Missing[]): string {
         reason === 'group' && group
           ? t('refusal.why.group', {
               min: group.min,
-              list: listOr(group.parts),
+              list: listOr(group.parts.map(quoted)),
               fresh: freshWords(group.fresh, group.parts),
               count: group.have,
             })
@@ -63,9 +64,9 @@ function handoffWhy(missing: readonly Missing[]): string {
               : reason === 'unchecked'
                 ? t('refusal.why.unchecked')
                 : reason === 'unproved'
-                  ? t('refusal.why.unproved', { list: listOf(points ?? []) })
+                  ? t('refusal.why.unproved', { list: listOf((points ?? []).map(quoted)) })
                   : '';
-      return said ? `${name} (${said})` : name;
+      return said ? `${quoted(name)} (${said})` : quoted(name);
     });
     if (note) what.push(t('refusal.why.note'));
     return t('refusal.why.missing', { list: listOf(what), count: what.length });

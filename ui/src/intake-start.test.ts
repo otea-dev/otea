@@ -41,7 +41,7 @@ describe('why Crear waits', () => {
     setLanguage('es');
     expect(createBlocked({ missing: [], parent: undefined })).toBeUndefined();
     expect(createBlocked({ missing: ['Título', 'Qué hace falta'], parent: undefined })).toBe(
-      'Falta Título, Qué hace falta para crear.',
+      'Para crear falta: «Título», «Qué hace falta».',
     );
     expect(
       createBlocked({

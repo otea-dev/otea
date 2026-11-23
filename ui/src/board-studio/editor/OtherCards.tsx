@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { mappedScales, partsFor, ROLES, viewsOf } from '../../../../src/core/board/analysis.ts';
 import { waysOf } from '../../../../src/core/board/engine.ts';
 import { DONE, SAME, TITLE, usedRefs } from '../../../../src/core/board/model.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { listOf, t, tx } from '../../i18n/i18n.ts';
 import { TypeIcon } from '../../icons/TypeIcon.tsx';
 import { Icon } from '../../kit/Icon.tsx';
@@ -112,7 +113,7 @@ export function DoneCard() {
   const droppers = def.steps.filter((s) => s.doerMayDrop && s.doer !== 'you');
   return (
     <>
-      <Head kicker={t('bs.editor.done.kicker')} title={t('bs.done')} />
+      <Head kicker={t('bs.editor.done.kicker')} title={boardSpeech().done} />
       <p className="se-sent se-sent-sm">
         {tx('bs.editor.done.sentence', {
           steps: reach.length ? <b>{listOf(reach)}</b> : t('bs.editor.done.last'),

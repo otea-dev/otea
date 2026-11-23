@@ -67,7 +67,6 @@ import { draftTitle } from './draft-request.ts';
 import { type Clock, systemClock } from './items.ts';
 import { linksOf, liveBoards } from './next.ts';
 import type { LoadedPreset, PresetCatalog } from './presets.ts';
-import { readingLang } from './reading-lang.ts';
 
 // Boards with versions, as Studio makes them: a draft per board, published as a new version in one
 // transaction (its collection, item moves and events), restorable, and compiled into the preset
@@ -300,14 +299,10 @@ export function insertNewBoard(
 // `draftStamp`: the draft's updatedAt as the writer last read it (null: it read no draft). When
 // given, a draft written since (an agent's arriving, another tab) refuses the write instead of
 // being lost under it.
-// `readIn`: the language the editor read the draft in, which the words it sends are in; a desk
-// that switched language since still saves the words it holds, and the snapshot is reconciled
-// against that language, not the one the request says. Without it, the request's language.
 export type SaveDraftInput = {
   definition: unknown;
   baseVersion: number | null;
   draftStamp?: string | null;
-  readIn?: Lang;
 };
 
 function assertDraftUnchanged(ctx: Context, id: string, stamp: string | null | undefined): void {
@@ -349,7 +344,7 @@ export function saveDraft(
     const previous = findDraft(ctx.db, id);
     upsertDraft(ctx.db, {
       boardId: id,
-      definition: storedDefinition(reading.definition, input.readIn),
+      definition: storedDefinition(reading.definition),
       baseVersion: input.baseVersion,
       updatedAt: now(),
       requestItem: previous?.requestItem ?? null,
@@ -1029,15 +1024,12 @@ function publishMoves(ctx: Context, collection: string, version: number) {
   });
 }
 
-// The preset catalog with every published board compiled in, once per language it is read in: a
-// board's words come in the language of the request that reads it (the desk's), or in the one the
-// board was made in for a reader with none, so each language has its own compiled catalog and a
-// request never sees another's. `ctx.presets` answers for the language of whoever asks (it is
-// resolved when read, not swapped under other requests), and a catalog is compiled again only when
-// a board was published since, which one query tells.
+// The preset catalog with every published board compiled in, each in the language it was made in
+// (the agent's, whatever the desk's screen says). `ctx.presets` answers with it, and it is compiled
+// again only when a board was published since, which one query tells.
 type Compiled = {
   base: PresetCatalog;
-  byLang: Map<string, { stamp: string; catalog: PresetCatalog }>;
+  built?: { stamp: string; catalog: PresetCatalog };
 };
 
 const compiled = new WeakMap<Context, Compiled>();
@@ -1059,20 +1051,17 @@ function compileCatalog(ctx: Context, base: PresetCatalog): PresetCatalog {
 }
 
 function catalogFor(ctx: Context, state: Compiled): PresetCatalog {
-  const lang = readingLang();
-  const key = lang ?? '';
   const stamp = boardsStamp(ctx.db);
-  const known = state.byLang.get(key);
-  if (known?.stamp === stamp) return known.catalog;
+  if (state.built?.stamp === stamp) return state.built.catalog;
   const catalog = compileCatalog(ctx, state.base);
-  state.byLang.set(key, { stamp, catalog });
+  state.built = { stamp, catalog };
   return catalog;
 }
 
 export function syncBoardPresets(ctx: Context): void {
   let state = compiled.get(ctx);
   if (!state) {
-    const created: Compiled = { base: ctx.presets, byLang: new Map() };
+    const created: Compiled = { base: ctx.presets };
     state = created;
     compiled.set(ctx, created);
     Object.defineProperty(ctx, 'presets', {
@@ -1081,7 +1070,7 @@ export function syncBoardPresets(ctx: Context): void {
       get: () => catalogFor(ctx, created),
       set: (catalog: PresetCatalog) => {
         created.base = catalog;
-        created.byLang.clear();
+        delete created.built;
       },
     });
   }

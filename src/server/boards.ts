@@ -56,6 +56,10 @@ const DraftBody = z.strictObject({
   definition: z.unknown(),
   baseVersion: z.number().int().positive().nullable(),
   draftStamp: z.string().nullable().optional(),
+  // What a tab opened before this release still sends: the language it read the draft in. Nothing
+  // reads it any more (a board is read and saved in its own language), but a tab left open must keep
+  // saving, so it is taken and dropped.
+  readIn: z.unknown().optional(),
 });
 
 const PublishBody = z.strictObject({

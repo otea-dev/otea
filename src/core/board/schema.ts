@@ -48,8 +48,8 @@ const flag = (description: string, example: boolean) =>
 // A motive names a closed state of its own (dropped__<id>), whose name takes no dash.
 const STATE_KEY = /^[a-z][a-z0-9_]*$/;
 
-// What a template made a thing from, kept so its words follow the language on screen; the board
-// publishes them as it reads them, and an agent leaves the key as it finds it.
+// What a template made a thing from, kept so its words stay the template's, in every language; the
+// board publishes them as it reads them, and an agent leaves the key as it finds it.
 const keyOf = (what: string) =>
   z
     .string()
@@ -449,15 +449,6 @@ export type DefinitionReading =
   | { ok: true; definition: BoardDefinition; notes?: string[] }
   | { ok: false; problems: string[] };
 
-// The language the reader of a board uses: the desk says it for the request it is answering
-// (app/reading-lang.ts); a command with no desk says none, and reads each board in the language it
-// was made in.
-let readerLang: () => Lang | undefined = () => undefined;
-
-export function readsIn(language: () => Lang | undefined): void {
-  readerLang = language;
-}
-
 // Checks a definition as it was handed in (a PUT draft, an agent's board.json) or stored. It
 // changes no word: speaking it in a language is readDefinition's.
 export function parseDefinition(input: unknown): DefinitionReading {
@@ -551,18 +542,18 @@ function idClashes(raw: unknown, definition: BoardDefinition): string[] {
 }
 
 // Reads a stored definition, which was checked when written: a failure here is a corrupt row. The
-// words its template gave it come in `lang`; else the language of the reader (readsIn); else the
-// language the board was made in.
+// words its template gave it come in the language the board was made in, which is how its agent and
+// its desk read it, or in `lang` when a caller asks for another.
 export function readDefinition(json: string, lang?: Lang): BoardDefinition {
   const reading = parseDefinition(JSON.parse(json));
   if (!reading.ok) throw new Error(`Corrupt board definition: ${reading.problems.join('; ')}`);
-  return speak(reading.definition, lang ?? readerLang());
+  return speak(reading.definition, lang);
 }
 
-// A definition as it is written to a version or a draft row. `reading` is the language it was read
-// in (the reader's, else the one it was made in): a word its template gave it that no longer says
+// A definition as it is written to a version or a draft row. `reading` is the language its words are
+// in (else the one it was made in): a word its template gave it that no longer says
 // what the snapshot says in that language was changed by the person, and their text stands in
 // every language (localize.ts reconcile).
 export function storedDefinition(definition: BoardDefinition, reading?: string): string {
-  return JSON.stringify(reconcile(definition, reading ?? readerLang()));
+  return JSON.stringify(reconcile(definition, reading));
 }

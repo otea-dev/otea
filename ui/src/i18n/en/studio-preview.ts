@@ -229,7 +229,6 @@ export const studioPreview = {
   'bs.preview.try.log.otherRound': '{who} asked for another round of {step}.',
   'bs.preview.try.log.done': '{id} reaches Done.',
 
-  'bs.preview.dropped': 'Dropped',
   'bs.preview.try.labelPair': 'Try both boards',
   'bs.preview.try.bannerPair':
     'Practice with a copy of your two drafts, {parent} and {child} · nothing is kept here',

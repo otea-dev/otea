@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { backWaysOf } from '../../../../src/core/board/engine.ts';
 import { partOf, type Selection } from '../../../../src/core/board/model.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { listOf, t } from '../../i18n/i18n.ts';
 import { AgentMark } from '../../kit/Marks.tsx';
 import { type LaneBlock, LaneList } from '../../lanes/LaneList.tsx';
@@ -68,7 +69,7 @@ export function VRoute({ board, role }: { board?: ReadyDraft; role?: PairRole } 
         </span>
       );
     } else if (row.key === 'done') {
-      title = t('bs.done');
+      title = boardSpeech().done;
       meta = <span>{t('bs.editor.vroute.done')}</span>;
     } else {
       const step = def.steps.find((s) => s.id === row.key);

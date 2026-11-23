@@ -435,7 +435,7 @@ function namer(
 type InstantiateOptions = { keep?: boolean; boards?: Readonly<Record<string, string>> };
 
 // A board made from a template, with the words the template says in every language kept on it
-// (its `snapshot`, localize.ts): the board reads in the language on screen, and never looks at the
+// (its `snapshot`, localize.ts): the board reads in the language it was made in, and never looks at the
 // template again, so editing or removing a template later touches no board made from it.
 // `keep`: the template's keys become the ids (a preset's reading keeps the keys its items' data is
 // stored under); otherwise every id is fresh.
@@ -861,7 +861,7 @@ const REQUESTS: Template = {
 
 // The language a board was made in, which the words it makes for an agent or a Pedido about it are
 // said in whatever language the desk is in; for a board that says none, the one its title is in.
-export function boardLang(def: BoardDefinition): Lang {
+export function boardLang(def: Pick<BoardDefinition, 'lang' | 'title'>): Lang {
   if (def.lang === 'en' || def.lang === 'es') return def.lang;
   return def.title === TITLE_NAME.es ? 'es' : 'en';
 }

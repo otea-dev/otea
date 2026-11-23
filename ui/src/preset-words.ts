@@ -16,16 +16,33 @@ export function stateWord(type: TypeView | undefined, state: string): string {
   return wordsOf(type)?.states[state] ?? state;
 }
 
-// A state name an event kept when it was written (stateName, toName): Done and Dropped in English,
-// a review in the board's language (Refinar (en revisión), or (in review) on an English board);
-// said here in the language on screen.
-export function keptStateWord(name: string): string {
-  if (name === 'Done') return t('node.done');
-  if (name === 'Dropped') return t('node.discarded');
+// The words of the board's language a kept state name is said in (the board's, the agent's, not the
+// screen's): from its type's labels, or from the board itself (boardSpeech). What it lacks, the
+// screen's words say.
+export type KeptWords = { done?: string; dropped?: string; inReview?: string };
+
+// What a type's labels say of Done and Dropped; they are the board's own, on every screen.
+export function keptWords(type: TypeView | undefined): KeptWords {
+  const states = wordsOf(type)?.states;
+  return {
+    ...(states?.done ? { done: states.done } : {}),
+    ...(states?.dropped ? { dropped: states.dropped } : {}),
+  };
+}
+
+// A state name an event kept when it was written (stateName, toName): Done and Dropped as the CLI
+// prints them (in English), a review in the board's language (Refinar (en revisión), or (in review)
+// on an English board). Said in the board's language (`words`), as its agent reads it; a board
+// that is not at hand leaves the screen's.
+export function keptStateWord(name: string, words: KeptWords = {}): string {
+  if (name === 'Done') return words.done ?? t('node.done');
+  if (name === 'Dropped') return words.dropped ?? t('node.discarded');
   const motive = /^Dropped \((.+)\)$/.exec(name);
   if (motive?.[1]) return motive[1];
   const review = /^(.+) \((?:in review|en revisión)\)$/.exec(name);
-  if (review?.[1]) return t('state.inReview', { step: review[1] });
+  if (review?.[1])
+    // Kept in the board's own language already: only a board at hand can say it in its words.
+    return words.inReview ? `${review[1]} (${words.inReview})` : name;
   return name;
 }
 

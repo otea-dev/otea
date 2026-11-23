@@ -1,5 +1,6 @@
 import { type CSSProperties, useLayoutEffect, useRef, useState } from 'react';
 import { DONE } from '../../../../src/core/board/model.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { t } from '../../i18n/i18n.ts';
 import { lookGlyph } from '../../lanes/looks.ts';
 import { C } from '../../motion/curves.ts';
@@ -110,7 +111,7 @@ function StopNode({ st, on }: { st: Stop; on: boolean }) {
 
 function stopName(st: Stop, item: string): string {
   if (st.kind === 'form') return t('bs.editor.route.create', { item });
-  if (st.kind === 'done') return t('bs.done');
+  if (st.kind === 'done') return boardSpeech().done;
   return st.step.name.trim() || t('bs.editor.route.unnamed');
 }
 

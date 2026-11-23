@@ -8,6 +8,7 @@ import type {
 import { DONE, stepById } from '../../../src/core/board/model.ts';
 import type { Change } from '../../../src/core/board/plan.ts';
 import type { Problem } from '../../../src/core/board/problems.ts';
+import { boardSpeech, lower } from '../board-words.ts';
 import { listOf, listOr, type PlainKey, t } from '../i18n/i18n.ts';
 
 // The board Studio's sentences: problems, publish changes, who does and reviews a step, and the
@@ -31,7 +32,7 @@ export function whoName(who: Doer | Reviewer): string {
 }
 
 export function targetName(def: BoardDefinition, target: Target): string {
-  if (target === DONE) return t('bs.done');
+  if (target === DONE) return boardSpeech(def).done;
   return stepById(def, target)?.name ?? '…';
 }
 
@@ -201,20 +202,14 @@ export function roleWord(role: string): string {
   return key ? t(key) : role;
 }
 
-const LEVEL_WORDS: Readonly<Record<string, PlainKey>> = {
-  low: 'bs.level.low',
-  medium: 'bs.level.medium',
-  high: 'bs.level.high',
-  critical: 'bs.level.critical',
-  yes: 'bs.yes',
-  no: 'bs.no',
-};
-
-// A start value as people read it: a choice by its name, a level or yes-or-no in words.
+// A start value as people read it: a choice by its name, a level or yes-or-no in the words of the
+// board's language.
 export function initialName(value: string, name?: string): string {
   if (name !== undefined) return name;
-  const key = LEVEL_WORDS[value];
-  return key ? t(key) : value;
+  const speech = boardSpeech();
+  if (value === 'yes') return lower(speech.yes);
+  if (value === 'no') return lower(speech.no);
+  return speech.level(value);
 }
 
 function waitsText(name: string, waits: readonly string[], board?: string): string {

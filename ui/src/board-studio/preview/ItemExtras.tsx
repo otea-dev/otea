@@ -10,6 +10,7 @@ import {
   STEP,
   type Step,
 } from '../../../../src/core/board/model.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { t, tx } from '../../i18n/i18n.ts';
 import { MenuItem, MenuLabel } from '../../kit/pop/Menu.tsx';
 import { Pop } from '../../kit/pop/Pop.tsx';
@@ -71,7 +72,7 @@ export function PlaceValue({
               <NodeGlyph look={done ? 'done' : (looks[k] ?? 'working')} size={16} />
               <span className="pid">{part.id}</span>
               <span className="pt2">{sampleTitle(on, k)}</span>
-              <span className="pst">{done ? t('bs.done') : (part.step ?? '')}</span>
+              <span className="pst">{done ? boardSpeech().done : (part.step ?? '')}</span>
             </span>
           </div>
         );

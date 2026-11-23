@@ -40,8 +40,9 @@ import {
   definitionRoute,
   type RouteWords,
 } from '../../board-studio/preview/route.ts';
+import { type BoardSpeech, boardSpeech, capital } from '../../board-words.ts';
 import { relayOf } from '../../format.ts';
-import { listOf, listOr, t } from '../../i18n/i18n.ts';
+import { listOf, listOr, quoted, t } from '../../i18n/i18n.ts';
 import type { Look } from '../../lanes/looks.ts';
 import type { AgentProfile } from '../../presence.ts';
 import { keptStateWord } from '../../preset-words.ts';
@@ -288,7 +289,9 @@ export function waitRows(def: BoardDefinition, stepId: string, links: ItemLinks)
 export function approvalRefusal(id: string, rows: readonly WaitRow[]): string | null {
   const parts = rows.find((r) => r.kind === 'parts' && r.open.length);
   if (parts) {
-    const list = listOf(parts.open.map((x) => (x.step ? `${x.id} (${x.step})` : x.id)));
+    const list = listOf(
+      parts.open.map((x) => (x.step ? `${x.id} (${x.unmerged ? x.step : quoted(x.step)})` : x.id)),
+    );
     if (parts.open.every((x) => x.unmerged))
       return t('bi.refuse.partsUnmerged', {
         id,
@@ -301,10 +304,15 @@ export function approvalRefusal(id: string, rows: readonly WaitRow[]): string | 
   const first = blockers?.open[0];
   if (!first) return null;
   if (first.unmerged)
-    return t('bi.refuse.blockersUnmerged', { id, other: first.id, board: first.board });
+    return t('bi.refuse.blockersUnmerged', { id, other: first.id, board: quoted(first.board) });
   return first.step
-    ? t('bi.refuse.blockers', { id, other: first.id, board: first.board, step: first.step })
-    : t('bi.refuse.blockersEnded', { id, other: first.id, board: first.board });
+    ? t('bi.refuse.blockers', {
+        id,
+        other: first.id,
+        board: quoted(first.board),
+        step: quoted(first.step),
+      })
+    : t('bi.refuse.blockersEnded', { id, other: first.id, board: quoted(first.board) });
 }
 
 // Aprobar on a review whose step waits for something still open stays off, saying what it waits
@@ -537,7 +545,7 @@ function stepWord(def: BoardDefinition, id: string, events: readonly ItemEvent[]
       kept(data.to, data.toName) ??
       kept(data.from, data.fromName) ??
       kept(data.state, data.stateName);
-    if (name) return keptStateWord(name);
+    if (name) return keptStateWord(name, boardSpeech(def));
   }
   return t('sheet.h.goneStep');
 }
@@ -751,8 +759,9 @@ export type HandRow = {
   name: string;
   ok: boolean;
   required: boolean;
-  // A field the page can fill in place ("Rellenar"); evidence is attached by an agent.
+  // A field the page can fill in place ("Rellenar"), and how; evidence is attached by an agent.
   part?: Part;
+  control?: FillControl;
 };
 
 export function handRows(
@@ -783,7 +792,7 @@ export function handRows(
       name: part.name,
       ok: hand.req === 'no' ? (filled?.(hand.ref) ?? false) : !lacks.has(hand.ref),
       required: hand.req !== 'no',
-      ...(isEvidence(part) ? {} : { part }),
+      ...(isEvidence(part) ? {} : { part, control: fillControl(part, boardSpeech(def)) }),
     });
   }
   // «Al menos N de»: one row for each group, done when enough of its parts hold a file.
@@ -793,7 +802,7 @@ export function handRows(
       name: t('bi.hand.group', {
         name: group.name,
         min: group.min,
-        list: listOr(group.parts.map((ref) => def.parts[ref]?.name ?? ref)),
+        list: listOr(group.parts.map((ref) => quoted(def.parts[ref]?.name ?? ref))),
       }),
       ok: !lacks.has(groupRef(group.id)),
       required: true,
@@ -808,21 +817,17 @@ export type FillControl =
   | { choices: { id: string; name: string }[] }
   | { input: 'text' | 'long' | 'number' | 'date' | 'url' };
 
-const capital = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
-
-export function fillControl(part: Part): FillControl {
+// `speech`: the words of the board's language, the agent's, not the screen's.
+export function fillControl(part: Part, speech: BoardSpeech): FillControl {
   if (part.kind === 'level')
     return {
-      choices: LEVELS.map((level) => ({
-        id: level,
-        name: capital(t(`bs.level.${level}` as 'bs.level.low')),
-      })),
+      choices: LEVELS.map((level) => ({ id: level, name: capital(speech.level(level)) })),
     };
   if (part.kind === 'yesno')
     return {
       choices: [
-        { id: 'yes', name: capital(t('bs.yes')) },
-        { id: 'no', name: capital(t('bs.no')) },
+        { id: 'yes', name: capital(speech.yes) },
+        { id: 'no', name: capital(speech.no) },
       ],
     };
   if (part.options.length > 0)
@@ -842,8 +847,7 @@ export function handRefusal(
   if (!parts.length) return null;
   return t('bi.refuse.missing', {
     id,
-    list: listOf(parts.map(({ name }) => name)),
-    count: parts.length,
+    list: listOf(parts.map(({ name }) => quoted(name))),
   });
 }
 

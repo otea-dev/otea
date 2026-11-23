@@ -671,10 +671,7 @@ export const detail = {
     other: 'espera a {list}, que lo frenan',
   },
   'bi.move.deliver': 'Entregar',
-  'bi.refuse.missing': {
-    one: 'No se entregó {id}: falta {list}.',
-    other: 'No se entregó {id}: faltan {list}.',
-  },
+  'bi.refuse.missing': 'No se entregó {id}. Falta: {list}.',
   // Aprobar una entrega cuyo grupo «al menos N de» se queda corto: se pregunta una vez, no se impide.
   'bi.approve.short': {
     one: '{list} no llega a lo que pide el paso. Pulsa {action} otra vez para aprobar igualmente.',
@@ -695,10 +692,11 @@ export const detail = {
   'sheet.refused': 'Otea no lo movió. Mira lo que falta y vuelve a intentarlo.',
   'bi.toast.delivered': 'Entregaste «{title}». Pasa a {state}.',
   'bi.refuse.blockers':
-    'No se aprobó {id}: {other} ({board}, {step}) lo frena y sigue sin terminar.',
-  'bi.refuse.blockersEnded': 'No se aprobó {id}: {other} ({board}) lo frena y sigue sin terminar.',
+    'No se aprobó {id}: {other} (en {board}, paso {step}) lo frena y sigue sin terminar.',
+  'bi.refuse.blockersEnded':
+    'No se aprobó {id}: {other} (en {board}) lo frena y sigue sin terminar.',
   'bi.refuse.blockersUnmerged':
-    'No se aprobó {id}: {other} ({board}) lo frena y aún no se fusionó: apruébalo cuando su rama esté en la base.',
+    'No se aprobó {id}: {other} (en {board}) lo frena y aún no se fusionó: apruébalo cuando su rama esté en la base.',
   'bi.partOf': 'Parte de',
   'bi.parts.title': 'Partes',
   'bi.parts.gloss': '{ended} de {total} terminadas',

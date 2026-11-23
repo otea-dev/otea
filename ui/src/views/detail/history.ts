@@ -16,10 +16,11 @@ import {
 } from '../../../../src/core/board/questions.ts';
 import { stateName } from '../../../../src/core/board/reading.ts';
 import { isSurface, type Surface } from '../../../../src/core/surface.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { describeEvent, formatTime, momentParts, relayOf } from '../../format.ts';
 import { type PlainKey, t } from '../../i18n/i18n.ts';
 import type { AgentProfile } from '../../presence.ts';
-import { fieldWord, keptStateWord, valueWord } from '../../preset-words.ts';
+import { fieldWord, keptStateWord, keptWords, valueWord } from '../../preset-words.ts';
 import { profilePair } from '../../profile-words.ts';
 import { isSetAside, SET_ASIDE_LIFTED } from '../../set-aside.ts';
 import type { ItemEvent, TypeView } from '../../types.ts';
@@ -87,14 +88,16 @@ export function historyOf(
   // A state the type still has reads by its name today; one deleted since, by the name its event
   // kept when it was written (`stateName`, `toName`). An event written before names were kept
   // reads by the board's step of that id, or says the step is gone; off a board, as stored.
+  // The words the board says its closing and its reviews in, as its agent reads them.
+  const said = board ? boardSpeech(board) : keptWords(type);
   const named = (state: string, kept: unknown) => {
     if (states.has(state)) return word(state);
-    if (typeof kept === 'string' && kept !== '') return keptStateWord(kept);
+    if (typeof kept === 'string' && kept !== '') return keptStateWord(kept, said);
     if (!board) return word(state);
     const position = positionOf(state);
     if (isClosed(position)) return word(state);
     return stepById(board, position.step)
-      ? keptStateWord(stateName(board, state))
+      ? keptStateWord(stateName(board, state), said)
       : t('sheet.h.goneStep');
   };
   const sorted = [...events]

@@ -858,11 +858,11 @@ describe('approvalWaitWords: the gate in the language on screen', () => {
     ];
     setLanguage('es');
     expect(approvalWaitWords(missing)).toBe(
-      'Aún no se puede aprobar: su parte TAR-6 (Implementar) sigue sin terminar.',
+      'Aún no se puede aprobar: su parte TAR-6 («Implementar») sigue sin terminar.',
     );
     setLanguage('en');
     expect(approvalWaitWords(missing)).toBe(
-      'Not approvable yet: its part TAR-6 (Implementar) is not finished.',
+      'Not approvable yet: its part TAR-6 (“Implementar”) is not finished.',
     );
   });
 });

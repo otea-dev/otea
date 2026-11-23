@@ -89,6 +89,12 @@ export function listOr(values: readonly string[]): string {
   return new Intl.ListFormat(current, { type: 'disjunction' }).format(values);
 }
 
+// A word of a board set inside the desk's own sentence, so that it reads as the board's and not as
+// the sentence's: «Do it» in Spanish, “Do it” in English.
+export function quoted(word: string): string {
+  return current === 'es' ? `«${word}»` : `“${word}”`;
+}
+
 export function isLanguage(value: unknown): value is Language {
   return LANGUAGES.includes(value as Language);
 }

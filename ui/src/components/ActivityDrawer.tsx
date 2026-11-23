@@ -80,11 +80,18 @@ function Lease({ row, now, onOpen }: { row: LeaseRow; now: number; onOpen: () =>
   );
 }
 
-// A step by the board's own words in the language on screen; the name its event kept only when the
-// board no longer has it (that name is the compiled one, in the board's first language).
+// A step by the board's own words, in the board's language; the name its event kept only when the
+// board no longer has it (that name is already in the board's language).
 function named(phrase: { state: string; name?: string }, state: (s: string) => string): string {
   const word = state(phrase.state);
-  return word !== phrase.state ? word : phrase.name ? keptStateWord(phrase.name) : word;
+  if (word !== phrase.state || !phrase.name) return word;
+  // A step the board no longer has: its closing words are the board's, said by its type.
+  const closing = (key: string) => (state(key) === key ? undefined : state(key));
+  const [done, dropped] = [closing('done'), closing('dropped')];
+  return keptStateWord(phrase.name, {
+    ...(done ? { done } : {}),
+    ...(dropped ? { dropped } : {}),
+  });
 }
 
 // The sentence of a feed line, the item's id as a button that opens it.

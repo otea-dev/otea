@@ -80,7 +80,7 @@ export type ScaleStep = { value: string; name: string };
 
 // The steps of a part's scale, lowest first. A number part has no fixed steps: its scale is the
 // distinct values the items carry, sorted (`values`); a level reads its keys, which the caller
-// words in the language on screen.
+// words in the board's language.
 export function scaleOf(part: Part, values: readonly string[] = []): ScaleStep[] {
   if (part.kind === 'level') return LEVELS.map((level) => ({ value: level, name: level }));
   if (part.kind === 'choice') return part.options.map(({ id, name }) => ({ value: id, name }));

@@ -10,7 +10,8 @@ import {
   stepById,
   stepIndex,
 } from '../../../../src/core/board/model.ts';
-import { language, type MessageKey, type PlainKey, t } from '../../i18n/i18n.ts';
+import { boardSpeech, lower } from '../../board-words.ts';
+import { language, type MessageKey, t } from '../../i18n/i18n.ts';
 import { doesText, reviewsText, targetName } from '../words.ts';
 
 // The board in sentences: the summary under its name, and what each choice on a step's card means
@@ -114,7 +115,7 @@ export function summary(def: BoardDefinition): Sentence[] {
   });
   out.push({
     key: 'bs.editor.sum.end',
-    params: { done: { name: t('bs.done'), at: { kind: 'done' } } },
+    params: { done: { name: boardSpeech(def).done, at: { kind: 'done' } } },
   });
   return out;
 }
@@ -146,8 +147,11 @@ export function whenValueName(def: BoardDefinition, part: string, value: string)
   const p = partOf(def, part);
   if (!p || !value) return '…';
   if (p.kind === 'level')
-    return (LEVELS as readonly string[]).includes(value) ? t(`bs.level.${value}` as PlainKey) : '…';
-  if (p.kind === 'yesno') return value === 'yes' ? t('bs.yes') : value === 'no' ? t('bs.no') : '…';
+    return (LEVELS as readonly string[]).includes(value) ? boardSpeech(def).level(value) : '…';
+  if (p.kind === 'yesno') {
+    const speech = boardSpeech(def);
+    return value === 'yes' ? lower(speech.yes) : value === 'no' ? lower(speech.no) : '…';
+  }
   return p.options.find((c) => c.id === value)?.name ?? '…';
 }
 

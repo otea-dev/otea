@@ -195,10 +195,4 @@ export const boardStudio = {
   'bs.show.ab': 'A y B, a ciegas',
   'bs.show.strip': 'en tira de fotogramas',
   'bs.show.player': 'en reproductor',
-  'bs.level.low': 'baja',
-  'bs.level.medium': 'media',
-  'bs.level.high': 'alta',
-  'bs.level.critical': 'crítica',
-  'bs.yes': 'sí',
-  'bs.no': 'no',
 } satisfies Partial<Catalog>;

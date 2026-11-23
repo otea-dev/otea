@@ -25,6 +25,7 @@ import {
 } from './model.ts';
 import { groupFaults } from './problems.ts';
 import { stateName } from './reading.ts';
+import { BOARD_WORDS, LEVEL_SAID } from './template-words.ts';
 import { boardLang, defaultZone, LANGS, type Lang } from './templates.ts';
 
 // A published board version compiled into the preset the rest of Otea already reads (items, moves,
@@ -72,29 +73,6 @@ const VARIANT: Readonly<Record<string, string>> = {
   ab: 'compare',
   strip: 'frames',
   player: 'player',
-};
-
-const WORDS: Readonly<Record<Lang, Record<string, string>>> = {
-  en: {
-    done: 'Done',
-    dropped: 'Dropped',
-    yes: 'Yes',
-    no: 'No',
-    low: 'low',
-    medium: 'medium',
-    high: 'high',
-    critical: 'critical',
-  },
-  es: {
-    done: 'Hecho',
-    dropped: 'Descartado',
-    yes: 'Sí',
-    no: 'No',
-    low: 'baja',
-    medium: 'media',
-    high: 'alta',
-    critical: 'crítica',
-  },
 };
 
 type RawField = {
@@ -412,8 +390,8 @@ export function compileBoard(id: string, version: number, def: BoardDefinition):
     types: { [BOARD_TYPE]: def.item },
     states: {
       ...Object.fromEntries(phases.map((phase) => [phase.state, phase.label(lang)])),
-      [DONE]: WORDS[lang].done,
-      [DROPPED]: WORDS[lang].dropped,
+      [DONE]: BOARD_WORDS[lang].done,
+      [DROPPED]: BOARD_WORDS[lang].dropped,
       // A discard with a motive reads as its motive (Duplicado).
       ...Object.fromEntries(
         def.drop.motives.map(({ id: motive, name }) => [
@@ -437,9 +415,9 @@ export function compileBoard(id: string, version: number, def: BoardDefinition):
         .map((part) => [
           part.id,
           part.kind === 'yesno'
-            ? { yes: WORDS[lang].yes, no: WORDS[lang].no }
+            ? { yes: BOARD_WORDS[lang].yes, no: BOARD_WORDS[lang].no }
             : part.kind === 'level'
-              ? Object.fromEntries(LEVELS.map((level) => [level, WORDS[lang][level] ?? level]))
+              ? Object.fromEntries(LEVELS.map((level) => [level, LEVEL_SAID[lang][level] ?? level]))
               : Object.fromEntries(part.options.map((choice) => [choice.id, choice.name])),
         ]),
     ),

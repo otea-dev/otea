@@ -145,6 +145,24 @@ describe('a board read by desks in two languages', () => {
     );
   });
 
+  // An editor tab opened before this release still sends the language it read the draft in. It must
+  // keep saving, and what it says changes nothing.
+  it('still takes the save of a tab that sends the language it read the draft in', async () => {
+    const id = await made('en');
+    const draft = (await call('GET', `/boards/${id}`)).body.record.draft?.definition;
+    const first = draft?.steps[0];
+    if (!draft || !first) throw new Error('no draft');
+    first.name = 'Fill in';
+
+    const saved = await call('PUT', `/boards/${id}/draft`, {
+      definition: draft,
+      baseVersion: null,
+      readIn: 'es',
+    });
+    expect(saved.status).toBe(200);
+    expect((await namesOf(id)).steps).toEqual(['Fill in', 'Triage', 'Fix', 'Land']);
+  });
+
   it('answers the same whatever the screen, so nothing it caches depends on it', async () => {
     const id = await made('en');
     const a = await call('GET', `/boards/${id}`, undefined, 'es');

@@ -1,5 +1,5 @@
 import { freshWords } from '../../fresh-words.ts';
-import { listOr, t } from '../../i18n/i18n.ts';
+import { listOr, quoted, t } from '../../i18n/i18n.ts';
 import type { EvidenceGaps as Gaps } from '../../views/detail/board-item.ts';
 
 // What a review leaves unsaid by showing only the evidence that has content: a group still short
@@ -22,14 +22,14 @@ export function EvidenceGaps({ gaps, required = false }: { gaps: Gaps; required?
             name: group.name,
             min: group.min,
             count: group.have,
-            list: listOr(group.parts),
+            list: listOr(group.parts.map(quoted)),
             fresh: freshWords(group.fresh, group.parts),
           })}
         </p>
       ))}
       {gaps.optional.length ? (
         <p className="ev-gap quiet t-cap">
-          {t('evidence.gap.optional', { list: gaps.optional.join(', ') })}
+          {t('evidence.gap.optional', { list: gaps.optional.map(quoted).join(', ') })}
         </p>
       ) : null}
     </div>

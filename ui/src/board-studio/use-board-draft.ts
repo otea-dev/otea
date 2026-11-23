@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { BoardDefinition, Selection } from '../../../src/core/board/model.ts';
 import { type BoardRef, type Problem, problemsOf } from '../../../src/core/board/problems.ts';
+import { editingBoard } from '../board-words.ts';
 import { type BoardRecord, fetchBoard, saveDraft } from './api.ts';
 import {
   canRedo,
@@ -102,6 +103,7 @@ export function useBoardDraft(id: string, options: DraftOptions): BoardDraft {
       .then(({ record }) => {
         const def = (record.draft ?? record.live)?.definition;
         if (!def) throw new Error(id);
+        editingBoard(def);
         base.current = record.draft ? record.draft.baseVersion : (record.live?.version ?? null);
         stamp.current = record.draft?.updatedAt ?? null;
         const was = keepRef.current ? kept.get(id) : undefined;
@@ -123,7 +125,10 @@ export function useBoardDraft(id: string, options: DraftOptions): BoardDraft {
           ...(typeof code === 'string' ? { code } : {}),
         });
       });
-    return () => abort.abort();
+    return () => {
+      abort.abort();
+      editingBoard(undefined);
+    };
   }, [id, attempt]);
 
   const saver = useMemo(

@@ -1,5 +1,6 @@
 import type { BoardDefinition } from '../../../../src/core/board/model.ts';
 import { partOf, stepById, usedRefs } from '../../../../src/core/board/model.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { t } from '../../i18n/i18n.ts';
 import { AgentMark } from '../../kit/Marks.tsx';
 import type { Lane } from '../../lanes/geometry.ts';
@@ -17,7 +18,7 @@ function turnText(item: SampleItem): string {
     return item.motive
       ? t('bs.preview.row.droppedAs', { motive: item.motive })
       : t('bs.preview.row.dropped');
-  if (item.closed) return t('bs.done');
+  if (item.closed) return boardSpeech().done;
   if (item.look === 'yours')
     return t(item.phase === 'doing' ? 'bs.preview.row.yourStep' : 'bs.preview.row.yourReview');
   if (item.look === 'waiting') return t('bs.preview.row.waiting', { agent: item.agent ?? '' });
