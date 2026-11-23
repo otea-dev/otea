@@ -168,6 +168,73 @@ describe('the commit a board says it landed', () => {
     });
   });
 
+  // P1-F3: an item that made no commit went Done with the hash of main, which was another item's
+  // commit. The commit must be this item's: not one another item landed with, and not one made
+  // before the item was taken.
+  describe('the commit must be this item’s own', () => {
+    const at = (iso: string) => ({ GIT_COMMITTER_DATE: iso, GIT_AUTHOR_DATE: iso });
+    const commitOn = (file: string, iso: string) => {
+      writeFileSync(join(dir, file), file);
+      git(dir, 'add', file);
+      execFileSync(
+        'git',
+        ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', file],
+        { cwd: dir, stdio: 'pipe', env: { ...process.env, ...at(iso) } },
+      );
+      return git(dir, 'rev-parse', '--short', 'HEAD');
+    };
+    const claimed = (iso: string) => Date.parse(iso);
+
+    it('refuses a commit another item already landed with, by any of its spellings', () => {
+      const first = commit('a.txt');
+      const full = git(dir, 'rev-parse', 'HEAD');
+      const others = [{ id: 'MN-3', value: `landed as ${first}` }];
+      for (const said of [first, full, `main is at ${first.toUpperCase()}`]) {
+        const refused = landedCommitRefusal(dir, 'Commit pushed', said, 'main', undefined, {
+          others,
+        });
+        expect(refused).toContain('is already the commit MN-3 landed with');
+      }
+      // The same commit, with nobody else holding it, is fine; so is another item's other commit.
+      expect(
+        landedCommitRefusal(dir, 'Commit pushed', first, 'main', undefined, { others: [] }),
+      ).toBeUndefined();
+      const second = commit('b.txt');
+      expect(
+        landedCommitRefusal(dir, 'Commit pushed', second, 'main', undefined, { others }),
+      ).toBeUndefined();
+    });
+
+    it('refuses a commit made before the item was taken, and takes one made after', () => {
+      const before = commitOn('a.txt', '2026-11-20T10:00:00Z');
+      const after = commitOn('b.txt', '2026-11-20T12:00:00Z');
+      const own = { others: [], claimedAt: claimed('2026-11-20T11:00:00Z') };
+      const refused = landedCommitRefusal(dir, 'Commit pushed', before, 'main', undefined, own);
+      expect(refused).toContain(`commit ${before} was made before this item was taken`);
+      expect(
+        landedCommitRefusal(dir, 'Commit pushed', after, 'main', undefined, own),
+      ).toBeUndefined();
+      // No claim to tell the time by: nothing to hold the commit to.
+      expect(
+        landedCommitRefusal(dir, 'Commit pushed', before, 'main', undefined, { others: [] }),
+      ).toBeUndefined();
+    });
+
+    // The item made no commit: its approved tip is main as it stood, which is the other item's
+    // commit. It holds that "work", yet it was made before the item was taken.
+    it('refuses the tip of main at the handoff of an item that made no commit', () => {
+      commit('base.txt');
+      git(dir, 'push', '-q', 'origin', 'main');
+      const theirs = commitOn('a.txt', '2026-11-20T10:00:00Z');
+      git(dir, 'push', '-q', 'origin', 'main');
+      const approved = { commit: git(dir, 'rev-parse', 'HEAD') };
+      const own = { others: [], claimedAt: claimed('2026-11-20T11:00:00Z') };
+      expect(landedCommitRefusal(dir, 'Commit pushed', theirs, 'main', approved, own)).toContain(
+        'was made before this item was taken',
+      );
+    });
+  });
+
   // A SHA-256 repository writes 64-digit ids. Skipped, visibly, where git cannot make one.
   const sha256Works = (() => {
     const probe = mkdtempSync(join(tmpdir(), 'otea-sha256-'));
