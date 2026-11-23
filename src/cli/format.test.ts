@@ -21,6 +21,32 @@ describe('a release the person made from Atasco', () => {
   });
 });
 
+// P1-S1: a move the person made with an HTTP call names where it came from.
+describe('a move the person made, in the timeline', () => {
+  const moved = (data: Record<string, unknown>) =>
+    formatEvent({
+      id: 12,
+      itemId: 'TASKS-1',
+      type: 'transitioned',
+      actor: human,
+      at: 'T',
+      data: { from: 'review', to: 'done', channel: 'ui', ...data },
+    });
+
+  it.each<[string, string]>([
+    ['desk', ', on the desk'],
+    ['phone', ', from the phone'],
+    ['api', ', by a direct API call, not from the desk or the phone'],
+  ])('says a move from %s', (surface, said) => {
+    expect(moved({ surface })).toMatch(new RegExp(`review -> done${said}$`));
+  });
+
+  it('says nothing of one made before it was recorded, and keeps a relayed one as it was', () => {
+    expect(moved({})).toMatch(/review -> done$/);
+    expect(moved({ surface: 'api', via: 'kiln' })).toMatch(/review -> done, relayed by kiln$/);
+  });
+});
+
 describe('a note on a recording in the timeline', () => {
   const note = (anchor: Record<string, unknown>) =>
     formatEvent({

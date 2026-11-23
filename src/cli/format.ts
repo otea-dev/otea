@@ -7,6 +7,7 @@ import type { Layout } from '../core/modules.ts';
 import { type EvidenceModuleEntry, groupEvidence } from '../core/placement.ts';
 import { DEFAULT_TYPE } from '../core/preset.ts';
 import { describeRelation, type Relation, type RelationView } from '../core/relations.ts';
+import { isSurface, type Surface } from '../core/surface.ts';
 import { timeText } from '../core/time.ts';
 import type { EvidenceRecord } from '../store/queries.ts';
 import type { GitHookStatus } from './hooks.ts';
@@ -122,8 +123,21 @@ function relayNote({ via, quote }: Event['data']): string {
   return `, relayed by ${via}${said}`;
 }
 
+const SURFACE_WORDS: Record<Surface, string> = {
+  desk: 'on the desk',
+  phone: 'from the phone',
+  api: 'by a direct API call, not from the desk or the phone',
+};
+
+// Where a move the person made came from (core/surface.ts); a relayed one names its agent instead.
+function surfaceNote({ type, actor, data }: Event): string {
+  const { surface, via } = data;
+  if (type !== 'transitioned' || actor.kind !== 'human' || via !== undefined) return '';
+  return isSurface(surface) ? `, ${SURFACE_WORDS[surface]}` : '';
+}
+
 function describeEvent(event: Event): string {
-  return `${describeAction(event)}${relayNote(event.data)}`;
+  return `${describeAction(event)}${relayNote(event.data)}${surfaceNote(event)}`;
 }
 
 // Why a lease ended: its holder let it go, a move handed it off, or the person put a stuck item
