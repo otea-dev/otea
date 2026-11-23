@@ -69,6 +69,43 @@ describe('the checkout and its branch, read without asking git', () => {
     git(dir, 'checkout', '--quiet', '--detach');
     expect(checkedOutBranch(dir)).toBeUndefined();
     expect(() => currentBranch(dir)).toThrow('no branch checked out here');
+    // With no git to ask, the HEAD file (a commit, no ref) gives it no branch to name either.
+    expect(withoutGit(() => checkedOutBranch(dir))).toBeUndefined();
+    expect(() => withoutGit(() => currentBranch(dir))).toThrow('no branch checked out here');
+  });
+
+  it('names the branch, not git`s heads/<name>, when a tag has the same name', () => {
+    // `git symbolic-ref --short` answers heads/main there, which no gate would find in its list of
+    // branches: the name of the branch is what the HEAD file says, and what is pinned here.
+    const dir = repo();
+    git(dir, 'commit', '--allow-empty', '-m', 'init');
+    git(dir, 'tag', 'main');
+    expect(withoutGit(() => currentBranch(dir))).toBe('main');
+    expect(withoutGit(() => checkedOutBranch(dir))).toBe('main');
+  });
+
+  it('asks git, which follows its own variables, when GIT_DIR is set', () => {
+    const here = repo();
+    git(here, 'switch', '--quiet', '-c', 'here-branch');
+    const other = repo();
+    git(other, 'switch', '--quiet', '-c', 'other-branch');
+    const set = process.env.GIT_DIR;
+    process.env.GIT_DIR = join(other, '.git');
+    try {
+      // GIT_DIR points git at the other repo, whatever folder the call runs in.
+      expect(checkedOutBranch(here)).toBe('other-branch');
+      expect(withoutGit(() => checkedOutBranch(here))).toBeUndefined();
+    } finally {
+      if (set === undefined) delete process.env.GIT_DIR;
+      else process.env.GIT_DIR = set;
+    }
+  });
+
+  it('asks git when the refs are a reftable, whose HEAD file names no branch', () => {
+    const dir = repo();
+    expect(withoutGit(() => checkedOutBranch(dir))).toBe('main');
+    mkdirSync(join(dir, '.git', 'reftable'));
+    expect(withoutGit(() => checkedOutBranch(dir))).toBeUndefined();
   });
 
   it('tells a main checkout from a linked worktree', () => {
@@ -87,5 +124,19 @@ describe('the checkout and its branch, read without asking git', () => {
     const dir = tempDir();
     expect(inMainCheckout(dir)).toBe(false);
     expect(checkedOutBranch(dir)).toBeUndefined();
+    expect(withoutGit(() => inMainCheckout(dir))).toBe(false);
+    expect(withoutGit(() => checkedOutBranch(dir))).toBeUndefined();
+  });
+
+  it('leaves a bare repo inside a checkout to git', () => {
+    const outer = repo();
+    git(outer, 'commit', '--allow-empty', '-m', 'init');
+    git(outer, 'switch', '--quiet', '-c', 'outer-branch');
+    const bare = join(outer, 'mirror.git');
+    git(outer, 'init', '--quiet', '--bare', '-b', 'bare-branch', bare);
+    // git takes the bare repo as the repo of this folder, not the checkout around it: climbing to
+    // the checkout would answer outer-branch.
+    expect(checkedOutBranch(bare)).toBe('bare-branch');
+    expect(currentBranch(bare)).toBe('bare-branch');
   });
 });

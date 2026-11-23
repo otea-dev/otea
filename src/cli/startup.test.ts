@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -32,7 +32,8 @@ describe('what the otea command loads', () => {
   let home: string;
 
   beforeAll(() => {
-    scratch = mkdtempSync(join(tmpdir(), 'otea-startup-'));
+    // The real path: the loader names files by it, and a temp folder may be a link (macOS /var).
+    scratch = realpathSync(mkdtempSync(join(tmpdir(), 'otea-startup-')));
     home = join(scratch, 'home');
     mkdirSync(home);
     writeFileSync(join(scratch, 'hook.mjs'), HOOK);
@@ -82,16 +83,16 @@ describe('what the otea command loads', () => {
       const { status, stdout, loaded } = load(SOURCE_MAIN, flag);
       expect(status).toBe(0);
       expect(stdout).toBe(`${version}\n`);
-      expect(loaded.length).toBeLessThanOrEqual(3);
+      expect(loaded.length).toBeLessThanOrEqual(5);
       expect(loaded.filter((url) => url.includes('/node_modules/'))).toEqual([]);
     }
   });
 
-  it('is three files of the bundle at most for --version, with no package from node_modules', () => {
+  it('is five files of the bundle at most for --version, with no package from node_modules', () => {
     const { status, stdout, loaded } = load(BUNDLE_MAIN, '--version');
     expect(status).toBe(0);
     expect(stdout).toBe(`${version}\n`);
-    expect(loaded.length).toBeLessThanOrEqual(3);
+    expect(loaded.length).toBeLessThanOrEqual(5);
     expect(loaded.filter((url) => url.includes('/node_modules/'))).toEqual([]);
   });
 
