@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { updateItem } from '../app/items.ts';
 import { approveItem, liveBoardOf } from '../app/next.ts';
 import { openProject } from '../app/project.ts';
 import { stateOf } from '../core/board/engine.ts';
@@ -43,20 +44,24 @@ describe('the Code on main board', () => {
       '--json',
     );
     const made: string = JSON.parse(created.out).id;
+    moveTo(made, step);
+    return made;
+  };
+  // Puts an item in `step`, being done, as if it had got there.
+  const moveTo = (item: string, step: string) => {
     const project = openProject(repo.dir);
     try {
       const doit = liveBoardOf(project, 'Código')?.def.steps.find(({ name }) => name === step);
       if (!doit) throw new Error(`no ${step}`);
       updateItemState(
         project.db,
-        made,
+        item,
         stateOf({ step: doit.id, phase: 'doing' }),
         '2026-11-19T10:00:00Z',
       );
     } finally {
       project.db.close();
     }
-    return made;
   };
   const approve = (item: string) => {
     const project = openProject(repo.dir);
@@ -218,19 +223,40 @@ describe('the Code on main board', () => {
   });
 
   // P1-F3: an item that made no commit went Done writing the hash of main, which was the commit of
-  // another item, and one made before it was taken. The commit it writes is its own.
-  it('closes Subir with no commit another item landed with, and none made before the item was taken', async () => {
+  // another item. The commit it writes is its own: not one an item that landed wrote (though a
+  // draft holding the hash counts for nothing), and not one the base held when it was claimed.
+  it('closes Subir only with a commit of its own, not another item’s', async () => {
     const put = (item: string, value: string) =>
       otea('update', item, '--field', `Commit subido=${value}`);
-    const first = await doing('Regar', 'Subir');
+    // The board takes its items one at a time, in the order they were asked.
+    const first = id;
+    const second = await doing('Riego doble');
+    const third = await doing('Otro riego');
+    const draft = await doing('Borrador');
     expect((await otea('claim', first)).code).toBe(0);
     change('regar.py', 'print(2)\n');
     const head = git('rev-parse', '--short', 'HEAD');
+    // A draft that wrote the same hash does not keep its real author from landing.
+    const project = openProject(repo.dir);
+    try {
+      updateItem(project, {
+        id: draft,
+        fields: { 'Commit subido': head },
+        actor: { kind: 'human', name: 'lucia' },
+      });
+    } finally {
+      project.db.close();
+    }
+    moveTo(first, 'Subir');
+    expect((await otea('claim', first)).code).toBe(0);
     expect((await put(first, head)).code).toBe(0);
     const landed = await otea('handoff', first);
     expect(landed.code, landed.err).toBe(0);
 
-    const second = await doing('Riego doble', 'Subir');
+    // second, taken after it, writes the commit first landed with.
+    const taken = await otea('claim', second);
+    expect(taken.code, taken.err).toBe(0);
+    moveTo(second, 'Subir');
     expect((await otea('claim', second)).code).toBe(0);
     expect((await put(second, head)).code).toBe(0);
     const reused = await otea('handoff', second);
@@ -238,29 +264,28 @@ describe('the Code on main board', () => {
     expect(reused.err).toContain(
       `${second} not handed off: Commit subido: commit ${head} is already the commit ${first} landed with`,
     );
-
-    // A commit made before the item was taken is not its work, however it got to main.
-    execFileSync(
-      'git',
-      ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'old'],
-      {
-        cwd: repo.dir,
-        stdio: 'pipe',
-        env: { ...process.env, GIT_COMMITTER_DATE: '2020-01-01T00:00:00Z' },
-      },
-    );
-    const old = git('rev-parse', '--short', 'HEAD');
-    expect((await put(second, old)).code).toBe(0);
-    const before = await otea('handoff', second);
-    expect(before.code).not.toBe(0);
-    expect(before.err).toContain(`commit ${old} was made before this item was taken`);
-
-    // Its own commit, made after it was taken, closes it.
     change('riego.py', 'print(3)\n');
     expect((await put(second, git('rev-parse', '--short', 'HEAD'))).code).toBe(0);
-    const own = await otea('handoff', second);
+    const done = await otea('handoff', second);
+    expect(done.code, done.err).toBe(0);
+
+    // A commit already on main when the item was claimed is not its work, whoever made it.
+    git('commit', '-q', '--allow-empty', '-m', 'old');
+    const old = git('rev-parse', '--short', 'HEAD');
+    expect((await otea('claim', third)).code).toBe(0);
+    moveTo(third, 'Subir');
+    expect((await otea('claim', third)).code).toBe(0);
+    expect((await put(third, old)).code).toBe(0);
+    const before = await otea('handoff', third);
+    expect(before.code).not.toBe(0);
+    expect(before.err).toContain(`commit ${old} was already on the base when this item was taken`);
+
+    // Its own commit, made after it was claimed, closes it.
+    change('otro.py', 'print(4)\n');
+    expect((await put(third, git('rev-parse', '--short', 'HEAD'))).code).toBe(0);
+    const own = await otea('handoff', third);
     expect(own.code, own.err).toBe(0);
-    expect(own.out).toContain(`${second} is Done`);
+    expect(own.out).toContain(`${third} is Done`);
   });
 
   // P1-F2: the board says to work on main with no branch, and the notice said to make a worktree

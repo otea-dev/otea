@@ -66,39 +66,77 @@ function remoteOfBase(cwd: string, base: string): string | undefined {
 // The work the person approved: what the item's handoff into review recorded (app/tips.ts).
 export type ApprovedWork = { commit: string };
 
-// What tells a commit is this item's own (P1-F3): the other items of its board with what they wrote
-// in the same field, and when this item was first taken (ms), if it ever was. An item that made no
-// commit went Done writing the hash of main, which was another item's.
-export type Ownership = { others: { id: string; value: string }[]; claimedAt?: number };
+// What tells a commit is this item's own (P1-F3). An item that made no commit went Done writing the
+// hash of main, which was another item's. `landed`: the other items of its board that really landed
+// (Done), with what they wrote in the same field; a draft holding a hash proves nothing about it.
+// `claimTips`: the full ids of the base's tips (local, and as the remote had it) recorded when this
+// item was first claimed (claimBaseTips); what they hold was on the base before the item began.
+// Without them (an older item) only `landed` is told.
+export type Ownership = {
+  landed: { id: string; value: string }[];
+  claimTips?: string[];
+};
 
-// The refusal of a named commit that cannot be this item's work: another item landed with it, or it
-// was made before this item was taken (its committer date, which a rebase moves to when the work
-// was rebuilt). Undefined when each is fine, or when there is no claim to tell the time by.
+type Named = { word: string; full: string };
+
+// Resolves each word to the commit it names in this checkout, in one git call: a word that is no
+// commit (a tree, a blob, an ambiguous or unknown id) is left out.
+function commitsNamed(cwd: string, words: string[]): Map<string, string> {
+  const found = new Map<string, string>();
+  if (words.length === 0) return found;
+  try {
+    const out = execFileSync('git', ['cat-file', '--batch-check=%(objectname) %(objecttype)'], {
+      cwd,
+      encoding: 'utf8',
+      input: `${words.map((word) => `${word}^{commit}`).join('\n')}\n`,
+      stdio: ['pipe', 'pipe', 'ignore'],
+      timeout: GIT_MS,
+      env: QUIET,
+    });
+    out.split(/\r?\n/).forEach((line, at) => {
+      const [full, type] = line.trim().split(' ');
+      const word = words[at];
+      if (word !== undefined && full && type === 'commit') found.set(word, full);
+    });
+  } catch {}
+  return found;
+}
+
+// The tips of the base to record when an item is claimed: the local branch, and the remote-tracking
+// one as this checkout last saw it (no fetch: a claim never waits on the network). Empty with no
+// such branch or no repository.
+export function baseTipsOf(cwd: string, base: string): string[] {
+  const remote = remoteOfBase(cwd, base);
+  const refs = [
+    `refs/heads/${base}`,
+    ...(remote === undefined ? [] : [`refs/remotes/${remote}/${base}`]),
+  ];
+  return [...new Set(refs.flatMap((ref) => commitOf(cwd, ref) ?? []))];
+}
+
+// The refusal of the commits that hold the work when none of them can be this item's: each is
+// another item's that landed already, or was on the base before this item was first claimed (so it
+// is reachable from a tip recorded then). One commit of its own among them is enough: the others
+// are context ("follows 9f8e7d6"). Undefined when one is its own.
 function notItsOwn(
   cwd: string,
   name: string,
-  commits: { word: string; full: string }[],
+  holding: Named[],
+  taken: Map<string, string>,
   own: Ownership,
 ): string | undefined {
-  const taken = new Map<string, string>();
-  for (const { id, value } of own.others) {
-    for (const word of value.match(HASH) ?? []) {
-      const full = commitOf(cwd, word.toLowerCase());
-      if (full !== undefined && !taken.has(full)) taken.set(full, id);
-    }
-  }
-  for (const { word, full } of commits) {
+  const why = ({ word, full }: Named): string | undefined => {
     const holder = taken.get(full);
     if (holder !== undefined) {
       return `${name}: commit ${word} is already the commit ${holder} landed with, so it is not this item's work. Commit this item's own change and write the hash of that commit (git rev-parse --short HEAD).`;
     }
-    if (own.claimedAt === undefined) continue;
-    const seconds = Number(git(cwd, 'show', '-s', '--format=%ct', full));
-    if (Number.isFinite(seconds) && seconds < Math.floor(own.claimedAt / 1000)) {
-      return `${name}: commit ${word} was made before this item was taken, so it is not this item's work. Commit this item's own change and write the hash of that commit (git rev-parse --short HEAD).`;
+    if ((own.claimTips ?? []).some((tip) => holds(cwd, tip, full))) {
+      return `${name}: commit ${word} was already on the base when this item was taken, so it is not this item's work. Commit this item's own change and write the hash of that commit (git rev-parse --short HEAD).`;
     }
-  }
-  return undefined;
+    return undefined;
+  };
+  const refusals = holding.map(why);
+  return refusals.some((each) => each === undefined) ? undefined : refusals[0];
 }
 
 // The refusal of a handoff whose `name` field does not hold a commit of `base` as it stands now, or
@@ -114,15 +152,20 @@ export function landedCommitRefusal(
   value: string,
   base: string,
   approved?: ApprovedWork,
-  own: Ownership = { others: [] },
+  own: Ownership = { landed: [] },
 ): string | undefined {
   const words = [...new Set((value.match(HASH) ?? []).map((id) => id.toLowerCase()))];
   const said = `${name} says "${value.trim().slice(0, 60)}"`;
   if (words.length === 0) {
     return `${said}, which is no commit: write the short hash of the commit of ${base} (git rev-parse --short ${base}).`;
   }
+  // The hashes of this value and of the items that landed, resolved in one git call.
+  const written = own.landed.map(({ value: text }) => [
+    ...new Set((text.match(HASH) ?? []).map((id) => id.toLowerCase())),
+  ]);
+  const resolved = commitsNamed(cwd, [...new Set([...words, ...written.flat()])]);
   const commits = words.flatMap((word) => {
-    const full = commitOf(cwd, word);
+    const full = resolved.get(word);
     return full === undefined ? [] : [{ word, full }];
   });
   if (commits.length === 0) {
@@ -172,22 +215,33 @@ export function landedCommitRefusal(
     }
     return `${name}: commit ${word} is not on ${upstream}. Write the hash of a commit of ${base} that is pushed (git rev-parse --short ${upstream}).`;
   }
-  const foreign = notItsOwn(cwd, name, commits, own);
-  if (foreign !== undefined) return foreign;
-  if (approved === undefined) return undefined;
-  const work = commitOf(cwd, approved.commit);
-  if (work === undefined) {
-    return `${name}: this checkout lacks the commit the person approved (${approved.commit.slice(0, 7)}), so it cannot tell that ${listed} holds it. Fetch it, then hand it off again.`;
+  // The commits that hold the work the person approved (with none approved, those it names): only
+  // they have to be this item's own, a hash named as context ("follows 9f8e7d6") is not judged.
+  let holding = commits;
+  if (approved !== undefined) {
+    const tip = commitOf(cwd, approved.commit);
+    if (tip === undefined) {
+      return `${name}: this checkout lacks the commit the person approved (${approved.commit.slice(0, 7)}), so it cannot tell that ${listed} holds it. Fetch it, then hand it off again.`;
+    }
+    // What it changes may be in the commit as a rebase or a squash leaves it; and it must be built
+    // on what the approved commit was built on, or an empty approved change (which any commit
+    // "contains") would pass for an older one.
+    const parent = commitOf(cwd, `${tip}^`);
+    holding = commits.filter(
+      ({ full }) =>
+        holds(cwd, full, tip) ||
+        (landedIn(cwd, tip, full) && (parent === undefined || holds(cwd, full, parent))),
+    );
+    if (holding.length === 0) {
+      return `${name}: ${listed} does not hold the work the person approved (${tip.slice(0, 7)}): it is an older commit of ${base}. Write the hash of the commit where that work landed (git rev-parse --short ${base} once it is there).`;
+    }
   }
-  // What it changes may be in the commit as a rebase or a squash leaves it; and it must be built on
-  // what the approved commit was built on, or an empty approved change (which any commit
-  // "contains") would pass for an older one.
-  const parent = commitOf(cwd, `${work}^`);
-  const holdsWork = ({ full }: { full: string }) =>
-    holds(cwd, full, work) ||
-    (landedIn(cwd, work, full) && (parent === undefined || holds(cwd, full, parent)));
-  if (commits.some(holdsWork)) {
-    return undefined;
-  }
-  return `${name}: ${listed} does not hold the work the person approved (${work.slice(0, 7)}): it is an older commit of ${base}. Write the hash of the commit where that work landed (git rev-parse --short ${base} once it is there).`;
+  const taken = new Map<string, string>();
+  own.landed.forEach(({ id }, at) => {
+    for (const word of written[at] ?? []) {
+      const full = resolved.get(word);
+      if (full !== undefined && !taken.has(full)) taken.set(full, id);
+    }
+  });
+  return notItsOwn(cwd, name, holding, taken, own);
 }

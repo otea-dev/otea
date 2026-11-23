@@ -3,7 +3,7 @@ import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { landedCommitRefusal } from './landed-commit.ts';
+import { baseTipsOf, landedCommitRefusal, type Ownership } from './landed-commit.ts';
 
 // P8-F1, P9-F5: «Commit pushed» took «banana», and the hash of a push the hook had refused. The
 // commit a handoff records must exist, be in the base, and, where the repo has a remote, be on
@@ -172,68 +172,87 @@ describe('the commit a board says it landed', () => {
   // commit. The commit must be this item's: not one another item landed with, and not one made
   // before the item was taken.
   describe('the commit must be this item’s own', () => {
-    const at = (iso: string) => ({ GIT_COMMITTER_DATE: iso, GIT_AUTHOR_DATE: iso });
-    const commitOn = (file: string, iso: string) => {
-      writeFileSync(join(dir, file), file);
-      git(dir, 'add', file);
-      execFileSync(
-        'git',
-        ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', file],
-        { cwd: dir, stdio: 'pipe', env: { ...process.env, ...at(iso) } },
-      );
-      return git(dir, 'rev-parse', '--short', 'HEAD');
-    };
-    const claimed = (iso: string) => Date.parse(iso);
+    const ask = (value: string, own: Ownership, approved?: { commit: string }) =>
+      landedCommitRefusal(dir, 'Commit pushed', value, 'main', approved, own);
+    const head = () => git(dir, 'rev-parse', 'HEAD');
 
-    it('refuses a commit another item already landed with, by any of its spellings', () => {
+    it('refuses a commit an item that landed already wrote, by any of its spellings', () => {
       const first = commit('a.txt');
-      const full = git(dir, 'rev-parse', 'HEAD');
-      const others = [{ id: 'MN-3', value: `landed as ${first}` }];
-      for (const said of [first, full, `main is at ${first.toUpperCase()}`]) {
-        const refused = landedCommitRefusal(dir, 'Commit pushed', said, 'main', undefined, {
-          others,
-        });
-        expect(refused).toContain('is already the commit MN-3 landed with');
+      const landed = [{ id: 'MN-3', value: `landed as ${first}` }];
+      for (const said of [first, head(), `main is at ${first.toUpperCase()}`]) {
+        expect(ask(said, { landed })).toContain('is already the commit MN-3 landed with');
       }
-      // The same commit, with nobody else holding it, is fine; so is another item's other commit.
-      expect(
-        landedCommitRefusal(dir, 'Commit pushed', first, 'main', undefined, { others: [] }),
-      ).toBeUndefined();
-      const second = commit('b.txt');
-      expect(
-        landedCommitRefusal(dir, 'Commit pushed', second, 'main', undefined, { others }),
-      ).toBeUndefined();
+      // With nobody holding it it is fine, and so is another commit of main.
+      expect(ask(first, { landed: [] })).toBeUndefined();
+      expect(ask(commit('b.txt'), { landed })).toBeUndefined();
     });
 
-    it('refuses a commit made before the item was taken, and takes one made after', () => {
-      const before = commitOn('a.txt', '2026-11-20T10:00:00Z');
-      const after = commitOn('b.txt', '2026-11-20T12:00:00Z');
-      const own = { others: [], claimedAt: claimed('2026-11-20T11:00:00Z') };
-      const refused = landedCommitRefusal(dir, 'Commit pushed', before, 'main', undefined, own);
-      expect(refused).toContain(`commit ${before} was made before this item was taken`);
-      expect(
-        landedCommitRefusal(dir, 'Commit pushed', after, 'main', undefined, own),
-      ).toBeUndefined();
-      // No claim to tell the time by: nothing to hold the commit to.
-      expect(
-        landedCommitRefusal(dir, 'Commit pushed', before, 'main', undefined, { others: [] }),
-      ).toBeUndefined();
+    // The base as it stood when the item was first claimed holds nothing of the item's work.
+    it('refuses a commit the base held when the item was claimed, and takes a later one', () => {
+      const before = commit('a.txt');
+      const claimTips = baseTipsOf(dir, 'main');
+      const after = commit('b.txt');
+      expect(ask(before, { landed: [], claimTips })).toContain(
+        `commit ${before} was already on the base when this item was taken`,
+      );
+      expect(ask(after, { landed: [], claimTips })).toBeUndefined();
+      // An older item recorded no tips: nothing to hold the commit to.
+      expect(ask(before, { landed: [] })).toBeUndefined();
     });
 
-    // The item made no commit: its approved tip is main as it stood, which is the other item's
-    // commit. It holds that "work", yet it was made before the item was taken.
-    it('refuses the tip of main at the handoff of an item that made no commit', () => {
+    // The persona's case: the item made no commit, so its approved tip is main as it stood, the
+    // commit of another item: it "holds the work", and was there before the item began.
+    it('refuses main as it stood for an item that made no commit', () => {
       commit('base.txt');
       execFileSync('git', ['init', '--quiet', '--bare', '-b', 'main', origin], { stdio: 'ignore' });
       git(dir, 'remote', 'add', 'origin', origin);
       git(dir, 'push', '-q', 'origin', 'main');
-      const theirs = commitOn('a.txt', '2026-11-20T10:00:00Z');
+      const theirs = commit('a.txt');
       git(dir, 'push', '-q', 'origin', 'main');
-      const approved = { commit: git(dir, 'rev-parse', 'HEAD') };
-      const own = { others: [], claimedAt: claimed('2026-11-20T11:00:00Z') };
-      expect(landedCommitRefusal(dir, 'Commit pushed', theirs, 'main', approved, own)).toContain(
-        'was made before this item was taken',
+      const claimTips = baseTipsOf(dir, 'main');
+      const approved = { commit: head() };
+      expect(ask(theirs, { landed: [], claimTips }, approved)).toContain(
+        'was already on the base when this item was taken',
       );
+      // The remote-tracking tip counts too: commits pushed by others that this checkout has not
+      // merged were on the base before the item began.
+      git(dir, 'reset', '-q', '--hard', 'HEAD~1');
+      expect(baseTipsOf(dir, 'main')).toHaveLength(2);
+    });
+
+    // A claim of B, then A commits and lands X: B writing X is refused, though X came after B's
+    // claim (the date and clock of the machine tell nothing here).
+    it('refuses what another item landed after this one was claimed', () => {
+      commit('base.txt');
+      const claimTips = baseTipsOf(dir, 'main');
+      const x = commit('x.txt');
+      expect(
+        ask(x, { landed: [{ id: 'MN-3', value: x }], claimTips }, { commit: head() }),
+      ).toContain('is already the commit MN-3 landed with');
+    });
+
+    // Only the commit that holds the approved work is judged: another hash in the text is context.
+    it('does not judge a hash the value only mentions', () => {
+      const context = commit('a.txt');
+      const claimTips = baseTipsOf(dir, 'main');
+      const mine = commit('b.txt');
+      const approved = { commit: head() };
+      const own = { landed: [{ id: 'MN-3', value: context }], claimTips };
+      expect(ask(`${mine}, follows ${context}`, own, approved)).toBeUndefined();
+      expect(ask(`follows ${context}, ${mine}`, own, approved)).toBeUndefined();
+      // Naming only the other item's commit is no proof of this item's work.
+      expect(ask(context, own, approved)).toContain('does not hold the work the person approved');
+    });
+
+    it('reads the hashes of every item that landed', () => {
+      const [a, b, c] = ['a.txt', 'b.txt', 'c.txt'].map(commit);
+      const landed = [
+        { id: 'MN-3', value: `${a} ${b}` },
+        { id: 'MN-4', value: `${c}` },
+      ];
+      const refused = ask(`${a} ${b} ${c}`, { landed });
+      expect(refused).toContain('landed with');
+      expect(ask(`${c} deadbee`, { landed: [] })).toBeUndefined();
     });
   });
 

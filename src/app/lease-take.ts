@@ -31,6 +31,10 @@ function stillWorking(id: string, lease: Lease): OteaError {
   );
 }
 
+// The tips (full commit ids) of the base an item's board protects as the claiming checkout has them
+// now, which a claim records with its event; the CLI knows the checkout, the app does not.
+export type BaseTips = (item: ItemRecord) => string[];
+
 // Takes the lease on an item for the actor, inside the caller's transaction, once the caller has
 // checked the item is the actor's to claim: refused while another holds it, unless that agent's
 // session ended (P3C-R3-11): its lease is taken over, with `cause: ended`. Claiming it again
@@ -41,6 +45,7 @@ export function takeItem(
   actor: Actor,
   at: string,
   ttlMs = DEFAULT_LEASE_TTL_MS,
+  baseTipsOf?: BaseTips,
 ): Lease {
   const held = activeLease(item.lease, at);
   const other = held && held.holder !== actor.name ? held : null;
@@ -55,7 +60,13 @@ export function takeItem(
   if (!takeLease(db, item.id, lease, at)) throw new OteaError('lease_held', `${item.id} is held`);
   if (!held || ended) {
     const previous = item.lease && item.lease.holder !== actor.name ? item.lease.holder : null;
-    const data = previous ? { ...lease, previous, ...(ended ? { cause: 'ended' } : {}) } : lease;
+    // Where the base stood when the item was taken (P1-F3): what it held is not this item's work.
+    const tips = baseTipsOf?.(item) ?? [];
+    const data = {
+      ...lease,
+      ...(previous ? { previous, ...(ended ? { cause: 'ended' } : {}) } : {}),
+      ...(tips.length > 0 ? { baseTips: tips } : {}),
+    };
     appendEvent(db, { itemId: item.id, type: 'claimed', actor, at, data });
   }
   return lease;

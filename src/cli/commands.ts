@@ -63,6 +63,7 @@ import {
 import { keepWaitingCommand, keepWaitingLine, waitAgainLine } from '../app/keep-waiting.ts';
 import { defaultLang } from '../app/language.ts';
 import { type Launcher, oteaLauncher, runningRoot, withHome } from '../app/launcher.ts';
+import type { BaseTips } from '../app/lease-take.ts';
 import { claimItem, heartbeatItem, releaseItem } from '../app/leases.ts';
 import { openMachine, rememberLocalProject, withMachine } from '../app/machine.ts';
 import { markMerged, reopenItem } from '../app/merged.ts';
@@ -275,7 +276,7 @@ import {
   removeClaudeHook,
   removeGitHook,
 } from './hooks.ts';
-import { landedCommitRefusal } from './landed-commit.ts';
+import { baseTipsOf, landedCommitRefusal } from './landed-commit.ts';
 import { mergedOutside, mergedOutsideLine } from './merged-outside.ts';
 import { boardsOf, eventData, itemCollections, itemData, readableEvent } from './names.ts';
 import { watchOwner } from './owner.ts';
@@ -1659,7 +1660,7 @@ const next: Command = {
       const profile = requireProfile(project.db, actor.name, { channel, confirmed: true });
       const answer = nextFor(project, actor.name, {
         ...(collection === undefined ? {} : { collection }),
-        ...(claim ? { claim } : {}),
+        ...(claim ? { claim, baseTipsOf: claimedBaseTips(project, input.cwd) } : {}),
         ...(brief ? { brief: true } : {}),
         // Over MCP the item's fields come as one JSON object line, which a model parses.
         ...(input.fieldsAsJson ? { startsAs: 'json' as const } : {}),
@@ -1714,6 +1715,18 @@ function boardMove(
   });
 }
 
+// What a claim records of the checkout it is made in (P1-F3): where the base its item's board
+// protects stands, so the commit an item later says it landed is told from what was already there.
+// Nothing for an item whose board protects no base. The FIRST claim with tips counts later, not each
+// step's: an item sent back for another round keeps the commits it made in the first.
+function claimedBaseTips(project: Project, cwd: string): BaseTips {
+  return (item) => {
+    const board = liveBoardOf(project, item.collection);
+    const base = board && guardedBranch(board.def)?.guard.base;
+    return base === undefined ? [] : baseTipsOf(cwd, base);
+  };
+}
+
 // A board that says a commit landed on its base (Commit pushed, Commit en main: the guard's
 // `commit` field) is told the truth: the hash an agent hands off must exist, be in the base, and,
 // where the repo has a remote, be on the remote's branch of it after a fetch (P8-F1, P9-F5). The
@@ -1739,15 +1752,20 @@ function refuseUnlandedCommit(project: Project, cwd: string, move: BoardMoveInpu
   // A tip recorded as unchanged (main held nothing the remote lacked at the handoff) is checked
   // too: an agent that pushed before handing off got it that way, and wrote an older hash.
   const approved = tip && { commit: tip.commit };
-  // The commit must be this item's own (P1-F3): not one another item of the board landed with, and
-  // not one made before this item was first taken.
-  const others = listItems(project, { collection: item.collection }).flatMap((other) => {
+  // The commit must be this item's own (P1-F3): not one an item of the board that landed (is Done)
+  // wrote, a draft holding a hash proves nothing, and not one the base held when this item was
+  // first claimed (an older item has no such tips, and only the first rule applies).
+  const landed = listItems(project, { collection: item.collection }).flatMap((other) => {
     const written = other.id === item.id ? undefined : other.fields[part.id];
-    return typeof written === 'string' ? [{ id: other.id, value: written }] : [];
+    const done = positionOf(other.state);
+    return typeof written === 'string' && isClosed(done) && done.closed === DONE
+      ? [{ id: other.id, value: written }]
+      : [];
   });
-  const taken = item.events.find(({ type }) => type === 'claimed');
-  const claimedAt = taken === undefined ? Number.NaN : Date.parse(taken.at);
-  const own = { others, ...(Number.isNaN(claimedAt) ? {} : { claimedAt }) };
+  const claimTips = item.events
+    .map(({ type, data }) => (type === 'claimed' ? data.baseTips : undefined))
+    .find((tips): tips is string[] => Array.isArray(tips));
+  const own = { landed, ...(claimTips ? { claimTips } : {}) };
   const refused = landedCommitRefusal(cwd, part.name, value, base, approved, own);
   if (refused) throw new OteaError('missing_fields', `${item.id} not handed off: ${refused}`);
 }
@@ -2479,7 +2497,10 @@ const claim: Command = {
     const lease = { id, actor, ...(ttl === undefined ? {} : { ttlMs: ttl }) };
     return withAgent(input, (project) => {
       requireProfile(project.db, actor.name, { channel: input.channel });
-      const item = claimItem(project, lease);
+      const item = claimItem(project, {
+        ...lease,
+        baseTipsOf: claimedBaseTips(project, input.cwd),
+      });
       const claimed = itemResult(project, item);
       // P3C-R3-11: the lease of an agent whose session ended is taken over, and said.
       const over = item.tookOver
