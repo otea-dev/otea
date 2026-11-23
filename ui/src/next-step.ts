@@ -36,15 +36,16 @@ const WEEK_MS = 7 * 24 * 3_600_000;
 // reached the last step of its board (a closed state that closes it as done) did so within the
 // last week. A project that finished its first item long ago (every project, on the release that
 // brought this card) never gets it, and a second finished item is not a first. Only work counts:
-// an item of a built-in board (`requests`, the collections of the Pedidos where a board an agent
-// drafts waits, closed by publishing it) is nobody's first finished item.
+// `work` holds the collections of the person's own boards, so an item of the built-in Pedidos
+// (where a board an agent drafts waits, closed by publishing it), or of a board not known yet (the
+// list of boards may be a step behind the items), is nobody's first finished item.
 export function firstFinishedRecently(
   items: readonly Item[],
   now: number,
-  requests: ReadonlySet<string> = new Set(),
+  work: ReadonlySet<string>,
 ): boolean {
   const done = items
-    .filter((item) => item.closes === 'done' && !requests.has(item.collection))
+    .filter((item) => item.closes === 'done' && work.has(item.collection))
     .map((item) => Date.parse(item.enteredAt ?? item.updatedAt))
     .filter((at) => !Number.isNaN(at));
   return done.length > 0 && Math.min(...done) >= now - WEEK_MS;

@@ -59,7 +59,10 @@ describe('otea start', () => {
   afterEach(async () => {
     await stopWhatRuns(repo.dir);
     rmSync(join(home(), SERVE_FILE), { force: true });
-    // On Windows the server's log stays open a moment after the process is gone: wait it out.
+    // `otea serve stop` already waits for the server's pid to end (daemon.ts kill), and this test
+    // waited for it again: it was gone. Yet on Windows the log stayed locked for 60 to 115 ms
+    // after that in 4 of 16 teardowns measured on an idle machine (EBUSY here, EPERM on CI): the
+    // system releases a dead process's handles a moment later. So the removal retries.
     rmSync(join(home(), SERVE_LOG), { force: true, maxRetries: 20, retryDelay: 250 });
     repo.remove();
     for (const folder of folders.splice(0)) {
@@ -122,6 +125,29 @@ describe('otea start', () => {
     expect(data.boards).toEqual({ made: [], all: [] });
     // With no board of its own the agent gets the whole first contact.
     expect(data.prompt).toContain('otea board draft');
+  }, 120_000);
+
+  // The language is the person's to force: --lang decides the board and the text for the agent, and
+  // the report says which it used, whatever this shell's locale says (P4-F5, P5-F4).
+  it('makes the board and the text in the language --lang gives, and says which', async () => {
+    const started = await person(
+      repo.dir,
+      'start',
+      '--no-open',
+      '--port',
+      '0',
+      '--template',
+      'todos',
+      '--lang',
+      'es',
+    );
+    expect(started.code).toBe(0);
+    expect(started.out).toContain('Boards: made "Pendientes"');
+    expect(started.out).toContain(
+      'Language: Spanish for the boards and the text below (--lang en makes them English)',
+    );
+    // With a board made, the agent's text is the one that joins it, in Spanish.
+    expect(started.out).toContain('Empieza a trabajar en este proyecto');
   }, 120_000);
 
   // With no one to ask, no board is made for the person: they leave with the way to one (an agent,

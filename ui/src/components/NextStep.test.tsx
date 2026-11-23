@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppTestProvider } from '../app/context.tsx';
-import { loadBoards, resetBoards } from '../board-studio/home/boards-store.ts';
+import { boardsState, loadBoards, resetBoards } from '../board-studio/home/boards-store.ts';
 import { ago, item } from '../derive/fixtures.ts';
 import { setLanguage } from '../i18n/i18n.ts';
 import { testApp } from '../shell/test-app.ts';
@@ -49,7 +49,7 @@ describe('the next-step card', () => {
     );
     loadBoards(1);
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      await vi.waitFor(() => expect(boardsState().status).toBe('ready'));
     });
   });
 
@@ -74,11 +74,26 @@ describe('the next-step card', () => {
     expect(mounted.root.textContent).toContain('Tu primer ítem está terminado');
   });
 
+  // The list of boards may be a step behind the items: the Pedidos board is made with the first
+  // board request, and its item can close before the list reloads on the new version. An item of a
+  // board the list does not hold is not known to be work, so it does not bring the card.
+  it('does not count an item of a board the list does not hold yet', () => {
+    const unknown: Item = { ...closed('REQ-2'), collection: 'Pedidos nuevos' };
+
+    mounted = drawn('race', [unknown]);
+
+    expect(mounted.root.textContent).toBe('');
+  });
+
   // The card leaves slowly: it is gone once its exit has run.
   const gone = () =>
-    act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 450));
-    });
+    vi.waitFor(
+      async () => {
+        await act(async () => {});
+        expect(mounted?.root.textContent).toBe('');
+      },
+      { timeout: 2000 },
+    );
   const buttonWith = (root: HTMLElement, text: string) =>
     [...root.querySelectorAll('button')].find((b) => b.textContent?.includes(text));
 

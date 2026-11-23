@@ -211,9 +211,12 @@ Then [give your agent the text](#give-your-agent-the-text).
    - offers a first board from a template (`--template <key>` names one, `none` skips it), or leaves the boards for your agent to design with you;
    - prints the text to paste into your agent's chat, and the MCP server it adds to its own config.
 
+   The boards and the text come in the language you use: the one your desk last used, else your locale variables (`LC_ALL`, `LC_MESSAGES`, `LANG`), else your computer's, else English. The report says which, and `--lang en` or `--lang es` forces one.
+
    ```text
    Project: set up "tienda-web" (data in ~/.otea/data/tienda-web-yafrhx)
    Boards: none yet. Your agent designs them with you from the text below, or start from a template now: otea start --template <key> (todos, ideas, ...)
+   Language: English for the boards and the text below (--lang es makes them Spanish)
    Desk: running in the background at http://127.0.0.1:4400/p/tienda-web-yafrhx/ (pid 4120; stop it with otea serve stop)
 
    Next, paste this into your agent's chat (otea prompt prints it again):

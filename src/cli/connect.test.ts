@@ -172,6 +172,14 @@ describe('setup for agents', () => {
       expect(out).toContain('Claude Code: .mcp.json');
       expect(out).toContain('OpenCode: opencode.json');
       expect(out).toContain('environment');
+      // The shapes of the three harnesses the README documents, as their official docs give them:
+      // OpenCode's servers carry a type and a command array; Codex reads TOML; Gemini CLI's
+      // settings.json nests them under mcpServers.
+      expect(out).toContain(
+        'OpenCode: opencode.json (under mcp.servers, with type local, command as one array of the command and its args, and env as environment)',
+      );
+      expect(out).toContain('Codex: .codex/config.toml (a [mcp_servers.<name>] table)');
+      expect(out).toContain('Gemini CLI: .gemini/settings.json (under mcpServers)');
       // p3-company run 2: a restart to load MCP lost the interview the session held.
       expect(out).toContain(
         "If your harness must restart or reload to load the server, ask the person for it now, before you go on, and to reopen this same conversation with your harness's resume option, if it has one, so you keep what was said; Otea keeps every item and board draft either way.",

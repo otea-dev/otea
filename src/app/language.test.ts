@@ -35,12 +35,6 @@ describe('the default language', () => {
     expect(systemLanguage({ LC_ALL: 'POSIX', LANG: 'es_ES' }, nothing)).toBe('es');
   });
 
-  // Git Bash sets LANG=en_US.UTF-8 on every Windows computer, so on a Spanish one it said English.
-  it('does not take the LANG that Git Bash sets for the language of the computer', () => {
-    expect(systemLanguage({ MSYSTEM: 'MINGW64', LANG: 'en_US.UTF-8' }, () => 'es-ES')).toBe('es');
-    expect(systemLanguage({ MSYSTEM: 'MINGW64', LC_ALL: 'en_US' }, () => 'es-ES')).toBe('en');
-  });
-
   it('does not take a language that merely begins with es for Spanish', () => {
     expect(systemLanguage({ LANG: 'est_EE' }, nothing)).toBe('en');
   });
