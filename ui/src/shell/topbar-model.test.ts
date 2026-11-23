@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { agent as actor, ago, inMinutes, item, moved, NOW } from '../derive/fixtures.ts';
 import { setLanguage } from '../i18n/i18n.ts';
 import type { Agent } from '../presence.ts';
-import type { ProjectOverview } from '../types.ts';
+import type { ProjectAgent, ProjectOverview } from '../types.ts';
 import {
   agentCounts,
   agentRows,
@@ -53,21 +53,61 @@ describe('the project menu’s rows', () => {
     expect(rows[0]).toMatchObject({
       id: 'hm',
       current: true,
-      line: 'abierto ahora',
+      line: '3 te esperan',
       waiting: 3,
       inert: false,
     });
     expect(rows[0]?.href).toBeUndefined();
   });
 
-  it('opens another project at its page on this server, names where it lives', () => {
+  it('says the project is open now while nothing waits and no agent works there', () => {
+    setLanguage('es');
+    const { rows } = projectRows(here, [overview({ id: 'hm', current: true })], 0);
+    expect(rows[0]?.line).toBe('abierto ahora');
+  });
+
+  it('opens another project at its page on this server, keeping where it lives for a tooltip', () => {
     const { rows } = projectRows(here, [overview({ id: 'mirefall', waiting: waiting(2) })], 0);
     expect(rows.find((r) => r.id === 'mirefall')).toMatchObject({
       href: '/p/mirefall/#/',
-      line: '/repos/mirefall',
+      line: '2 wait for you',
+      where: '/repos/mirefall',
       waiting: 2,
       inert: false,
     });
+  });
+
+  // P6-F7: every row says what is going on there, in the server's words for each agent.
+  it('says in each row what waits for you and how many agents work, in the server’s words', () => {
+    setLanguage('es');
+    const agent = (name: string, status: string) => ({ name, status, holding: 1 });
+    const { rows } = projectRows(
+      here,
+      [
+        overview({
+          id: 'busy',
+          waiting: waiting(2),
+          agents: [
+            agent('kiln', 'working'),
+            agent('quill', 'working'),
+            agent('mender', 'silent'),
+            agent('scout', 'listening'),
+          ] as ProjectAgent[],
+        }),
+        overview({
+          id: 'calm',
+          agents: [agent('scout', 'listening')] as ProjectAgent[],
+        }),
+        overview({ id: 'old' }),
+      ],
+      0,
+    );
+    expect(rows.find((r) => r.id === 'busy')?.line).toBe(
+      '2 te esperan · 2 trabajando · 1 sin señal',
+    );
+    // Listening is not at work: nothing to report; an older server that sends no agents is the same.
+    expect(rows.find((r) => r.id === 'calm')?.line).toBe('nada te espera');
+    expect(rows.find((r) => r.id === 'old')?.line).toBe('nada te espera');
   });
 
   it('keeps a project it cannot read inert, saying so', () => {
@@ -90,7 +130,9 @@ describe('the project menu’s rows', () => {
       ],
       0,
     );
-    expect(rows.find((r) => r.id === 'gone')?.line).toBe('a path is missing · /old');
+    expect(rows.find((r) => r.id === 'gone')?.line).toBe(
+      'a path is missing · nothing waits for you',
+    );
   });
 
   // P6-17: a folder on the computer means nothing on the phone, and a Windows path is noise there.

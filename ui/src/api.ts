@@ -62,13 +62,15 @@ async function get(path: string, signal: AbortSignal): Promise<Response> {
   return response;
 }
 
-// How each model performs (Rendimiento), on one board or all of them, over a period.
+// How each model performs (Rendimiento), on one board or all of them, over a period; `all`: every
+// project this server serves, read together (a board filter has no meaning there).
 export async function fetchPerformance(
-  query: { board?: string | undefined; since: string },
+  query: { board?: string | undefined; since: string; all?: boolean },
   signal: AbortSignal,
 ): Promise<PerformanceView> {
   const params = new URLSearchParams({ since: query.since });
-  if (query.board) params.set('board', query.board);
+  if (query.all) params.set('projects', 'all');
+  else if (query.board) params.set('board', query.board);
   return (await get(`/api/performance?${params}`, signal)).json();
 }
 

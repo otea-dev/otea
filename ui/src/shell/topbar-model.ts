@@ -15,13 +15,35 @@ export type ProjectRow = {
   id: string;
   name: string;
   current: boolean;
-  // The mono line: open now, where it lives, or how to open it.
+  // The mono line: what is going on there (what waits for you, the agents at work), or why it
+  // cannot be read.
   line: string;
+  // Where it lives, for the row's tooltip (the phone has none).
+  where?: string;
   waiting: number;
   // Another served project opens at its own address; the current one and an unserved one have none.
   href?: string;
   inert: boolean;
 };
+
+// What is going on in a project, in a line: how many items wait for you, how many agents are at
+// work and how many gave no sign. Each agent's state is the server's (status); none is worked out
+// here. Nothing to say reads null.
+export function stateLine(
+  waiting: number,
+  project: Pick<ProjectOverview, 'agents'>,
+): string | null {
+  const count = (status: string) =>
+    (project.agents ?? []).filter((each) => each.status === status).length;
+  const working = count('working');
+  const silent = count('silent');
+  const parts = [
+    waiting > 0 ? t('shell.waitingThere', { count: waiting }) : null,
+    working > 0 ? t('shell.pill.working', { count: working }) : null,
+    silent > 0 ? t('shell.pill.silent', { count: silent }) : null,
+  ].filter((part): part is string => part !== null);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
 
 // Every project on this machine: the one open now first (with your count, the rail's), then the
 // rest as the server lists them. Before the server answers, the project open now alone.
@@ -48,11 +70,12 @@ export function projectRows(
       ];
   const rows = listed.map((each): ProjectRow => {
     if (each.current) {
+      const told = stateLine(yoursHere, each);
       return {
         id: each.id,
         name: each.name,
         current: true,
-        line: t('shell.projectOpen'),
+        line: told ?? t('shell.projectOpen'),
         waiting: yoursHere,
         inert: false,
       };
@@ -61,13 +84,15 @@ export function projectRows(
     const where = whereOf(each) ?? '';
     const missing = each.paths.some((path) => path.missing);
     const waits = each.waiting.length;
-    const told = waits > 0 ? t('shell.waitingThere', { count: waits }) : t('shell.nothingThere');
-    const line = href ? (phone ? told : where) : t('shell.unavailable');
+    const line = href
+      ? (stateLine(waits, each) ?? t('shell.nothingThere'))
+      : t('shell.unavailable');
     return {
       id: each.id,
       name: each.name,
       current: false,
       line: missing && !phone ? `${t('shell.pathMissing')} · ${line}` : line,
+      ...(where && !phone ? { where } : {}),
       waiting: each.waiting.length,
       ...(href ? { href } : {}),
       inert: !href,

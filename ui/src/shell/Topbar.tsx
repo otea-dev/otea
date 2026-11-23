@@ -121,7 +121,7 @@ export function ProjectMenuBody({ project, rows, total, onClose }: ProjectMenuPr
         const body = (
           <>
             <ProjectTile name={row.name} icon={row.current ? app.project?.icon : undefined} large />
-            <span>
+            <span title={row.where}>
               <span className="pn">{row.name}</span>
               <span className="pl">{row.line}</span>
             </span>

@@ -1,3 +1,4 @@
+import type { AgentStatus } from '../../src/core/agent-status.ts';
 import type { Layout } from '../../src/core/modules.ts';
 import type { NotifyPrefs } from '../../src/core/notify/planner.ts';
 import type { FieldRequirement, Labels } from '../../src/core/preset.ts';
@@ -332,9 +333,14 @@ export type ProjectOverview = {
   // Side topics an agent answered there: yours to read, never work (absent from an older server).
   topics?: AnsweredTopic[];
   withAgents: number;
+  // The agents there that are not away, with the server's status for each (absent from an older
+  // server).
+  agents?: ProjectAgent[];
   open: number;
   unavailable?: string;
 };
+
+export type ProjectAgent = { name: string; status: AgentStatus; holding: number };
 
 export type AnsweredTopic = {
   id: string;

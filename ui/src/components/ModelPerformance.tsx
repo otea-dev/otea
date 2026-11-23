@@ -28,6 +28,8 @@ import { profileValue } from '../profile-words.ts';
 
 const PERIODS = ['7d', '30d', 'all'] as const;
 type Period = (typeof PERIODS)[number];
+const SCOPES = ['project', 'all'] as const;
+type Scope = (typeof SCOPES)[number];
 
 // A thin meter: how many handoffs came back, on a track of the same hue; a row with too few
 // handoffs to say much draws it faded. Its figure sits beside it; the tooltip says it in words.
@@ -175,9 +177,14 @@ export function ModelPerformance() {
   const app = useApp();
   const [period, setPeriod] = useState<Period>('30d');
   const [board, setBoard] = useState('');
+  const [scope, setScope] = useState<Scope>('project');
+  // Across projects only where there is more than one to read.
+  const several = (app.projects?.length ?? 0) > 1;
+  const all = several && scope === 'all';
   const load = useCallback(
-    (signal: AbortSignal) => fetchPerformance({ board: board || undefined, since: period }, signal),
-    [board, period],
+    (signal: AbortSignal) =>
+      fetchPerformance({ board: board || undefined, since: period, all }, signal),
+    [board, period, all],
   );
   const remote = useRemote(load, app.version, app.connection);
   const name = app.project?.name ?? '';
@@ -186,10 +193,10 @@ export function ModelPerformance() {
     <div className="page perf">
       <header className="head" data-enter="head">
         <div className="kicker">
-          <b>{t('perf.kicker')}</b> &nbsp;·&nbsp; {name}
+          <b>{t('perf.kicker')}</b> &nbsp;·&nbsp; {all ? t('perf.scope.all') : name}
         </div>
         <h1 className="display">{t('perf.display')}</h1>
-        <p className="dek">{t('perf.dek', { name })}</p>
+        <p className="dek">{all ? t('perf.dekAll') : t('perf.dek', { name })}</p>
       </header>
       <div className="perf-body" data-enter="fade">
         <div className="perf-tools">
@@ -199,22 +206,32 @@ export function ModelPerformance() {
             options={PERIODS.map((value) => ({ value, label: t(`perf.period.${value}`) }))}
             onChange={setPeriod}
           />
-          <select
-            className="perf-boards"
-            aria-label={t('perf.board')}
-            value={board}
-            onChange={(event) => setBoard(event.target.value)}
-          >
-            <option value="">{t('perf.allBoards')}</option>
-            {boards.map((each) => (
-              <option key={each} value={each}>
-                {each}
-              </option>
-            ))}
-          </select>
+          {several ? (
+            <Seg
+              label={t('perf.scope')}
+              value={scope}
+              options={SCOPES.map((value) => ({ value, label: t(`perf.scope.${value}`) }))}
+              onChange={setScope}
+            />
+          ) : null}
+          {all ? null : (
+            <select
+              className="perf-boards"
+              aria-label={t('perf.board')}
+              value={board}
+              onChange={(event) => setBoard(event.target.value)}
+            >
+              <option value="">{t('perf.allBoards')}</option>
+              {boards.map((each) => (
+                <option key={each} value={each}>
+                  {each}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         {remote.status === 'ready' ? (
-          <PerformanceBody view={remote.value} oneBoard={board !== ''} />
+          <PerformanceBody view={remote.value} oneBoard={board !== '' && !all} />
         ) : (
           <p
             className={

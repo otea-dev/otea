@@ -197,7 +197,7 @@ describe('the project menu', () => {
   it('ticks the project open now, opens another in this window, keeps an unreadable one inert', () => {
     const html = menu();
     expect(html).toMatch(/class="prow cur"[^>]*aria-current="page"/);
-    expect(html).toContain('abierto ahora');
+    expect(html).toContain('3 te esperan');
     expect(html).toContain('class="tick"');
     expect(html).toContain('<a class="prow" data-i="" href="/p/mirefall/#/">');
     expect(html).not.toContain('_blank');
