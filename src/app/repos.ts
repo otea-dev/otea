@@ -190,6 +190,24 @@ export function repoNameAt(project: Project, cwd: string, env: Env = process.env
   );
 }
 
+// What an agent is told before a push is refused, when the checkout it works in is a repo whose
+// remote was added after Otea first saw it (see repoNameAt): the repo's name and the one command.
+// It changes nothing: only the person's word that this is that repo makes it so, and a fork would
+// say the same (P3-F1). Undefined for any other checkout, and outside one.
+export function remoteAddedLine(
+  project: Project,
+  cwd: string,
+  env: Env = process.env,
+): string | undefined {
+  const top = checkoutTop(cwd);
+  if (top === undefined) return undefined;
+  const repos = listRepos(project, env);
+  if (repoAt(repos, top)) return undefined;
+  const before = repoByRootOf(repos, top);
+  if (!before) return undefined;
+  return `A remote was added to ${top} after Otea first saw it, so every push from it is refused until the person says it is the same repo as "${before.name}" (a fork would look the same): ask the person, and if it is, run once in ${top}: otea repos add --name ${before.name}`;
+}
+
 // Registers the repo checked out at `path`, under `name` or its folder's name; a repo already
 // registered keeps its name unless `name` renames it. Every clone of a repo is the same repo.
 export function addRepo(

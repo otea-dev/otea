@@ -146,6 +146,7 @@ import {
   listRepos,
   type Repo,
   readReposAtFolder,
+  remoteAddedLine,
   removeRepo,
   repoNameAt,
   UnknownRepo,
@@ -1667,6 +1668,7 @@ const next: Command = {
       const outside = offered && mergedOutsideLine(project, input.cwd, offered);
       // Offered work in the shared main checkout says so before the agent starts (P6-R2-3).
       const shared = offered && sharedCheckoutLine(project, input, offered.id);
+      const remote = remoteAddedNotice(project, input.cwd);
       // It always ends with the exact command to keep waiting: told only to wait, agents ended
       // their turn, and the person's answer on the desk went unheard.
       const text = [
@@ -1676,6 +1678,7 @@ const next: Command = {
           ? `${answer.text}\n${offeredLine(answer.item)}`
           : answer.text,
         ...(shared ? [shared] : []),
+        ...(remote ? [remote] : []),
         ...topicLines(project, actor.name, answer.brief === true),
         // A brief next leaves out what the agent already read, the profile line too.
         ...(answer.brief ? [] : [profileReminder(profile, actor.name, channel)]),
@@ -2380,6 +2383,17 @@ const wait: Command = {
   },
 };
 
+// The notice an agent reads on next and claim when the checkout it works in had a remote added
+// after Otea saw it: its pushes are refused until the person says it is that repo (P3-F1). Never
+// breaks the command it rides on.
+function remoteAddedNotice(project: Project, cwd: string): string | undefined {
+  try {
+    return remoteAddedLine(project, cwd);
+  } catch {
+    return undefined;
+  }
+}
+
 // An agent that claims, or is offered, an item in the repo's main checkout is told to work in its
 // own worktree (P1-15, P6-R2-3) while other agents hold work in the project (two agents in one
 // checkout change each other's files), or while that checkout sits on another open item's branch
@@ -2463,7 +2477,8 @@ const claim: Command = {
         ? `Took ${item.id} over from ${item.tookOver}: its session ended (no MCP server or wait of it runs), so its lease was yours to take.`
         : undefined;
       const shared = sharedCheckoutLine(project, input, id);
-      const lines = [claimed.text, over, shared].filter((line) => line !== undefined);
+      const remote = remoteAddedNotice(project, input.cwd);
+      const lines = [claimed.text, over, shared, remote].filter((line) => line !== undefined);
       return {
         data: item.tookOver
           ? { ...(claimed.data as object), tookOver: item.tookOver }
