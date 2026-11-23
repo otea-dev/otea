@@ -286,6 +286,13 @@ import { PHONE_COMMANDS } from './phone.ts';
 import { portFrom, portToOpen, portToStart, projectPage } from './ports.ts';
 import { probeSignIn } from './probe.ts';
 import { readServeFile, removeServeFile, serverVersionNote, writeServeFile } from './serve-file.ts';
+import {
+  boardHintLines,
+  cancelled,
+  choiceFrom,
+  choiceQuestion,
+  defaultBoard,
+} from './start-choice.ts';
 import { statsText } from './stats.ts';
 import {
   dataTargets,
@@ -3569,7 +3576,7 @@ const serveStatus: Command = {
 // otea start: the person's first minutes in one command (README, Getting started).
 const start: Command = {
   name: 'start',
-  summary: `For you, not for an agent, in the project's folder: set everything up for a first session in one command, and say what is ready. It creates the project when there is none (otea init), starts this computer's background server and opens the desk signed in (otea serve start; --no-open prints a single-use sign-in link instead, --port picks the port for a first start, and a later start keeps the port it last ran on), offers a first board from a template when the project has none of its own (--template <key> names one, none skips it; asked at a terminal when not given; otherwise no board is made and your agent designs the boards with you, the report saying how to start from a template instead); the board and the text are in ${LANGUAGE_RULE} or the one --lang gives (a project it makes is made in it), once, which is how to force one, and the report says which; it prints the text to paste into your agent's chat (otea prompt) with the MCP server it adds to its own config. It looks before it acts: run again, it changes nothing that exists and says what was already there. An agent never runs it: it connects with otea connect and never starts the desk`,
+  summary: `For you, not for an agent, in the project's folder: set everything up for a first session in one command, and say what is ready. It creates the project when there is none (otea init), starts this computer's background server and opens the desk signed in (otea serve start; --no-open prints a single-use sign-in link instead, --port picks the port for a first start, and a later start keeps the port it last ran on), offers a first board from a template when the project has none of its own (--template <key> names one, none skips it; at a terminal, when not given, a short numbered choice asks (code changes, to-dos, or let your agent design them; Enter takes the default it shows, none or Ctrl+C makes no board); with --json, --yes or no terminal nothing is asked and no board is made, the report naming the command for each template instead); the board and the text are in ${LANGUAGE_RULE} or the one --lang gives (a project it makes is made in it), once, which is how to force one, and the report says which; it prints the text to paste into your agent's chat (otea prompt) with the MCP server it adds to its own config. It looks before it acts: run again, it changes nothing that exists and says what was already there. An agent never runs it: it connects with otea connect and never starts the desk`,
   details: TEMPLATE_LIST,
   args: [],
   options: {
@@ -3577,6 +3584,7 @@ const start: Command = {
     lang: { choices: LANGS },
     port: {},
     'no-open': { flag: true },
+    yes: { flag: true },
   },
   execute: async (input) => {
     const { cwd, option, agent } = input;
@@ -3587,17 +3595,23 @@ const start: Command = {
       );
     }
     const template = option('template');
+    // A script (--json, --yes) or a pipe is never asked: with no one to choose, no board is made.
+    const scripted = input.flag('json') || input.flag('yes');
     const report = await startProject(cwd, {
       template,
       lang: option('lang') as Lang | undefined,
-      choose: async () =>
-        (
-          await input.ask(
-            `${TEMPLATE_LIST}\nA first board? changes is for code, todos for anything else. Its key, or Enter to let your agent design the boards with you: `,
-          )
-        )
-          ?.trim()
-          .toLowerCase(),
+      ...(scripted
+        ? {}
+        : {
+            choose: async () => {
+              const fallback = defaultBoard(checkoutRoot(cwd) !== undefined);
+              const answer = await input.ask(choiceQuestion(fallback)).catch((error: unknown) => {
+                throw cancelled(error) ?? error;
+              });
+              // Nobody to ask (no terminal): no board, as before.
+              return answer === undefined ? undefined : choiceFrom(answer, fallback);
+            },
+          }),
     });
     // The background server serves this project: a local one is remembered for it first.
     const here = projectHere(cwd);
@@ -3636,10 +3650,10 @@ const start: Command = {
         ? `Boards: made ${boards.made.map(({ name }) => `"${name}"`).join(', ')}`
         : boards.all.length > 0
           ? `Boards: already has ${boards.all.map((name) => `"${name}"`).join(', ')}${kept ? `; --template ${template} was not added to them (otea board add <name> --template ${template} adds it)` : ''}`
-          : // Nothing was asked of a person (no terminal, so no one chose): no board is made for them.
-            // They leave with the way to one: the agent designs it with them, or the command for a
-            // template, with the keys it takes.
-            `Boards: none yet. Pick one now: otea start --template changes (code, one branch per change) or otea start --template todos (anything that is not code); or paste the text below and your agent designs them with you (otea start --help lists every template)`;
+          : // No board was made: no one chose (no terminal, a script) or the person chose none. They
+            // leave with the way to one: the exact command for each template and what it is for,
+            // or the agent designs them with them.
+            boardHintLines().join('\n');
     const deskLine = started
       ? `Desk: running in the background at ${url} (pid ${pid}; stop it with otea serve stop)`
       : `Desk: already running at ${url} (pid ${pid})`;

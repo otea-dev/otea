@@ -335,12 +335,19 @@ describe('otea start', () => {
       };
       return { asked, cli: (cwd = repo.dir) => cliAt(cwd, {}, undefined, undefined, ask) };
     };
-    const made = (result: Result) => json(result).boards.all;
+    // The boards the report says it made (the text: --json is for scripts, which are never asked).
+    const made = (result: Result) => {
+      if (result.out.startsWith('{')) return json(result).boards.all;
+      const line = result.out.split('\n').find((text) => text.startsWith('Boards:')) ?? '';
+      return line.startsWith('Boards: made')
+        ? [...line.matchAll(/"([^"]+)"/g)].map((m) => m[1])
+        : [];
+    };
 
     it('shows the choices with one plain line each and the default marked, then makes the picked board', async () => {
       const { asked, cli } = typing('2');
 
-      const started = await cli()('start', '--no-open', '--port', '0', '--json');
+      const started = await cli()('start', '--no-open', '--port', '0');
 
       expect(started.code).toBe(0);
       expect(asked).toHaveLength(1);
@@ -356,7 +363,7 @@ describe('otea start', () => {
 
     it('takes the default on Enter, only after it was shown: changes in a git repo, to-dos elsewhere', async () => {
       const inRepo = typing('');
-      const started = await inRepo.cli()('start', '--no-open', '--port', '0', '--json');
+      const started = await inRepo.cli()('start', '--no-open', '--port', '0');
       expect(started.code).toBe(0);
       expect(inRepo.asked[0]).toContain('(default)');
       expect(made(started)).toEqual(['Changes']);
@@ -364,7 +371,7 @@ describe('otea start', () => {
       const folder = realpathSync.native(mkdtempSync(join(tmpdir(), 'otea-folder-')));
       folders.push(folder);
       const outside = typing('');
-      const plain = await outside.cli(folder)('start', '--no-open', '--json');
+      const plain = await outside.cli(folder)('start', '--no-open');
       expect(plain.code).toBe(0);
       expect(outside.asked[0]).toMatch(/2\) todos.*\(default\)/);
       expect(made(plain)).toEqual(['To-dos']);
@@ -375,10 +382,10 @@ describe('otea start', () => {
       async (answer) => {
         const { cli } = typing(answer);
 
-        const started = await cli()('start', '--no-open', '--port', '0', '--json');
+        const started = await cli()('start', '--no-open', '--port', '0');
 
         expect(started.code).toBe(0);
-        expect(json(started).project.created).toBe(true);
+        expect(started.out).toContain('Project: set up');
         expect(made(started)).toEqual([]);
       },
       120_000,
@@ -407,7 +414,7 @@ describe('otea start', () => {
       async (_name, extra) => {
         const { asked, cli } = typing('1');
 
-        const started = await cli()('start', '--no-open', '--port', '0', '--json', ...extra);
+        const started = await cli()('start', '--no-open', '--port', '0', ...extra);
 
         expect(started.code).toBe(0);
         expect(asked).toEqual([]);
