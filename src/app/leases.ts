@@ -8,7 +8,7 @@ import { transaction } from '../store/database.ts';
 import { appendEvent, clearLease, type ItemRecord, takeLease } from '../store/queries.ts';
 import type { Context } from './context.ts';
 import { type Item, present, requireWritableItem, systemClock, workflowOf } from './items.ts';
-import { takeItem } from './lease-take.ts';
+import { type BaseTips, takeItem } from './lease-take.ts';
 import { assertMayClaim, liveBoardOf, setAsideRefusal, wantedNowRefusal } from './next.ts';
 
 // `later`: on a release, the agent sets the item aside for later (P3C-R2-4): next and wait leave it
@@ -31,10 +31,11 @@ function notHolder(item: ItemRecord, actor: Actor, at: string): OteaError {
   return new OteaError('not_lease_holder', message);
 }
 
+// `baseTipsOf`: where the base stands in the claiming checkout, recorded with the claim (BaseTips).
 // `tookOver`: the agent whose lease the claim took over, its session ended (takeItem).
 export function claimItem(
   ctx: Context,
-  input: LeaseInput,
+  input: LeaseInput & { baseTipsOf?: BaseTips },
   now = systemClock,
 ): Item & { tookOver?: string } {
   const { db } = ctx;
@@ -53,7 +54,7 @@ export function claimItem(
     const at = now();
     assertMayClaim(ctx, item, input.actor.name, at);
     const held = activeLease(item.lease, at)?.holder;
-    const lease = takeItem(db, item, input.actor, at, input.ttlMs);
+    const lease = takeItem(db, item, input.actor, at, input.ttlMs, input.baseTipsOf);
     const claimed = present({ ...item, lease }, workflow, at);
     return held !== undefined && held !== input.actor.name
       ? { ...claimed, tookOver: held }

@@ -123,7 +123,7 @@ import {
   workflowOf,
 } from './items.ts';
 import { type LandsFirst, landsFirst, landsFirstLine, landsFirstText } from './land-order.ts';
-import { assertMayWriteItem, takeItem } from './lease-take.ts';
+import { assertMayWriteItem, type BaseTips, takeItem } from './lease-take.ts';
 import { sessionAlive, sessionRuns } from './presence.ts';
 import { priorityOf } from './priority.ts';
 import { liftSetAside, retakeOf, retakeText, SET_ASIDE_LIFTED, setAsideOf } from './set-aside.ts';
@@ -1299,7 +1299,13 @@ export function offeredLine(id: string): string {
 export function nextFor(
   ctx: Context,
   agent: string,
-  options: { collection?: string; claim?: boolean; brief?: boolean; startsAs?: 'json' } = {},
+  options: {
+    collection?: string;
+    claim?: boolean;
+    brief?: boolean;
+    startsAs?: 'json';
+    baseTipsOf?: BaseTips;
+  } = {},
   now = systemClock,
 ): NextAnswer {
   const { collection } = options;
@@ -1402,7 +1408,14 @@ export function nextFor(
     }
     const { board } = first;
     const lease = options.claim
-      ? takeItem(ctx.db, first.item, { kind: 'agent', name: agent }, at)
+      ? takeItem(
+          ctx.db,
+          first.item,
+          { kind: 'agent', name: agent },
+          at,
+          undefined,
+          options.baseTipsOf,
+        )
       : (activeLease(first.item.lease, at) ?? undefined);
     const item = lease ? { ...first.item, lease } : first.item;
     if (!lease) saveOffer(ctx.db, { agent, item: item.id, state: item.state, at });
