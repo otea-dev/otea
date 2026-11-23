@@ -290,7 +290,9 @@ export function PillWords({ summary }: { summary: PillSummary }) {
       <span>
         {summary.kind === 'away'
           ? t('shell.pill.away', { count: summary.count })
-          : t('shell.pill.silent', { count: summary.count })}
+          : summary.away
+            ? `${t('shell.pill.silent', { count: summary.count })} · ${t('shell.pill.away', { count: summary.away })}`
+            : t('shell.pill.silent', { count: summary.count })}
       </span>
     );
   }
@@ -305,14 +307,22 @@ export function PillWords({ summary }: { summary: PillSummary }) {
             : t('shell.pill.waiting', { count: summary.count })}
       </span>
       {extra ? (
-        <small className={extra.kind === 'silent' || extra.kind === 'away' ? 'wl warn-t' : 'wl'}>
+        <small
+          className={
+            extra.kind === 'silent' || extra.kind === 'away' || extra.kind === 'silentAway'
+              ? 'wl warn-t'
+              : 'wl'
+          }
+        >
           {extra.kind === 'of'
             ? t('shell.pill.of', { count: extra.n })
-            : extra.kind === 'silent'
-              ? t('shell.pill.silent', { count: extra.n })
-              : extra.kind === 'away'
-                ? t('shell.pill.away', { count: extra.n })
-                : t('shell.pill.noProfile', { count: extra.n })}
+            : extra.kind === 'silentAway'
+              ? `${t('shell.pill.silent', { count: extra.n })} · ${t('shell.pill.away', { count: extra.away })}`
+              : extra.kind === 'silent'
+                ? t('shell.pill.silent', { count: extra.n })
+                : extra.kind === 'away'
+                  ? t('shell.pill.away', { count: extra.n })
+                  : t('shell.pill.noProfile', { count: extra.n })}
         </small>
       ) : null}
     </>

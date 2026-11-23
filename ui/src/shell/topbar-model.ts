@@ -200,11 +200,12 @@ export function agentRows(
       (it): HeldItem => ({ id: it.id, title: it.title, look: 'stuck' }),
     );
     const st = agentState(a.name, items, feed, now, a.lastSeen, statusOf(a));
-    // Not connected, and its lease ran out on an item it left stuck: no signal, as any other. One
+    // Away (the server's status), and its lease ran out on an item it left stuck: «ausente». One
+    // with no signal on a live lease keeps its own word, whatever else it left stuck, and one
     // still connected is whatever the server says it is: its lease on that item ran out, which
     // says nothing of the agent, and it may still be at work on it (lease-take.ts).
     const connected = live.includes(a);
-    const quiet = !connected && stuck.length > 0;
+    const quiet = statusOf(a) === 'away' && stuck.length > 0;
     const lapsedItem = connected ? stuck.at(0) : undefined;
     // An item whose question waits for you is not work: the agent waits for your answer. One
     // no longer connected works on nothing, whatever its lease still holds (P7-R3-10).
@@ -305,14 +306,18 @@ export function pillMark(connection: Connection, rows: readonly AgentRow[]): Pil
 
 // The pill's second datum, in grey or in warn: one with no signal wins over one without a profile,
 // which wins over the total ("de 3") beside those working. Never more than two data on the pill.
-export type PillExtra = { kind: 'silent' | 'away' | 'noProfile' | 'of'; n: number } | null;
+export type PillExtra =
+  | { kind: 'silent' | 'away' | 'noProfile' | 'of'; n: number }
+  // One with no signal and one away: both show, and nothing else (two data at most).
+  | { kind: 'silentAway'; n: number; away: number }
+  | null;
 
 export type PillSummary =
   | { kind: 'offline' }
   | { kind: 'none' }
   // Nobody connected, but an agent gave no signal (on a live lease) or is away (its lease ran out
   // and left its item stuck): not an empty room, and not at work either.
-  | { kind: 'silent'; count: number }
+  | { kind: 'silent'; count: number; away?: number }
   | { kind: 'away'; count: number }
   | { kind: 'working' | 'waiting' | 'connected'; count: number; extra: PillExtra };
 
@@ -322,20 +327,24 @@ export function pillSummary(connection: Connection, rows: readonly AgentRow[]): 
   if (connection === 'reconnecting') return { kind: 'offline' };
   const c = agentCounts(rows);
   if (c.live === 0) {
-    if (c.silent > 0) return { kind: 'silent', count: c.silent };
+    if (c.silent > 0) {
+      return { kind: 'silent', count: c.silent, ...(c.away > 0 ? { away: c.away } : {}) };
+    }
     return c.away > 0 ? { kind: 'away', count: c.away } : { kind: 'none' };
   }
   const working = c.holding > 0;
   const extra: PillExtra =
-    c.silent > 0
-      ? { kind: 'silent', n: c.silent }
-      : c.away > 0
-        ? { kind: 'away', n: c.away }
-        : c.noProfile > 0
-          ? { kind: 'noProfile', n: c.noProfile }
-          : working && c.live > c.holding
-            ? { kind: 'of', n: c.live }
-            : null;
+    c.silent > 0 && c.away > 0
+      ? { kind: 'silentAway', n: c.silent, away: c.away }
+      : c.silent > 0
+        ? { kind: 'silent', n: c.silent }
+        : c.away > 0
+          ? { kind: 'away', n: c.away }
+          : c.noProfile > 0
+            ? { kind: 'noProfile', n: c.noProfile }
+            : working && c.live > c.holding
+              ? { kind: 'of', n: c.live }
+              : null;
   if (working) return { kind: 'working', count: c.holding, extra };
   // Connected but none waiting: nobody hears the desk, and the pill does not say "escuchando".
   return c.idle > 0

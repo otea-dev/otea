@@ -92,6 +92,15 @@ export function Stand({
     return <>{tx('agent.stand.work', { title: <em>{it.title}</em>, time: since })}</>;
   if (row.quiet && it)
     return <>{tx('agent.stand.quiet', { title: <em>{it.title}</em>, time: clockOf(row.since) })}</>;
+  // No signal on a live lease: the server's «sin señal», never «ausente» (it is not away).
+  if (row.state === 'silent') {
+    const held = row.held.at(0);
+    return held ? (
+      <>{tx('agent.stand.silent', { title: <em>{held.title}</em>, time: clockOf(row.since) })}</>
+    ) : (
+      <>{t('agent.stand.silentFree', { time: clockOf(row.since) })}</>
+    );
+  }
   if (row.lapsed && row.state === 'idle')
     return (
       <>
