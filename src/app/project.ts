@@ -1,6 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+} from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { OteaError } from '../core/errors.ts';
@@ -58,7 +65,53 @@ type Location = { root: string; gitCommonDir?: string };
 const OTEA_DIR = '.otea';
 const EXCLUDE_ENTRY = `${OTEA_DIR}/`;
 
+// What makes git look for its dir somewhere other than the first .git above cwd.
+const GIT_DISCOVERY_ENV = [
+  'GIT_DIR',
+  'GIT_COMMON_DIR',
+  'GIT_WORK_TREE',
+  'GIT_CEILING_DIRECTORIES',
+  'GIT_DISCOVERY_ACROSS_FILESYSTEM',
+];
+
+// The common git dir of the checkout at cwd, found by walking up to its .git, as git does: a .git
+// folder is the common dir; a .git file (`gitdir: <path>`) of a linked worktree points at a dir whose
+// `commondir` file names it, and of a submodule at the dir itself. Undefined whenever this cannot be
+// sure (git's own variables set, a .git that does not read as one, no .git above cwd): git is asked.
+export function commonDirByWalking(cwd: string, env: NodeJS.ProcessEnv): string | undefined {
+  if (GIT_DISCOVERY_ENV.some((name) => env[name] !== undefined)) return undefined;
+  const start = resolve(cwd);
+  for (let dir = start; ; dir = dirname(dir)) {
+    const dotGit = join(dir, '.git');
+    try {
+      const kind = statSync(dotGit);
+      let common: string;
+      if (kind.isDirectory()) {
+        common = dotGit;
+      } else if (kind.isFile()) {
+        const pointer = /^gitdir:\s*(.+?)\s*$/m.exec(readFileSync(dotGit, 'utf8'));
+        if (!pointer?.[1]) return undefined;
+        const gitDir = resolve(dir, pointer[1]);
+        const named = join(gitDir, 'commondir');
+        common = existsSync(named) ? resolve(gitDir, readFileSync(named, 'utf8').trim()) : gitDir;
+      } else {
+        return undefined;
+      }
+      if (!existsSync(join(common, 'HEAD'))) return undefined;
+      // git answers the real path of a dir it reached through a link, and the plain `.git` at the
+      // top of the checkout it ran in.
+      const plain = (kind.isDirectory() && dir === start) || process.platform === 'win32';
+      return plain ? common : realpathSync(common);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return undefined;
+    }
+    if (dirname(dir) === dir) return undefined;
+  }
+}
+
 export function gitCommonDir(cwd: string): string | undefined {
+  const walked = commonDirByWalking(cwd, process.env);
+  if (walked !== undefined) return walked;
   try {
     const output = execFileSync('git', ['rev-parse', '--git-common-dir'], {
       cwd,
