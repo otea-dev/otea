@@ -760,10 +760,11 @@ export const detail = {
   },
   'bi.branch.diffOffMore': '{count} más',
   'bi.branch.diffFiles':
-    'El diff adjunto no coincide con lo que aterriza. El diff {diff}; lo entregado cambia {landed}. Aprobar aprueba lo entregado, no el diff.',
+    'El diff adjunto no coincide con lo que aterriza. El diff {diff}; lo entregado {landed}. Aprobar aprueba lo entregado, no el diff.',
   'bi.branch.diffFilesNames': 'nombra {files}',
   'bi.branch.diffFilesNone': 'no nombra ningún archivo',
-  'bi.branch.diffFilesNothing': 'ningún archivo',
+  'bi.branch.diffFilesChanges': 'cambia {files}',
+  'bi.branch.diffFilesChangesNone': 'no cambia ningún archivo',
   'bi.branch.moved':
     'La rama cambió en el remoto después de la entrega: ahora está en {now}. Aprobar aprueba solo lo entregado, {handed}.',
   'bi.request.board': 'Tablero {name}',

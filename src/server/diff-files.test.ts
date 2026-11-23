@@ -41,7 +41,16 @@ describe('GET /api/items/:id/diff-files', () => {
 
   // `template`: the board; `branch`: its Rama, main for a board kept on main. The item is put in
   // its first step, claimed (which records where main stood), worked on, and handed off.
-  const handOff = async (template: 'changes' | 'mainline', branch: string, diff: () => string) => {
+  const handOff = async (
+    template: 'changes' | 'mainline',
+    branch: string,
+    diff: () => string,
+    // What the item's work is: two files, unless the test says otherwise.
+    work: () => void = () => {
+      change('b.txt', 'regar\n');
+      change('c.txt', 'regar\n');
+    },
+  ) => {
     repo = tempGitRepo();
     const otea = cliAt(repo.dir, { OTEA_AGENT: 'quill' });
     const person = cliAt(repo.dir);
@@ -77,8 +86,7 @@ describe('GET /api/items/:id/diff-files', () => {
     }
     expect((await otea('claim', 'CAM-1')).code).toBe(0);
     if (branch !== 'main') git('checkout', '-q', '-b', branch);
-    change('b.txt', 'regar\n');
-    change('c.txt', 'regar\n');
+    work();
     writeFileSync(join(repo.dir, 'regar.diff'), diff());
     expect((await otea('attach', 'CAM-1', 'regar.diff')).code).toBe(0);
     const handed = await otea('handoff', 'CAM-1', '--note', 'regar');
@@ -94,11 +102,11 @@ describe('GET /api/items/:id/diff-files', () => {
   });
 
   const both = [
-    ['a branch of the board', 'changes', 'cambio/1-regar', 'main...HEAD'],
-    ['main, on a board kept on main', 'mainline', 'main', 'HEAD~2..HEAD'],
+    ['a branch of the board', 'changes', 'cambio/1-regar', 'main...HEAD', 'main...HEAD'],
+    ['main, on a board kept on main', 'mainline', 'main', 'HEAD~2..HEAD', 'HEAD~1..HEAD'],
   ] as const;
 
-  describe.each(both)('on %s', (_name, template, branch, range) => {
+  describe.each(both)('on %s', (_name, template, branch, range, last) => {
     it('says nothing when the diff names the files the work changes', async () => {
       await handOff(template, branch, () => git('diff', range));
       expect(await mismatch()).toBeNull();
@@ -112,6 +120,44 @@ describe('GET /api/items/:id/diff-files', () => {
     it('names both lists when the diff covers other files than the work', async () => {
       await handOff(template, branch, () => git('diff', range).replaceAll('c.txt', 'z.txt'));
       expect(await mismatch()).toEqual({ diff: ['b.txt', 'z.txt'], landed: ['b.txt', 'c.txt'] });
+    });
+
+    // The persona's case: an empty commit and an invented diff. Both lists are empty, which is
+    // still no match for work that changes nothing.
+    it('warns when the work changes no file, whatever the diff names', async () => {
+      const empty = () => git('commit', '-q', '--allow-empty', '-m', 'nothing');
+      await handOff(template, branch, () => 'nothing really, invented\n', empty);
+      expect(await mismatch()).toEqual({ diff: [], landed: [] });
+    });
+
+    // git quotes a path with non-ASCII letters in the diff as octal bytes; the files git lists
+    // are read as they are.
+    it('matches a path with non-ASCII letters that the diff quotes', async () => {
+      let made = '';
+      await handOff(
+        template,
+        branch,
+        () => {
+          expect(made).toContain('\\303\\251');
+          return made;
+        },
+        () => {
+          change('café.txt', 'regar\n');
+          made = git('diff', last);
+        },
+      );
+      expect(await mismatch()).toBeNull();
+    });
+
+    // A path is kept as git gives it: only the end of the whole output is trimmed.
+    it('keeps a leading space of a path', async () => {
+      await handOff(
+        template,
+        branch,
+        () => git('diff', last),
+        () => change(' lead.txt', 'regar\n'),
+      );
+      expect(await mismatch()).toBeNull();
     });
   });
 });
@@ -134,6 +180,26 @@ describe('the files a diff names', () => {
       'deleted file mode 100644',
     ].join('\n');
     expect(diffFiles(text)).toEqual(['gone.ts', 'new name.ts', 'old name.ts', 'src/a.ts']);
+  });
+
+  // git quotes a path with non-ASCII letters (and a quote, a backslash, a tab) in C style, the
+  // letters as octal bytes of their UTF-8.
+  it('unquotes the octal bytes git writes for non-ASCII paths', () => {
+    const text = [
+      'diff --git "a/caf\\303\\251.txt" "b/caf\\303\\251.txt"',
+      'diff --git "a/di\\"re\\\\ct.txt" "b/di\\"re\\\\ct.txt"',
+      'diff --git a/plain.txt b/plain.txt',
+    ].join('\n');
+    expect(diffFiles(text)).toEqual(['café.txt', 'di"re\\ct.txt', 'plain.txt']);
+    expect(
+      diffFiles('--- "a/caf\\303\\251.txt"\n+++ "b/caf\\303\\251.txt"\n@@ -1 +1 @@\n'),
+    ).toEqual(['café.txt']);
+  });
+
+  // An unquoted path never holds an escape, so a backslash in it is the path's own, and spaces
+  // around a name are kept.
+  it('keeps a path as written when git did not quote it', () => {
+    expect(diffFiles('diff --git a/ x y.txt b/ x y.txt')).toEqual([' x y.txt']);
   });
 
   it('reads a plain unified diff by its +++ and --- lines, and a text with no file as none', () => {

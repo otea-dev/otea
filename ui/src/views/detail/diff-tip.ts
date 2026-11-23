@@ -48,8 +48,7 @@ export function useDiffOffTip(item: string, asking: boolean, at: string): DiffOf
 // approves; approving is still theirs.
 const LISTED = 4;
 
-function filesList(files: readonly string[], empty: 'bi.branch.diffFilesNothing'): string {
-  if (files.length === 0) return t(empty);
+function filesList(files: readonly string[]): string {
   const more = files.length - LISTED;
   const named = files.slice(0, LISTED);
   return listOf(more > 0 ? [...named, t('bi.branch.diffOffMore', { count: more })] : named);
@@ -59,11 +58,12 @@ export function diffFilesText(off: DiffFilesOff): string {
   const diff =
     off.diff.length === 0
       ? t('bi.branch.diffFilesNone')
-      : t('bi.branch.diffFilesNames', { files: filesList(off.diff, 'bi.branch.diffFilesNothing') });
-  return t('bi.branch.diffFiles', {
-    diff,
-    landed: filesList(off.landed, 'bi.branch.diffFilesNothing'),
-  });
+      : t('bi.branch.diffFilesNames', { files: filesList(off.diff) });
+  const landed =
+    off.landed.length === 0
+      ? t('bi.branch.diffFilesChangesNone')
+      : t('bi.branch.diffFilesChanges', { files: filesList(off.landed) });
+  return t('bi.branch.diffFiles', { diff, landed });
 }
 
 // Whether the attached diff names other files than the work handed off changes, while `asking`;

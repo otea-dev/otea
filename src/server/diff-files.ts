@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { evidenceFile } from '../app/evidence.ts';
 import { getItem } from '../app/items.ts';
@@ -15,27 +16,66 @@ import { git } from './diff-tip.ts';
 // names, `landed` what the commits handed off change over where the base stood before them.
 export type DiffFilesOff = { diff: string[]; landed: string[] };
 
-const unquote = (path: string) => path.replace(/\\(["\\])/g, '$1');
+const ESCAPES: Record<string, number> = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13 };
+
+// A path as git quotes it in a diff (core.quotePath): C-style escapes, a non-ASCII letter as the
+// octal bytes of its UTF-8. Only a quoted path has escapes; one git left bare is taken as it is.
+function unquote(path: string): string {
+  const bytes: number[] = [];
+  for (let at = 0; at < path.length; at++) {
+    const char = path.charAt(at);
+    const octal = /^[0-7]{3}/.exec(path.slice(at + 1))?.[0];
+    if (char !== '\\') bytes.push(...Buffer.from(char));
+    else if (octal !== undefined) {
+      bytes.push(Number.parseInt(octal, 8));
+      at += 3;
+    } else {
+      const next = path.charAt(at + 1);
+      bytes.push(...(next in ESCAPES ? [ESCAPES[next] ?? 0] : Buffer.from(next)));
+      at += 1;
+    }
+  }
+  return Buffer.from(bytes).toString('utf8');
+}
+
+// `"…"` is the quoted spelling of a path, `bare` the other.
+const pathOf = (quoted: string | undefined, bare: string | undefined): string =>
+  quoted === undefined ? (bare ?? '') : unquote(quoted);
 
 // Every path the text of a diff names (both sides of a rename, a deleted or an added file), sorted:
 // by its `diff --git` lines, else by the +++ and --- lines of a plain unified diff. Empty for a
-// text that names none.
+// text that names none. A path is kept as written: no trimming.
 export function diffFiles(text: string): string[] {
   const paths = new Set<string>();
-  for (const line of text.split(/\r?\n/)) {
-    const head = /^diff --git "?a\/(.+?)"? "?b\/(.+?)"?$/.exec(line);
-    if (head?.[1] && head[2]) {
-      paths.add(unquote(head[1]));
-      paths.add(unquote(head[2]));
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    const head = /^diff --git (?:"a\/(.+?)"|a\/(.+?)) (?:"b\/(.+?)"|b\/(.+?))$/.exec(line);
+    if (head) {
+      paths.add(pathOf(head[1], head[2]));
+      paths.add(pathOf(head[3], head[4]));
     }
   }
   if (paths.size === 0) {
-    for (const line of text.split(/\r?\n/)) {
-      const side = /^(?:---|\+\+\+) (?:[ab]\/)?([^\t]+?)\s*(?:\t.*)?$/.exec(line)?.[1];
-      if (side && side !== '/dev/null') paths.add(unquote(side));
+    for (const line of lines) {
+      const side = /^(?:---|\+\+\+) (?:"[ab]\/(.+)"|(?:[ab]\/)?([^\t]+))(?:\t.*)?$/.exec(line);
+      const path = side && pathOf(side[1], side[2]);
+      if (path && path !== '/dev/null') paths.add(path);
     }
   }
-  return [...paths].sort();
+  return [...paths].filter(Boolean).sort();
+}
+
+// Git's output for paths, as it is (with -z, NUL-separated): never trimmed, since a name may begin
+// or end with a space, which `git` of diff-tip.ts, made for hashes and counts, would cut.
+function gitPaths(cwd: string, ...args: string[]): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    execFile(
+      'git',
+      args,
+      { cwd, encoding: 'utf8', timeout: 20_000, windowsHide: true, maxBuffer: 64 * 1024 * 1024 },
+      (error, stdout) => resolve(error ? undefined : String(stdout)),
+    );
+  });
 }
 
 async function tryGit(cwd: string, ...args: string[]): Promise<string | undefined> {
@@ -78,7 +118,7 @@ async function landedFiles(
         from = candidate;
       }
     }
-    diffArgs = ['diff', '--no-renames', '-z', '--name-only', `${from}`, tip];
+    diffArgs = ['diff', '--no-renames', '--no-ext-diff', '-z', '--name-only', `${from}`, tip];
   } else {
     let nearest: number | undefined;
     for (const candidate of [`origin/${base}`, base]) {
@@ -93,10 +133,19 @@ async function landedFiles(
         from = candidate;
       }
     }
-    diffArgs = ['diff', '--no-renames', '-z', '--name-only', `${from}...${tip}`];
+    diffArgs = ['diff', '--no-renames', '--no-ext-diff', '-z', '--name-only', `${from}...${tip}`];
   }
   if (from === undefined) return undefined;
-  const out = await tryGit(cwd, '-c', 'core.quotePath=false', ...diffArgs);
+  // The names as git has them whatever the person's config says (no quoting, no mnemonic prefix,
+  // no external diff tool), NUL-separated.
+  const out = await gitPaths(
+    cwd,
+    '-c',
+    'core.quotePath=false',
+    '-c',
+    'diff.mnemonicPrefix=false',
+    ...diffArgs,
+  );
   return out === undefined ? undefined : [...new Set(out.split('\0').filter(Boolean))].sort();
 }
 
@@ -127,6 +176,11 @@ export async function diffFilesOff(project: Project, id: string): Promise<DiffFi
   const landed = await landedFiles(project, item.id, tip.commit, branch, base);
   if (landed === undefined) return null;
   const diff = diffFiles(text);
-  const same = diff.length === landed.length && diff.every((path, at) => path === landed[at]);
+  // Work that changes no file is never a match, whatever the diff names (an empty commit and an
+  // invented diff both list nothing): there is nothing for the diff to be the diff of.
+  const same =
+    landed.length > 0 &&
+    diff.length === landed.length &&
+    diff.every((path, at) => path === landed[at]);
   return same ? null : { diff, landed };
 }
