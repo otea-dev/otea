@@ -50,6 +50,17 @@ const git = (cwd: string, ...args: string[]): string | undefined => {
 const commitOf = (cwd: string, ref: string): string | undefined =>
   git(cwd, 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`) || undefined;
 
+// Whether a commit changes no file: against its first parent, or against nothing for a root. A
+// commit git cannot read counts as changing files, never a refusal made on a guess.
+function changesNothing(cwd: string, commit: string): boolean {
+  const parent = commitOf(cwd, `${commit}^`);
+  const names =
+    parent === undefined
+      ? git(cwd, 'diff-tree', '--root', '-r', '--name-only', '--no-commit-id', commit)
+      : git(cwd, 'diff', '--name-only', parent, commit);
+  return names === '';
+}
+
 // Whether `ancestor` is in the history of `ref`.
 const holds = (cwd: string, ref: string, ancestor: string): boolean =>
   git(cwd, 'merge-base', '--is-ancestor', ancestor, ref) !== undefined;
@@ -235,6 +246,13 @@ export function landedCommitRefusal(
     if (holding.length === 0) {
       return `${name}: ${listed} does not hold the work the person approved (${tip.slice(0, 7)}): it is an older commit of ${base}. Write the hash of the commit where that work landed (git rev-parse --short ${base} once it is there).`;
     }
+  }
+  // A commit that changes no file (git commit --allow-empty) is a new hash of the base with no work
+  // in it (P1-F2): one that changes something among those named is enough.
+  const empty = holding.filter(({ full }) => changesNothing(cwd, full));
+  const [first] = empty;
+  if (first && empty.length === holding.length) {
+    return `${name}: commit ${first.word} changes no files, so it is no work landed (a commit made with git commit --allow-empty is a new hash and nothing else). Commit this item's own change and write the hash of that commit (git rev-parse --short HEAD).`;
   }
   const taken = new Map<string, string>();
   own.landed.forEach(({ id }, at) => {

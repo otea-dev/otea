@@ -271,7 +271,7 @@ describe('the Code on main board', () => {
     expect(done.code, done.err).toBe(0);
 
     // A commit already on main when the item was claimed is not its work, whoever made it.
-    git('commit', '-q', '--allow-empty', '-m', 'old');
+    change('viejo.py', 'print(0)\n');
     const old = git('rev-parse', '--short', 'HEAD');
     expect((await otea('claim', third)).code).toBe(0);
     moveTo(third, 'Subir');
