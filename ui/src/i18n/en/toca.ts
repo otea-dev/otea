@@ -65,6 +65,7 @@ export const toca = {
   'toca.sub.didIt': 'done by {agent}',
   'toca.sub.closedBy': 'closed by {agent}',
   'toca.sub.closedByYou': 'closed by you',
+  'toca.sub.closedRelayed': 'closed, relayed by {agent}',
   // The right-hand column already says «lease expired»: who and since when, short, so the row does
   // not cut the text.
   'toca.quiet': '{agent} · {time} ago',

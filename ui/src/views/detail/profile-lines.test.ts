@@ -173,6 +173,17 @@ describe('Quién lo hace', () => {
     expect(markup(cells({ kind: 'agent', name: 'kiln' })?.value)).toContain('kiln');
     expect(cells({ kind: 'human', name: 'fede' })?.value).toBe('Tú');
     expect(cells(null)?.value).toBe('—');
+    // An approval an agent relayed is never «Tú» (P1-F1).
+    const relayed = detailCells({
+      item: view,
+      type: bug,
+      facts,
+      own: false,
+      now: NOW,
+      board: { reviewer: 'none', reviewedBy: { kind: 'human', name: 'human' }, relayedBy: 'orch' },
+    })[1];
+    expect(relayed?.value).toBe('Relayada por orch');
+    expect(relayed?.cls).toBeUndefined();
   });
 
   it('says the type only where the board holds several, never repeating its only one', () => {

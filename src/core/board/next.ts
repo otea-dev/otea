@@ -71,7 +71,16 @@ export type SentBack = {
   step: string;
   round: number;
   reopened?: true;
+  // The agent that relayed it as the person's word (otea relay): not the person's own decision.
+  relayedBy?: string;
 };
+
+// Who a send-back or an approval came from, in the agent's words: the person, an agent, or an
+// agent's word that the person said it.
+function whoText(by: SentBack['by'], relayedBy: string | undefined): string {
+  if (relayedBy !== undefined) return `relayed by ${relayedBy}`;
+  return `by ${by.kind === 'human' ? 'the person' : by.name}`;
+}
 
 // The note's hint when the round was sent back and the step itself asks for no note.
 export const SENT_BACK_HINT = 'what you changed since it was sent back';
@@ -313,11 +322,11 @@ function sentBackLines(sent: SentBack): string[] {
     ? [`${lead} with the notes from the person above: answer each`]
     : [`${lead}: "${first}`, ...rest.map((line) => `  ${line}`)];
   if (!bare) quoted[quoted.length - 1] += '"';
-  const who = sent.by.kind === 'human' ? 'the person' : sent.by.name;
+  const who = whoText(sent.by, sent.relayedBy);
   const from = sent.reopened
     ? `after it was ${sent.step}`
     : `from the review of ${sent.step} round ${sent.round}`;
-  return ['', ...quoted, `  by ${who}, ${timeText(sent.at)}, ${from}`];
+  return ['', ...quoted, `  ${who}, ${timeText(sent.at)}, ${from}`];
 }
 
 // The note an approval carried into this step: what the reviewer said, who and when.
@@ -325,11 +334,11 @@ function approvedLines(approved: SentBack): string[] {
   const [first = '', ...rest] = approved.note.trim().split(/\r?\n/);
   const quoted = [`Approved with a note: "${first}`, ...rest.map((line) => `  ${line}`)];
   quoted[quoted.length - 1] += '"';
-  const who = approved.by.kind === 'human' ? 'the person' : approved.by.name;
+  const who = whoText(approved.by, approved.relayedBy);
   return [
     '',
     ...quoted,
-    `  by ${who}, ${timeText(approved.at)}, from the review of ${approved.step} round ${approved.round}`,
+    `  ${who}, ${timeText(approved.at)}, from the review of ${approved.step} round ${approved.round}`,
   ];
 }
 

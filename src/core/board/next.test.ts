@@ -252,6 +252,28 @@ describe('nextText', () => {
     expect(text).not.toContain('""');
   });
 
+  // P1-F1: what an agent relayed as the person's word is not «by the person» for the next agent.
+  it('says a send-back an agent relayed was relayed, never by the person', () => {
+    const text = nextText(def, {
+      ...base,
+      round: 2,
+      position: { step: 'sconcept', phase: 'doing' },
+      missing: [],
+      sentBack: {
+        note: 'Otra pose',
+        by: { kind: 'human', name: 'human' },
+        relayedBy: 'orch-a',
+        at: '2026-11-12T10:04:00.000Z',
+        step: 'Concepto',
+        round: 1,
+      },
+    });
+    expect(text).toContain(
+      '\nSent back to you: "Otra pose"\n  relayed by orch-a, 2026-11-12 10:04 UTC, from the review of Concepto round 1\n',
+    );
+    expect(text).not.toContain('by the person');
+  });
+
   it('never offers an agent the review of a step it did in this round', () => {
     const text = nextText(def, {
       ...base,

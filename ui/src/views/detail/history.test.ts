@@ -144,6 +144,23 @@ describe('the history, newest first, in words', () => {
     ]);
   });
 
+  it('keeps the reason a relayed send-back carried, and names who relayed it', () => {
+    const relayedBack = ev(
+      'transitioned',
+      you,
+      { from: 'verify', to: 'fixing', via: 'Kiln', quote: 'devuélvelo', reason: 'Falta el carro.' },
+      1,
+    );
+    const [line] = historyOf([relayedBack], bug, word, NOW);
+
+    expect(line).toMatchObject({
+      who: 'Kiln',
+      dot: 'relay',
+      text: 'Relayed by Kiln, quoting "devuélvelo": fixing',
+      quote: 'Falta el carro.',
+    });
+  });
+
   it('quotes what was said; what a relayed decision quotes is in its own line', () => {
     expect(lines.map((l) => l.quote ?? null)).toEqual([
       null,

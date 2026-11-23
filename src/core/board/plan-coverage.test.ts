@@ -56,6 +56,17 @@ describe('changePlan, the later settings', () => {
     ]);
   });
 
+  // A board turning relay off (or on again) changes what agents may do, so it is a change to publish.
+  it('says when relay is turned off or on again', () => {
+    const live = errores();
+    const off = errores();
+    off.relay = false;
+    const words = { boardName: () => undefined };
+    expect(changePlan(live, off, words)).toEqual([{ kind: 'relay', on: false }]);
+    expect(changePlan(off, live, words)).toEqual([{ kind: 'relay', on: true }]);
+    expect(changePlan(live, errores(), words)).toEqual([]);
+  });
+
   // P8-F1: naming the field a handoff checks as the landed commit changes what agents may do, so
   // it is a change of the guard to publish, not nothing.
   it('says a change of the commit field a guard checks', () => {

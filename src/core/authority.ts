@@ -153,6 +153,6 @@ export function authorizeRelay(
   }
   throw new OteaError(
     'forbidden',
-    `${moving(workflow, from, to)} requires human-ui authority (${WHO['human-ui']}) and cannot be relayed; the human must make it in the web UI`,
+    `${moving(workflow, from, to)} requires human-ui authority (${WHO['human-ui']}) and cannot be relayed; the person gives it themselves on the desk or the phone: ask them with otea ask`,
   );
 }

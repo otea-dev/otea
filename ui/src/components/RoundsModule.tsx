@@ -203,9 +203,19 @@ function VerdictLine({ round, name }: { round: Round; name: StateName }) {
             at: momentLabel(verdict.at, Date.now()),
           });
   return (
-    <p className="rd-verdict-line t-small" data-kind={verdict.kind}>
-      <b>{what}</b>
-      {by ? ` · ${by}` : ''}
+    <p
+      className="rd-verdict-line t-small"
+      data-kind={verdict.kind}
+      data-relayed={by ? '' : undefined}
+    >
+      {/* A relayed verdict leads with who relayed it, never with a bold «aprobada». */}
+      {by ? (
+        <>
+          <b>{by}</b> · {what}
+        </>
+      ) : (
+        <b>{what}</b>
+      )}
       {verdict.reason ? (
         <>
           {' · '}

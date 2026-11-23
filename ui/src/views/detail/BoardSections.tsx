@@ -618,6 +618,16 @@ export function LinksSection({
 
 // Who wrote a round's note: you, or the agent by name.
 const bylineOf = (n: RoundNote): string => {
+  // An agent's word that the person said it: never «you».
+  if (n.relayedBy !== undefined)
+    return t(
+      n.reopened
+        ? 'bi.rounds.reopenedRelayed'
+        : n.kind === 'back'
+          ? 'bi.rounds.backRelayed'
+          : 'bi.rounds.handoffRelayed',
+      { by: n.relayedBy },
+    );
   if (n.reopened)
     return n.person ? t('bi.rounds.reopenedYou') : t('bi.rounds.reopened', { by: n.by });
   if (n.person) return n.kind === 'back' ? t('bi.rounds.backYou') : t('bi.rounds.handoffYou');

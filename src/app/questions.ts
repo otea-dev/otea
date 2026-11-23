@@ -27,7 +27,7 @@ import { askingItems } from './asking.ts';
 import type { Context } from './context.ts';
 import { requireItem, requireWritableItem, systemClock } from './items.ts';
 import { assertMayWriteItem, takeItem } from './lease-take.ts';
-import { itemOnBoard, type LiveBoard, liveBoardOf } from './next.ts';
+import { itemOnBoard, type LiveBoard, liveBoardOf, relayAllowed } from './next.ts';
 import { sessionAlive } from './presence.ts';
 import { RELAYED_HUMAN } from './relay.ts';
 import { liftSetAside, SET_ASIDE_LIFTED } from './set-aside.ts';
@@ -147,6 +147,13 @@ export function noteChatAnswer(
   const text = input.text.trim();
   if (text === '')
     refuse('reason_required', id, 'empty', `Not noted on ${id}: give the person's words`);
+  // Otea cannot check the person said it, so a board may turn the relay of their words off.
+  const collection = requireItem(ctx.db, id).collection;
+  if (!relayAllowed(ctx, collection))
+    throw new OteaError(
+      'forbidden',
+      `Not noted: ${liveBoardOf(ctx, collection)?.def.name ?? collection} does not take answers noted through an agent, so the person answers ${id} themselves on the desk. Ask them with otea ask ${id} "<your question>" and wait for them; never record their answer for them.`,
+    );
   const data = { via: actor.name, source: 'conversation' };
   const { question, gone } = recordAnswer(ctx, { ...input, text, actor: RELAYED_HUMAN }, data, now);
   const asker = question.by === actor.name ? undefined : { name: question.by, gone };

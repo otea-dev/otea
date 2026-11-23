@@ -104,11 +104,11 @@ describe('feedLines', () => {
     ]);
   });
 
-  it('keeps a relayed decision in your lane, named after the agent that relayed it', () => {
+  it('puts a relayed decision in the lane of the agent that relayed it, never in yours', () => {
     const relayed = ev('WORK-1', 'transitioned', you, 1, { to: 'done', via: 'claude-b' });
 
     expect(feedLines([relayed], turnOf)[0]).toMatchObject({
-      lane: 'you',
+      lane: 'agent',
       relayed: true,
       agent: 'claude-b',
     });

@@ -201,6 +201,8 @@ export function historyOf(
           text: relay.quote
             ? t('sheet.h.relayed', { via: relay.via, quote: relay.quote, state })
             : t('sheet.h.relayedBare', { via: relay.via, state }),
+          // The reason a relayed send-back carried is still its reason.
+          ...(reason ? { quote: reason } : {}),
         };
       }
       const q = reason ? { quote: reason } : {};

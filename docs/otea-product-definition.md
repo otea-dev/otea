@@ -111,7 +111,7 @@ Each action or field in a preset declares who may perform it:
 | `human` | a human in the UI, **or** an agent relaying a decision the human made in conversation | accept definitions agreed in chat |
 | `human-ui` | a human in the web UI only | approve visual results, taste gates, final verification |
 
-- A relayed decision is recorded as `actor: human, via: agent, source: conversation`, with a quote or summary of what the human said. It is visibly marked as relayed in the timeline.
+- A relayed decision is recorded as `actor: human, via: agent, source: conversation`, with a quote or summary of what the human said. It is visibly marked as relayed in the timeline, history, rounds and phone review, and never counts as the person's own approval: Otea cannot check the quote. On a board, the person's forward approval into a land step or Done is `human-ui`, so it cannot be relayed (send-backs and drops can), and a board can turn relay off entirely (`relay: false`), which also refuses `otea answer` and a `--later --quote`.
 - An agent may relay a decision only after the human explicitly approved it. This is enforced in two layers:
   - **Playbook**: relaying requires an explicit human approval in the conversation, quoted in the record.
   - **Harness**: relaying is a dedicated MCP tool / CLI command, separate from every other write, so the harness permission system can require human confirmation on each call. That confirmation prompt is the hard gate.

@@ -73,6 +73,39 @@ describe('the rounds of the step under review, on the phone', () => {
     expect(out[0]?.by).toBe('kiln');
   });
 
+  // P1-F1: a verdict an agent relayed is tagged as relayed, never as the person's send-back or
+  // approval, and a relayed send-back keeps its reason and still tells the next round what it asked.
+  it('tags a relayed verdict as relayed, whatever its kind, and keeps a send-back’s reason', () => {
+    const relayed: Round[] = [
+      {
+        ...(rounds[0] as Round),
+        verdict: {
+          kind: 'sent-back',
+          to: 'todo',
+          at: '2026-11-11T09:30:00Z',
+          actor: you,
+          reason: 'Pruébalo con la red lenta.',
+          relayedBy: 'orch',
+          relayQuote: 'devuélvelo',
+        },
+      },
+      {
+        ...(rounds[1] as Round),
+        verdict: {
+          kind: 'approved',
+          to: 'done',
+          at: '2026-11-11T12:00:00Z',
+          actor: you,
+          relayedBy: 'orch',
+        },
+      },
+    ];
+    const out = phoneRounds(relayed, true);
+    expect(out.map((r) => r.tag)).toEqual(['relayed', 'relayed']);
+    expect(out[1]?.reason).toBe('Pruébalo con la red lenta.');
+    expect(out[0]?.asked?.text).toBe('Pruébalo con la red lenta.');
+  });
+
   it('leaves the last one without a tag when it is not your turn', () => {
     expect(phoneRounds(rounds, false)[0]?.tag).toBeNull();
   });

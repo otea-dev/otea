@@ -243,6 +243,17 @@ describe('a row’s call to act', () => {
       act: 'Descartado',
       sub: { key: 'toca.sub.closedByYou' },
     });
+    // P1-F1: closed by an agent's relay of what the person said: never «cerrado por ti».
+    const relayedDrop = [moved('R', 'rejected', you, { reason: 'No.', via: 'orch' })];
+    expect(rowCall(dropped, 'cerrados', ctx(relayedDrop)).sub).toEqual({
+      key: 'toca.sub.closedRelayed',
+      agent: 'orch',
+    });
+    const relayedDone = [moved('D', 'fixed', you, { from: 'verify', minutes: 5, via: 'orch' })];
+    expect(rowCall(done, 'cerrados', { ...ctx(relayedDone), onBoard: () => true }).sub).toEqual({
+      key: 'toca.sub.closedRelayed',
+      agent: 'orch',
+    });
   });
 
   // P7-R3-1: «espera a un agente» on an item the only agent had set aside for later.

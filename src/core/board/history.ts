@@ -35,11 +35,24 @@ const MIGRATE = 'migrate';
 
 // What a move said and who made it, by the move's index: its note, else its reason (a send-back's
 // note), else the quote of a relayed one. `reading`: the question a preset reading carried.
-export type Said = { by: Actor; text?: string; reading?: true };
+// `relayedBy`: an agent relayed it as the person's word (`via`): Otea cannot check that, so it is
+// not the person's own.
+export type Said = { by: Actor; text?: string; reading?: true; relayedBy?: string };
 
 // A handoff's note as the history holds it: the step it was handed off from, how many moves came
 // before it (its round is the step's round then), when and by whom.
-export type HandoffNote = { step: string; before: number; note: string; at: string; by: Actor };
+export type HandoffNote = {
+  step: string;
+  before: number;
+  note: string;
+  at: string;
+  by: Actor;
+  relayedBy?: string;
+};
+
+// The agent that relayed an event as the person's word, if one did.
+const relayerOf = (data: Record<string, unknown>): { relayedBy: string } | Record<string, never> =>
+  typeof data.via === 'string' ? { relayedBy: data.via } : {};
 
 export type History = {
   initial: string;
@@ -55,7 +68,7 @@ const words = (value: unknown): value is string => typeof value === 'string' && 
 
 function saidOf(data: Record<string, unknown>, by: Actor): Said {
   const text = [data.note, data.reason, data.quote].find(words);
-  return text === undefined ? { by } : { by, text };
+  return text === undefined ? { by, ...relayerOf(data) } : { by, text, ...relayerOf(data) };
 }
 
 // The item's moves as the engine replays them, undone moves left out. A collection read from a
@@ -111,7 +124,14 @@ export function historyOf(
   for (const { data, at, actor } of moved.slice(migrated + 1)) {
     const from = positionOf(String(data.from));
     if (words(data.note) && !isClosed(from))
-      out.notes.push({ step: from.step, before: out.moves.length, note: data.note, at, by: actor });
+      out.notes.push({
+        step: from.step,
+        before: out.moves.length,
+        note: data.note,
+        at,
+        by: actor,
+        ...relayerOf(data),
+      });
     out.moves.push({
       from: String(data.from),
       to: String(data.to),
@@ -155,13 +175,14 @@ export function roundAfter(
 export function handoffNotes(
   def: BoardDefinition,
   history: History,
-): { step: string; round: number; note: string; at: string; by: Actor }[] {
-  return history.notes.map(({ step, before, note, at, by }) => ({
+): { step: string; round: number; note: string; at: string; by: Actor; relayedBy?: string }[] {
+  return history.notes.map(({ step, before, note, at, by, relayedBy }) => ({
     step,
     round: roundAfter(def, history, step, before),
     note,
     at,
     by,
+    ...(relayedBy === undefined ? {} : { relayedBy }),
   }));
 }
 

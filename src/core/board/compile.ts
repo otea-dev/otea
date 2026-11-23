@@ -183,13 +183,20 @@ function closingByYou(transition: RawTransition): RawTransition {
     : transition;
 }
 
+// The person's forward approval into what lands on main or closes the item (a land step, or Hecho)
+// is theirs alone, given on the desk or the phone: an agent cannot relay it, since Otea cannot
+// check that the person said it. Send-backs and drops stay `human`, so chat can still make them.
+function approvalOf(def: BoardDefinition, by: RawTransition['by'], way: string) {
+  return by === 'human' && (way === DONE || isLandStep(def, way)) ? ('human-ui' as const) : by;
+}
+
 function transitionsOf(def: BoardDefinition): RawTransition[] {
   const out: RawTransition[] = [];
   const target = (way: string) => (way === DONE ? DONE : stateOf({ step: way, phase: 'doing' }));
   for (const step of def.steps) {
     const doing = stateOf({ step: step.id, phase: 'doing' });
     const doer = step.doer === 'you' ? 'human' : 'agent';
-    const ways = waysOf(def, step.id).map(target);
+    const ways = waysOf(def, step.id);
     const back = stateOf({ step: backTarget(def, step.id), phase: 'doing' });
     // A handoff that carries the round's note says it as the move's reason.
     const note = step.note.req === 'always' ? { reason: 'required' as const } : {};
@@ -197,8 +204,14 @@ function transitionsOf(def: BoardDefinition): RawTransition[] {
       out.push({ from: doing, to: target(earlier), by: doer, reason: 'required' });
     if (step.reviewer === 'none') {
       const land = isLandStep(def, step.id) ? { land: true as const } : {};
-      for (const to of ways)
-        out.push({ from: doing, to, by: doer, ...note, ...(to === DONE ? land : {}) });
+      for (const way of ways)
+        out.push({
+          from: doing,
+          to: target(way),
+          by: approvalOf(def, doer, way),
+          ...note,
+          ...(way === DONE ? land : {}),
+        });
       // The person may send an approved item back from its land step, before it lands, to the
       // step they approved, saying why.
       if (land.land)
@@ -215,7 +228,8 @@ function transitionsOf(def: BoardDefinition): RawTransition[] {
     const review = stateOf({ step: step.id, phase: 'review' });
     const reviewer = step.reviewer === 'you' ? 'human' : 'agent';
     out.push({ from: doing, to: review, by: doer, ...note });
-    for (const to of ways) out.push({ from: review, to, by: reviewer });
+    for (const way of ways)
+      out.push({ from: review, to: target(way), by: approvalOf(def, reviewer, way) });
     out.push({ from: review, to: back, by: reviewer, reason: 'required' });
   }
   return out.map(closingByYou);

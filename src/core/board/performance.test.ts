@@ -109,6 +109,23 @@ describe('modelPerformance', () => {
     expect(by('opus')).toMatchObject({ handoffs: 1, sentBack: 0, finishedSteps: 1, rounds: 2 });
   });
 
+  // P1-F1: an agent can relay a send-back with any quote; it must not count against the doer.
+  it('does not count a send-back an agent relayed against the handoff it sent back', () => {
+    const events = [
+      created(),
+      move('sconcept', 'sconcept__review', sonnet),
+      move('sconcept__review', 'sconcept', YOU, { reason: 'No', via: 'orch', quote: 'no' }),
+      move('sconcept', 'sconcept__review', sonnet),
+    ];
+
+    const { rows } = modelPerformance([trail('CRI-1', events)]);
+
+    expect(rows.find((row) => row.family === 'sonnet')).toMatchObject({
+      handoffs: 2,
+      sentBack: 0,
+    });
+  });
+
   it('groups exact models of one family and effort, and tells them apart in the drill-down', () => {
     const one = [created(), move('sconcept', 'sconcept__review', opus)];
     const two = [created(), move('sconcept', 'sconcept__review', AGENT(kiln, OPUS_OLD))];

@@ -122,8 +122,8 @@ export function boardItemOf(
     if (move && said?.text)
       out.reopened = {
         why: said.text.trim(),
-        by: said.by.name,
-        person: said.by.kind === 'human',
+        by: said.relayedBy ?? said.by.name,
+        person: said.by.kind === 'human' && said.relayedBy === undefined,
         at: move.at,
       };
   }
@@ -159,6 +159,8 @@ export type ItemBoardBlock = {
   closedBy?: {
     doer?: string;
     reviewer?: { kind: 'human' | 'agent'; name: string };
+    // The agent that relayed the approval as the person's word (not the person's own).
+    reviewerRelayedBy?: string;
     // The person did its last step's work, a step of theirs (P4-R3-3).
     doneByPerson?: true;
   };
@@ -419,6 +421,8 @@ export type RoundNote = {
   person: boolean;
   at: string;
   reopened?: true;
+  // The agent that relayed it as the person's word: `person` is false, `by` is that agent.
+  relayedBy?: string;
 };
 // `doer`: the agent that did the round, with the profile it did it with (agents mock §5).
 export type Round = {
@@ -475,8 +479,9 @@ export function roundNotes(
           {
             kind: 'back',
             text: back.said.text.trim(),
-            by: back.said.reading ? '' : back.said.by.name,
-            person: back.said.by.kind === 'human',
+            by: back.said.reading ? '' : (back.said.relayedBy ?? back.said.by.name),
+            person: back.said.by.kind === 'human' && back.said.relayedBy === undefined,
+            ...(back.said.relayedBy === undefined ? {} : { relayedBy: back.said.relayedBy }),
             at: back.at,
             ...(back.reopened ? { reopened: true as const } : {}),
           },
@@ -492,8 +497,9 @@ export function roundNotes(
     round?.notes.push({
       kind: 'handoff',
       text: n.note.trim(),
-      by: n.by.name,
-      person: n.by.kind === 'human',
+      by: n.relayedBy ?? n.by.name,
+      person: n.by.kind === 'human' && n.relayedBy === undefined,
+      ...(n.relayedBy === undefined ? {} : { relayedBy: n.relayedBy }),
       at: n.at,
     });
   }

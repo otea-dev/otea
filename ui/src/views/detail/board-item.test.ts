@@ -381,6 +381,30 @@ describe('roundNotes: each round of the step with its notes', () => {
     ]);
   });
 
+  // P1-F1: a send-back an agent relayed is not the person's own, so «lo devolviste» never shows.
+  it('names the agent that relayed a send-back and does not call it the person’s', () => {
+    const relayed = said(
+      moved('sfix__review', 'sfix', you, '2026-01-03T00:00:00Z'),
+      'Sigue cayendo.',
+    );
+    relayed.data = { ...relayed.data, via: 'orch-a', quote: 'devuélvelo' };
+    const events: ItemEvent[] = [
+      created('sfix'),
+      moved('sfix', 'sfix__review', by, '2026-01-02T00:00:00Z'),
+      relayed,
+    ];
+    expect(roundNotes(errores(), 'sfix', events)[1]?.notes).toEqual([
+      {
+        kind: 'back',
+        text: 'Sigue cayendo.',
+        by: 'orch-a',
+        person: false,
+        relayedBy: 'orch-a',
+        at: '2026-01-03T00:00:00Z',
+      },
+    ]);
+  });
+
   it('names who did each round with the profile it handed off with (agents mock §5)', () => {
     const opus = { harness: 'claude-code', model: 'opus', effort: 'high', family: 'opus' };
     const gpt = { harness: 'codex', model: 'gpt-5.5', effort: 'high', family: 'gpt-5' };
