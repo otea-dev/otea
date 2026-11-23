@@ -46,6 +46,7 @@ import { listAgents, presenceSignature } from '../app/presence.ts';
 import { listPresetViews } from '../app/preset-views.ts';
 import { estimatesOfItems, pinItems, priorityOf, setOrder } from '../app/priority.ts';
 import { type Env, type Project, projectView } from '../app/project.ts';
+import { projectLanguage } from '../app/project-language.ts';
 import { answerQuestion } from '../app/questions.ts';
 import { inLanguage } from '../app/reading-lang.ts';
 import { linkItems, unlinkItems } from '../app/relations.ts';
@@ -529,6 +530,8 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         const { kind, lang: asked } = c.req.query();
         if (kind !== undefined && !isPromptKind(kind))
           throw new InvalidQuery(`kind must be one of ${PROMPT_KINDS.join(', ')}`);
+        // `lang` is the desk's screen: it words the list beside the prompt. The prompt itself is in
+        // the project's language, as otea prompt writes it.
         const lang =
           asked === 'es' || asked === 'en' ? asked : resolveLang(storedLanguage(machine), env);
         const moment = kind ?? promptKindOf(project);
@@ -540,7 +543,7 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         const first = 'first' in facts && facts.first === true ? { first: true } : {};
         return c.json({
           kind: moment,
-          prompt: agentPrompt(moment, lang, facts),
+          prompt: agentPrompt(moment, projectLanguage(project, env), facts),
           ...connectFacts(shown),
           ...first,
         });

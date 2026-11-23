@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { storedLanguage } from '../app/language.ts';
 import { memoryMachine } from '../app/machine.ts';
 import type { Project } from '../app/project.ts';
+import { setProjectLanguage } from '../app/project-language.ts';
 import { startPrompt } from '../core/agent-prompts.ts';
+import { insertProjectIdentity } from '../store/queries.ts';
 import { createServer, type OteaServer } from './server.ts';
 import { LOCAL_HOST, memoryProject, SESSION_COOKIE, TOKEN } from './testing.ts';
 
@@ -30,6 +32,8 @@ describe('the person language on the server', () => {
 
   beforeEach(() => {
     project = memoryProject();
+    // A project has its identity row (where its language is kept) from the day it is opened.
+    insertProjectIdentity(project.db, project.identity);
     machine = memoryMachine();
     server = createServer(project, { token: TOKEN, machine });
   });
@@ -73,8 +77,9 @@ describe('the person language on the server', () => {
     expect(storedLanguage(machine)).toBeUndefined();
   });
 
-  it('writes the agent prompt in the desk language when none is asked, and in the one asked', async () => {
-    vi.stubEnv('LC_ALL', 'es_ES.UTF-8');
+  // What the desk copies is what otea prompt prints: the project's language, not the screen's.
+  it('writes the agent prompt in the project language, whatever the desk or the screen is in', async () => {
+    setProjectLanguage(project, 'es');
     expect((await call('/p/memory-aaaaaa/api/agent-prompt')).body.prompt).toBe(
       startPrompt('es', false),
     );
@@ -82,10 +87,15 @@ describe('the person language on the server', () => {
     await call('/api/language', { lang: 'en' });
 
     expect((await call('/p/memory-aaaaaa/api/agent-prompt')).body.prompt).toBe(
-      startPrompt('en', false),
-    );
-    expect((await call('/p/memory-aaaaaa/api/agent-prompt?lang=es')).body.prompt).toBe(
       startPrompt('es', false),
+    );
+    expect((await call('/p/memory-aaaaaa/api/agent-prompt?lang=en')).body.prompt).toBe(
+      startPrompt('es', false),
+    );
+
+    setProjectLanguage(project, 'en');
+    expect((await call('/p/memory-aaaaaa/api/agent-prompt?lang=es')).body.prompt).toBe(
+      startPrompt('en', false),
     );
   });
 });

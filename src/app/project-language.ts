@@ -26,8 +26,13 @@ function requestsBoardLang(db: DatabaseSync): Lang | undefined {
   const version =
     board?.liveVersion == null ? undefined : findVersion(db, board.id, board.liveVersion);
   if (version === undefined) return undefined;
-  const reading = parseDefinition(JSON.parse(version.definition));
-  return reading.ok ? boardLang(reading.definition) : undefined;
+  // A definition that cannot be read says nothing: it must not stop the project from opening.
+  try {
+    const reading = parseDefinition(JSON.parse(version.definition));
+    return reading.ok ? boardLang(reading.definition) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 // What is stored, read without writing.

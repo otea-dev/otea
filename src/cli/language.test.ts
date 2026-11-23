@@ -137,6 +137,19 @@ describe('the language of what the CLI makes', () => {
     expect((await person('projects', 'lang', 'fr')).code).not.toBe(0);
   });
 
+  it('leaves changing the project language to the person: an agent may read it, not set it', async () => {
+    await switchDeskTo('en');
+    await person('init', '--local', '--template', 'none');
+    const agent = cliAt(repo.dir, { OTEA_AGENT: 'claude' });
+
+    const refused = await agent('projects', 'lang', 'es');
+
+    expect(refused.code).not.toBe(0);
+    expect(refused.err).toContain("the person's choice");
+    expect((await agent('projects', 'lang')).out).toContain('English (en)');
+    expect((await person('projects', 'lang')).out).toContain('English (en)');
+  });
+
   it('puts the Pedido of a board an agent drafts in the project language, not the desk one', async () => {
     await switchDeskTo('es');
     await person('init', '--local', '--template', 'none');
