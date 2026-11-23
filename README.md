@@ -15,6 +15,20 @@
 
 ¿Hablas español? Lee el [inicio rápido en español](README.es.md).
 
+## Start in a minute
+
+In the folder you want to track, usually a repository:
+
+```sh
+npm i -g @otea/cli   # needs Node.js 22.18 or later
+otea start
+```
+
+`otea start` makes the project, opens the desk in your browser and prints the text to paste into your agent's chat. [Get started](#from-the-terminal-npm-or-source) says what it does, step by step.
+
+- **`npm i -g` says permission denied?** Install into a folder of your own, with no `sudo`: `npm i -g --prefix ~/.otea-npm @otea/cli`, then put `~/.otea-npm/bin` on your `PATH` ([details](#the-otea-command-from-npm)).
+- **No Node, or you prefer Otea in its own window?** Install the desktop app instead: [Install](#install) has both ways.
+
 > From the Spanish verb *otear*: to scan from a high vantage point, to watch what is happening and what is coming.
 
 Agents produce work faster than a human can follow it live. Otea is where work changes hands: agents leave findings, deliverables and evidence; you leave decisions and feedback; both can see at any moment where each thing stands and whose turn it is.
@@ -63,17 +77,6 @@ The same change on a phone, with the agent's note and your two moves.
 
 **Answer your agents from your phone.** A question from an agent reaches your phone; you answer there, and the desk shows the agent going on.
 
-## Start in a minute
-
-In the folder you want to track, usually a repository:
-
-```sh
-npm i -g @otea/cli   # needs Node.js 22.18 or later
-otea start
-```
-
-`otea start` makes the project, opens the desk in your browser and prints the text to paste into your agent's chat. [Get started](#from-the-terminal-npm-or-source) says what it does, step by step. No Node, or you prefer Otea in its own window? Install the desktop app instead: [Install](#install) has both ways.
-
 ## Status
 
 Early and still changing fast, but usable. The [changelog](https://github.com/otea-dev/otea/blob/main/CHANGELOG.md) says what each release changed, and the product definition lives in [`docs/otea-product-definition.md`](docs/otea-product-definition.md).
@@ -88,7 +91,8 @@ There are two ways to install Otea: the **desktop app**, or the **`otea` command
 - **macOS:** the desktop app, if you want Otea in its own window with notifications. It cannot update itself yet: you download each new version. If you already use Node, npm is just as good.
 - **Linux:** the desktop app as a `.deb` on Debian or Ubuntu. On other distributions, the AppImage, or npm if you want `otea` in your terminal.
 
-### What each one gives you
+<details>
+<summary><strong>What each one gives you</strong> (a table, if you want to compare)</summary>
 
 | | Desktop app | npm (`npm i -g @otea/cli`) |
 | --- | --- | --- |
@@ -101,6 +105,8 @@ There are two ways to install Otea: the **desktop app**, or the **`otea` command
 | Needs Node.js | ❌ It brings its own | ✅ Node.js 22.18 or later |
 
 Everything else works the same both ways: boards, the phone (pairing and notifications on it), agents over the CLI or MCP. Neither starts on its own when you log in.
+
+</details>
 
 ### The desktop app
 
@@ -153,6 +159,16 @@ You need [Node.js](https://nodejs.org/) 22.18 or later (Node 24 recommended). Ch
 npm i -g @otea/cli
 otea --version
 ```
+
+If `npm i -g` fails with a permission error (EACCES), do not reach for `sudo`: install into a folder of your own and put its `bin` on your `PATH`.
+
+```sh
+npm i -g --prefix ~/.otea-npm @otea/cli
+export PATH="$HOME/.otea-npm/bin:$PATH"   # add this line to your shell profile too
+otea --version
+```
+
+On Windows the command lands in the prefix folder itself: add `%USERPROFILE%\.otea-npm` to your `PATH` instead. Update and remove with the same `--prefix` (`npm i -g --prefix ~/.otea-npm @otea/cli`, `npm uninstall -g --prefix ~/.otea-npm @otea/cli`).
 
 To update, run `npm i -g @otea/cli` again. To remove it, `npm uninstall -g @otea/cli`. You open the desk with `otea serve` (see [Get started](#from-the-terminal-npm-or-source)).
 
@@ -215,7 +231,7 @@ Then [give your agent the text](#give-your-agent-the-text).
 
    ```text
    Project: set up "tienda-web" (data in ~/.otea/data/tienda-web-yafrhx)
-   Boards: none yet. Your agent designs them with you from the text below, or start from a template now: otea start --template <key> (todos, ideas, ...)
+   Boards: none yet. Pick one now: otea start --template changes (code, one branch per change) or otea start --template todos (anything that is not code); or paste the text below and your agent designs them with you (otea start --help lists every template)
    Language: English for the boards and the text below (--lang es makes them Spanish)
    Desk: running in the background at http://127.0.0.1:4400/p/tienda-web-yafrhx/ (pid 4120; stop it with otea serve stop)
 
