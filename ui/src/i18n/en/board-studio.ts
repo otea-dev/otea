@@ -20,6 +20,8 @@ export const boardStudio = {
   'bs.problem.group_small':
     'The group “{group}” in {step} asks for {min} of {of}. It needs at least one, and no more than it has.',
   'bs.problem.group_duplicate': '“{part}” is twice in the group “{group}” of {step}. Take one out.',
+  'bs.problem.group_overlap':
+    '“{part}” is in the groups “{other}” and “{group}” of {step}. A part belongs to one group: take it out of one.',
   'bs.problem.group_member':
     '“{part}” in the group “{group}” of {step} is not optional evidence of that step. Take it out of the group.',
   'bs.problem.way_invalid':

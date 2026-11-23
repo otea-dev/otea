@@ -135,13 +135,12 @@ export const common = {
   'refusal.why.unchecked': 'every box ticked',
   'refusal.why.unproved': 'a proof for {list}',
   'refusal.why.group': {
-    one: 'at least {min} of {list}; {count} attached',
-    other: 'at least {min} of {list}; {count} attached',
+    one: 'at least {min} of {list}{fresh}; {count} attached',
+    other: 'at least {min} of {list}{fresh}; {count} attached',
   },
-  'refusal.why.groupFresh': {
-    one: 'at least {min} of {list}, new this round; {count} attached',
-    other: 'at least {min} of {list}, new this round; {count} attached',
-  },
+  // What a group says of the files its counting discards: every part new each round, or some.
+  'evidence.fresh.all': ', each new this round',
+  'evidence.fresh.some': ', new this round: {names}',
   'refusal.why.note': 'a note',
   'refusal.why.part': 'its part {list} is not finished',
   'refusal.why.partsUnmerged': {

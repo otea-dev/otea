@@ -37,6 +37,7 @@ export type ProblemCode =
   | 'group_small'
   | 'group_member'
   | 'group_duplicate'
+  | 'group_overlap'
   | 'way_invalid'
   | 'back_invalid'
   | 'cap_invalid'
@@ -315,9 +316,10 @@ function initialFits(kind: string, options: readonly { id: string }[], value: st
 
 // What is wrong with the "at least N of" groups of a step: a group with no name, one that asks for
 // more than it has (or for fewer than one), a member that is no evidence the step hands off, or one
-// the step already requires on its own (the group would ask for nothing more of it).
+// the step already requires on its own (the group would ask for nothing more of it), or one that is
+// in another group of the step too (a part counts by one group's way: new each round, or carried).
 export type GroupFault = {
-  code: 'group_unnamed' | 'group_small' | 'group_member' | 'group_duplicate';
+  code: 'group_unnamed' | 'group_small' | 'group_member' | 'group_duplicate' | 'group_overlap';
   params: ProblemParams;
 };
 
@@ -326,8 +328,18 @@ export function groupFaults(
   step: BoardDefinition['steps'][number],
 ): GroupFault[] {
   const out: GroupFault[] = [];
+  const firstGroup = new Map<string, string>();
   for (const group of step.groups ?? []) {
     const params = { step: step.name, group: group.name.trim() };
+    for (const ref of new Set(group.parts)) {
+      const other = firstGroup.get(ref);
+      if (other === undefined) firstGroup.set(ref, group.name.trim());
+      else
+        out.push({
+          code: 'group_overlap',
+          params: { ...params, part: def.parts[ref]?.name ?? ref, other },
+        });
+    }
     if (key(group.name) === '') out.push({ code: 'group_unnamed', params });
     const members = new Set(group.parts);
     // A part named twice would count twice toward the minimum.

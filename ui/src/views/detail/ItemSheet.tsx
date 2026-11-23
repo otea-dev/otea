@@ -68,6 +68,7 @@ import {
   waitBlock,
   waitRows,
 } from './board-item.ts';
+import { cautionKeyOf, useCaution } from './caution.ts';
 import { Details, detailCells } from './Details.tsx';
 import { useDiffOffTip } from './diff-tip.ts';
 import { useDrift } from './drift.ts';
@@ -297,10 +298,12 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
         ? handRefusal(item.id, missing)
         : null;
   // Approving a delivery whose "at least N of" group is short asks once (a second press approves).
-  const caution = (c: MoveChoice) =>
+  // Asked here, for the page and for the reader (useCaution): a file attached meanwhile asks again.
+  const cautionOf = (c: MoveChoice) =>
     live && c.kind === 'approve'
       ? shortGroupCaution(evidenceGaps(live, item).groups, c.label)
       : null;
+  const careful = useCaution(cautionKeyOf(item), cautionOf);
   const filled = (ref: string) => {
     const value = item.fields[ref];
     const held = Array.isArray(value)
@@ -619,9 +622,16 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
         back: backChoice
           ? { label: backChoice.label, onClick: () => pressMove(backChoice.move.to) }
           : undefined,
+        // A group short asks once, here, with the reader open; the second press closes it and goes.
         approve: approveChoice
-          ? { label: approveChoice.label, onClick: () => pressMove(approveChoice.move.to) }
+          ? {
+              label: approveChoice.label,
+              onClick: () => {
+                if (careful.press(approveChoice) === null) pressMove(approveChoice.move.to);
+              },
+            }
           : undefined,
+        warn: careful.line || undefined,
       }
     : undefined;
   const unseen = approveChoice && deciding ? unopenedOf(reader.files, seen) : null;
@@ -866,7 +876,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                   : ''
               }
               refuse={live ? refuse : undefined}
-              caution={live ? caution : undefined}
+              caution={live ? cautionOf : undefined}
               back={live ? (to: string) => backOf(live, item, to) : undefined}
               onClose={onClose}
               notes={
@@ -1040,7 +1050,8 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
               <Acts
                 onDrop={live && dropChoices.length ? () => setDropping(true) : undefined}
                 refuse={live ? refuse : undefined}
-                caution={live ? caution : undefined}
+                ask={live ? careful.press : undefined}
+                warning={careful.line}
                 back={live ? (to: string) => backOf(live, item, to) : undefined}
                 item={item}
                 type={type}

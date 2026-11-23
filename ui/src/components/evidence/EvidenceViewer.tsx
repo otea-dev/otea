@@ -165,7 +165,11 @@ export type ReaderDecide = {
   // A line that never holds the moves: review comments that go with a send-back.
   notice?: string | undefined;
   back?: { label: string; onClick: () => void } | undefined;
-  approve?: { label: string; onClick: () => void } | undefined;
+  // `hold`: true when the move waits for a second press (its line shows here in `warn`), so a
+  // host that closes the reader first leaves it open instead.
+  approve?: { label: string; onClick: () => void; hold?: () => boolean } | undefined;
+  // What waits for the second press, said where the person is: a refusal-weight line, never a hold.
+  warn?: string | undefined;
 };
 
 // A note to the agent at work from inside the reader, on the file read: on the line or diagram node
@@ -475,6 +479,11 @@ export function EvidenceReader({
       <span className="ev-reader-seen">
         {t('evidence.seenOf', { n: decide.seen, total: evidence.length })}
         {decide.notice ? <small className="ev-reader-notice">{decide.notice}</small> : null}
+        {decide.warn ? (
+          <small className="ev-reader-notice warn" role="alert">
+            {decide.warn}
+          </small>
+        ) : null}
       </span>
       {decide.back ? (
         <button

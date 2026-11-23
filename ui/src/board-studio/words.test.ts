@@ -4,7 +4,7 @@ import { changePlan } from '../../../src/core/board/plan.ts';
 import { problemsOf } from '../../../src/core/board/problems.ts';
 import { cambios, creatures, errores, step } from '../../../src/core/board/testing.ts';
 import { moduleAccepts } from '../../../src/core/placement.ts';
-import { setLanguage } from '../i18n/i18n.ts';
+import { setLanguage, t } from '../i18n/i18n.ts';
 import {
   changeText,
   doesText,
@@ -168,6 +168,23 @@ describe('what a kind of evidence promises', () => {
             true,
           );
       }
+    },
+  );
+
+  // The picker's line over the kinds names them in one breath: GIF belongs to the images it takes,
+  // never to the video that refuses it.
+  it.each(['en', 'es'] as const)(
+    'puts GIF with the images, not the video, in the picker, in %s',
+    (language) => {
+      setLanguage(language);
+      const gloss = t('bs.editor.pick.evidence_gloss');
+      const segment = gloss.split(/,\s*/).find((part) => /\bGIF/i.test(part)) ?? '';
+      expect(segment).not.toBe('');
+      expect(segment).toMatch(/images|imágenes/i);
+      expect(segment).not.toMatch(/video|vídeo/i);
+      // And what it says of video promises none of GIF.
+      expect(kindName('video')).not.toMatch(/GIF/i);
+      expect(kindGloss('video')).not.toMatch(/GIF/i);
     },
   );
 });

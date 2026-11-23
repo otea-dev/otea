@@ -284,6 +284,17 @@ export function isEvidence(part: Part): boolean {
   return isEvidenceKind(part.kind);
 }
 
+// The members of a group that count only files of the round (their hand is new each round), by ref.
+// Counting discards the older files of exactly these, so these are what the group says are new.
+export function freshMembers(step: Step, group: Group): string[] {
+  return group.parts.filter((ref) => step.hand.find((hand) => hand.ref === ref)?.fresh === true);
+}
+
+// Whether every member is new in each round: a send-back then empties the whole group.
+export function groupFresh(step: Step, group: Group): boolean {
+  return group.parts.length > 0 && freshMembers(step, group).length === group.parts.length;
+}
+
 // The motive of a discard, by id.
 export function motiveById(def: BoardDefinition, id: string): Choice | undefined {
   return def.drop.motives.find((motive) => motive.id === id);

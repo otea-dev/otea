@@ -9,7 +9,7 @@ import {
   EVIDENCE_SHOWS,
   type EvidenceKind,
   type FieldKind,
-  type Group,
+  groupFresh,
   isEvidenceKind,
   type Lead,
   MOTIVE,
@@ -349,18 +349,28 @@ function tidyGroups(step: Step): void {
   }
 }
 
-// The evidence a group of the step may name: what it hands off and does not require on its own.
-export function groupable(def: BoardDefinition, step: Step): string[] {
+// The evidence a group of the step may name: what it hands off, does not require on its own and no
+// other group has (a part belongs to at most one group, so its way of counting is one). `own`: the
+// group asking, whose members stay on offer.
+export function groupable(def: BoardDefinition, step: Step, own?: string): string[] {
+  const taken = new Set(
+    (step.groups ?? []).filter((group) => group.id !== own).flatMap((group) => group.parts),
+  );
   return step.hand
     .filter(
-      (h) => h.req !== 'always' && def.parts[h.ref] && isEvidenceKind(def.parts[h.ref]?.kind ?? ''),
+      (h) =>
+        h.req !== 'always' &&
+        !taken.has(h.ref) &&
+        def.parts[h.ref] &&
+        isEvidenceKind(def.parts[h.ref]?.kind ?? ''),
     )
     .map((h) => h.ref);
 }
 
-// A new group of every optional evidence of the step, asking for one: the person takes out what
-// does not belong. It starts new in each round: a send-back then asks the group for a file of the
-// new round, so a returned round never goes back with only what the first one attached (P5-F2).
+// A new group of the optional evidence of the step no group has, asking for one: the person takes
+// out what does not belong. It starts new in each round: a send-back then asks the group for a file
+// of the new round, so a returned round never goes back with only what the first one attached
+// (P5-F2). Only its own parts change; what another group holds keeps its way.
 export function addGroup(def: BoardDefinition, stepId: string, name: string): string | undefined {
   const step = stepOf(def, stepId);
   if (!step) return undefined;
@@ -372,16 +382,9 @@ export function addGroup(def: BoardDefinition, stepId: string, name: string): st
   return id;
 }
 
-// Whether the group is new in each round: every one of its parts is (a send-back empties it).
-export function groupFresh(step: Step, group: Group): boolean {
-  return (
-    group.parts.length > 0 &&
-    group.parts.every((ref) => step.hand.find((h) => h.ref === ref)?.fresh === true)
-  );
-}
-
 // Turns the whole group new in each round, or lets what it holds carry over from one round to the
-// next. Its parts follow together, so a group never counts a mix of this round's files and last's.
+// next. Its parts follow together, so a group never counts a mix of this round's files and last's;
+// no other group's part is touched.
 export function setGroupFresh(def: BoardDefinition, stepId: string, id: string, fresh: boolean) {
   const step = stepOf(def, stepId);
   const group = groupOf(def, stepId, id);
@@ -416,7 +419,7 @@ export function toggleGroupPart(
   if (!step || !group) return;
   if (group.parts.includes(ref)) {
     if (group.parts.length > 1) group.parts = group.parts.filter((r) => r !== ref);
-  } else if (groupable(def, step).includes(ref)) {
+  } else if (groupable(def, step, id).includes(ref)) {
     // A part joining takes the group's way: new in each round, or carried over.
     const fresh = groupFresh(step, group);
     group.parts = step.hand.map((h) => h.ref).filter((r) => r === ref || group.parts.includes(r));

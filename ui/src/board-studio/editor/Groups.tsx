@@ -1,11 +1,10 @@
-import type { Group, Step } from '../../../../src/core/board/model.ts';
+import { type Group, groupFresh, type Step } from '../../../../src/core/board/model.ts';
 import { t } from '../../i18n/i18n.ts';
 import { ChipButton } from '../../kit/Button.tsx';
 import { useEditor } from './context.ts';
 import {
   addGroup,
   groupable,
-  groupFresh,
   removeGroup,
   renameGroup,
   setGroupFresh,
@@ -20,7 +19,8 @@ import { Conseq } from './SentenceText.tsx';
 function GroupRow({ step, group }: { step: Step; group: Group }) {
   const { draft } = useEditor();
   const def = draft.def;
-  const choices = groupable(def, step);
+  // What this group may name: its own parts and those no other group has.
+  const choices = groupable(def, step, group.id);
   const fresh = groupFresh(step, group);
   const mutate = (change: (d: typeof def) => void, burst?: string) => draft.mutate(change, burst);
   return (
