@@ -202,6 +202,8 @@ export const common = {
   'refusal.thisStep': 'this step',
   'refusal.frozen':
     'Not updated {item}: its {part} is frozen here; it changes only while {steps} is being done.',
+  'refusal.laterField':
+    'Not updated {item}: {part} is filled in {step}, a later step, so it stays as it is while {review} is in review; fill it once the item gets there.',
   'refusal.closed': '{item} has ended: it takes no more changes.',
   'refusal.noPick': 'Not approved {item}: it is a decision, pick one of its options on its page.',
   'refusal.draftNotPublished':

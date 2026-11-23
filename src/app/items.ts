@@ -44,6 +44,7 @@ import { presentEvidence } from './evidence.ts';
 import { assertMayWriteItem } from './lease-take.ts';
 import {
   assertBranchMayChange,
+  assertLaterFieldsStay,
   assertMayStandAlone,
   assertMoveHandsOff,
   type BoardBlock,
@@ -373,6 +374,7 @@ export function updateItem(ctx: Context, input: UpdateItemInput, now = systemClo
     }
     const fields = boardFieldInput(ctx, item.collection, input.fields ?? {});
     assertBranchMayChange(ctx, item, fields, input.actor);
+    assertLaterFieldsStay(ctx, item, fields);
     const changes = {
       ...fields,
       ...(input.title === undefined ? {} : { title: input.title }),

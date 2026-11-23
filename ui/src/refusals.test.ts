@@ -256,6 +256,23 @@ describe('a refusal from the server', () => {
     );
   });
 
+  it('words a field of a later step written during a review, in each language', () => {
+    const later = refused('forbidden', 'x', {
+      kind: 'later_field',
+      item: 'CAM-1',
+      part: 'Commit en main',
+      step: 'Integrar',
+      review: 'Hacerlo',
+    });
+    expect(serverMessage(later, 403)).toBe(
+      'Not updated CAM-1: Commit en main is filled in Integrar, a later step, so it stays as it is while Hacerlo is in review; fill it once the item gets there.',
+    );
+    setLanguage('es');
+    expect(serverMessage(later, 403)).toBe(
+      'No se actualizó CAM-1: Commit en main se completa en Integrar, un paso posterior, así que no cambia mientras Hacerlo está en revisión; complétalo cuando el ítem llegue ahí.',
+    );
+  });
+
   it('words archiving and deleting a board, and an archived item', () => {
     setLanguage('es');
     const frozen = refused('board_archived', 'x', {

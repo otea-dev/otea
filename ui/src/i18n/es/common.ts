@@ -208,6 +208,8 @@ export const common = {
   'refusal.thisStep': 'este paso',
   'refusal.frozen':
     'No se actualizó {item}: su {part} está congelado aquí; solo cambia mientras se hace {steps}.',
+  'refusal.laterField':
+    'No se actualizó {item}: {part} se completa en {step}, un paso posterior, así que no cambia mientras {review} está en revisión; complétalo cuando el ítem llegue ahí.',
   'refusal.closed': '{item} ya terminó: no admite cambios.',
   'refusal.noPick': 'No se aprobó {item}: es una decisión, elige una de sus opciones en su página.',
   'refusal.draftNotPublished':

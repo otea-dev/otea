@@ -817,6 +817,24 @@ export function sentBackAt(
   return -1;
 }
 
+// The fields that only steps after `stepId` hand off, each with the first step that does: none of
+// the creation form, nor of this step or an earlier one. While the item waits in this step's
+// review they have no value to give yet, so they are not written (P1-F3).
+export function laterFields(def: BoardDefinition, stepId: string): Map<string, Step> {
+  const index = stepIndex(def, stepId);
+  const later = new Map<string, Step>();
+  if (index < 0) return later;
+  const known = new Set<string>([TITLE, ...def.form.map(({ ref }) => ref)]);
+  for (const step of def.steps.slice(0, index + 1)) for (const { ref } of step.hand) known.add(ref);
+  for (const step of def.steps.slice(index + 1)) {
+    for (const { ref } of step.hand) {
+      const part = partOf(def, ref);
+      if (part && !isEvidence(part) && !known.has(ref) && !later.has(ref)) later.set(ref, step);
+    }
+  }
+  return later;
+}
+
 // What a step starts with: the title, the creation form and everything handed off before it, each
 // once, with the step that handed it off.
 export function startsWith(def: BoardDefinition, stepId: string): { ref: string; from?: string }[] {

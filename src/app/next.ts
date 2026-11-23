@@ -15,6 +15,7 @@ import {
   isClosed,
   isLandStep,
   type Linked,
+  laterFields,
   type Missing,
   type MoveResult,
   mayReview,
@@ -2128,6 +2129,31 @@ export function assertBranchMayChange(
       steps: branch.guard.push.map((id) => stepById(board.def, id)?.name ?? id),
     },
   );
+}
+
+// While a step is in review, what only a later step hands off stays as it is, for the person and
+// for an agent alike: a value there now would show as true before the item is anywhere near it
+// (P1-F3). It can be filled once the item reaches that step.
+export function assertLaterFieldsStay(
+  ctx: Context,
+  item: { id: string; collection: string; state: string },
+  changes: Readonly<Record<string, unknown>>,
+): void {
+  const board = liveBoardOf(ctx, item.collection);
+  const position = positionOf(item.state);
+  if (!board || isClosed(position) || position.phase !== 'review') return;
+  const later = laterFields(board.def, position.step);
+  for (const ref of Object.keys(changes)) {
+    const step = later.get(ref);
+    if (!step) continue;
+    const name = board.def.parts[ref]?.name ?? ref;
+    const review = stepById(board.def, position.step)?.name ?? position.step;
+    throw new OteaError(
+      'forbidden',
+      `Not updated ${item.id}: ${name} is filled in ${step.name}, a later step, so it stays as it is while ${review} is in review; fill it once the item gets there.`,
+      { kind: 'later_field', item: item.id, part: name, step: step.name, review },
+    );
+  }
 }
 
 // The state a reader names on a board (a step's name, `Done`), as the workflow's state.

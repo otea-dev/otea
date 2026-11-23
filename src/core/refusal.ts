@@ -50,6 +50,9 @@ export type RefusalDetails =
     }
   // The protected branch (or its repository) cannot change at this step.
   | { kind: 'frozen'; item: string; part: string; steps: string[] }
+  // A field only a later step hands off, written while an earlier step is in review: `step` hands
+  // it, `review` is the step under review (names as the board wrote them).
+  | { kind: 'later_field'; item: string; part: string; step: string; review: string }
   // An item that has ended takes no update.
   | { kind: 'closed'; item: string }
   // A Pedido closed as done while the board it drafts still waits as a draft: publishing the board

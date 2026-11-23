@@ -191,6 +191,13 @@ function said(details: RefusalDetails): string | undefined {
         part: details.part,
         steps: listOr(details.steps),
       });
+    case 'later_field':
+      return t('refusal.laterField', {
+        item: details.item,
+        part: details.part,
+        step: details.step,
+        review: details.review,
+      });
     case 'closed':
       return t('refusal.closed', { item: details.item });
     case 'board_unpublished':
