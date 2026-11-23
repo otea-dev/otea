@@ -836,6 +836,51 @@ input.se-stepname:focus {
   background: var(--you-wash);
   color: var(--you-ink);
 }
+/* A chip that is on says so beyond its border (P5-F8): a filled box with a tick before the name,
+   an empty one when off, and a tinted fill; the state is a shape and a fill, not a hue alone. */
+.se-radios .chipb.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding-left: 9px;
+}
+.se-radios .chipb.mark::before {
+  content: "";
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1.5px var(--ink-3);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  transition:
+    background-color 240ms var(--o-drift),
+    box-shadow 240ms var(--o-drift);
+}
+.se-radios .chipb.mark.on::before {
+  content: "✓";
+  background: var(--ink);
+  box-shadow: none;
+  color: var(--ground);
+}
+.se-radios .chipb.mark.on {
+  background: var(--well);
+}
+.se-radios .chipb.mark.you.on {
+  background: var(--you-wash);
+}
+.se-radios .chipb.mark.you.on::before {
+  background: var(--you-ink);
+}
+.se-radios .chipb.mark:not(.on) {
+  color: var(--ink-2);
+}
+.se-group-fresh {
+  margin-top: 8px;
+}
 .se-opts {
   display: flex;
   flex-wrap: wrap;

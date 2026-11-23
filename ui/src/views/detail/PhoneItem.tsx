@@ -92,6 +92,7 @@ type PhoneItemProps = {
   links?: ReactNode | undefined;
   linksSummary?: string | undefined;
   refuse?: ((choice: MoveChoice) => string | null) | undefined;
+  caution?: ((choice: MoveChoice) => string | null) | undefined;
   back?: ((state: string) => { agent: string | null; round: number }) | undefined;
   onClose: () => void;
   notes?: PhoneNotes | undefined;
@@ -728,6 +729,8 @@ export function PhoneItem(p: PhoneItemProps) {
   const docked = (dock && (primary || sendback || picking)) || !!leave;
   const [asking, setAsking] = useState<Asking | null>(null);
   const [refused, setRefused] = useState('');
+  // The move a caution was said for (Aprobar with a group short): pressed again, it goes through.
+  const [warned, setWarned] = useState<string | null>(null);
   const [text, setText] = useState('');
   const backBtn = useRef<HTMLButtonElement>(null);
   const primaryBtn = useRef<HTMLButtonElement>(null);
@@ -795,6 +798,16 @@ export function PhoneItem(p: PhoneItemProps) {
     if (no) {
       setRefused(no);
       return;
+    }
+    const careful = warned === c.move.to ? null : p.caution?.(c);
+    if (careful) {
+      setWarned(c.move.to);
+      setRefused(careful);
+      return;
+    }
+    if (warned) {
+      setWarned(null);
+      setRefused('');
     }
     if (c.move.reasonRequired || c.kind === 'sendback') ask(c);
     else make(c);

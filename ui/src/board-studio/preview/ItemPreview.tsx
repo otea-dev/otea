@@ -2,6 +2,7 @@ import { type DragEvent, type ReactNode, useLayoutEffect, useRef, useState } fro
 import { type Phase, waysOf } from '../../../../src/core/board/engine.ts';
 import {
   type BoardDefinition,
+  type Group,
   partOf,
   type Selection,
   type Step,
@@ -249,30 +250,15 @@ export function ItemPreview({
               </button>
             );
           })}
-          {(step.groups ?? []).map((group) => {
-            const ok = at !== 'doing';
-            return (
-              <button
-                type="button"
-                key={group.id}
-                className={['bsp-hc', ok ? 'ok' : 'miss', 'req'].join(' ')}
-                onClick={reveal({ kind: 'step', id: step.id })}
-                title={t('bs.preview.why')}
-              >
-                <span className="bx" aria-hidden="true">
-                  {ok ? <Tick /> : null}
-                </span>
-                <span>
-                  {t('bi.hand.group', {
-                    name: group.name,
-                    min: group.min,
-                    list: listOr(group.parts.map((ref) => partOf(def, ref)?.name ?? ref)),
-                  })}
-                </span>
-                <small>{t(ok ? 'bs.preview.check.ready' : 'bs.preview.check.missing')}</small>
-              </button>
-            );
-          })}
+          {(step.groups ?? []).map((group) => (
+            <GroupCheck
+              key={group.id}
+              def={def}
+              group={group}
+              review={at !== 'doing'}
+              onReveal={reveal({ kind: 'step', id: step.id })}
+            />
+          ))}
           {step.waits.map((wait) => {
             const ok = at !== 'doing';
             const linked =
@@ -330,6 +316,62 @@ export function ItemPreview({
         />
       </div>
     </article>
+  );
+}
+
+// A group of the handoff's checklist. In review it reads as met; «Ver corto» shows it as it stands
+// when the agent attached one file fewer than it asks (P5-F7), so the red line and what the board
+// asks of its group can be seen without making an item.
+export function GroupCheck({
+  def,
+  group,
+  review,
+  onReveal,
+}: {
+  def: BoardDefinition;
+  group: Group;
+  review: boolean;
+  onReveal: () => void;
+}) {
+  const [short, setShort] = useState(false);
+  const ok = review && !short;
+  const have = Math.max(0, group.min - 1);
+  const word = ok
+    ? t('bs.preview.check.ready')
+    : short
+      ? t('bs.preview.check.short', { have, min: group.min })
+      : t('bs.preview.check.missing');
+  return (
+    <div className="bsp-hcg">
+      <button
+        type="button"
+        className={['bsp-hc', ok ? 'ok' : 'miss', 'req'].join(' ')}
+        onClick={onReveal}
+        title={t('bs.preview.why')}
+      >
+        <span className="bx" aria-hidden="true">
+          {ok ? <Tick /> : null}
+        </span>
+        <span>
+          {t('bi.hand.group', {
+            name: group.name,
+            min: group.min,
+            list: listOr(group.parts.map((ref) => partOf(def, ref)?.name ?? ref)),
+          })}
+        </span>
+        <small>{word}</small>
+      </button>
+      {review ? (
+        <button
+          type="button"
+          className="bsp-hcswap"
+          aria-pressed={short}
+          onClick={() => setShort((was) => !was)}
+        >
+          {t(short ? 'bs.preview.check.showMet' : 'bs.preview.check.showShort')}
+        </button>
+      ) : null}
+    </div>
   );
 }
 

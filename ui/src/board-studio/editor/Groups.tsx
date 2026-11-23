@@ -5,8 +5,10 @@ import { useEditor } from './context.ts';
 import {
   addGroup,
   groupable,
+  groupFresh,
   removeGroup,
   renameGroup,
+  setGroupFresh,
   setGroupMin,
   toggleGroupPart,
 } from './edits.ts';
@@ -19,6 +21,7 @@ function GroupRow({ step, group }: { step: Step; group: Group }) {
   const { draft } = useEditor();
   const def = draft.def;
   const choices = groupable(def, step);
+  const fresh = groupFresh(step, group);
   const mutate = (change: (d: typeof def) => void, burst?: string) => draft.mutate(change, burst);
   return (
     <div className="se-group" data-group={group.id}>
@@ -67,6 +70,7 @@ function GroupRow({ step, group }: { step: Step; group: Group }) {
           {choices.map((ref) => (
             <ChipButton
               key={ref}
+              className="mark"
               on={group.parts.includes(ref)}
               onClick={() => mutate((d) => toggleGroupPart(d, step.id, group.id, ref))}
             >
@@ -75,7 +79,21 @@ function GroupRow({ step, group }: { step: Step; group: Group }) {
           ))}
         </div>
       </div>
-      <Conseq s={{ key: 'bs.editor.group.conseq', params: { min: group.min } }} />
+      <div className="se-radios se-group-fresh">
+        <ChipButton
+          className="you mark"
+          on={fresh}
+          onClick={() => mutate((d) => setGroupFresh(d, step.id, group.id, !fresh))}
+        >
+          {t('bs.editor.part.fresh')}
+        </ChipButton>
+      </div>
+      <Conseq
+        s={{
+          key: fresh ? 'bs.editor.group.conseq_fresh' : 'bs.editor.group.conseq',
+          params: { min: group.min },
+        }}
+      />
     </div>
   );
 }

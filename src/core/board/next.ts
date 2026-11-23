@@ -561,10 +561,33 @@ function whenWords(def: BoardDefinition, when: NonNullable<Hand['when']>): strin
   return `${read?.name ?? '…'} is ${value}`;
 }
 
-// "at least 1 of Screenshot, GIF, Video, Log": what a group asks of the handoff.
-function groupWords(group: Group, def: BoardDefinition): string {
+// Whether every part of a group is new in each round: a send-back then empties the whole group.
+function freshGroup(group: Group, step: Step): boolean {
+  return (
+    group.parts.length > 0 &&
+    group.parts.every((ref) => step.hand.find((hand) => hand.ref === ref)?.fresh === true)
+  );
+}
+
+// "at least 1 of Screenshot, GIF, Video, Log": what a group asks of the handoff; "each new this
+// round" when a send-back empties it.
+function groupWords(group: Group, def: BoardDefinition, step: Step): string {
   const names = group.parts.map((ref) => partOf(def, ref)?.name ?? ref);
-  return `at least ${group.min} of ${names.join(', ')}`;
+  const fresh = freshGroup(group, step) ? ', each new this round' : '';
+  return `at least ${group.min} of ${names.join(', ')}${fresh}`;
+}
+
+// What "new this round" means, said once, to the one who hands off again after a send-back: the
+// parts the step marks new need a file of this round, even an unchanged one; the rest carry over.
+export const FRESH_RULE =
+  'New this round means attached in this round: after a send-back, a file from an earlier round does not count, even when it did not change, so attach it again. Anything the step does not mark new this round carries over.';
+
+// The step asks for evidence new in each round, alone or as a group.
+function hasFresh(def: BoardDefinition, step: Step): boolean {
+  return step.hand.some((hand) => {
+    const part = partOf(def, hand.ref);
+    return hand.fresh && part !== undefined && isEvidence(part);
+  });
 }
 
 // Where a group stands: its state from the engine, or from what the handoff lacks.
@@ -587,7 +610,7 @@ function groupLines(def: BoardDefinition, step: Step, input: NextInput): string[
     const have = state
       ? ` (${state.have} attached${state.held.length ? `: ${state.held.join(', ')}` : ''})`
       : '';
-    return `  ${met ? '✓' : '✗'} ${group.name}: ${groupWords(group, def)}${have}`;
+    return `  ${met ? '✓' : '✗'} ${group.name}: ${groupWords(group, def, step)}${have}`;
   });
   return Object.keys(states).length === 0
     ? lines
@@ -595,11 +618,14 @@ function groupLines(def: BoardDefinition, step: Step, input: NextInput): string[
 }
 
 // What the step's "at least N of" groups mean for the one handing off, said once: pick what fits.
-function groupRules(def: BoardDefinition, step: Step): string[] {
-  return (step.groups ?? []).map(
+function groupRules(def: BoardDefinition, step: Step, input: NextInput): string[] {
+  const groups = (step.groups ?? []).map(
     (group) =>
-      `  ${group.name}: attach ${groupWords(group, def)} (the ones that fit this item; each with real content). Each one you attach counts once, and the handoff is refused while fewer than ${group.min} are attached.`,
+      `  ${group.name}: attach ${groupWords(group, def, step)} (the ones that fit this item; each with real content). Each one you attach counts once, and the handoff is refused while fewer than ${group.min} are attached.`,
   );
+  // After a send-back, what the step marks new must be attached again; said once, where it applies.
+  const again = input.sentBack !== undefined && hasFresh(def, step) ? [`  ${FRESH_RULE}`] : [];
+  return [...groups, ...again];
 }
 
 function handLines(def: BoardDefinition, step: Step, input: NextInput): string[] {
@@ -832,7 +858,7 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
     lines.push(
       ...section('Before you hand it off', [
         ...indent(mentionText(def, step.instructions.before)),
-        ...groupRules(def, step),
+        ...groupRules(def, step, input),
       ]),
     );
 
@@ -963,7 +989,7 @@ function lackingText(id: string, missing: readonly Missing[]): string {
     const what = parts.map(({ name, reason, fresh, points, group }) => {
       const said =
         reason === 'group' && group
-          ? `at least ${group.min} of ${group.parts.join(', ')}; ${group.have} attached`
+          ? `at least ${group.min} of ${group.parts.join(', ')}${group.fresh ? ', each new this round' : ''}; ${group.have} attached`
           : reason === 'missing' && fresh
             ? 'new this round'
             : reason === 'unproved' && points?.length
@@ -978,7 +1004,14 @@ function lackingText(id: string, missing: readonly Missing[]): string {
         ? `Call handoff again${flag}.`
         : `Attach or fill them with otea attach ${id} / otea update ${id}, then call handoff again${flag}.`;
     const prove = parts.some(({ reason }) => reason === 'unproved') ? [proveText(id)] : [];
-    return [`Not handed off ${id}: missing ${and(what)}.`, then, ...prove].join('\n');
+    // A part with only earlier files, or a group new in each round, says what attaching it again
+    // means (P7-F8).
+    const again = parts.some(
+      ({ reason, group }) => reason === 'not_new' || (reason === 'group' && group?.fresh),
+    )
+      ? [FRESH_RULE]
+      : [];
+    return [`Not handed off ${id}: missing ${and(what)}.`, then, ...again, ...prove].join('\n');
   }
   const lines: string[] = [];
   const waitingParts = missing.find(({ ref }) => ref === WAIT_PARTS);

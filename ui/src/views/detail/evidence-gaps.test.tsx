@@ -132,6 +132,29 @@ describe('the review of a delivery with mixed evidence', () => {
     expect(markup).toContain('Prueba: at least 1 of Animación, Captura, or Salida (0 attached)');
   });
 
+  // P5-F6: «(1 adjuntados)». The count agrees with what it counts, and a group new in each round
+  // says so.
+  it('agrees the count of a short group in Spanish, and says when it is new each round', () => {
+    const original = animar.groups;
+    animar.groups = [{ id: 'gproof', name: 'Prueba', parts: ['eanim', 'eshot', 'elog'], min: 2 }];
+    try {
+      setLanguage('es');
+      const one = evidenceMarkup(item([file(1, 'efile', 'informe.txt'), file(2, 'elog', 's.log')]));
+      expect(one).toContain('Prueba: al menos 2 de Animación, Captura o Salida (1 adjuntado)');
+      const none = evidenceMarkup(item([file(1, 'efile', 'informe.txt')]));
+      expect(none).toContain('(0 adjuntados)');
+      setLanguage('en');
+      for (const hand of animar.hand) if (hand.ref !== 'efile') hand.fresh = true;
+      const fresh = evidenceMarkup(item([file(1, 'efile', 'informe.txt')]));
+      expect(fresh).toContain(
+        'at least 2 of Animación, Captura, or Salida, new this round (0 attached)',
+      );
+    } finally {
+      if (original) animar.groups = original;
+      for (const hand of animar.hand) hand.fresh = false;
+    }
+  });
+
   it('counts a file with no bytes as nothing', () => {
     const gaps = evidenceGaps(def, item([file(1, 'efile', 'informe.txt', 0)]));
     expect(gaps.required.map(({ ref }) => ref)).toEqual(['efile']);

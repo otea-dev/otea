@@ -63,6 +63,7 @@ import {
   roundStartOf,
   selectOnFold,
   sheetLook,
+  shortGroupCaution,
   stepRounds,
   waitBlock,
   waitRows,
@@ -295,6 +296,11 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
       : c.kind === 'own' && ownStep
         ? handRefusal(item.id, missing)
         : null;
+  // Approving a delivery whose "at least N of" group is short asks once (a second press approves).
+  const caution = (c: MoveChoice) =>
+    live && c.kind === 'approve'
+      ? shortGroupCaution(evidenceGaps(live, item).groups, c.label)
+      : null;
   const filled = (ref: string) => {
     const value = item.fields[ref];
     const held = Array.isArray(value)
@@ -860,6 +866,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                   : ''
               }
               refuse={live ? refuse : undefined}
+              caution={live ? caution : undefined}
               back={live ? (to: string) => backOf(live, item, to) : undefined}
               onClose={onClose}
               notes={
@@ -1033,6 +1040,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
               <Acts
                 onDrop={live && dropChoices.length ? () => setDropping(true) : undefined}
                 refuse={live ? refuse : undefined}
+                caution={live ? caution : undefined}
                 back={live ? (to: string) => backOf(live, item, to) : undefined}
                 item={item}
                 type={type}

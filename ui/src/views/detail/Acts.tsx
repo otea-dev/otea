@@ -79,6 +79,9 @@ type ActsProps = {
   // and a move the board refuses (Aprobar while a wait no longer holds) says why instead.
   onDrop?: (() => void) | undefined;
   refuse?: ((choice: MoveChoice) => string | null) | undefined;
+  // A move that is allowed but worth a second look (Aprobar with an "at least N of" group short):
+  // its line is said once, and pressing the move again makes it.
+  caution?: ((choice: MoveChoice) => string | null) | undefined;
   // On a Studio board: the agent and round a way back lands on.
   back?: ((state: string) => { agent: string | null; round: number }) | undefined;
   // While an agent does the step: «Dejar una nota» in the receipt's place, and the line that says
@@ -203,6 +206,7 @@ export function Acts({
   onNotes,
   onDrop,
   refuse,
+  caution,
   back,
   note,
   unopened,
@@ -249,11 +253,24 @@ export function Acts({
       .catch(() => setRefused({ k, text: t('sheet.refused') }));
   };
   const refusedNow = refused?.k === refusalKey ? refused.text : '';
+  // The move a caution was said for: pressed again, it goes through.
+  const [warned, setWarned] = useState<{ k: string; to: string } | null>(null);
   const choose = (c: MoveChoice, button: HTMLButtonElement) => {
     const no = refuse?.(c);
     if (no) {
       setRefused({ k: refusalKey, text: no });
       return;
+    }
+    const again = warned?.k === refusalKey && warned.to === c.move.to;
+    const careful = again ? null : caution?.(c);
+    if (careful) {
+      setWarned({ k: refusalKey, to: c.move.to });
+      setRefused({ k: refusalKey, text: careful });
+      return;
+    }
+    if (warned) {
+      setWarned(null);
+      setRefused(null);
     }
     if (c.move.reasonRequired) onNotes(c, button);
     else make(c);

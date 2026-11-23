@@ -60,6 +60,34 @@ describe('instructionHints, what an agent reads on a step', () => {
     ]);
   });
 
+  // P5-F3: each member of an "at least N of" group is optional alone, but the group asks for them.
+  it('does not warn about instructions that ask for the members of a group the handoff requires', () => {
+    const def = creatures();
+    const animate = at(def, 'sanimate');
+    animate.hand = [
+      { ref: 'fsteps', req: 'always', fresh: false },
+      { ref: 'eanim', req: 'no', fresh: false },
+      { ref: 'ecode', req: 'no', fresh: false },
+    ];
+    animate.instructions.before = 'Adjunta @[eanim] o @[ecode].';
+    expect(instructionHints(def).map(({ code }) => code)).toEqual([
+      'instructions_ask_part',
+      'instructions_ask_part',
+      'instructions_ask_evidence',
+    ]);
+    animate.groups = [{ id: 'gproof', name: 'Prueba', parts: ['eanim', 'ecode'], min: 1 }];
+    expect(instructionHints(def)).toEqual([]);
+    // A member the group does not name is still optional.
+    animate.groups = [{ id: 'gproof', name: 'Prueba', parts: ['eanim'], min: 1 }];
+    expect(instructionHints(def)).toEqual([
+      {
+        code: 'instructions_ask_part',
+        step: 'sanimate',
+        params: { step: 'Animar', part: 'Cambios de código' },
+      },
+    ]);
+  });
+
   it('reads what the item already carries without a hint', () => {
     const def = creatures();
     // Descripción comes with the form, Arte conceptual from Concepto: reading them is fine.

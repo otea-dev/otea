@@ -727,6 +727,13 @@ export function EvidenceReader({
           note={note}
           phrase={pickableOn(shown) === 'phrase'}
         />
+      ) : note && !phone ? (
+        // The desk keeps the list's room from the start, empty: the first note left took it from
+        // the picture, which shrank and moved the mark the person was working on (P5-F9).
+        <div className="ev-reader-left ev-left-none">
+          <b className="ev-left-head">{t('notes.left.empty')}</b>
+          <p>{t('notes.left.emptyHint')}</p>
+        </div>
       ) : null}
       {phone && (note || decide) ? (
         // On the phone the note and the moves share one foot that stays at the sheet's bottom: two
