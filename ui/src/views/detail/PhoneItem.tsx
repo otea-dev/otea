@@ -681,12 +681,14 @@ export function PhoneItem(p: PhoneItemProps) {
   const handed = useMemo(
     () =>
       p.board
-        ? handedFields(p.board.def, p.board.step, item.fields).map((f) => ({
-            ...f,
-            value: valueWord(p.type, f.ref, f.value),
-          }))
+        ? handedFields(p.board.def, p.board.step ?? rounds[0]?.step ?? null, item.fields).map(
+            (f) => ({
+              ...f,
+              value: valueWord(p.type, f.ref, f.value),
+            }),
+          )
         : [],
-    [p.board, p.type, item.fields],
+    [p.board, p.type, item.fields, rounds],
   );
   const gaps = useMemo(
     () => (p.board ? evidenceGaps(p.board.def, item) : undefined),

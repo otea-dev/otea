@@ -25,6 +25,7 @@ import {
   type CaptureBoard,
   captureBoards,
   capturePayload,
+  clearDraft,
   closeCapture,
   keepDraft,
   landsStep,
@@ -35,9 +36,9 @@ import {
   photoPlaces,
   pickBoard,
   readable,
+  readDraft,
   rememberBoard,
   samePlace,
-  takeDraft,
   useCapture,
 } from './capture.ts';
 
@@ -356,10 +357,8 @@ export function CaptureSheet() {
     setSeq(cap.seq);
     setChosen(undefined);
     setPicking(false);
-    // Blank, but for the words a save that failed left behind (a reload brings them back too).
-    const left = takeDraft(project);
-    setTitle(left?.title ?? '');
-    setNote(left?.note ?? '');
+    setTitle('');
+    setNote('');
     setPhoto(null);
     setPhotoPlace(undefined);
     file.current = null;
@@ -367,6 +366,17 @@ export function CaptureSheet() {
     setError(undefined);
     key.current = captureId();
   }
+
+  // The words a save that failed left behind come back as the sheet opens (a reload too); they stay
+  // until a save succeeds.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on each opening only
+  useEffect(() => {
+    if (!cap.open) return;
+    const left = readDraft(project);
+    if (!left) return;
+    setTitle(left.title);
+    setNote(left.note);
+  }, [cap.open, cap.seq]);
 
   const pick = pickBoard(boards, { here: cap.o.board, last: lastBoard(project) });
   const board = chosen === undefined ? pick.board : boards.find((b) => b.name === chosen);
@@ -453,6 +463,7 @@ export function CaptureSheet() {
         );
       }
       rememberBoard(project, board.name);
+      clearDraft(project);
       queued.current = { board: board.name };
       closeCapture();
     };
@@ -460,6 +471,7 @@ export function CaptureSheet() {
       if (app.sync.offline && queueAvailable()) return await keep();
       const item = await createItem(board.name, type.name, fields, undefined, files, key.current);
       rememberBoard(project, board.name);
+      clearDraft(project);
       saved.current = { board: board.name, id: item.id };
       closeCapture();
     } catch (e) {
