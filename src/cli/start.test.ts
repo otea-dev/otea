@@ -123,6 +123,21 @@ describe('otea start', () => {
     expect(data.prompt).toContain('otea board draft');
   }, 120_000);
 
+  // With no one to ask, no board is made for the person: they leave with the way to one (an agent,
+  // or the template command with its keys), and the init their agent runs next does not tell them
+  // to start the desk that already runs.
+  it('says how to get a board when none was made, and init does not say to start a running desk', async () => {
+    const started = await person(repo.dir, 'start', '--no-open', '--port', '0');
+    expect(started.code).toBe(0);
+    expect(started.out).toContain('Boards: none yet. Your agent designs them with you');
+    expect(started.out).toContain('otea start --template <key> (');
+    expect(started.out).toContain('todos');
+
+    const init = await person(repo.dir, 'init');
+    expect(init.out).toContain('the desk already runs at');
+    expect(init.out).not.toContain('run otea serve');
+  }, 120_000);
+
   it('never runs for an agent, which connects and never starts the desk', async () => {
     const refused = await cliAt(repo.dir, { OTEA_AGENT: 'claude' })('start', '--no-open');
 
