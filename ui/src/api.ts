@@ -46,26 +46,29 @@ async function get(path: string, signal: AbortSignal): Promise<Response> {
     if (!signal.aborted) noteRead({ kind: 'failed' });
     throw error;
   });
-  const read = readOf(response.headers);
-  // The session's own read is the PC's answer to anyone: it says it is there, not that this
-  // browser is signed in.
-  noteRead(read.kind === 'fresh' && path === SESSION_PATH ? { kind: 'fresh', open: true } : read);
-  // A device on the LAN whose token was revoked (or never paired) goes back to the pairing screen.
+  // The refusal is classified before the read is noted: a refused read records only that, never a
+  // fresh answer that would lift the signed-out page for an instant (it remounts the app).
+  let code: unknown;
   if (response.status === 401) {
     const body: unknown = await response
       .clone()
       .json()
       .catch(() => undefined);
-    const code = (body as { error?: { code?: unknown } } | undefined)?.error?.code;
-    if (code === 'unpaired') window.location.assign('/pair');
-    // This computer's browser without the sign-in cookie, or whose sign-in ran out: the server
-    // reads to no one else. The app says so, with the way back in (SignedOut), instead of showing
-    // an empty project (P8-F4).
-    if (code === 'unauthorized') {
-      noteRead({ kind: 'refused' });
-      throw new Error(t('error.readSignIn'));
-    }
+    code = (body as { error?: { code?: unknown } } | undefined)?.error?.code;
   }
+  // This computer's browser without the sign-in cookie, or whose sign-in ran out: the server reads
+  // to no one else. The app says so, with the way back in (SignedOut), instead of showing an empty
+  // project (P8-F4).
+  if (code === 'unauthorized') {
+    noteRead({ kind: 'refused' });
+    throw new Error(t('error.readSignIn'));
+  }
+  const read = readOf(response.headers);
+  // The session's own read is the PC's answer to anyone: it says it is there, not that this
+  // browser is signed in.
+  noteRead(read.kind === 'fresh' && path === SESSION_PATH ? { kind: 'fresh', open: true } : read);
+  // A device on the LAN whose token was revoked (or never paired) goes back to the pairing screen.
+  if (code === 'unpaired') window.location.assign('/pair');
   if (!response.ok && response.status !== 404) {
     throw new Error(t('error.getFailed', { path, status: response.status }));
   }
