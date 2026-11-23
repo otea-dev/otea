@@ -407,6 +407,10 @@ export function TriCard({
   // one for the same line goes through. Anything that changes the line asks again.
   const [warned, setWarned] = useState<string | null>(null);
   const line = round.caution ?? null;
+  // Once nothing is short, what was asked is forgotten: a group that falls short again asks again.
+  useEffect(() => {
+    if (line === null) setWarned(null);
+  }, [line]);
   const askFirst = (): boolean => {
     if (line === null || warned === line) return false;
     setWarned(line);

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '../test-dom.tsx';
 import { ago, item } from '../derive/fixtures.ts';
 import { setLanguage } from '../i18n/i18n.ts';
@@ -97,6 +97,68 @@ describe('Aprobar on a Triage card with a group short', () => {
     setLanguage('es');
     const { into } = draw(null);
     act(() => approve(into)?.click());
+    expect(decisions).toEqual(['approve']);
+  });
+
+  it('forgets what it asked once the group is met, and asks again if it falls short again', () => {
+    setLanguage('es');
+    const { into, render } = draw(LINE);
+    act(() => approve(into)?.click());
+    expect(into.querySelector('.tc-caution')).not.toBeNull();
+    render(null);
+    expect(into.querySelector('.tc-caution')).toBeNull();
+    render(LINE);
+    expect(into.querySelector('.tc-caution')).toBeNull();
+    act(() => approve(into)?.click());
+    expect(decisions).toEqual([]);
+    expect(into.querySelector('.tc-caution')?.textContent).toContain(LINE);
+  });
+});
+
+// A swipe right is a gesture, not a press: past the threshold the card used to be thrown out. With a
+// group short the first swipe comes home and says the line, and the second goes through.
+describe('a swipe to approve on a Triage card with a group short', () => {
+  const swipe = (card: HTMLElement, dx: number) => {
+    const fire = (type: string, x: number) =>
+      act(() => {
+        card.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            pointerId: 1,
+            button: 0,
+            clientX: 100 + x,
+            clientY: 300,
+          }),
+        );
+      });
+    fire('pointerdown', 0);
+    fire('pointermove', dx / 2);
+    fire('pointermove', dx);
+    fire('pointerup', dx);
+  };
+  const cardOf = (el: HTMLElement) => el.querySelector('article.tcard') as HTMLElement;
+
+  beforeEach(() => {
+    // happy-dom lays nothing out: the card is 360 wide, so the threshold is 108.
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(360);
+    HTMLElement.prototype.setPointerCapture ??= () => undefined;
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('holds the first swipe and says the line, and the second swipe approves', () => {
+    setLanguage('es');
+    const { into } = draw(LINE);
+    swipe(cardOf(into), 220);
+    expect(decisions).toEqual([]);
+    expect(into.querySelector('.tc-caution')?.textContent).toContain(LINE);
+    swipe(cardOf(into), 220);
+    expect(decisions).toEqual(['approve']);
+  });
+
+  it('swipes out at once when nothing is short', () => {
+    setLanguage('es');
+    const { into } = draw(null);
+    swipe(cardOf(into), 220);
     expect(decisions).toEqual(['approve']);
   });
 });
