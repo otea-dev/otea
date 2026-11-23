@@ -130,6 +130,12 @@ describe('the projects api', () => {
       expect(all.status).toBe(200);
       expect(await all.json()).toEqual(expect.objectContaining({ rows: [], since: null }));
       expect((await read('projects=all&since=soon')).status).toBe(400);
+      // Reading every project's boards is for the signed-in desk only.
+      const unsigned = await server.app.request(
+        `/p/${here.identity.id}/api/performance?projects=all`,
+        { headers: { host: LOCAL_HOST } },
+      );
+      expect(unsigned.status).toBe(401);
     });
 
     it('GET /api/project/settings names its paths, repos, gate and storage', async () => {
@@ -177,6 +183,16 @@ describe('the projects api', () => {
       const gone = projects.find((project) => !project.current);
       expect(gone?.unavailable).toMatch(/missing/);
       expect(gone?.waiting).toEqual([]);
+      // Rendimiento over every project still answers, without the one that cannot be read.
+      const across = await server.app.request(
+        `/p/${here.identity.id}/api/performance?projects=all`,
+        { headers: { host: LOCAL_HOST, cookie: SESSION_COOKIE } },
+      );
+      expect(across.status).toBe(200);
+      const view = (await across.json()) as { rows: unknown[]; boards: string[] };
+      expect(view.rows).toEqual([]);
+      expect(view.boards.length).toBeGreaterThan(0);
+      expect(view.boards.every((board) => board.startsWith(`${here.identity.name} / `))).toBe(true);
     });
 
     it('names each repo as the project does, not by its folder', async () => {

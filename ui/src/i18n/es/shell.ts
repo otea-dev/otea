@@ -13,7 +13,7 @@ export const shell = {
   'shell.unavailable': 'no se puede leer ahora',
   'shell.waitingThere': { one: '{count} te espera', other: '{count} te esperan' },
   'shell.nothingThere': 'nada te espera',
-  'shell.pathMissing': 'falta una ruta',
+  'shell.pathMissing': 'falta la carpeta',
   'shell.settingsOf': 'configuración de {project}',
   'shell.otherProjects': { one: '{count} proyecto', other: '{count} proyectos' },
   'shell.elsewhere': {

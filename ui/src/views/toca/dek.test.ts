@@ -101,6 +101,31 @@ describe('what happened today', () => {
     expect(todayCounts(feed, ctx(items)).approved).toBe(1);
   });
 
+  // A publish or a migrate between an agent's handoff and your approval is not you taking the item:
+  // the approval still counts.
+  it('still counts an approval after a publish or a migrate moved the item in between', () => {
+    const items = [
+      item({ id: 'Q', state: 'fixed', turn: 'none' }),
+      item({ id: 'R', state: 'fixed', turn: 'none' }),
+      item({ id: 'S', state: 'fixed', turn: 'none' }),
+    ];
+    const published = moved('Q', 'verify', you, { minutes: 40, from: 'verify', reason: 'publish' });
+    const closing = moved('S', 'verify', you, { minutes: 40, from: 'verify' });
+    closing.data.published_board = 'b1';
+    const feed = [
+      moved('Q', 'verify', agent('mender'), { minutes: 60, from: 'fixing' }),
+      published,
+      moved('Q', 'fixed', you, { minutes: 15, from: 'verify' }),
+      moved('R', 'verify', agent('mender'), { minutes: 60, from: 'fixing' }),
+      moved('R', 'verify', you, { minutes: 40, from: 'verify', reason: 'migrate' }),
+      moved('R', 'fixed', you, { minutes: 15, from: 'verify' }),
+      moved('S', 'verify', agent('mender'), { minutes: 60, from: 'fixing' }),
+      closing,
+      moved('S', 'fixed', you, { minutes: 15, from: 'verify' }),
+    ];
+    expect(todayCounts(feed, ctx(items)).approved).toBe(3);
+  });
+
   it('never counts publishing a board as an approval: neither the Pedido it closes nor the items it moves', () => {
     const items = [item({ id: 'C', state: 'fixed', turn: 'none' })];
     const closed = moved('C', 'fixed', you, {

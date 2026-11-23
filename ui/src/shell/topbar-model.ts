@@ -1,3 +1,4 @@
+import type { AgentStatus } from '../../../src/core/agent-status.ts';
 import type { FeedEvent } from '../activity.ts';
 import { isStuck } from '../derive/toca.ts';
 import type { Connection } from '../hooks.ts';
@@ -33,7 +34,7 @@ export function stateLine(
   waiting: number,
   project: Pick<ProjectOverview, 'agents'>,
 ): string | null {
-  const count = (status: string) =>
+  const count = (status: AgentStatus) =>
     (project.agents ?? []).filter((each) => each.status === status).length;
   const working = count('working');
   const silent = count('silent');
@@ -82,16 +83,18 @@ export function projectRows(
     }
     const href = each.unavailable ? undefined : projectHref(each);
     const where = whereOf(each) ?? '';
-    const missing = each.paths.some((path) => path.missing);
+    // A folder that is gone is said with its path, in the line itself: a tooltip is nothing on the
+    // phone. It outranks the rest of the state, which the badge's count still carries.
+    const gone = each.paths.find((path) => path.missing)?.path;
     const waits = each.waiting.length;
-    const line = href
+    const state = href
       ? (stateLine(waits, each) ?? t('shell.nothingThere'))
       : t('shell.unavailable');
     return {
       id: each.id,
       name: each.name,
       current: false,
-      line: missing && !phone ? `${t('shell.pathMissing')} · ${line}` : line,
+      line: gone !== undefined ? `${t('shell.pathMissing')} · ${gone}` : state,
       ...(where && !phone ? { where } : {}),
       waiting: each.waiting.length,
       ...(href ? { href } : {}),

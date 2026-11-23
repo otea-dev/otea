@@ -201,3 +201,23 @@ export function useBeat(ms: number): number {
   }, [ms]);
   return beat;
 }
+
+// A value that follows `value` at most once every `ms`: the first change goes through at once, a
+// burst after it waits and lands as one (the last). Keeps a read that costs the server a look at
+// every project from running on every event of a busy minute.
+export function useThrottled<T>(value: T, ms: number): T {
+  const [shown, setShown] = useState(value);
+  const last = useRef(0);
+  useEffect(() => {
+    if (Object.is(value, shown)) return;
+    const timer = setTimeout(
+      () => {
+        last.current = Date.now();
+        setShown(value);
+      },
+      Math.max(0, last.current + ms - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [value, shown, ms]);
+  return shown;
+}

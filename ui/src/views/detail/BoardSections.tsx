@@ -407,7 +407,7 @@ function Prow({ x, now, extra }: { x: LinkedView; now: number; extra?: ReactNode
   );
 }
 
-// Partes: the parts with their step, how many have finished, and "+ Crear · Tarea de repo, parte
+// Partes: the parts with their step, how many have finished, and "+ Crear tarea de repo, parte
 // de CAM-1" (the create dialog on the parts' board, the parent filled in).
 export function PartsSection({
   item,
