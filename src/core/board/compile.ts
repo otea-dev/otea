@@ -232,7 +232,19 @@ function transitionsOf(def: BoardDefinition): RawTransition[] {
       out.push({ from: review, to: target(way), by: approvalOf(def, reviewer, way) });
     out.push({ from: review, to: back, by: reviewer, reason: 'required' });
   }
-  return out.map(closingByYou);
+  // Whatever puts the item in a land step is the person's alone, a send-back from a later step
+  // into it too: it is a fresh approval of what lands, which an agent cannot relay.
+  const landing = new Set(
+    def.steps
+      .filter(({ id }) => isLandStep(def, id))
+      .map(({ id }) => stateOf({ step: id, phase: 'doing' })),
+  );
+  return out
+    .map(closingByYou)
+    .map(
+      (move): RawTransition =>
+        move.by === 'human' && landing.has(move.to) ? { ...move, by: 'human-ui' } : move,
+    );
 }
 
 // The published list: a list or a table (grid) whose columns are the list row, grouped by a field,
