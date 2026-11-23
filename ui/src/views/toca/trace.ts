@@ -1,3 +1,4 @@
+import type { AgentStatus } from '../../../../src/core/agent-status.ts';
 import { activeLease } from '../../active-lease.ts';
 import type { FeedEvent } from '../../activity.ts';
 import { askingAgent, handedNote, isStuck } from '../../derive/toca.ts';
@@ -137,23 +138,32 @@ const latest = <T>(xs: readonly T[], at: (x: T) => number): T | undefined =>
 
 // What the agent is up to: working (it holds a lease, since its claim), quiet (its lease ran out,
 // since then), waiting for your answer (its question waits for you, even on an item it holds), or
-// free (since its last act).
+// free (since its last act). `status` is the server's word for the agent: it alone says whether it
+// works (working) or went quiet (silent, away), so a connected agent is neither, whatever its
+// leases say. Left out (an older server), the leases decide as they did.
 export function agentState(
   name: string,
   items: readonly Item[],
   feed: readonly FeedEvent[],
   now: number,
   lastSeen?: string,
+  status?: AgentStatus,
 ): AgentState {
   const lastClaim = (id: string) =>
     feed.findLast((e) => e.itemId === id && e.type === 'claimed' && byAgent(e, name));
-  const held = items.filter((it) => activeLease(it.lease, now)?.holder === name && !it.asks);
+  const mayWork = status === undefined || status === 'working';
+  const mayBeQuiet = status === undefined || status === 'silent' || status === 'away';
+  const held = mayWork
+    ? items.filter((it) => activeLease(it.lease, now)?.holder === name && !it.asks)
+    : [];
   if (held.length) {
     const claimAt = (it: Item) => Date.parse(lastClaim(it.id)?.at ?? it.updatedAt);
     const it = latest(held, claimAt) ?? null;
     return { state: 'work', since: it ? claimAt(it) : now, item: it };
   }
-  const ran = items.filter((it) => it.expiredLease?.holder === name && isStuck(it, now));
+  const ran = mayBeQuiet
+    ? items.filter((it) => it.expiredLease?.holder === name && isStuck(it, now))
+    : [];
   if (ran.length) {
     const at = (it: Item) => Date.parse(it.expiredLease?.expiresAt ?? it.updatedAt);
     const it = latest(ran, at) ?? null;

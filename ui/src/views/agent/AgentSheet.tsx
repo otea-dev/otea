@@ -76,7 +76,7 @@ function Block({
   );
 }
 
-function Stand({
+export function Stand({
   row,
   presence,
   now,
@@ -92,6 +92,15 @@ function Stand({
     return <>{tx('agent.stand.work', { title: <em>{it.title}</em>, time: since })}</>;
   if (row.quiet && it)
     return <>{tx('agent.stand.quiet', { title: <em>{it.title}</em>, time: clockOf(row.since) })}</>;
+  if (row.lapsed && row.state === 'idle')
+    return (
+      <>
+        {tx('agent.stand.lapsed', {
+          title: <em>{row.lapsed.title}</em>,
+          time: clockOf(row.lapsed.at),
+        })}
+      </>
+    );
   if (row.state === 'wait' && it)
     return (
       <>

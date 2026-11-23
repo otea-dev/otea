@@ -415,12 +415,12 @@ export const detail = {
   'sheet.stand.asks': '{agent} asks you.',
   'sheet.stand.own': 'It’s your step.',
   'sheet.stand.yours': 'It’s your turn.',
-  'sheet.stand.stuck': '{agent} has had no signal for {time}.',
-  'sheet.stand.stuckNow': '{agent} has no signal.',
+  'sheet.stand.stuck': '{agent}’s lease ran out {time} ago.',
+  'sheet.stand.stuckNow': '{agent}’s lease ran out.',
   'sheet.stand.ended':
     '{agent}’s session ended; it goes back to the queue when its lease runs out.',
   'sheet.stand.silent':
-    '{agent} has gone quiet for {time}; it goes back to the queue when its lease runs out.',
+    '{agent} has had no signal for {time}; it goes back to the queue when its lease runs out.',
   'sheet.stand.unread':
     '{agent} has given no sign since you answered its question, {time} ago; it goes back to the queue when its lease runs out.',
   'sheet.stand.unreadBehind':
@@ -539,7 +539,7 @@ export const detail = {
   'sheet.d.fewer': 'fewer',
   'sheet.d.allValue': 'show all',
   'sheet.d.lessValue': 'show less',
-  'sheet.d.expired': 'no signal',
+  'sheet.d.expired': 'lease expired',
   'sheet.says': '{agent} says',
   'sheet.mine': 'Your notes',
   'sheet.answers': 'What you answered',
@@ -872,6 +872,8 @@ export const detail = {
   'agent.from': 'from the agents menu',
   'agent.stand.work': 'Working on {title}, for {time}.',
   'agent.stand.quiet': 'No signal since {time} on {title}: its lease ran out.',
+  'agent.stand.lapsed':
+    'Connected: its lease on {title} ran out at {time}, but it may still be at work on it.',
   'agent.stand.wait': 'Waiting for {answer} on {title}, for {time}.',
   'agent.stand.answer': 'your answer',
   'agent.stand.idle': 'Waiting, free for {time}.',

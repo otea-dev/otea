@@ -70,7 +70,7 @@ export const toca = {
   'toca.sub.didIt': 'lo hizo {agent}',
   'toca.sub.closedBy': 'lo cerró {agent}',
   'toca.sub.closedByYou': 'cerrado por ti',
-  'toca.quiet': '{agent} sin señal · {time}',
+  'toca.quiet': '{agent}: reserva vencida · {time}',
   'toca.replied': '{agent} contestó',
   'toca.round': 'ronda {n}',
 

@@ -405,6 +405,41 @@ describe('the agents menu', () => {
     expect(html).toMatch(/class="held warn">.*sin señal desde \d\d:\d\d ·/);
   });
 
+  // Review of #605: the lease on CRE-44 ran out, but Kiln is connected and may still be at work on it
+  // (lease-take.ts): its row said «escuchando · libre desde…» beside Reasignar.
+  it('names the stuck item of a connected agent whose lease ran out, never «libre» or «sin señal»', () => {
+    setLanguage('es');
+    const body = (rows: ReturnType<typeof agentRows>) =>
+      renderIn(
+        testApp(),
+        createElement(AgentsMenuBody, {
+          project: 'Hollowmere',
+          rows,
+          counts: agentCounts(rows),
+          now: NOW,
+          onOpen: () => undefined,
+          onActivity: () => undefined,
+          onConnect: () => undefined,
+          onPerformance: () => undefined,
+        }),
+      );
+    const connected = agent('Kiln', { status: 'connected', waiting: false, profile: opus });
+    const html = body(agentRows([connected], items, NOW));
+    expect(html).toContain(
+      '<span class="verb">conectado · su reserva de CRE-44 venció</span><span class="tx">Tortuga musgosa</span>',
+    );
+    expect(html).not.toContain('libre');
+    expect(html).not.toContain('sin señal');
+    const listening = { ...connected, status: 'listening' as const, waiting: true };
+    expect(body(agentRows([listening], items, NOW))).toContain(
+      '<span class="verb">escuchando · su reserva de CRE-44 venció</span>',
+    );
+    setLanguage('en');
+    expect(body(agentRows([connected], items, NOW))).toContain(
+      'connected · its lease on CRE-44 ran out',
+    );
+  });
+
   it('opens the agent’s sheet from its whole row', () => {
     expect(menu()).toMatch(/<button type="button" class="arow" data-i="" data-agent="Scout"/);
   });

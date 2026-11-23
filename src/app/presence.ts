@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
-import { type AgentStatus, agentStatus } from '../core/agent-status.ts';
+import { type AgentStatus, agentStatus, LISTEN_WINDOW_MS } from '../core/agent-status.ts';
 import type { AgentChannel } from '../core/authority.ts';
 import { OteaError } from '../core/errors.ts';
 import { isAgentName } from '../core/item.ts';
@@ -77,7 +77,8 @@ export const LIVE_WINDOW_MS = 5 * 60_000;
 // listening: having run a command lately is no listening. A lease alone keeps no agent connected
 // (P7-R3-10): after its session ended, it would stay «trabajando» until the lease ran out.
 export const LISTEN_BEAT_MS = 60_000;
-export const LISTEN_WINDOW_MS = 150_000;
+// The window is the core's, so the desk (ui/src/listening.ts) grants a holder the same moment.
+export { LISTEN_WINDOW_MS };
 
 // A sighting counts for this long: an agent seen, between its commands, counts as connected, and
 // an ended subagent drops out soon after its last call (P1-11).
@@ -403,7 +404,8 @@ export function sessionAlive(
 }
 
 // Whether an agent that ran an otea command at `actedAt` (a listener's beat is none) still counts
-// as at work at `at`: within LISTEN_WINDOW_MS (P7-R2-9, P7-R3-11).
+// as connected at `at`: within LISTEN_WINDOW_MS (P7-R2-9, P7-R3-11). That is not work: only a lease
+// makes an agent work (core/agent-status.ts).
 function calledLately(actedAt: string | null | undefined, at: string): boolean {
   return !!actedAt && Date.parse(at) - Date.parse(actedAt) <= LISTEN_WINDOW_MS;
 }

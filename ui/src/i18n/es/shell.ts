@@ -33,6 +33,8 @@ export const shell = {
   'shell.row.open': '{agent}: abrir su ficha',
   'shell.row.work': 'trabaja en',
   'shell.row.quiet': 'sin señal desde {time} ·',
+  // Conectado, y la reserva de un ítem suyo venció: puede seguir en ello (se dice con el estado)
+  'shell.row.lapsed': 'su reserva de {id} venció',
   'shell.row.wait': 'espera tu respuesta ·',
   'shell.row.idle': 'escuchando · libre desde {time}',
   'shell.row.connected': 'conectado · no escucha ahora: no espera trabajo nuevo',

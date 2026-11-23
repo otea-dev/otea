@@ -33,10 +33,10 @@ describe('leaseLeft', () => {
     expect(at('2026-10-26T14:00:00.000Z')).toBe('2d left');
   });
 
-  // Its holder gave no sign: the status word, not one of the lease's own.
-  it('says no signal once the lease runs out', () => {
-    expect(at('2026-10-28T14:30:00.000Z')).toBe('no signal');
-    expect(at('2026-10-29T09:00:00.000Z')).toBe('no signal');
+  // The lease's own word: its holder may be connected and still at work, so it is no «sin señal».
+  it('says the lease expired once it runs out', () => {
+    expect(at('2026-10-28T14:30:00.000Z')).toBe('lease expired');
+    expect(at('2026-10-29T09:00:00.000Z')).toBe('lease expired');
   });
 });
 
@@ -81,7 +81,7 @@ describe('timeCell', () => {
   it('says a lease that ran out without a release has expired, and stops changing', () => {
     const expired = {
       tone: 'expired',
-      text: 'no signal',
+      text: 'lease expired',
       label: 'held by claude-b, its lease expired at 14:30',
     };
     const later = Date.parse('2026-10-28T15:00:00.000Z');

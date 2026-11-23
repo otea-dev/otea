@@ -65,7 +65,7 @@ export const toca = {
   'toca.sub.didIt': 'done by {agent}',
   'toca.sub.closedBy': 'closed by {agent}',
   'toca.sub.closedByYou': 'closed by you',
-  'toca.quiet': '{agent} no signal · {time}',
+  'toca.quiet': '{agent}: lease expired · {time}',
   'toca.replied': '{agent} answered',
   'toca.round': 'round {n}',
 

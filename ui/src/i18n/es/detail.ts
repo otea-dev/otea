@@ -423,8 +423,8 @@ export const detail = {
   'sheet.stand.asks': '{agent} te pregunta.',
   'sheet.stand.own': 'Es tu paso.',
   'sheet.stand.yours': 'Es tu turno.',
-  'sheet.stand.stuck': '{agent} no da señales desde hace {time}.',
-  'sheet.stand.stuckNow': '{agent} no da señales.',
+  'sheet.stand.stuck': 'La reserva de {agent} venció hace {time}.',
+  'sheet.stand.stuckNow': 'La reserva de {agent} venció.',
   'sheet.stand.ended': 'La sesión de {agent} terminó; vuelve a la cola cuando venza su reserva.',
   'sheet.stand.silent':
     '{agent} no da señales desde hace {time}; vuelve a la cola cuando venza su reserva.',
@@ -547,7 +547,7 @@ export const detail = {
   'sheet.d.fewer': 'menos',
   'sheet.d.allValue': 'ver todo',
   'sheet.d.lessValue': 'ver menos',
-  'sheet.d.expired': 'sin señal',
+  'sheet.d.expired': 'reserva vencida',
   'sheet.says': '{agent} dice',
   'sheet.mine': 'Tus notas',
   'sheet.answers': 'Lo que respondiste',
@@ -880,6 +880,8 @@ export const detail = {
   'agent.from': 'desde el menú de agentes',
   'agent.stand.work': 'Trabaja en {title}, desde hace {time}.',
   'agent.stand.quiet': 'Sin señal desde las {time} en {title}: su reserva venció.',
+  'agent.stand.lapsed':
+    'Conectado: su reserva de {title} venció a las {time}, pero puede seguir en ello.',
   'agent.stand.wait': 'Espera {answer} en {title}, desde hace {time}.',
   'agent.stand.answer': 'tu respuesta',
   'agent.stand.idle': 'En espera, libre desde hace {time}.',
