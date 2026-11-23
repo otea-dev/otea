@@ -89,6 +89,7 @@ import {
 } from '../store/queries.ts';
 import { boardsApi } from './boards.ts';
 import { type ChangeFeed, createChangeFeed } from './changes.ts';
+import { diffFilesOff } from './diff-files.ts';
 import { diffOffTip } from './diff-tip.ts';
 import { branchDrift } from './drift.ts';
 import {
@@ -754,6 +755,11 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       // recorded (P1-R3-1): the desk says so before the person approves.
       .get('/items/:id/diff-tip', async (c) =>
         c.json({ off: await diffOffTip(project, c.req.param('id')) }),
+      )
+      // The same diff against the files the work handed off changes (P1-F2): the desk and the
+      // phone warn when the two lists differ, naming both, and approving stays the person's.
+      .get('/items/:id/diff-files', async (c) =>
+        c.json({ mismatch: await diffFilesOff(project, c.req.param('id')) }),
       )
       .get('/items/:id/opened', (c) =>
         c.json({ evidence: openedFiles(project, c.req.param('id')) }),

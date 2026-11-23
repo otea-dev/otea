@@ -16,7 +16,7 @@ import { selectEvidence } from '../store/queries.ts';
 export type DiffOffTip = { branch: string; tip: string; files: string[] };
 
 // Git runs off the request's thread, as for the drift.
-function git(cwd: string, ...args: string[]): Promise<string> {
+export function git(cwd: string, ...args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       'git',
