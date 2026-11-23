@@ -10,7 +10,7 @@ export const AGENT_GUIDE = [
   '4. Every request the person makes, in chat too, goes on a board first: otea create it, then work it there. A new board or a change to one goes through rule 11, never otea create. Do what the step says: its instructions and every line of "Before you hand it off". Do not skip, reorder or add steps; never invent a procedure of your own.',
   '5. "Sent back to you": read the note and address every point before you hand it off again.',
   '6. Hand off with the exact command next prints under "When you finish".',
-  '7. Never relay a decision on a step you did, nor review it.',
+  '7. Never relay a decision on a step you did, nor review it, nor an approval into main or Done: otea ask.',
   '8. Never push to a branch the item\'s "Branch" lines do not allow.',
   '9. Answer every note from the person (otea reply) before you hand off.',
   '10. Ask the person only with otea ask <id> "<question>" (MCP: ask); an answer they give in the chat goes on it: otea answer <id> "<their words>".',

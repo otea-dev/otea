@@ -159,7 +159,7 @@ describe('authorizeRelay', () => {
 
     expect(approve).toThrow(expect.objectContaining({ code: 'forbidden' }));
     expect(approve).toThrow(
-      'Moving from "review" to "done" requires human-ui authority (a human in the web UI) and cannot be relayed; the human must make it in the web UI',
+      'Moving from "review" to "done" requires human-ui authority (a human in the web UI) and cannot be relayed; the person gives it themselves on the desk or the phone: ask them with otea ask',
     );
   });
 

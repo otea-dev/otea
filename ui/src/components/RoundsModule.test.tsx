@@ -216,6 +216,31 @@ describe('the rounds of a board step', () => {
     expect(labels[1]).not.toContain('devuelta');
   });
 
+  // P1-F1: a relayed verdict leads with who relayed it and what they quoted, never a bold «aprobada».
+  it('leads a relayed verdict with who relayed it and the quote, never with «aprobada»', () => {
+    setLanguage('es');
+    const relayed: ItemView = {
+      ...onBoard,
+      events: [
+        ...onBoard.events.slice(0, 4),
+        step('09:40', you, 'sconcept__review', 'sanimate', { via: 'orch', quote: 'dale' }),
+      ],
+    };
+    const html = renderToStaticMarkup(
+      <RoundsModule
+        item={relayed}
+        type={{ ...bug, states }}
+        entry={{ module: 'rounds' }}
+        canWrite
+        quiet
+        board={{ def, step: 'sconcept' }}
+      />,
+    );
+    expect(html).toContain('data-relayed');
+    expect(html).toContain('<b>relayada por orch, citando &quot;dale&quot;</b>');
+    expect(html).not.toContain('<b>aprobada');
+  });
+
   it('names the step whose rounds it shows when the item went through several', () => {
     setLanguage('es');
     const html = renderToStaticMarkup(

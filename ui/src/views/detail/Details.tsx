@@ -67,6 +67,8 @@ export function detailCells(o: {
     | {
         reviewer: 'you' | 'none' | 'any';
         reviewedBy?: { kind: 'human' | 'agent'; name: string } | null;
+        // The agent that relayed the approval as the person's word: not the person's own.
+        relayedBy?: string;
       }
     | undefined;
   agents?: readonly Agent[] | null | undefined;
@@ -140,17 +142,22 @@ export function detailCells(o: {
     approved !== undefined
       ? approved === null
         ? { label: t('sheet.d.reviewer'), value: '—' }
-        : approved.kind === 'human'
-          ? { label: t('sheet.d.reviewer'), value: you, cls: 'you' }
-          : {
+        : o.board?.relayedBy !== undefined
+          ? {
               label: t('sheet.d.reviewer'),
-              value: (
-                <>
-                  <AgentMark name={approved.name} decorative />
-                  {approved.name}
-                </>
-              ),
+              value: t('sheet.d.relayedBy', { agent: o.board.relayedBy }),
             }
+          : approved.kind === 'human'
+            ? { label: t('sheet.d.reviewer'), value: you, cls: 'you' }
+            : {
+                label: t('sheet.d.reviewer'),
+                value: (
+                  <>
+                    <AgentMark name={approved.name} decorative />
+                    {approved.name}
+                  </>
+                ),
+              }
       : !o.board || o.board.reviewer === 'you'
         ? { label: t('sheet.d.reviewer'), value: you, cls: 'you' }
         : o.board.reviewer === 'none'

@@ -1,9 +1,12 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { liveBoardOf } from '../app/next.ts';
 import { openProject } from '../app/project.ts';
 import { publishAs } from '../app/testing.ts';
+import { stateOf } from '../core/board/engine.ts';
 import { errores } from '../core/board/testing.ts';
+import { updateItemState } from '../store/queries.ts';
 import {
   type Cli,
   cliAt,
@@ -128,7 +131,7 @@ describe('relay', () => {
     expect(JSON.parse(err).error).toEqual({
       code: 'forbidden',
       message:
-        'Moving from "Hacerlo (en revisión)" to "Done" requires human-ui authority (a human in the web UI) and cannot be relayed; the human must make it in the web UI',
+        'Moving from "Hacerlo (en revisión)" to "Done" requires human-ui authority (a human in the web UI) and cannot be relayed; the person gives it themselves on the desk or the phone: ask them with otea ask',
     });
     expect((await json('show', 'TASKS-1')).state).toBe('todo__review');
   });
@@ -276,6 +279,77 @@ describe('relay by an agent that worked the step but did not hand it off', () =>
     await otea('handoff', 'TASKS-1', '--note', 'Redone', '--as', 'codex');
 
     expect((await relay()).code).toBe(0);
+  });
+});
+
+// P1-F1: any other agent relayed an invented quote and the Changes board's Hacerlo review moved
+// into Integrar (the land step), then to Hecho, with no one reviewing. Approving what lands on main,
+// or closes the item, is the person's, on the desk or the phone; a send-back may still be relayed.
+describe('relay on the review of a step that leads to what lands or closes', () => {
+  let repo: TempRepo;
+  let otea: Cli;
+  let inReview = '';
+  let landing = '';
+
+  beforeEach(async () => {
+    repo = tempGitRepo();
+    otea = cliAt(repo.dir, { OTEA_AGENT: 'orch' });
+    const person = cliAt(repo.dir);
+    await person('init', '--template', 'none');
+    await person('board', 'add', 'Cambios', '--template', 'changes');
+    declareProfiles(repo.dir, 'orch', 'codex');
+    await otea('create', '--collection', 'Cambios', '--title', 'Regar', '--field', 'Qué quiero=x');
+    const project = openProject(repo.dir);
+    try {
+      const steps = liveBoardOf(project, 'Cambios')?.def.steps ?? [];
+      const doit = steps.find(({ name }) => name === 'Hacerlo');
+      const land = steps.find(({ name }) => name === 'Integrar');
+      if (!doit || !land) throw new Error('no Hacerlo or Integrar');
+      inReview = stateOf({ step: doit.id, phase: 'review' });
+      landing = stateOf({ step: land.id, phase: 'doing' });
+      updateItemState(project.db, 'CAM-1', inReview, '2026-11-18T10:00:00Z');
+    } finally {
+      project.db.close();
+    }
+  });
+
+  afterEach(() => repo.remove());
+
+  it('refuses a relayed approval into the land step, telling the agent the person gives it', async () => {
+    const { code, err } = await otea(
+      'relay',
+      'CAM-1',
+      'Integrar',
+      '--quote',
+      'yes approved go',
+      '--json',
+    );
+
+    expect(code).toBe(7);
+    const { message } = JSON.parse(err).error;
+    expect(message).toContain('desk or the phone');
+    expect(message).toContain('otea ask');
+    const shown = JSON.parse((await otea('show', 'CAM-1', '--json')).out);
+    expect(shown.state).toBe(inReview);
+    // The approval is not even offered to relay: the send-back and the drop still are.
+    const offered = shown.relayable.map(({ to }: { to: string }) => to);
+    expect(offered).not.toContain(landing);
+    expect(offered.length).toBeGreaterThan(0);
+  });
+
+  it('still relays a send-back from the same review', async () => {
+    const { code, err } = await otea(
+      'relay',
+      'CAM-1',
+      'Hacerlo',
+      '--quote',
+      'devuélvelo',
+      '--reason',
+      'Falta el carro',
+    );
+
+    expect(code, err).toBe(0);
+    expect((await otea('show', 'CAM-1', '--json')).out).toContain('"actor":{"kind":"human"');
   });
 });
 

@@ -101,7 +101,8 @@ export type SubKey =
   | 'toca.sub.setAside'
   | 'toca.sub.didIt'
   | 'toca.sub.closedBy'
-  | 'toca.sub.closedByYou';
+  | 'toca.sub.closedByYou'
+  | 'toca.sub.closedRelayed';
 
 export type RowCall = { act: string; sub: { key: SubKey; agent?: string } };
 
@@ -191,13 +192,15 @@ export function rowCall(item: Item, sec: TocaSection, ctx: TocaContext): RowCall
         const closing = feed.findLast(
           (e) => e.itemId === item.id && e.type === 'transitioned' && e.data.to === item.state,
         );
-        const by =
-          closing?.actor.kind === 'agent' && typeof closing.data.via !== 'string'
-            ? closing.actor.name
-            : null;
+        const relayer = typeof closing?.data.via === 'string' ? closing.data.via : null;
+        const by = closing?.actor.kind === 'agent' && !relayer ? closing.actor.name : null;
         return {
           act: t('toca.act.dropped'),
-          sub: by ? sub('toca.sub.closedBy', by) : sub('toca.sub.closedByYou'),
+          sub: relayer
+            ? sub('toca.sub.closedRelayed', relayer)
+            : by
+              ? sub('toca.sub.closedBy', by)
+              : sub('toca.sub.closedByYou'),
         };
       }
       // On a board, a step of yours you closed yourself: you did it, not the agent before you
@@ -210,10 +213,16 @@ export function rowCall(item: Item, sec: TocaSection, ctx: TocaContext): RowCall
         closing?.actor.kind === 'human' &&
         !String(closing.data.from ?? '').endsWith('__review');
       const who = yours ? null : agentOf(item, feed);
+      // Closed by an agent's relay of what the person said: never «cerrado por ti».
+      const relayer = typeof closing?.data.via === 'string' ? closing.data.via : null;
       return {
         // Done with its branch not merged yet reads apart from a merged one (P3C-R2-6).
         act: item.merge === 'waiting' ? t('boardView.approvedUnmerged') : t('toca.act.done'),
-        sub: who ? sub('toca.sub.didIt', who) : sub('toca.sub.closedByYou'),
+        sub: relayer
+          ? sub('toca.sub.closedRelayed', relayer)
+          : who
+            ? sub('toca.sub.didIt', who)
+            : sub('toca.sub.closedByYou'),
       };
     }
   }

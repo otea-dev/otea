@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { compileBoard } from './compile.ts';
+import { isLandStep, stateOf } from './engine.ts';
 import { sequenceIds } from './ids.ts';
-import type { BoardDefinition, Part } from './model.ts';
-import { instantiateSet, requireSet, TEMPLATE_SETS } from './templates.ts';
+import { type BoardDefinition, DONE, type Part } from './model.ts';
+import {
+  instantiate,
+  instantiateSet,
+  requireSet,
+  requireTemplate,
+  TEMPLATE_SETS,
+} from './templates.ts';
 import { errores } from './testing.ts';
 
 const moves = (def = errores()) =>
@@ -97,6 +104,45 @@ describe('compileBoard, the template sets', () => {
         }
       }
     }
+  });
+
+  // P1-F1: an agent could relay an invented approval into the land step. What lands on main or
+  // closes the item is the person's, on the desk or the phone, in every shipped board; send-backs
+  // and drops stay `human`, so chat can still make them.
+  it('makes the approval into a land step or Hecho human-ui in every board, never a send-back', () => {
+    let lands = 0;
+    for (const set of TEMPLATE_SETS) {
+      for (const lang of ['en', 'es'] as const) {
+        const ids = set.boards.map((_, index) => ({ id: `b${index}` }));
+        for (const def of instantiateSet(set, lang, ids)) {
+          const landing = new Set(
+            def.steps
+              .filter(({ id }) => isLandStep(def, id))
+              .map(({ id }) => stateOf({ step: id, phase: 'doing' })),
+          );
+          lands += landing.size;
+          const { transitions } = compileBoard('bset', 1, def).workflow;
+          const relayable = transitions.filter(({ by }) => by === 'human');
+          const where = `${set.key} ${def.name}`;
+          for (const { to } of relayable) {
+            expect(landing.has(to), `${where}: ${to} is a land step`).toBe(false);
+            expect(to, `${where}: ${to} is Hecho`).not.toBe(DONE);
+          }
+        }
+      }
+    }
+    expect(lands).toBeGreaterThan(0);
+  });
+
+  it('keeps a send-back from the person’s review relayable, and its approval into the land step human-ui', () => {
+    const def = instantiate(requireTemplate('changes'), 'en', {}, sequenceIds());
+    const step = (name: string) => def.steps.find((each) => each.name === name)?.id ?? '';
+    const review = stateOf({ step: step('Do it'), phase: 'review' });
+    const doing = (name: string) => stateOf({ step: step(name), phase: 'doing' });
+    const all = moves(def);
+    expect(all).toContain(`${review}>${doing('Do it')}:human!`);
+    expect(all).toContain(`${review}>${doing('Land')}:human-ui`);
+    expect(all).toContain(`${doing('Land')}>${DONE}:agent`);
   });
 
   it('compiles the protected branch of Entregas into its gates', () => {

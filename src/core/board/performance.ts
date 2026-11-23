@@ -130,7 +130,10 @@ function factsOf(trail: ItemTrail): Facts {
       const back = source.phase !== 'doing' ? toIndex <= fromIndex : toIndex < fromIndex;
       // A way back an agent takes itself while it does a later step (a conflict once main moved,
       // P3C-R3-6) found no fault in the handoff: only a review's send-back, or the person's, counts.
-      const sent = source.phase !== 'doing' || move.actor.kind === 'human';
+      // One an agent relayed as the person's word cannot be checked: it counts against no one.
+      const sent =
+        (source.phase !== 'doing' || move.actor.kind === 'human') &&
+        typeof move.data.via !== 'string';
       const returned = back ? pending.get(target.step) : undefined;
       if (returned) {
         if (sent) returned.sentBack = true;

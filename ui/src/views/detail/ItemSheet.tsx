@@ -660,6 +660,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
       ? {
           reviewer: roundsStep ? roundsStep.reviewer : 'none',
           ...(closedBy ? { reviewedBy: closedBy.reviewer ?? null } : {}),
+          ...(closedBy?.reviewerRelayedBy ? { relayedBy: closedBy.reviewerRelayedBy } : {}),
         }
       : undefined,
     agents: app.agents,

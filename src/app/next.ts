@@ -278,6 +278,7 @@ function approvedOf(
   return {
     note: said.text,
     by: { kind: said.by.kind, name: said.by.name },
+    ...(said.relayedBy === undefined ? {} : { relayedBy: said.relayedBy }),
     at: move.at,
     step: stepById(def, from.step)?.name ?? from.step,
     round: roundAfter(def, history, from.step, index),
@@ -299,6 +300,7 @@ function sentBackOf(
     return {
       note: why.text ?? '',
       by: { kind: why.by.kind, name: why.by.name },
+      ...(why.relayedBy === undefined ? {} : { relayedBy: why.relayedBy }),
       at: reopen.at,
       step: closedName(def, positionOf(reopen.from)),
       round: roundAfter(def, history, position.step, reopened + 1),
@@ -314,6 +316,7 @@ function sentBackOf(
   return {
     note: said.text ?? '',
     by: { kind: said.by.kind, name: said.by.name },
+    ...(said.relayedBy === undefined ? {} : { relayedBy: said.relayedBy }),
     at: move.at,
     step: stepById(def, from.step)?.name ?? from.step,
     round: roundAfter(def, history, from.step, index),
@@ -536,6 +539,9 @@ export type ClosedBy = {
   doer?: string;
   doerProfile?: ProfileView;
   reviewer?: Actor;
+  // The agent that relayed the reviewer's decision as the person's word (otea relay): the person
+  // did not make it themselves.
+  reviewerRelayedBy?: string;
   doneByPerson?: true;
 };
 
@@ -563,10 +569,17 @@ function closedByOf(def: BoardDefinition, events: readonly EventRecord[]): Close
       delete out.doerProfile;
       out.doneByPerson = true;
     }
-    if (from.phase === 'review') out.reviewer = event.actor;
+    if (from.phase === 'review') {
+      out.reviewer = event.actor;
+      if (typeof event.data.via === 'string') out.reviewerRelayedBy = event.data.via;
+      else delete out.reviewerRelayedBy;
+    }
   }
   const last = events.findLast(({ type }) => type === 'transitioned');
-  if (!out.reviewer && last?.actor.kind === 'human') out.reviewer = last.actor;
+  if (!out.reviewer && last?.actor.kind === 'human') {
+    out.reviewer = last.actor;
+    if (typeof last.data.via === 'string') out.reviewerRelayedBy = last.data.via;
+  }
   return out;
 }
 
@@ -769,10 +782,15 @@ export function wantedNowRefusal(
       return new OteaError('invalid_transition', laterNotesRefusal(item.id, open));
   }
   const retake = retakeOf(selectEvents(ctx.db, item.id));
-  if (!retake || quote) return undefined;
+  // On a board that turned relay off a quote lifts nothing: Otea cannot check the person said it.
+  const relays = relayAllowed(ctx, item.collection);
+  if (!retake || (quote && relays)) return undefined;
+  const taken = `Not set aside ${item.id}: the person took it up again (${retakeText(retake)}) after ${retake.by} set it aside: do it now.`;
   return new OteaError(
     'invalid_transition',
-    `Not set aside ${item.id}: the person took it up again (${retakeText(retake)}) after ${retake.by} set it aside: do it now. If they asked you since to leave it for later, relay their words: otea release ${item.id} --later --quote "<the person's words>"`,
+    relays
+      ? `${taken} If they asked you since to leave it for later, relay their words: otea release ${item.id} --later --quote "<the person's words>"`
+      : `${taken} This board does not take their words through an agent: if they may want it left for later, ask them with otea ask ${item.id} "<your question>".`,
   );
 }
 

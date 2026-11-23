@@ -227,7 +227,8 @@ export function feedLines(
       const agent = relay ? relay.via : event.actor.kind === 'agent' ? event.actor.name : null;
       const said = phraseOf(event, turnOf, rankOf);
       // A handoff lands in your lane: from then on the item is yours.
-      const yours = event.actor.kind !== 'agent' || said.kind === 'handoff';
+      // A relayed move is the agent's word that the person said it: its lane is the agent's.
+      const yours = relay === null && (event.actor.kind !== 'agent' || said.kind === 'handoff');
       return {
         event,
         ...said,
