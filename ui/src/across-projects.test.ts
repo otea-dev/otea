@@ -46,9 +46,10 @@ const projects = [
 ];
 
 describe('the agents across projects', () => {
-  it('lists each agent in each project that is not away, those that need a look first', () => {
+  it('lists each agent the server gives for each project, away ones too, those that need a look first', () => {
     expect(agentsAcross(projects).map((a) => `${a.name}@${a.project.name}:${a.status}`)).toEqual([
       'kiln@Beta:silent',
+      'ghost@Beta:away',
       'kiln@Alfa:working',
       'scout@Alfa:listening',
       'quill@Beta:connected',
@@ -65,7 +66,7 @@ describe('the agents across projects', () => {
     );
     expect(html).toMatch(/data-status="working"[^>]*>.*trabajando.*<a href="#\/">Alfa/);
     expect(html).toContain('con 2 ítems');
-    expect(html).not.toContain('ghost');
+    expect(html).toMatch(/data-status="away"[^>]*>.*ghost.*ausente/);
     expect(html).not.toContain('lost');
   });
 

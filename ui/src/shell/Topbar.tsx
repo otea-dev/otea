@@ -285,8 +285,14 @@ function AgentsMark({ kind, quiet }: { kind: PillMark; quiet: boolean }) {
 export function PillWords({ summary }: { summary: PillSummary }) {
   if (summary.kind === 'offline') return <span>{t('shell.offline')}</span>;
   if (summary.kind === 'none') return <span>{t('shell.pill.none')}</span>;
-  if (summary.kind === 'silent') {
-    return <span>{t('shell.pill.silent', { count: summary.count })}</span>;
+  if (summary.kind === 'silent' || summary.kind === 'away') {
+    return (
+      <span>
+        {summary.kind === 'away'
+          ? t('shell.pill.away', { count: summary.count })
+          : t('shell.pill.silent', { count: summary.count })}
+      </span>
+    );
   }
   const { extra } = summary;
   return (
@@ -299,12 +305,14 @@ export function PillWords({ summary }: { summary: PillSummary }) {
             : t('shell.pill.waiting', { count: summary.count })}
       </span>
       {extra ? (
-        <small className={extra.kind === 'silent' ? 'wl warn-t' : 'wl'}>
+        <small className={extra.kind === 'silent' || extra.kind === 'away' ? 'wl warn-t' : 'wl'}>
           {extra.kind === 'of'
             ? t('shell.pill.of', { count: extra.n })
             : extra.kind === 'silent'
               ? t('shell.pill.silent', { count: extra.n })
-              : t('shell.pill.noProfile', { count: extra.n })}
+              : extra.kind === 'away'
+                ? t('shell.pill.away', { count: extra.n })
+                : t('shell.pill.noProfile', { count: extra.n })}
         </small>
       ) : null}
     </>
@@ -408,6 +416,12 @@ export function AgentsMenuBody({
               <>
                 {counts.holding || waiting || counts.connected ? ' · ' : null}
                 <span className="warn-t">{t('shell.pill.silent', { count: counts.silent })}</span>
+              </>
+            ) : null}
+            {counts.away ? (
+              <>
+                {counts.holding || waiting || counts.connected || counts.silent ? ' · ' : null}
+                <span className="warn-t">{t('shell.pill.away', { count: counts.away })}</span>
               </>
             ) : null}
           </span>
@@ -544,7 +558,7 @@ function AgentsPill() {
         disabled={offline}
         onClick={() => setOpen((o) => !o)}
       >
-        <AgentsMark kind={mark} quiet={!offline && counts.silent > 0} />
+        <AgentsMark kind={mark} quiet={!offline && counts.silent + counts.away > 0} />
         <PillWords summary={summary} />
         {/* Named by the words it shows, then what it opens (WCAG 2.5.3). */}
         <span className="visually-hidden"> · {t('shell.agentsTitle')}</span>

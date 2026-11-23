@@ -287,8 +287,8 @@ describe('the agents menu’s rows', () => {
     expect(gone[0]).toMatchObject({ silent: true, lapsed: null });
   });
 
-  // P6-F2: an agent whose lease ran out reads «sin señal» like any silent one, never a word of its own.
-  it('keeps an agent with no signal on its expired lease, its item stuck', () => {
+  // P6-F1: an agent whose lease ran out is away, as the API says: «ausente» in every view.
+  it('keeps an agent away on its expired lease, its item stuck', () => {
     const rows = agentRows([agent('Kiln', { live: false, lastSeen: ago(12) })], items, NOW);
     expect(rows).toEqual([
       expect.objectContaining({
@@ -328,7 +328,8 @@ describe('the agents menu’s rows', () => {
       holding: 1,
       idle: 2,
       connected: 0,
-      silent: 1,
+      silent: 0,
+      away: 1,
       noProfile: 4,
     });
   });
@@ -375,7 +376,7 @@ describe('the agents pill', () => {
     expect(pillSummary('live', quiet)).toEqual({
       kind: 'working',
       count: 1,
-      extra: { kind: 'silent', n: 1 },
+      extra: { kind: 'away', n: 1 },
     });
     expect(pillSummary('live', rows([a('a'), agent('n', { profile: null })]))).toEqual({
       kind: 'waiting',
@@ -386,8 +387,20 @@ describe('the agents pill', () => {
 
   it('never counts an agent with no signal as listening: with only it, the pill says so, not «sin agentes»', () => {
     const quiet = agentRows([agent('q', { live: false, lastSeen: ago(12) })], stuck, NOW);
-    expect(pillSummary('live', quiet)).toEqual({ kind: 'silent', count: 1 });
+    expect(pillSummary('live', quiet)).toEqual({ kind: 'away', count: 1 });
     expect(pillMark('live', quiet)).toBe('none');
+  });
+
+  // The word for a live lease that gave no sign stays «sin señal»; only a lapsed lease is away.
+  it('says «sin señal» of the server’s silent status and keeps it apart from away', () => {
+    const held = item({ id: 'Y', turn: 'agent', lease: { holder: 's', expiresAt: inMinutes(9) } });
+    const silent = agentRows(
+      [agent('s', { live: false, status: 'silent', holding: ['Y'], lastSeen: ago(12) })],
+      [held],
+      NOW,
+    );
+    expect(pillSummary('live', silent)).toEqual({ kind: 'silent', count: 1 });
+    expect(agentCounts(silent)).toMatchObject({ silent: 1, away: 0 });
   });
 
   // P7-R3-10: an agent no longer connected still holds a live lease on another item; it is quiet,
@@ -400,7 +413,7 @@ describe('the agents pill', () => {
       NOW,
     );
     expect(quiet[0]).toMatchObject({ silent: true, working: false, state: 'silent' });
-    expect(pillSummary('live', quiet)).toEqual({ kind: 'silent', count: 1 });
+    expect(pillSummary('live', quiet)).toEqual({ kind: 'away', count: 1 });
     expect(pillMark('live', quiet)).toBe('none');
   });
 

@@ -11,23 +11,23 @@ export type AcrossAgent = {
   project: Pick<ProjectOverview, 'id' | 'name' | 'current'>;
 };
 
-// What needs a look first: no signal, then at work, then waiting, then merely connected.
-const ATTENTION: readonly AgentStatus[] = ['silent', 'working', 'listening', 'connected', 'away'];
+// What needs a look first: no signal, then away (it left an item stuck), then at work, then
+// waiting, then merely connected.
+const ATTENTION: readonly AgentStatus[] = ['silent', 'away', 'working', 'listening', 'connected'];
 
 // The agents of every readable project, the ones that need a look first. The same agent working in
-// two projects is two rows: each is its own session of work. Away ones are never listed.
+// two projects is two rows: each is its own session of work. The server lists an away agent only
+// while it has an item stuck; every one it lists is shown, in the word it has everywhere.
 export function agentsAcross(projects: readonly ProjectOverview[]): AcrossAgent[] {
   return projects
     .filter((project) => project.unavailable === undefined)
     .flatMap((project) =>
-      (project.agents ?? [])
-        .filter((agent) => agent.status !== 'away')
-        .map((agent) => ({
-          name: agent.name,
-          status: agent.status,
-          holding: agent.holding,
-          project: { id: project.id, name: project.name, current: project.current },
-        })),
+      (project.agents ?? []).map((agent) => ({
+        name: agent.name,
+        status: agent.status,
+        holding: agent.holding,
+        project: { id: project.id, name: project.name, current: project.current },
+      })),
     )
     .sort(
       (a, b) =>

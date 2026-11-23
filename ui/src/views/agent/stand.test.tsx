@@ -44,10 +44,11 @@ describe('what the agent sheet says of an agent whose lease ran out', () => {
     expect(stand(kiln({ status: 'connected' }))).toContain('may still be at work on it');
   });
 
-  it('says no signal only of one that is not connected', () => {
+  it('says «ausente», the server’s word, only of one that is not connected', () => {
     setLanguage('es');
     const html = stand(kiln({ status: 'away', live: false, lastSeen: ago(12) }));
-    expect(html).toContain('Sin señal desde las');
+    expect(html).toContain('Ausente desde las');
+    expect(html).not.toContain('Sin señal');
     expect(html).toContain('<em>Tortuga musgosa</em>');
     expect(html).not.toContain('Conectado');
   });
