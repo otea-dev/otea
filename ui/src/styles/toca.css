@@ -84,7 +84,7 @@
    reading edge like the card above, with a line of your colour: it is yours to answer or put away. */
 .nextstep {
   position: relative;
-  margin: 4px 0 22px 72px;
+  margin: 22px 0 22px 72px;
   padding: 20px 24px 16px 26px;
   border-radius: 12px;
   background: var(--sheet);
@@ -206,8 +206,13 @@
     margin-left: 0;
     padding: 18px 18px 14px 20px;
   }
+  /* Compact on a phone: the three things and their names, the notes under them left out, so the
+     card stays short beside the install banner. */
   .ns-move {
-    min-height: 56px;
+    min-height: 48px;
+  }
+  .ns-move small {
+    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {

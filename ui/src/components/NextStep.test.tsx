@@ -2,10 +2,11 @@
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppTestProvider } from '../app/context.tsx';
+import { loadBoards, resetBoards } from '../board-studio/home/boards-store.ts';
 import { ago, item } from '../derive/fixtures.ts';
 import { setLanguage } from '../i18n/i18n.ts';
 import { testApp } from '../shell/test-app.ts';
-import { buttonNamed, type Mounted, mount, press } from '../test-dom.tsx';
+import { buttonNamed, type Mounted, mount, press, stubServer } from '../test-dom.tsx';
 import type { Item } from '../types.ts';
 import { NextStep } from './NextStep.tsx';
 
@@ -31,15 +32,46 @@ const drawn = (project: string, items: Item[], extra: Parameters<typeof testApp>
 describe('the next-step card', () => {
   let mounted: Mounted | undefined;
 
-  beforeEach(() => {
+  // The project's boards are read first: Errores is the person's board, Pedidos the built-in one.
+  beforeEach(async () => {
     window.localStorage.clear();
     setLanguage('es');
+    resetBoards();
+    stubServer((path) =>
+      path.endsWith('/api/boards')
+        ? {
+            boards: [
+              { id: 'b1', name: 'Errores', collection: 'Errores', builtin: false },
+              { id: 'b2', name: 'Pedidos', collection: 'Pedidos', builtin: true },
+            ],
+          }
+        : undefined,
+    );
+    loadBoards(1);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
   });
 
   afterEach(() => {
     mounted?.unmount();
     mounted = undefined;
+    vi.unstubAllGlobals();
     setLanguage('en');
+  });
+
+  // Publishing a board an agent drafted closes its Pedido: that is the desk's own errand, not the
+  // person's first finished item.
+  it('does not count the request a board was drafted on', () => {
+    const pedido: Item = { ...closed('REQ-1'), collection: 'Pedidos' };
+
+    mounted = drawn('req', [pedido]);
+    expect(mounted.root.textContent).toBe('');
+    mounted.unmount();
+
+    // The person's own work still brings it, whatever the Pedido did before.
+    mounted = drawn('req2', [pedido, closed('A-1')]);
+    expect(mounted.root.textContent).toContain('Tu primer ítem está terminado');
   });
 
   // The card leaves slowly: it is gone once its exit has run.
