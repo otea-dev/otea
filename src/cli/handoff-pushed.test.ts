@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -321,10 +322,10 @@ describe('a handoff of a branch', () => {
       expect((await handoff()).code).toBe(0);
     });
 
-    // A subagent in a worktree of its own calls its parent's MCP server, which runs in the parent's
-    // checkout: there, the branch checked out tells nothing of the subagent's work.
-    it('checks the branch checked out only at the CLI, where it runs in the agent own checkout', async () => {
-      git('checkout', '-q', '-b', 'probe/badge');
+    // The server runs in the checkout its session started in, so it never learns where the agent
+    // is: it asks git whether any checkout of the repository (the main one, or a worktree) holds
+    // the branch (P8-F1).
+    const overMcp = async (): Promise<{ isError?: boolean; text: string }> => {
       const server = createMcpServer(COMMANDS, { cwd: repo.dir, agent: 'quill', warn: () => {} });
       const client = new Client({ name: 'test', version: '0' });
       const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
@@ -335,10 +336,48 @@ describe('a handoff of a branch', () => {
           name: 'handoff',
           arguments: { id: 'CAM-1', note: 'regar' },
         })) as { isError?: boolean; content: { text: string }[] };
-        expect(reply.isError, reply.content[0]?.text).toBeFalsy();
+        return { ...(reply.isError ? { isError: true } : {}), text: reply.content[0]?.text ?? '' };
       } finally {
         await client.close();
       }
+    };
+
+    it('refuses over MCP a Rama no checkout of the repository has checked out, as the CLI does', async () => {
+      for (const on of ['probe/badge', 'main']) {
+        git('checkout', '-q', ...(on === 'main' ? [] : ['-b']), on);
+        const reply = await overMcp();
+        expect(reply.isError, reply.text).toBe(true);
+        expect(reply.text).toContain(
+          `Rama names ${BRANCH}, but no checkout of this repository is on it`,
+        );
+        expect(reply.text).toContain(`this one is on ${on}`);
+        expect(reply.text).toContain(`git switch ${BRANCH}`);
+      }
+      git('checkout', '-q', BRANCH);
+      const handed = await overMcp();
+      expect(handed.isError, handed.text).toBeFalsy();
+    });
+
+    // A subagent in a worktree of its own calls its parent's MCP server, which runs in the parent's
+    // checkout: there, the branch checked out tells nothing of the subagent's work, but its own
+    // worktree holds the branch.
+    it('takes over MCP a Rama that a worktree of the repository has checked out', async () => {
+      git('checkout', '-q', '-b', 'probe/badge');
+      const parent = mkdtempSync(join(tmpdir(), 'otea-worktree-'));
+      try {
+        git('worktree', 'add', '-q', join(parent, 'sub'), BRANCH);
+        const handed = await overMcp();
+        expect(handed.isError, handed.text).toBeFalsy();
+      } finally {
+        git('worktree', 'remove', '--force', join(parent, 'sub'));
+        rmSync(parent, { recursive: true, force: true });
+      }
+    });
+
+    it('takes over MCP a repository whose checkout is detached, as the CLI does', async () => {
+      git('checkout', '-q', '--detach');
+      const handed = await overMcp();
+      expect(handed.isError, handed.text).toBeFalsy();
     });
   });
 });

@@ -61,6 +61,22 @@ export function checkedOutBranch(cwd: string): string | undefined {
   }
 }
 
+// Whether some checkout of the repository at cwd, the main one or a linked worktree, has `branch`
+// checked out: what an MCP server can tell of where an agent works, since it only knows the
+// directory its session started in. Undefined when git cannot say.
+export function branchCheckedOutAnywhere(cwd: string, branch: string): boolean | undefined {
+  try {
+    const listed = execFileSync('git', ['worktree', 'list', '--porcelain'], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return listed.split(/\r?\n/).some((line) => line.trim() === `branch refs/heads/${branch}`);
+  } catch {
+    return undefined;
+  }
+}
+
 // How many commits `branch` holds over the first of `bases` the repo at cwd has: the branch as it
 // is here, or else on origin. Undefined when the repo has neither, or cwd is no repo.
 export function commitsOver(
