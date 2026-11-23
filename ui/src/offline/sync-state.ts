@@ -68,7 +68,7 @@ export function noteRead(read: Read, now = Date.now()): void {
 
 export const syncNow = (): SyncState => state;
 
-const subscribe = (fn: () => void) => {
+export const subscribe = (fn: () => void) => {
   listeners.add(fn);
   return () => listeners.delete(fn);
 };

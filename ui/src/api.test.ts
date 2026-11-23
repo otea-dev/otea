@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  fetchCollections,
   fetchItem,
   fetchItems,
+  fetchProject,
   fetchSession,
   freshPairingCode,
   reassignItem,
@@ -9,7 +11,12 @@ import {
   resumeItem,
   undoRelease,
 } from './api.ts';
-import { resetSync, syncNow } from './offline/sync-state.ts';
+import {
+  resetSync,
+  type SyncState,
+  subscribe as subscribeSync,
+  syncNow,
+} from './offline/sync-state.ts';
 
 // Retomar, Reasignar and their Deshacer, as the UI asks the server.
 
@@ -128,5 +135,36 @@ describe('a session that ran out, from the UI', () => {
     );
     await fetchSession(signal());
     expect(syncNow().signedOut).toBe(true);
+  });
+
+  // The signed-out page replaces the app: a moment of «not signed out» between two refused reads
+  // would mount the app and unmount it again, and drop what was being typed.
+  it('never lifts it, nor stamps a sync, while refused reads keep coming, in parallel too', async () => {
+    const seen: SyncState[] = [];
+    const stop = subscribeSync(() => seen.push(syncNow()));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (path: string) =>
+        path.endsWith('/api/session') ? answer({ canWrite: false }) : refused(),
+      ),
+    );
+    const reads = () =>
+      Promise.allSettled([
+        fetchItems(signal()),
+        fetchCollections(signal()),
+        fetchSession(signal()),
+        fetchProject(signal()),
+      ]);
+    // A refused read stamps no sync time.
+    await Promise.allSettled([fetchItems(signal()), fetchCollections(signal())]);
+    expect(syncNow()).toEqual({ offline: false, syncedAt: null, signedOut: true });
+    await reads();
+    // A retry (the page's button, the stream coming back) reads everything again, all at once.
+    await Promise.all([reads(), reads()]);
+    stop();
+    const first = seen.findIndex((state) => state.signedOut === true);
+    expect(first).toBeGreaterThanOrEqual(0);
+    expect(seen.slice(first).every((state) => state.signedOut === true)).toBe(true);
+    expect(seen.every((state) => !state.offline)).toBe(true);
   });
 });
