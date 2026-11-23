@@ -15,6 +15,7 @@ import {
   boardState,
   liveBoardOf,
   motiveByName,
+  relayAllowed,
   roundWorkersOf,
 } from './next.ts';
 import { assertMayEnter } from './relations.ts';
@@ -70,6 +71,7 @@ export function relayDecision(ctx: Context, input: RelayInput, now = systemClock
   const { db } = ctx;
   return transaction(db, () => {
     const item = requireWritableItem(db, input.id);
+    assertRelayOn(ctx, item);
     const type = typeOfItem(ctx, item);
     const { workflow } = type;
     const { reason, via, channel } = input;
@@ -96,6 +98,16 @@ export function relayDecision(ctx: Context, input: RelayInput, now = systemClock
     };
     return landMove(ctx, workflow, item, move, data, { via });
   });
+}
+
+// A board may turn relay off, because Otea cannot check that the person said what the agent quotes.
+function assertRelayOn(ctx: Context, item: ItemRecord): void {
+  if (relayAllowed(ctx, item.collection)) return;
+  const board = liveBoardOf(ctx, item.collection)?.def.name ?? item.collection;
+  throw new OteaError(
+    'forbidden',
+    `Not relayed: ${board} does not take decisions relayed through an agent, so the person decides ${item.id} themselves on the desk. Ask them with otea ask ${item.id} "<your question>" and wait for them; never record their decision for them.`,
+  );
 }
 
 // A move the agent made itself, not one it relayed (a relayed move is the human's).

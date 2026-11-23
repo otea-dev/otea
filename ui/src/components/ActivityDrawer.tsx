@@ -91,6 +91,15 @@ function named(phrase: { state: string; name?: string }, state: (s: string) => s
 function sentence(line: FeedLine, id: ReactNode, state: (s: string) => string): ReactNode {
   const { phrase } = line;
   const you = line.agent === null;
+  // A decision an agent relayed is the agent's word that the person said it: never «approved».
+  if (
+    line.relayed &&
+    (phrase.key === 'activity.moved' ||
+      phrase.key === 'activity.approved' ||
+      phrase.key === 'activity.sentBack' ||
+      phrase.key === 'activity.closed')
+  )
+    return tx('activity.relayed', { id, state: named(phrase, state) });
   switch (phrase.key) {
     case 'activity.claimed':
       return tx(phrase.key, { id, time: phrase.time });

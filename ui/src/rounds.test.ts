@@ -114,7 +114,11 @@ describe('rounds', () => {
       [3, 4],
     ]);
     expect(rounds[0]?.verdict).toMatchObject({ kind: 'sent-back', reason: 'Too frantic' });
-    expect(rounds[1]?.verdict).toMatchObject({ kind: 'sent-back', relayedBy: 'claude-b' });
+    expect(rounds[1]?.verdict).toMatchObject({
+      kind: 'sent-back',
+      relayedBy: 'claude-b',
+      relayQuote: 'trail it',
+    });
     expect(rounds[2]?.verdict).toBeUndefined();
     expect(roundFiles(rounds[2], 'recording').map(({ id }) => id)).toEqual([3]);
   });

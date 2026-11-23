@@ -40,6 +40,7 @@ import {
   definitionRoute,
   type RouteWords,
 } from '../../board-studio/preview/route.ts';
+import { relayOf } from '../../format.ts';
 import { listOf, listOr, t } from '../../i18n/i18n.ts';
 import type { Look } from '../../lanes/looks.ts';
 import type { AgentProfile } from '../../presence.ts';
@@ -503,7 +504,7 @@ export function roundNotes(
 // How the item last left a step: moved on after a review (approved), moved on by its doer
 // (handed), moved on after a send-back into it (reworked), back to an earlier step, or closed.
 export type StepOutcome =
-  | { kind: 'approved' | 'handed' | 'reworked' | 'done' | 'dropped' }
+  | { kind: 'approved' | 'handed' | 'reworked' | 'done' | 'dropped' | 'relayed' }
   | { kind: 'back'; to: string };
 
 // One step the item went through with its rounds (roundNotes). `current`: the step it is on;
@@ -570,6 +571,16 @@ export function stepRounds(
     if (!isClosed(position) && id === position.step) return undefined;
     const move = left.get(id);
     if (!move) return undefined;
+    // An agent's word that the person decided it: never read as the person's own approval.
+    const leaving = [...events]
+      .sort((a, b) => a.id - b.id)
+      .findLast((e) => {
+        if (e.type !== 'transitioned') return false;
+        const from = positionOf(String(e.data.from ?? ''));
+        const next = positionOf(String(e.data.to ?? ''));
+        return !isClosed(from) && from.step === id && (isClosed(next) || next.step !== from.step);
+      });
+    if (leaving && relayOf(leaving)) return { kind: 'relayed' };
     const to = positionOf(move.to);
     if (isClosed(to)) return { kind: to.closed === DONE ? 'done' : 'dropped' };
     if (stepIndex(def, to.step) < stepIndex(def, id))

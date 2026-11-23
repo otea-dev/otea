@@ -49,12 +49,31 @@ describe('what happened today', () => {
       moved('B', 'fixing', agent('kiln'), { minutes: 40, from: 'accepted' }), // not to you
       moved('B', 'fixing', you, { minutes: 30, from: 'verify', reason: 'Falta el carro.' }),
       moved('C', 'fixed', you, { minutes: 20, from: 'verify' }),
-      moved('B', 'accepted', agent('kiln'), { minutes: 10, from: 'reported', via: 'kiln' }),
       moved('D', 'rejected', you, { minutes: 5, from: 'reported' }), // discarded: neither
       moved('B', 'fixing', you, { minutes: 4, from: 'needs_info', reason: 'migrate' }), // a reading
       moved('C', 'fixed', you, { minutes: 3, from: 'verify', reason: 'migrate' }), // a reading
     ];
-    expect(todayCounts(feed, ctx(items))).toEqual({ handed: 1, approved: 2, sent: 1 });
+    expect(todayCounts(feed, ctx(items))).toEqual({ handed: 1, approved: 1, sent: 1 });
+  });
+
+  // P1-F2: an agent can relay a decision with any quote, and Otea cannot check the person said it.
+  // It is shown as relayed and never adds to what you approved or sent back.
+  it('never counts a relayed decision as something you approved or sent back', () => {
+    const items = [
+      item({ id: 'A', state: 'accepted', turn: 'agent' }),
+      item({ id: 'B', state: 'fixing', turn: 'agent' }),
+      item({ id: 'C', state: 'fixed', turn: 'none' }),
+    ];
+    const as = { actor: { kind: 'human' as const, name: 'human' }, via: 'orch-a' };
+    const feed = [
+      moved('A', 'verify', agent('mender'), { minutes: 60 }),
+      moved('A', 'accepted', as.actor, { minutes: 50, from: 'verify', via: as.via }),
+      moved('B', 'verify', agent('mender'), { minutes: 40 }),
+      moved('B', 'fixing', as.actor, { minutes: 30, from: 'verify', via: as.via }),
+      moved('C', 'verify', agent('mender'), { minutes: 20 }),
+      moved('C', 'fixed', you, { minutes: 10, from: 'verify' }),
+    ];
+    expect(todayCounts(feed, ctx(items))).toEqual({ handed: 3, approved: 1, sent: 0 });
   });
 
   // A send-back made with review comments only has no reason of its own; an approval may carry a

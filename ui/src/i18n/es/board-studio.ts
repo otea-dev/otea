@@ -126,6 +126,9 @@ export const boardStudio = {
   'bs.change.motives_off': 'Al descartar ya no se elige un motivo.',
   'bs.change.drop_by_page': 'Descartar lo haces tú, solo desde la página.',
   'bs.change.drop_by_anyone': 'Descartar lo haces tú, desde la página o pidiéndoselo a un agente.',
+  'bs.change.relay_on': 'Un agente puede transmitir una decisión que le diste en el chat.',
+  'bs.change.relay_off':
+    'Los agentes te preguntan en el escritorio: ya no pueden transmitir una decisión en tu nombre.',
   'bs.change.list': 'La lista se ve como {as}.',
   'bs.change.list_grouped': 'La lista se ve como {as}, agrupada por {group}.',
   'bs.change.list_list': 'Lista',

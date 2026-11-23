@@ -134,7 +134,7 @@ describe('the history, newest first, in words', () => {
 
   it('lists newest first, each with who, its dot and its words', () => {
     expect(lines.map((l) => [l.text, l.who, l.dot])).toEqual([
-      ['Kiln passed on your decision: fixed', 'you', 'relay'],
+      ['Relayed by Kiln, quoting "dale": fixed', 'Kiln', 'relay'],
       ['Handed it to you again in verify', 'Mender', 'agent'],
       ['You sent it back to fixing with notes', 'you', 'you'],
       ['Handed it to you in verify', 'Mender', 'agent'],
@@ -144,9 +144,9 @@ describe('the history, newest first, in words', () => {
     ]);
   });
 
-  it('quotes what was said', () => {
+  it('quotes what was said; what a relayed decision quotes is in its own line', () => {
     expect(lines.map((l) => l.quote ?? null)).toEqual([
-      'dale',
+      null,
       'Ya cruzan.',
       'El último se queda.',
       'Lo probé.',

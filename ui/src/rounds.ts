@@ -26,8 +26,10 @@ export type Verdict = {
   actor: Actor;
   reason?: string;
   closes?: Closing;
-  // The agent that relayed it, when the human gave it in conversation.
+  // The agent that relayed it, saying the human gave it in conversation, and what it quoted: Otea
+  // cannot check either, so a relayed verdict always reads as relayed.
   relayedBy?: string;
+  relayQuote?: string;
 };
 
 export type Round = {
@@ -132,6 +134,7 @@ export function roundsOf(
         ...(reason ? { reason } : {}),
         ...(closes ? { closes } : {}),
         ...(relay ? { relayedBy: relay.via } : {}),
+        ...(relay?.quote ? { relayQuote: relay.quote } : {}),
       };
     }
   }

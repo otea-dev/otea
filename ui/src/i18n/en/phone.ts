@@ -70,6 +70,7 @@ export const phone = {
   'phone.r.yours': 'your call',
   'phone.r.sentBack': 'sent back',
   'phone.r.approved': 'approved',
+  'phone.r.relayed': 'relayed by an agent',
   'phone.r.closed': 'closed',
   'phone.r.delivered': 'What it delivered',
   'phone.r.newIn': 'new in round {n}',

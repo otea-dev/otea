@@ -118,7 +118,7 @@ function describeChanges(changes: unknown): string {
 // A decision relayed from conversation names the agent that relayed it and what the human said.
 function relayNote({ via, quote }: Event['data']): string {
   if (typeof via !== 'string') return '';
-  const said = typeof quote === 'string' ? `: ${JSON.stringify(quote)}` : '';
+  const said = typeof quote === 'string' ? `, quoting ${JSON.stringify(quote)}` : '';
   return `, relayed by ${via}${said}`;
 }
 
@@ -208,8 +208,17 @@ function describeAction({ type, data }: Event): string {
   return JSON.stringify(data);
 }
 
+// Who an event was by. What an agent relayed as the person's word is the agent's to answer for: it
+// reads `relay:<agent>`, never as the person's own (`human:human`), since Otea cannot check it.
+function eventActor(event: Event): string {
+  const { via } = event.data;
+  return event.actor.kind === 'human' && typeof via === 'string'
+    ? `relay:${via}`
+    : actorLabel(event.actor);
+}
+
 function eventRow(event: Event): string[] {
-  return [timeText(event.at), actorLabel(event.actor), event.type, describeEvent(event)];
+  return [timeText(event.at), eventActor(event), event.type, describeEvent(event)];
 }
 
 export function formatEvent(event: Event): string {

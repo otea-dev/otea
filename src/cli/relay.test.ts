@@ -1,7 +1,18 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type Cli, declareProfiles, presetCollection, seedOnce, type TempRepo } from './testing.ts';
+import { openProject } from '../app/project.ts';
+import { publishAs } from '../app/testing.ts';
+import { errores } from '../core/board/testing.ts';
+import {
+  type Cli,
+  cliAt,
+  declareProfiles,
+  presetCollection,
+  seedOnce,
+  type TempRepo,
+  tempGitRepo,
+} from './testing.ts';
 
 const QUOTE = 'Discard it, the old flow is gone';
 const USAGE = 'Usage: otea relay <id> <state> --quote <what the human said> [--reason <reason>]';
@@ -71,8 +82,14 @@ describe('relay', () => {
     await otea('relay', 'TASKS-1', 'dropped', '--quote', QUOTE, '--reason', 'Gone');
 
     expect((await otea('show', 'TASKS-1')).out).toMatch(
-      /human:human +transitioned {2}Hacerlo \(en revisión\) -> Dropped \(Gone\), relayed by claude: "Discard it, the old flow is gone"$/m,
+      /relay:claude +transitioned {2}Hacerlo \(en revisión\) -> Dropped \(Gone\), relayed by claude, quoting "Discard it, the old flow is gone"$/m,
     );
+  });
+
+  it('never shows a relayed decision as the person’s own', async () => {
+    await otea('relay', 'TASKS-1', 'dropped', '--quote', QUOTE, '--reason', 'Gone');
+
+    expect((await otea('show', 'TASKS-1')).out).not.toMatch(/human:human +transitioned/);
   });
 
   it('prints the moved item with --json', async () => {
@@ -259,6 +276,57 @@ describe('relay by an agent that worked the step but did not hand it off', () =>
     await otea('handoff', 'TASKS-1', '--note', 'Redone', '--as', 'codex');
 
     expect((await relay()).code).toBe(0);
+  });
+});
+
+// A board can turn relay off: nothing an agent says the person said is taken as their word there.
+describe('relay on a board that turned it off', () => {
+  let repo: TempRepo;
+  let otea: Cli;
+
+  async function bugOn(relay: boolean): Promise<string> {
+    repo = tempGitRepo();
+    otea = cliAt(repo.dir, { OTEA_AGENT: 'claude' });
+    await otea('init', '--local', '--template', 'none');
+    const project = openProject(repo.dir);
+    try {
+      const def = errores();
+      def.drop.by = 'anyone';
+      def.relay = relay;
+      publishAs(project, def, 'berr');
+    } finally {
+      project.db.close();
+    }
+    const created = await otea('create', '--collection', 'Errores', '--title', 'Faro', '--json');
+    return JSON.parse(created.out).id;
+  }
+
+  const discard = (id: string) =>
+    otea('relay', id, 'Dropped', '--motive', 'Duplicado', '--quote', 'tíralo', '--reason', 'x');
+
+  afterEach(() => repo.remove());
+
+  it('refuses it, tells the agent to ask the person, and leaves the item as it was', async () => {
+    const id = await bugOn(false);
+
+    const { code, err } = await discard(id);
+
+    expect(code).toBe(7);
+    expect(err).toContain('otea ask');
+    expect(err).toContain('Errores');
+    expect(JSON.parse((await otea('show', id, '--json')).out).state).not.toBe('dropped__duplicate');
+  });
+
+  it('does not offer a relay in show either', async () => {
+    const id = await bugOn(false);
+
+    expect((await otea('show', id)).out).not.toContain('Agent can relay to:');
+  });
+
+  it('relays as ever on a board that keeps it on', async () => {
+    const id = await bugOn(true);
+
+    expect((await discard(id)).code).toBe(0);
   });
 });
 

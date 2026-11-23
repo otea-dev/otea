@@ -75,12 +75,14 @@ export function todayCounts(feed: readonly FeedEvent[], ctx: TodayContext): Toda
     if (Date.parse(e.at) < from) continue;
     const to = stateOf(e.itemId, String(e.data.to));
     if (!to) continue;
-    // A relayed move is the person's words, carried by an agent.
+    // A relayed move is an agent's word that the person said it (P1-F2): Otea cannot check it, so
+    // it is neither an approval nor a send-back of yours, and the item reads as relayed.
     const relayed = typeof e.data.via === 'string';
     if (e.actor.kind === 'agent' && !relayed) {
       if (to.turn === 'human') out.handed++;
       continue;
     }
+    if (relayed) continue;
     if (to.closes === 'discarded') continue;
     if (to.turn === 'agent' && sentBack(e)) out.sent++;
     else if (!mine) out.approved++;

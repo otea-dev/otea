@@ -361,6 +361,8 @@ export function changeText(change: Change): string {
         : t('bs.change.motives_on', { names: listOr(change.names) });
     case 'drop_by':
       return t(change.by === 'page' ? 'bs.change.drop_by_page' : 'bs.change.drop_by_anyone');
+    case 'relay':
+      return t(change.on ? 'bs.change.relay_on' : 'bs.change.relay_off');
     case 'list': {
       const group = groupName(change.group);
       const as = t(change.as === 'table' ? 'bs.change.list_table' : 'bs.change.list_list');
