@@ -328,7 +328,8 @@ describe('next and the board moves', () => {
     const noted = await otea('handoff', 'CRI-1', '--note', 'Barro añadido', '--as', 'quill');
     expect(noted).toMatchObject({
       code: 0,
-      out: 'Handed off. CRI-1 waits for the person to review Concepto.\nThen keep going: otea next --as quill; when it has nothing, otea wait --turn agent --unclaimed --as quill in the background if you can.\n',
+      // The same art file as in the first round: taken, and said (P5-F1).
+      out: 'Handed off. CRI-1 waits for the person to review Concepto.\nNote: Arte conceptual: same bytes as round 1; the review shows it unchanged.\nThen keep going: otea next --as quill; when it has nothing, otea wait --turn agent --unclaimed --as quill in the background if you can.\n',
     });
   });
 
