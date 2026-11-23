@@ -18,13 +18,15 @@ export function NextStep() {
   const [gone, setGone] = useState(() => project === undefined || nextStepDismissed(project));
   const [leaving, setLeaving] = useState(false);
   const boards = useBoards(app.version);
-  // Until the boards are known, nothing says which items are the person's work, not a board
-  // request (a Pedido), so the card waits.
+  // Until the boards are known, nothing says which items are the person's work. Only the items of
+  // the person's own boards count: the built-in Pedidos board (a board request, closed by
+  // publishing) never does, and an item of a board the list does not hold yet (the Pedidos board
+  // made a moment ago, before the list reloaded on the new version) waits for it.
   if (gone || boards.status !== 'ready') return null;
-  const requests = new Set(
-    boards.boards.flatMap((b) => (b.builtin && b.collection ? [b.collection] : [])),
+  const work = new Set(
+    boards.boards.flatMap((b) => (!b.builtin && b.collection ? [b.collection] : [])),
   );
-  if (!firstFinishedRecently(app.all, app.now, requests)) return null;
+  if (!firstFinishedRecently(app.all, app.now, work)) return null;
 
   const put = () => {
     if (project !== undefined) dismissNextStep(project);

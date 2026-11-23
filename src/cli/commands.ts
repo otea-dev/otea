@@ -442,6 +442,10 @@ function boardsText(boards: readonly InitBoard[]): string {
   return `Made the boards ${boards.map(({ name }) => name).join(', ')}`;
 }
 
+// Which language a command with no desk in front of the person makes things in (app/language.ts).
+const LANGUAGE_RULE =
+  "the one the desk last used, else the first of the locale variables LC_ALL, LC_MESSAGES and LANG that is set (C and POSIX say nothing), else this computer's language, else English";
+
 // The templates the CLI takes, the same Studio's home offers, as its help lists them.
 const TEMPLATE_KEYS = LISTED_KEYS.join(', ');
 
@@ -1211,7 +1215,7 @@ const boardName = (record: BoardRecord) => (record.live ?? record.draft)?.defini
 
 const boardAdd: Command = {
   name: 'board add',
-  summary: `For the person, with no agent name: make a board and publish it, from a template (${TEMPLATE_KEYS}) or blank, in the language you use (the desk's, else this computer's, else English) or the one --lang gives, once; --item names what each item is; a set such as ideas or repos makes all of its boards, the name and --item naming the first; --prefix chooses how its item ids start (2 to 6 letters or digits; one board only)`,
+  summary: `For the person, with no agent name: make a board and publish it, from a template (${TEMPLATE_KEYS}) or blank, in the language you use (${LANGUAGE_RULE}) or the one --lang gives, once, which is how to force one; --item names what each item is; a set such as ideas or repos makes all of its boards, the name and --item naming the first; --prefix chooses how its item ids start (2 to 6 letters or digits; one board only)`,
   details: TEMPLATE_LIST,
   args: ['name'],
   options: {
@@ -3161,7 +3165,7 @@ const serveStatus: Command = {
 // otea start: the person's first minutes in one command (README, Getting started).
 const start: Command = {
   name: 'start',
-  summary: `For you, not for an agent, in the project's folder: set everything up for a first session in one command, and say what is ready. It creates the project when there is none (otea init), starts this computer's background server and opens the desk signed in (otea serve start; --no-open prints the sign-in link instead, --port picks the port for a first start), offers a first board from a template when the project has none of its own (--template <key> names one, none skips it; asked at a terminal when not given; otherwise no board is made and your agent designs the boards with you, the report saying how to start from a template instead), in the language you use (the desk's, else this computer's, else English) or the one --lang gives and prints the text to paste into your agent's chat (otea prompt) with the MCP server it adds to its own config. It looks before it acts: run again, it changes nothing that exists and says what was already there. An agent never runs it: it connects with otea connect and never starts the desk`,
+  summary: `For you, not for an agent, in the project's folder: set everything up for a first session in one command, and say what is ready. It creates the project when there is none (otea init), starts this computer's background server and opens the desk signed in (otea serve start; --no-open prints the sign-in link instead, --port picks the port for a first start), offers a first board from a template when the project has none of its own (--template <key> names one, none skips it; asked at a terminal when not given; otherwise no board is made and your agent designs the boards with you, the report saying how to start from a template instead); the board and the text are in the language you use (${LANGUAGE_RULE}) or the one --lang gives, once, which is how to force one, and the report says which; it prints the text to paste into your agent's chat (otea prompt) with the MCP server it adds to its own config. It looks before it acts: run again, it changes nothing that exists and says what was already there. An agent never runs it: it connects with otea connect and never starts the desk`,
   details: TEMPLATE_LIST,
   args: [],
   options: {
@@ -3179,9 +3183,10 @@ const start: Command = {
       );
     }
     const template = option('template');
+    const lang = (option('lang') as Lang | undefined) ?? defaultLang();
     const report = await startProject(cwd, {
       template,
-      lang: (option('lang') as Lang | undefined) ?? defaultLang(),
+      lang,
       choose: async () =>
         (
           await input.ask(
@@ -3232,13 +3237,18 @@ const start: Command = {
           : // Nothing was asked of a person (no terminal, so no one chose): no board is made for them.
             // They leave with the way to one: the agent designs it with them, or the command for a
             // template, with the keys it takes.
-            `Boards: none yet. Your agent designs them with you from the text below, or start from a template now: otea start --template <key> (${TEMPLATE_KEYS}); --lang en|es picks the language of its words`;
+            `Boards: none yet. Your agent designs them with you from the text below, or start from a template now: otea start --template <key> (${TEMPLATE_KEYS})`;
     const deskLine = started
       ? `Desk: running in the background at ${url} (pid ${pid}; stop it with otea serve stop)`
       : `Desk: already running at ${url} (pid ${pid})`;
+    // Which language the boards and the text for the agent are in, and how to force the other.
+    const [said, other, otherKey] =
+      lang === 'es' ? ['Spanish', 'English', 'en'] : ['English', 'Spanish', 'es'];
+    const langLine = `Language: ${said} for the boards and the text below (--lang ${otherKey} makes them ${other})`;
     const text = [
       projectLine,
       boardsLine,
+      langLine,
       deskLine,
       ...signIn,
       '',
@@ -3251,6 +3261,7 @@ const start: Command = {
       data: {
         project: { ...project, created },
         boards,
+        lang,
         desk: { url, pid, port, started },
         prompt,
         mcp,
