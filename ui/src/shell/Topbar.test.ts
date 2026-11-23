@@ -386,7 +386,7 @@ describe('the agents menu', () => {
       }),
     );
     expect(html).toContain(
-      '<span class="verb">conectado · no escucha: no está en otea wait</span>',
+      '<span class="verb">conectado · no escucha ahora: no espera trabajo nuevo</span>',
     );
     expect(html).not.toContain('verb warn-t');
   });
