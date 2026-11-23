@@ -206,7 +206,8 @@ describe('the Code on main board', () => {
     expect((await put(local)).code).toBe(0);
     const unpushed = await handoff();
     expect(unpushed.code).not.toBe(0);
-    expect(unpushed.err).toContain(`commit ${local} is in your local main but not on origin/main`);
+    // A new remote with nothing on it: it has no main at all, whatever this checkout last saw.
+    expect(unpushed.err).toContain(`origin has no main branch, so ${local} is not pushed`);
     expect(unpushed.err).toContain('git push origin main');
 
     git('push', '-q', 'origin', 'main');

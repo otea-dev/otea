@@ -54,14 +54,21 @@ function holdsBase(
   item: ItemRecord,
 ): { key: string; base: string } | undefined {
   const position = positionOf(item.state);
-  if (isClosed(position) || position.phase === 'doing') return undefined;
+  if (isClosed(position)) return undefined;
   const guard = guardedBranch(board.def);
   if (!guard || workedBase(board.def) === undefined) return undefined;
-  if (!stepById(board.def, position.step)?.hand.some(({ ref }) => ref === guard.id)) {
-    return undefined;
-  }
   const branch = String(item.fields[guard.id] ?? '').trim();
-  if (approvedTipOf(ctx, item.id, branch)?.unchanged) return undefined;
+  const tip = approvedTipOf(ctx, item.id, branch);
+  if (tip?.unchanged) return undefined;
+  // Until it is Done, in every phase: in review, being landed (with or without an agent holding
+  // it), or sent back for another round after it was handed off once. A fresh item, never handed
+  // off, has committed nothing yet.
+  const landing = position.phase === 'doing' && isLandStep(board.def, position.step);
+  const reviewed =
+    position.phase !== 'doing' &&
+    stepById(board.def, position.step)?.hand.some(({ ref }) => ref === guard.id) === true;
+  const again = position.phase === 'doing' && tip !== undefined;
+  if (!landing && !reviewed && !again) return undefined;
   const base = guard.guard.base ?? 'the base';
   const repo = guard.guard.repo === undefined ? '' : item.fields[guard.guard.repo];
   return { key: `${typeof repo === 'string' ? repo.toLowerCase() : ''}\0${base}`, base };

@@ -119,6 +119,41 @@ describe('working straight on main, one agent at a time', () => {
     expect(claimItem(ctx, { id: second, actor: agent('quill') }, now).lease?.holder).toBe('quill');
   });
 
+  // The item being landed holds main with no agent on it too: a second item the person put above it
+  // is not offered, or its commits would ride along in the landing push.
+  it('keeps main taken by the item being landed, whatever the order puts above it', () => {
+    const { ctx, def, doing } = board();
+    const landing = doing('landing');
+    updateItemState(ctx.db, landing, 'land', now());
+    const above = doing('above');
+    setOrder(ctx, { collection: def.name, ids: [above, landing], actor: you }, now);
+
+    expect(() => claimItem(ctx, { id: above, actor: agent('quill') }, now)).toThrow(
+      `${above} not claimed: ${landing} is committed on main and waits for its review and its push`,
+    );
+    expect(nextFor(ctx, 'quill', {}, now).item).toBe(landing);
+  });
+
+  it('keeps main taken by an item sent back after it was handed off once', () => {
+    const { ctx, doing } = board();
+    const sent = doing('sent back');
+    const fresh = doing('fresh');
+    appendEvent(ctx.db, {
+      itemId: sent,
+      type: 'transitioned',
+      actor: agent('claude-b'),
+      at: now(),
+      data: {
+        to: 'doit__review',
+        tip: { branch: 'main', commit: 'a'.repeat(40), tree: 'b'.repeat(40) },
+      },
+    });
+
+    expect(() => claimItem(ctx, { id: fresh, actor: agent('quill') }, now)).toThrow(
+      `${fresh} not claimed: ${sent} is committed on main`,
+    );
+  });
+
   it('holds nothing for an item whose handoff made no commit', () => {
     const { ctx, doing } = board();
     const first = doing('first');

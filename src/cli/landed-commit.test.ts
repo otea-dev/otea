@@ -125,22 +125,68 @@ describe('the commit a board says it landed', () => {
       const later = commit('b.txt');
       git(dir, 'push', '-q', 'origin', 'main');
       expect(landedCommitRefusal(dir, 'Commit pushed', later, 'main', approved)).toBeUndefined();
-      expect(
-        landedCommitRefusal(dir, 'Commit pushed', old, 'main', { ...approved, unchanged: true }),
-      ).toBeUndefined();
+    });
+
+    // The agent pushed main before handing off: the tip is then recorded as unchanged (main held
+    // nothing the remote lacked), yet an older hash is still no proof of the work it did.
+    it('still refuses an older hash when the agent pushed before handing off', () => {
+      const old = git(dir, 'rev-parse', '--short', 'origin/main');
+      const work = commit('a.txt');
+      git(dir, 'push', '-q', 'origin', 'main');
+      const approved = { commit: git(dir, 'rev-parse', 'HEAD') };
+      expect(landedCommitRefusal(dir, 'Commit pushed', old, 'main', approved)).toContain(
+        'does not hold the work the person approved',
+      );
+      expect(landedCommitRefusal(dir, 'Commit pushed', work, 'main', approved)).toBeUndefined();
+    });
+
+    // An approved change with no change in it is "contained" by any commit: the hash must also be
+    // built on what it was built on.
+    it('does not take any hash for an approved commit that changes nothing', () => {
+      const older = git(dir, 'rev-parse', '--short', 'HEAD');
+      commit('c1.txt');
+      git(dir, 'commit', '-q', '--allow-empty', '-m', 'nothing');
+      const approved = { commit: git(dir, 'rev-parse', 'HEAD') };
+      const after = commit('a.txt');
+      git(dir, 'push', '-q', 'origin', 'main');
+      expect(landedCommitRefusal(dir, 'Commit pushed', older, 'main', approved)).toContain(
+        'does not hold the work the person approved',
+      );
+      expect(landedCommitRefusal(dir, 'Commit pushed', after, 'main', approved)).toBeUndefined();
+    });
+
+    // The remote has no main (deleted there) though this checkout still has the old origin/main
+    // from its last fetch: that is no proof, the commit is not pushed.
+    it('refuses when the remote has no base branch, whatever the stale ref says', () => {
+      const pushed = commit('a.txt');
+      git(dir, 'push', '-q', 'origin', 'main');
+      git(origin, 'update-ref', '-d', 'refs/heads/main');
+      expect(git(dir, 'branch', '-r', '--contains', pushed)).toContain('origin/main');
+      const said = refusal(pushed);
+      expect(said).toContain('origin has no main branch');
+      expect(said).toContain('git push origin main');
     });
   });
 
-  // A SHA-256 repository writes 64-digit ids.
-  it('takes a 64-digit id of a SHA-256 repository', () => {
-    const sha256 = join(root, 'sha256');
+  // A SHA-256 repository writes 64-digit ids. Skipped, visibly, where git cannot make one.
+  const sha256Works = (() => {
+    const probe = mkdtempSync(join(tmpdir(), 'otea-sha256-'));
     try {
-      execFileSync('git', ['init', '--quiet', '-b', 'main', '--object-format=sha256', sha256], {
+      execFileSync('git', ['init', '--quiet', '--object-format=sha256', probe], {
         stdio: 'ignore',
       });
+      return true;
     } catch {
-      return;
+      return false;
+    } finally {
+      rmSync(probe, { recursive: true, force: true });
     }
+  })();
+  it.skipIf(!sha256Works)('takes a 64-digit id of a SHA-256 repository', () => {
+    const sha256 = join(root, 'sha256');
+    execFileSync('git', ['init', '--quiet', '-b', 'main', '--object-format=sha256', sha256], {
+      stdio: 'ignore',
+    });
     execFileSync(
       'git',
       ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--allow-empty', '-qm', 'x'],
