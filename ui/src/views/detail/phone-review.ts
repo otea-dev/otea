@@ -29,6 +29,8 @@ export type PhoneRound = {
   reason?: string;
   // What you asked of it: your note on the round before.
   asked?: { n: number; text: string };
+  // On a board, the step it was handed off from.
+  step?: string;
 };
 
 const TAG = { 'sent-back': 'sentBack', approved: 'approved', closed: 'closed' } as const;
@@ -48,6 +50,7 @@ export function phoneRounds(rounds: readonly Round[], yours: boolean): PhoneRoun
         at: r.endedAt,
         ...(r.note ? { note: r.note } : {}),
         evidence: r.evidence,
+        ...(r.step ? { step: r.step } : {}),
         tag,
         ...(reason ? { reason } : {}),
         ...(asked && before ? { asked: { n: before.n, text: asked } } : {}),

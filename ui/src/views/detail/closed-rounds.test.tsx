@@ -44,7 +44,7 @@ const done = {
   collection: 'Tareas',
   type: 'Tarea de repo',
   title: 'Quitar el parpadeo',
-  fields: {},
+  fields: { fwhat: 'Quitar el parpadeo del menú' },
   presetVersion: 1,
   state: 'done',
   turn: 'none',
@@ -84,7 +84,10 @@ const app = {
 
 beforeEach(() => {
   const live = tareasDeRepo();
-  live.steps = [...live.steps, step('sint', 'Integrar', { reviewer: 'none' })];
+  const [prop, impl] = live.steps;
+  if (!prop || !impl) throw new Error('fixture');
+  impl.hand = [...impl.hand, { ref: 'fwhat', req: 'always', fresh: false }];
+  live.steps = [prop, impl, step('sint', 'Integrar', { reviewer: 'none' })];
   seen.board = { id: 'b-tareas', version: 1, changed: false, live };
 });
 afterEach(() => setLanguage('en'));
@@ -105,5 +108,7 @@ describe('a closed item on the phone', () => {
     );
     expect(html).toContain('What it delivered');
     expect(html).toContain('parpadeo-despues.png');
+    // The fields the last reviewed step handed over are drawn too.
+    expect(html).toContain('Quitar el parpadeo del menú');
   });
 });

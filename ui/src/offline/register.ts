@@ -68,7 +68,7 @@ export function onInstallPrompt(listener: () => void): () => void {
   return () => promptListeners.delete(listener);
 }
 
-function keepInstallPrompt(event: InstallPrompt | null): void {
+export function keepInstallPrompt(event: InstallPrompt | null): void {
   installPrompt = event;
   for (const listener of promptListeners) listener();
 }
@@ -77,13 +77,16 @@ function keepInstallPrompt(event: InstallPrompt | null): void {
 // the caller can say how to install by hand instead of doing nothing.
 export async function promptInstall(): Promise<boolean> {
   const event = installPrompt;
-  keepInstallPrompt(null);
   if (!event) return false;
+  // The prompt stays kept while the browser's dialog is open, so the banner does not flick to the
+  // manual steps behind it; a prompt is used once, and goes as it settles.
   try {
     await event.prompt();
     return true;
   } catch {
     return false;
+  } finally {
+    if (installPrompt === event) keepInstallPrompt(null);
   }
 }
 

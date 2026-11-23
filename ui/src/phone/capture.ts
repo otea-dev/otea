@@ -270,12 +270,11 @@ export function keepDraft(project: string | undefined, draft: CaptureDraft): voi
   }
 }
 
-// The draft a failed save left, once: reading it takes it away.
-export function takeDraft(project: string | undefined): CaptureDraft | undefined {
+// The draft a failed save left. It stays until a save succeeds (clearDraft).
+export function readDraft(project: string | undefined): CaptureDraft | undefined {
   try {
     const raw = localStorage.getItem(draftKey(project));
     if (raw === null) return undefined;
-    localStorage.removeItem(draftKey(project));
     const draft: unknown = JSON.parse(raw);
     if (typeof draft !== 'object' || draft === null) return undefined;
     const { title, note } = draft as Partial<CaptureDraft>;
@@ -283,6 +282,14 @@ export function takeDraft(project: string | undefined): CaptureDraft | undefined
     return title.trim() === '' && note.trim() === '' ? undefined : { title, note };
   } catch {
     return undefined;
+  }
+}
+
+export function clearDraft(project: string | undefined): void {
+  try {
+    localStorage.removeItem(draftKey(project));
+  } catch {
+    // Storage off: nothing was kept.
   }
 }
 

@@ -4,6 +4,7 @@ import {
   captureBoards,
   captureNow,
   capturePayload,
+  clearDraft,
   closeCapture,
   keepDraft,
   landsStep,
@@ -14,8 +15,8 @@ import {
   photoPlaces,
   pickBoard,
   readable,
+  readDraft,
   rememberBoard,
-  takeDraft,
 } from './capture.ts';
 
 const LAYOUT: Layout = {
@@ -331,18 +332,20 @@ describe('the words of a save that failed', () => {
     });
   };
 
-  it('come back once, for that project', () => {
+  it('stay for that project until a save succeeds', () => {
     stub();
     keepDraft('p1', { title: 'Item con foto', note: 'nota' });
-    expect(takeDraft('p2')).toBeUndefined();
-    expect(takeDraft('p1')).toEqual({ title: 'Item con foto', note: 'nota' });
-    expect(takeDraft('p1')).toBeUndefined();
+    expect(readDraft('p2')).toBeUndefined();
+    expect(readDraft('p1')).toEqual({ title: 'Item con foto', note: 'nota' });
+    expect(readDraft('p1')).toEqual({ title: 'Item con foto', note: 'nota' });
+    clearDraft('p1');
+    expect(readDraft('p1')).toBeUndefined();
   });
 
   it('are not kept blank, and storage that throws loses nothing else', () => {
     stub();
     keepDraft('p1', { title: ' ', note: '' });
-    expect(takeDraft('p1')).toBeUndefined();
+    expect(readDraft('p1')).toBeUndefined();
     vi.stubGlobal('localStorage', {
       getItem: () => {
         throw new Error('blocked');
@@ -355,7 +358,7 @@ describe('the words of a save that failed', () => {
       },
     });
     expect(() => keepDraft('p1', { title: 'a', note: '' })).not.toThrow();
-    expect(takeDraft('p1')).toBeUndefined();
+    expect(readDraft('p1')).toBeUndefined();
   });
 });
 

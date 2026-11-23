@@ -39,6 +39,8 @@ export type Round = {
   note?: string;
   evidence: Evidence[];
   verdict?: Verdict;
+  // On a board, the step it was handed off from.
+  step?: string;
 };
 
 export type BoardRounds = { def: BoardDefinition; step?: string };
@@ -154,7 +156,7 @@ function stepRounds(
   const starts = roundsOfStep(board.def, history, step);
   return rounds
     .filter((round) => round.step === step)
-    .map(({ step: _, ...round }) => ({
+    .map((round) => ({
       ...round,
       n: starts.findLast(({ at }) => at <= round.endedAt)?.round ?? 1,
     }));
