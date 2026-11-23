@@ -70,7 +70,9 @@ export const toca = {
   'toca.sub.didIt': 'lo hizo {agent}',
   'toca.sub.closedBy': 'lo cerró {agent}',
   'toca.sub.closedByYou': 'cerrado por ti',
-  'toca.quiet': '{agent}: reserva vencida · {time}',
+  // La columna de la derecha ya dice «reserva vencida»: aquí, quién y desde cuándo, corto para
+  // que la fila no corte el texto.
+  'toca.quiet': '{agent} · hace {time}',
   'toca.replied': '{agent} contestó',
   'toca.round': 'ronda {n}',
 
