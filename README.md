@@ -224,14 +224,17 @@ Then [give your agent the text](#give-your-agent-the-text).
 
    - makes the project when there is none (what `otea init` does);
    - starts the desk in the background (`otea serve start`) and opens it in your browser, signed in; `--no-open` prints a sign-in link instead (single-use, good for 10 minutes: it is never the key); it keeps the port it last ran on;
-   - offers a first board from a template (`--template <key>` names one, `none` skips it), or leaves the boards for your agent to design with you;
+   - at a terminal, offers a first board as a short numbered choice (code changes, to-dos, or let your agent design the boards), with the default marked: Enter takes it, `none` or Ctrl+C makes no board. `--template <key>` names one (`none` skips it) and skips the question, as do `--json`, `--yes` and a pipe: with nothing asked, no board is made and the report names the command for each;
    - prints the text to paste into your agent's chat, and the MCP server it adds to its own config.
 
    The boards and the text come in the project's language, which is fixed when the project is made, in the language you use then: the one your desk last used, else your locale variables (`LC_ALL`, `LC_MESSAGES`, `LANG`), else your computer's, else English. A later run says the same thing even if your desk changed language. The report says which, `--lang en` or `--lang es` forces one for that run (on a new project, it makes the project in it), and `otea projects lang en|es` changes the project's from then on.
 
    ```text
    Project: set up "tienda-web" (data in ~/.otea/data/tienda-web-yafrhx)
-   Boards: none yet. Pick one now: otea start --template changes (code, one branch per change) or otea start --template todos (anything that is not code); or paste the text below and your agent designs them with you (otea start --help lists every template)
+   Boards: none yet (nothing is made until you choose). In a code repo run the first; for anything else, the second:
+     otea start --template changes  code: your agent does each change on its own branch, and it merges once you approve
+     otea start --template todos    anything that is not code: a to-do list your agent works through
+     or paste the text below and your agent designs the boards with you (otea start --help lists every template)
    Language: English for the boards and the text below (--lang es makes them Spanish)
    Desk: running in the background at http://127.0.0.1:4400/p/tienda-web-yafrhx/ (pid 4120; stop it with otea serve stop)
 
