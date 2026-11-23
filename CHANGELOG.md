@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.0](https://github.com/otea-dev/otea/compare/v0.5.0...v0.6.0) (2026-11-23)
+
+
+### Features
+
+* **start:** a numbered first-board choice at a terminal, and a hint that names each command ([4c14553](https://github.com/otea-dev/otea/commit/4c14553fbe454c2ed74fb89b5c979f94b7aee494))
+
+
+### Bug fixes
+
+* **desk:** say a board's levels, sizes, yes/no and Done in its language, and drop the dead reading-language path ([8c75ec9](https://github.com/otea-dev/otea/commit/8c75ec9d1ab2e8f2138a940efc184de0616c2021))
+* **desk:** show a board's own words in the language it was made in, the agent's, on every screen ([681289f](https://github.com/otea-dev/otea/commit/681289f684f9152b4ab47545a78429a1aca0d531))
+* **review:** name at most twenty commits of main, as a remote branch does, and keep the answer ([90eb238](https://github.com/otea-dev/otea/commit/90eb2389772b893968232b00ac4d4bf0175b365d))
+* **review:** warn when main moved past the handoff, and when a round repeats the last one ([e024a1c](https://github.com/otea-dev/otea/commit/e024a1c1c7b16c956bf1c28efc4b54c26cd06147))
+* **start:** Ctrl+C reaches the real prompt, ask only on two terminals, --yes takes the default, --no-board ([bcd1fbc](https://github.com/otea-dev/otea/commit/bcd1fbc422aa044f2cf0afb0c02db7c17bdec7cb))
+
 ## [0.5.0](https://github.com/otea-dev/otea/compare/v0.4.0...v0.5.0) (2026-11-23)
 
 
