@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { listBoardSummaries } from '../app/boards.ts';
+import { listItems } from '../app/items.ts';
 import { rememberLanguage } from '../app/language.ts';
 import { openMachine } from '../app/machine.ts';
 import { openProject } from '../app/project.ts';
@@ -8,8 +9,9 @@ import { createServer } from '../server/server.ts';
 import { LOCAL_HOST, memoryProject, SESSION_COOKIE, TOKEN } from '../server/testing.ts';
 import { type Cli, cliAt, tempGitRepo } from './testing.ts';
 
-// What Otea makes with no desk to ask takes the language the person uses: the desk's, as the
-// server last heard it, else this computer's, else English. It stays as it was made.
+// What Otea makes with no desk to ask is in the project's language, fixed when the project was made
+// from the language the person used then: the desk's, as the server last heard it, else this
+// computer's, else English. The desk changing its own does not move it; projects lang does.
 describe('the language of what the CLI makes', () => {
   let repo: ReturnType<typeof tempGitRepo>;
   let person: Cli;
@@ -81,9 +83,9 @@ describe('the language of what the CLI makes', () => {
     expect(second.prompt).toBe((await person('prompt', '--lang', 'en')).out.trimEnd());
   });
 
-  it('is English for a board added after the desk was switched to English', async () => {
-    await person('init', '--local');
+  it('is English for a board added to a project made while the desk was in English', async () => {
     await switchDeskTo('en');
+    await person('init', '--local');
 
     expect((await person('board', 'add', 'Bugs', '--template', 'bugs')).code).toBe(0);
 
@@ -114,8 +116,61 @@ describe('the language of what the CLI makes', () => {
     expect(boardNames()).toEqual(expect.arrayContaining(['Changes', 'Requests', 'Bugs']));
     expect(boardNames()).not.toContain('Cambios');
     expect((await person('board', 'Changes')).out).toBe(before);
-    // What is made from now on is in the language now used.
+    // What is made from now on is in the project's language, which the desk's does not move.
+    const bugs = (await person('board', 'Bugs')).out;
+    expect(bugs).toContain('Bugs: steps for each Bug');
+    expect(bugs).not.toContain('Pasos para reproducirlo');
+  });
+
+  it('changes what is made from then on with projects lang, and nothing that exists', async () => {
+    await switchDeskTo('en');
+    await person('init', '--local', '--template', 'changes');
+    expect((await person('projects', 'lang')).out).toContain('English (en)');
+    const before = (await person('board', 'Changes')).out;
+
+    expect((await person('projects', 'lang', 'es')).out).toContain('Spanish (es)');
+    expect((await person('projects', 'lang')).out).toContain('Spanish (es)');
+    await person('board', 'add', 'Bugs', '--template', 'bugs');
+
     expect((await person('board', 'Bugs')).out).toContain('Pasos para reproducirlo');
+    expect((await person('board', 'Changes')).out).toBe(before);
+    expect((await person('projects', 'lang', 'fr')).code).not.toBe(0);
+  });
+
+  it('puts the Pedido of a board an agent drafts in the project language, not the desk one', async () => {
+    await switchDeskTo('es');
+    await person('init', '--local', '--template', 'none');
+    await switchDeskTo('en');
+    const agent = cliAt(repo.dir, { OTEA_AGENT: 'claude' });
+
+    await agent('board', 'draft', '--new', 'Criaturas', '--why', 'Criaturas del pantano');
+
+    const project = openProject(repo.dir);
+    try {
+      expect(listItems(project, {}).map(({ title }) => title)).toEqual([
+        'Esbozar el tablero Criaturas',
+      ]);
+    } finally {
+      project.db.close();
+    }
+  });
+
+  // A project from before the language was stored takes the one its Pedidos board was made in.
+  it('reads the language of a project with none stored from its Pedidos board, and keeps it', async () => {
+    await switchDeskTo('es');
+    await person('init', '--local', '--template', 'none');
+    const project = openProject(repo.dir);
+    try {
+      project.db.exec('UPDATE project SET lang = NULL');
+    } finally {
+      project.db.close();
+    }
+
+    await switchDeskTo('en');
+    expect((await person('projects', 'lang')).out).toContain('Spanish (es)');
+    await switchDeskTo('es');
+    await person('board', 'add', 'Cosas', '--template', 'changes');
+    expect((await person('board', 'Cosas')).out).toContain('Aclarar');
   });
 
   it('follows the language of the computer while no desk has said one', async () => {
@@ -152,17 +207,20 @@ describe('the language of what the CLI makes', () => {
     expect(refused.code).not.toBe(0);
   });
 
-  it('writes otea prompt in the desk language', async () => {
-    await person('init', '--local');
+  it('writes otea prompt in the project language, whatever the desk is in', async () => {
     await switchDeskTo('en');
+    await person('init', '--local');
     const english = (await person('prompt', 'design')).out;
 
     await switchDeskTo('es');
-    const spanish = (await person('prompt', 'design')).out;
 
-    expect(english).not.toBe(spanish);
+    expect((await person('prompt', 'design')).out).toBe(english);
     expect(english).toBe((await person('prompt', 'design', '--lang', 'en')).out);
-    expect(spanish).toBe((await person('prompt', 'design', '--lang', 'es')).out);
+    const spanish = (await person('prompt', 'design', '--lang', 'es')).out;
+    expect(spanish).not.toBe(english);
+    // Changing the project's language changes it.
+    await person('projects', 'lang', 'es');
+    expect((await person('prompt', 'design')).out).toBe(spanish);
   });
 
   it('writes the first-contact prompt of a folder with no project in the desk language too', async () => {

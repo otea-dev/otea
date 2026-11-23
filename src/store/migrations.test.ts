@@ -51,29 +51,26 @@ describe('migrate', () => {
         'process_beats',
       ]),
     );
-    expect(userVersion(db)).toBe(41);
+    expect(userVersion(db)).toBe(42);
   });
 
   it('is idempotent', () => {
     migrate(db);
     migrate(db);
 
-    expect(userVersion(db)).toBe(41);
+    expect(userVersion(db)).toBe(42);
   });
 
   describe('from version 40, which kept a language on the project', () => {
-    it('drops the column and keeps the project', () => {
+    // The old column was dropped and the project's language settled again when it is opened (from
+    // its Pedidos board), so what it held, a default nobody chose, is not carried over.
+    it('leaves the project with no language settled, and keeps the project', () => {
       migrate(db, 40);
       db.exec("INSERT INTO project (id, name, lang) VALUES ('p-1', 'p', 'en')");
 
       migrate(db);
 
-      const columns = db
-        .prepare('PRAGMA table_info(project)')
-        .all()
-        .map((row) => row.name);
-      expect(columns).not.toContain('lang');
-      expect(db.prepare('SELECT id FROM project').all()).toEqual([{ id: 'p-1' }]);
+      expect(db.prepare('SELECT id, lang FROM project').all()).toEqual([{ id: 'p-1', lang: null }]);
     });
   });
 

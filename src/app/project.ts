@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
+import type { Lang } from '../core/board/template-words.ts';
 import { OteaError } from '../core/errors.ts';
 import { assertIconName } from '../core/icons.ts';
 import { PROJECT_ID_RANDOM_BYTES, projectId } from '../core/project-id.ts';
@@ -46,8 +47,8 @@ import {
   registerProject,
   withRegistry,
 } from './home.ts';
-import { defaultLang } from './language.ts';
 import { loadPresets } from './presets.ts';
+import { settleProjectLang } from './project-language.ts';
 
 // `root` is the folder the project was found from (where AGENTS.md and .mcp.json go); `dataDir`
 // holds its database, evidence, presets and blueprint: `.otea/` in the root for a local project, a folder in
@@ -218,7 +219,13 @@ function ensureIdentity(db: DatabaseSync, identity: () => ProjectIdentity): Proj
   return selectProjectIdentity(db) as ProjectIdentity;
 }
 
-function open(found: Found, env: Env, identity = () => newIdentity(found.root)): Project {
+// `creation` is the language a project being created is made in; one that exists keeps its own.
+function open(
+  found: Found,
+  env: Env,
+  identity = () => newIdentity(found.root),
+  creation?: Lang,
+): Project {
   return openWithSetup(databasePath(found.dataDir), (db) => {
     migrate(db);
     const presets = loadPresets(found.dataDir);
@@ -232,8 +239,8 @@ function open(found: Found, env: Env, identity = () => newIdentity(found.root)):
     // Published boards join the catalog as compiled presets (app/boards.ts); a collection still on a
     // preset file is read as a published board, and every project has its Pedidos board.
     syncBoardPresets(project);
-    // What it makes now, with no desk to ask, is in the language the person uses (app/language.ts).
-    const lang = defaultLang(env);
+    // What it makes, with no desk to ask, is in the project's language (app/project-language.ts).
+    const lang = settleProjectLang(db, env, creation);
     migrateProjectBoards(project, lang);
     ensureRequestsBoard(project, lang);
     return project;
@@ -336,17 +343,19 @@ export function openProject(cwd: string, env: Env = process.env): Project {
   return openFound(found, env);
 }
 
-export type InitOptions = { here?: boolean; local?: boolean; join?: string };
+// `lang` is the language a new project is made in (the one the person uses, without it); a project
+// that exists keeps its own.
+export type InitOptions = { here?: boolean; local?: boolean; join?: string; lang?: Lang };
 
-function createLocal({ root, gitCommonDir }: Location, env: Env): Project {
+function createLocal({ root, gitCommonDir }: Location, env: Env, lang?: Lang): Project {
   mkdirSync(oteaDir(root), { recursive: true });
   if (gitCommonDir) excludeFromGit(gitCommonDir);
-  return open(local(root), env);
+  return open(local(root), env, undefined, lang);
 }
 
 // Common storage leaves no trace in the folder: the data goes to the Otea home and the registry
 // links the folder to it.
-function createCommon({ root }: Location, env: Env): Project {
+function createCommon({ root }: Location, env: Env, lang?: Lang): Project {
   const identity = newIdentity(root);
   const dataDir = join(oteaHome(env), 'data', identity.id);
   const registry = openRegistry(env);
@@ -359,7 +368,7 @@ function createCommon({ root }: Location, env: Env): Project {
     registry.close();
   }
   mkdirSync(dataDir, { recursive: true });
-  return open({ root, dataDir, storage: 'common' }, env, () => identity);
+  return open({ root, dataDir, storage: 'common' }, env, () => identity, lang);
 }
 
 // Links `path` to a registered project; linking it again to the same project changes nothing.
@@ -416,7 +425,9 @@ export function initProject(
       { kind: 'covered', root, covering: existing.root },
     );
   }
-  return options.local ? createLocal(location, env) : createCommon(location, env);
+  return options.local
+    ? createLocal(location, env, options.lang)
+    : createCommon(location, env, options.lang);
 }
 
 // The project as clients see it: its identity and the icon it was given, null when none was (the

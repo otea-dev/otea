@@ -227,7 +227,7 @@ Then [give your agent the text](#give-your-agent-the-text).
    - offers a first board from a template (`--template <key>` names one, `none` skips it), or leaves the boards for your agent to design with you;
    - prints the text to paste into your agent's chat, and the MCP server it adds to its own config.
 
-   The boards and the text come in the language you use: the one your desk last used, else your locale variables (`LC_ALL`, `LC_MESSAGES`, `LANG`), else your computer's, else English. The report says which, and `--lang en` or `--lang es` forces one.
+   The boards and the text come in the project's language, which is fixed when the project is made, in the language you use then: the one your desk last used, else your locale variables (`LC_ALL`, `LC_MESSAGES`, `LANG`), else your computer's, else English. A later run says the same thing even if your desk changed language. The report says which, `--lang en` or `--lang es` forces one for that run (on a new project, it makes the project in it), and `otea projects lang en|es` changes the project's from then on.
 
    ```text
    Project: set up "tienda-web" (data in ~/.otea/data/tienda-web-yafrhx)

@@ -476,6 +476,13 @@ export const MIGRATIONS = [
   `
   ALTER TABLE project DROP COLUMN lang;
   `,
+  // The project's language, again, and now it is the project's: what Otea makes for it with no desk
+  // to ask (otea start, prompt, board add, board draft, a Pedido's title) must not flip with the
+  // language the desk last used. Null until settled when the project is opened: at its creation,
+  // or, for a project from before, from its Pedidos board (app/project-language.ts).
+  `
+  ALTER TABLE project ADD COLUMN lang TEXT;
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {

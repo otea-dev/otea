@@ -11,6 +11,7 @@ import {
   type ProjectView,
   projectView,
 } from './project.ts';
+import { projectLanguage } from './project-language.ts';
 import { listRepos } from './repos.ts';
 
 // otea start: what a person needs in their first minutes, in the project's folder, in one pass.
@@ -31,12 +32,16 @@ export type StartReport = {
     all: string[];
   };
   prompt: string;
+  // The language of the boards and the prompt: --lang once, else the project's.
+  lang: Lang;
 };
 
 export type StartOptions = {
   // A template key (or `none`), as init --template takes it.
   template?: string | undefined;
-  lang: Lang;
+  // Forces the language of this run's boards and prompt. A project being made is made in it; one
+  // that exists keeps its own, which `otea projects lang` changes.
+  lang?: Lang | undefined;
   // Asked once, only when nothing was named and the project is new: the key the person picks, or
   // nothing to leave the boards to the agent. A project that exists is never asked again, so a
   // second run does not nag the person who left the boards to their agent.
@@ -51,7 +56,7 @@ function assertTemplate(key: string | undefined): void {
 }
 
 export async function startProject(cwd: string, options: StartOptions): Promise<StartReport> {
-  const { template, lang } = options;
+  const { template } = options;
   assertTemplate(template);
   let project: Project | undefined;
   try {
@@ -65,9 +70,10 @@ export async function startProject(cwd: string, options: StartOptions): Promise<
     // What the person types is checked before the project is made, so a typo leaves nothing behind.
     if (picked === undefined) picked = (await options.choose?.()) || undefined;
     assertTemplate(picked);
-    project = initProject(cwd);
+    project = initProject(cwd, options.lang === undefined ? {} : { lang: options.lang });
   }
   try {
+    const lang = options.lang ?? projectLanguage(project);
     if (created) listRepos(project);
     const made = initBoards(project, picked, lang);
     const moment = promptKindOf(project);
@@ -82,6 +88,7 @@ export async function startProject(cwd: string, options: StartOptions): Promise<
           .map(({ name }) => name),
       },
       prompt: agentPrompt(moment, lang, promptFacts(project, moment)),
+      lang,
     };
   } finally {
     project.db.close();
