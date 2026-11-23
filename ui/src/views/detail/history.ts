@@ -104,7 +104,10 @@ export function historyOf(
   const lines = sorted.map((e, i): HistoryLine => {
     const relay = relayOf(e);
     const human = e.actor.kind === 'human';
-    const who = human || relay ? t('sheet.d.youLower') : e.actor.name;
+    // A relayed move is the agent's word that the person said it, so it names the agent, never
+    // «you» (P1-F1). (An answer noted from the chat, otea answer, still reads as yours.)
+    const relayedMove = relay !== null && e.type === 'transitioned';
+    const who = relayedMove ? relay.via : human || relay ? t('sheet.d.youLower') : e.actor.name;
     const base = {
       id: e.id,
       when: whenOf(e.at, now),
@@ -191,11 +194,13 @@ export function historyOf(
           text: t('sheet.h.published', { version: String(e.data.board_version ?? ''), state }),
         };
       if (e.data.reason === 'restore') return { ...base, text: t('sheet.h.restored', { state }) };
+      // Never «you»: Otea cannot check that the person said what the agent quotes (P1-F1).
       if (relay) {
         return {
           ...base,
-          text: t('sheet.h.relayed', { via: relay.via, state }),
-          ...(relay.quote ? { quote: relay.quote } : {}),
+          text: relay.quote
+            ? t('sheet.h.relayed', { via: relay.via, quote: relay.quote, state })
+            : t('sheet.h.relayedBare', { via: relay.via, state }),
         };
       }
       const q = reason ? { quote: reason } : {};

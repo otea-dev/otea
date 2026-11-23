@@ -835,6 +835,12 @@
       "required": ["by", "motives"],
       "additionalProperties": false
     },
+    "relay": {
+      "default": true,
+      "type": "boolean",
+      "description": "Whether an agent may record a decision the person gave in the chat (otea relay). Off, the agent asks the person with otea ask and the person decides on the desk",
+      "examples": [true]
+    },
     "list": {
       "default": {
         "as": "list"

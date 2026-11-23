@@ -246,6 +246,10 @@ export type BoardDefinition = {
   snapshot?: Snapshot;
   split?: Split;
   drop: Drop;
+  // Whether an agent may record, with `otea relay`, a decision the person gave in the chat. Off,
+  // the agent asks the person (`otea ask`) and the person decides on the desk. Never verifiable:
+  // the quote is the agent's word, so a relayed decision always reads as relayed.
+  relay: boolean;
   list: ListView;
   // The other boards a template set made with this one (their hidden ids): Producto's two boards
   // open each other ("Abrir Errores"), and Studio's home says they were made together.
@@ -256,8 +260,8 @@ export type BoardDefinition = {
 };
 
 // A board's settings that every new board starts with.
-export function boardDefaults(): Pick<BoardDefinition, 'drop' | 'list'> {
-  return { drop: { by: 'anyone', motives: [] }, list: { as: 'list' } };
+export function boardDefaults(): Pick<BoardDefinition, 'drop' | 'relay' | 'list'> {
+  return { drop: { by: 'anyone', motives: [] }, relay: true, list: { as: 'list' } };
 }
 
 // A selection in the editor: what a problem, a change or a "¿por qué está aquí?" points at.

@@ -55,6 +55,7 @@ import {
   boardState,
   liftWhenWaitsClose,
   liveBoardOf,
+  relayAllowed,
 } from './next.ts';
 import {
   addRelation,
@@ -312,7 +313,8 @@ export function showItem(
   const moves = {
     ...offered,
     transitions: boardMoves(ctx, item, offered.transitions),
-    relayable: boardMoves(ctx, item, offered.relayable),
+    // A board that turned relay off offers an agent no decision to relay.
+    relayable: relayAllowed(ctx, item.collection) ? boardMoves(ctx, item, offered.relayable) : [],
   };
   const board = boardBlockOf(ctx, item);
   const archived = archivedBoardOf(ctx.db, item.id);

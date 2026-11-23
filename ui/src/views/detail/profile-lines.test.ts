@@ -53,10 +53,10 @@ const events: ItemEvent[] = [
 ];
 
 describe('the profile in the history', () => {
-  it('keeps the profile of each agent event, never on yours or on a decision relayed for you', () => {
+  it('keeps the profile of each agent event, never on yours or on a decision an agent relayed', () => {
     const lines = historyOf(events, bug, (s) => s, NOW);
     expect(lines.map((l) => [l.who, l.profile?.model ?? null])).toEqual([
-      ['you', null],
+      ['claude-d', null],
       ['claude-d', 'opus'],
       ['codex-b', 'gpt-5.5'],
       ['you', null],

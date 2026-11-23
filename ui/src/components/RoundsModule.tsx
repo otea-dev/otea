@@ -187,7 +187,11 @@ function Note({ round }: { round: Round }) {
 function VerdictLine({ round, name }: { round: Round; name: StateName }) {
   const { verdict } = round;
   if (!verdict) return <p className="rd-verdict-line t-small">{t('rounds.waiting')}</p>;
-  const by = verdict.relayedBy ? t('rounds.relayedBy', { agent: verdict.relayedBy }) : '';
+  const by = verdict.relayedBy
+    ? verdict.relayQuote
+      ? t('rounds.relayedQuoting', { agent: verdict.relayedBy, quote: verdict.relayQuote })
+      : t('rounds.relayedBy', { agent: verdict.relayedBy })
+    : '';
   const what =
     verdict.kind === 'sent-back'
       ? t('rounds.sentBack', { at: momentLabel(verdict.at, Date.now()) })

@@ -15,8 +15,9 @@ import type { Evidence, Layout } from '../../types.ts';
 // asked of it the round before. The rounds are read by rounds.ts, which numbers them as the step
 // engine does (core/board/history.ts): nothing is counted here.
 
-// How a round ended: still yours to judge, sent back, approved, closed; null while it is not.
-export type RoundTag = 'yours' | 'sentBack' | 'approved' | 'closed' | null;
+// How a round ended: still yours to judge, sent back, approved, closed, or decided by an agent that
+// relayed your word (never read as yours); null while it is not.
+export type RoundTag = 'yours' | 'sentBack' | 'approved' | 'closed' | 'relayed' | null;
 
 export type PhoneRound = {
   n: number;
@@ -42,7 +43,13 @@ export function phoneRounds(rounds: readonly Round[], yours: boolean): PhoneRoun
       const before = rounds[i - 1];
       const asked = before?.verdict?.kind === 'sent-back' ? before.verdict.reason : undefined;
       const last = i === rounds.length - 1;
-      const tag: RoundTag = r.verdict ? TAG[r.verdict.kind] : last && yours ? 'yours' : null;
+      const tag: RoundTag = r.verdict
+        ? r.verdict.relayedBy
+          ? 'relayed'
+          : TAG[r.verdict.kind]
+        : last && yours
+          ? 'yours'
+          : null;
       const reason = r.verdict?.kind === 'sent-back' ? r.verdict.reason : undefined;
       return {
         n: r.n,

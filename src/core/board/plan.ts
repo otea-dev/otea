@@ -96,6 +96,7 @@ export type Change =
   | { kind: 'split'; board: string | null; always: boolean }
   | { kind: 'motives'; names: string[] }
   | { kind: 'drop_by'; by: Drop['by'] }
+  | { kind: 'relay'; on: boolean }
   // `group`: a field's name, STEP or MOTIVE.
   | { kind: 'list'; as: ListView['as']; group?: string };
 
@@ -278,6 +279,7 @@ function laterBoardChanges(
   if (!same(motiveNames(live), motiveNames(draft)))
     out.push({ kind: 'motives', names: motiveNames(draft) });
   if (live.drop.by !== draft.drop.by) out.push({ kind: 'drop_by', by: draft.drop.by });
+  if (live.relay !== draft.relay) out.push({ kind: 'relay', on: draft.relay });
   if (!same(live.list, draft.list)) {
     const group = draft.list.group;
     const named =

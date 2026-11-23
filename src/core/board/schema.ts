@@ -414,6 +414,10 @@ export const definitionSchema = z
       .meta(
         about('Who may drop an item, and the motives a drop names', { by: 'anyone', motives: [] }),
       ),
+    relay: flag(
+      'Whether an agent may record a decision the person gave in the chat (otea relay). Off, the agent asks the person with otea ask and the person decides on the desk',
+      true,
+    ).default(true),
     list: z
       .strictObject({
         as: z.enum(['list', 'table']).meta(about('How the published list shows its items', 'list')),

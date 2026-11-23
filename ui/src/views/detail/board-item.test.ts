@@ -961,6 +961,12 @@ describe('stepRounds: the item’s whole history, grouped by step', () => {
       moved('sconcept__review', 'sanimate', you, '2026-01-03T00:00:00Z'),
     ];
     expect(stepRounds(creatures(), 'sanimate', approved)[0]?.outcome).toEqual({ kind: 'approved' });
+    // An approval an agent relayed is its word that the person gave it: it reads as relayed.
+    const relayed = moved('sconcept__review', 'sanimate', you, '2026-01-03T00:00:00Z');
+    relayed.data = { ...relayed.data, via: 'orch-a', quote: 'yes go' };
+    expect(
+      stepRounds(creatures(), 'sanimate', [...approved.slice(0, 2), relayed])[0]?.outcome,
+    ).toEqual({ kind: 'relayed' });
     const back = [
       ...crossed(),
       said(moved('sfix__review', 'striage', you, '2026-01-09T00:00:00Z'), 'Otra categoría.'),

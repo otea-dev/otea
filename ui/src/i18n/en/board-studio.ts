@@ -125,6 +125,9 @@ export const boardStudio = {
   'bs.change.motives_off': 'Dropping no longer names a motive.',
   'bs.change.drop_by_page': 'You drop items, from the page only.',
   'bs.change.drop_by_anyone': 'You drop items, from the page or by asking an agent.',
+  'bs.change.relay_on': 'An agent may pass on a decision you gave in the chat.',
+  'bs.change.relay_off':
+    'Agents ask you on the desk: they can no longer pass on a decision in your name.',
   'bs.change.list': 'The list shows as a {as}.',
   'bs.change.list_grouped': 'The list shows as a {as}, grouped by {group}.',
   'bs.change.list_list': 'List',

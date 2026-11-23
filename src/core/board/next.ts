@@ -1093,6 +1093,8 @@ export function takenBackText(
 // agent: the exact relay, so an agent the person told in the chat never dead-ends (P1-R3-4).
 function relayDropText(def: BoardDefinition, id: string): string {
   if (def.drop.by === 'page') return '';
+  if (!def.relay)
+    return ` ${def.name} does not take a decision relayed through an agent: if the person may want it dropped, ask them with otea ask ${id} "<your question>".`;
   return ` If the person told you to drop it, relay their decision in their words: otea relay ${id} ${DROPPED_NAME} --quote "<the person's words>" --reason "<why>"${motiveFlag(def)}`;
 }
 

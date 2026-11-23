@@ -150,6 +150,12 @@ export function liveBoardOf(ctx: Context, collection: string): LiveBoard | undef
   };
 }
 
+// Whether an agent may record the person's words on a collection (otea relay): a board can turn it
+// off. A collection still on a preset has no such setting.
+export function relayAllowed(ctx: Context, collection: string): boolean {
+  return liveBoardOf(ctx, collection)?.def.relay !== false;
+}
+
 // Every published board that is on a collection.
 export function liveBoards(ctx: Context): LiveBoard[] {
   return listBoards(ctx.db).flatMap((row) =>

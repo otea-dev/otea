@@ -65,6 +65,7 @@ export const phone = {
   'phone.r.yours': 'tu veredicto',
   'phone.r.sentBack': 'devuelta',
   'phone.r.approved': 'aprobada',
+  'phone.r.relayed': 'relayada por un agente',
   'phone.r.closed': 'cerrada',
   'phone.r.delivered': 'Lo que entregó',
   'phone.r.newIn': 'nuevo en la ronda {n}',

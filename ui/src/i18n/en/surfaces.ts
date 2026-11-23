@@ -362,6 +362,7 @@ export const surfaces = {
   'activity.touched': 'updated {id}',
   'activity.touchedYou': 'You updated {id}',
   'activity.movedYou': 'You moved {id} to {state}',
+  'activity.relayed': 'relayed a decision on {id}: on to {state}',
   'activity.approved': 'approved {id}: on to {state}',
   'activity.approvedYou': 'You approved {id}: on to {state}',
   'activity.closed': 'closed {id}: {state}',
