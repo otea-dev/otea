@@ -16,7 +16,7 @@ import {
 } from '../store/queries.ts';
 import type { PathKind } from '../store/registry.ts';
 import { repoOfItem, sameRepo } from './gates.ts';
-import { kindOf, listProjects, repoFingerprint, withRegistry } from './home.ts';
+import { kindOf, listProjects, remoteUrlAt, repoFingerprint, withRegistry } from './home.ts';
 import { listItems } from './items.ts';
 import { liveBoards } from './next.ts';
 import type { Env, Project } from './project.ts';
@@ -199,13 +199,17 @@ export function remoteAddedLine(
   cwd: string,
   env: Env = process.env,
 ): string | undefined {
+  // The happy path costs one git process: no origin, or an origin a repo of the project goes by.
+  const remoteUrl = remoteUrlAt(cwd);
+  if (!remoteUrl) return undefined;
+  const identity = repoIdentity({ remoteUrl, rootCommit: null });
+  const repos = listRepos(project, env);
+  if (repos.some((each) => each.identity === identity)) return undefined;
   const top = checkoutTop(cwd);
   if (top === undefined) return undefined;
-  const repos = listRepos(project, env);
-  if (repoAt(repos, top)) return undefined;
   const before = repoByRootOf(repos, top);
   if (!before) return undefined;
-  return `A remote was added to ${top} after Otea first saw it, so every push from it is refused until the person says it is the same repo as "${before.name}" (a fork would look the same): ask the person, and if it is, run once in ${top}: otea repos add --name ${before.name}`;
+  return `A remote was added to ${top} after Otea first saw it, so every push from it is refused until the person says it is the same repo as "${before.name}" (a fork would look the same): ask the person, and if it is, run once in ${top}: otea repos add --name "${before.name}"`;
 }
 
 // Registers the repo checked out at `path`, under `name` or its folder's name; a repo already
