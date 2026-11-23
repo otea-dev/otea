@@ -206,7 +206,7 @@ describe('leaseRows', () => {
     ]);
   });
 
-  it('says the time left, "expires soon" under twenty minutes, and "expired" in warn', () => {
+  it('says the time left, "expires soon" under twenty minutes, and "no signal" in warn', () => {
     const items = [
       item('WORK-1', { holder: 'mender', expiresAt: iso(102) }),
       item('WORK-2', { holder: 'scout', expiresAt: iso(12) }),
@@ -216,7 +216,7 @@ describe('leaseRows', () => {
     if (!kiln || !scout || !mender) throw new Error('three rows');
     expect(leaseLeft(mender, T)).toEqual({ main: '1 h 42 min', sub: 'left', warn: false });
     expect(leaseLeft(scout, T)).toEqual({ main: '12 min', sub: 'soon', warn: false });
-    expect(leaseLeft(kiln, T)).toEqual({ main: 'expired', sub: 'unrenewed', warn: true });
+    expect(leaseLeft(kiln, T)).toEqual({ main: 'no signal', sub: 'unrenewed', warn: true });
   });
 });
 

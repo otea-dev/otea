@@ -282,7 +282,7 @@ export const phone = {
   'notify.turnHint': 'a review or an approval',
   'notify.replied': 'An agent answered your note',
   'notify.stuck': 'Something got stuck',
-  'notify.stuckHint': 'an agent went quiet holding it',
+  'notify.stuckHint': 'an agent lost signal holding it',
   'notify.ask': 'An agent asks you',
   'notify.aside': 'An agent set something aside for later',
   'notify.projects': 'projects',

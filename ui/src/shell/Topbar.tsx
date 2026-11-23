@@ -281,18 +281,10 @@ function AgentsMark({ kind, quiet }: { kind: PillMark; quiet: boolean }) {
   );
 }
 
-// The pill's words (mock §1): what happens, then one datum in grey, or in warn when one went quiet.
+// The pill's words (mock §1): what happens, then one datum in grey, or in warn when one has no signal.
 export function PillWords({ summary }: { summary: PillSummary }) {
   if (summary.kind === 'offline') return <span>{t('shell.offline')}</span>;
-  if (summary.kind === 'none')
-    return (
-      <>
-        <span>{t('shell.pill.none')}</span>
-        {summary.quiet ? (
-          <small className="wl warn-t">{t('shell.pill.quiet', { count: summary.quiet })}</small>
-        ) : null}
-      </>
-    );
+  if (summary.kind === 'none') return <span>{t('shell.pill.none')}</span>;
   if (summary.kind === 'silent') {
     return <span>{t('shell.pill.silent', { count: summary.count })}</span>;
   }
@@ -307,14 +299,12 @@ export function PillWords({ summary }: { summary: PillSummary }) {
             : t('shell.pill.waiting', { count: summary.count })}
       </span>
       {extra ? (
-        <small className={extra.kind === 'quiet' ? 'wl warn-t' : 'wl'}>
+        <small className={extra.kind === 'silent' ? 'wl warn-t' : 'wl'}>
           {extra.kind === 'of'
             ? t('shell.pill.of', { count: extra.n })
-            : extra.kind === 'quiet'
-              ? t('shell.pill.quiet', { count: extra.n })
-              : extra.kind === 'silent'
-                ? t('shell.pill.silent', { count: extra.n })
-                : t('shell.pill.noProfile', { count: extra.n })}
+            : extra.kind === 'silent'
+              ? t('shell.pill.silent', { count: extra.n })
+              : t('shell.pill.noProfile', { count: extra.n })}
         </small>
       ) : null}
     </>
@@ -336,7 +326,9 @@ function RowDoing({ row, now }: { row: AgentRow; now: number }) {
     return (
       <span className="held warn">
         {held ? <NodeGlyph look={held.look} size={14} /> : null}
-        <span className="verb">{t('shell.row.silent')}</span>
+        <span className="verb">
+          {row.quiet ? t('shell.row.quiet', { time: clockOf(row.since) }) : t('shell.row.silent')}
+        </span>
         {held ? <span className="id">{held.id}</span> : null}
         {held ? <span className="tx">{held.title}</span> : null}
       </span>
@@ -346,20 +338,15 @@ function RowDoing({ row, now }: { row: AgentRow; now: number }) {
     const time = clockOf(Math.min(row.since, now));
     return (
       <span className="held">
-        <span className={row.waiting ? 'verb' : 'verb warn-t'}>
+        <span className="verb">
           {row.waiting ? t('shell.row.idle', { time }) : t('shell.row.connected')}
         </span>
       </span>
     );
   }
-  const verb =
-    row.state === 'work'
-      ? t('shell.row.work')
-      : row.state === 'wait'
-        ? t('shell.row.wait')
-        : t('shell.row.quiet', { time: clockOf(row.since) });
+  const verb = row.state === 'work' ? t('shell.row.work') : t('shell.row.wait');
   return (
-    <span className={row.state === 'quiet' ? 'held warn' : 'held'}>
+    <span className="held">
       <NodeGlyph look={it.look} size={14} />
       <span className="verb">{verb}</span>
       <span className="id">{it.id}</span>
@@ -405,15 +392,9 @@ export function AgentsMenuBody({
             {waiting ? t('shell.pill.waiting', { count: waiting }) : null}
             {(counts.holding || waiting) && counts.connected ? ' · ' : null}
             {counts.connected ? t('shell.pill.connected', { count: counts.connected }) : null}
-            {counts.quiet ? (
-              <>
-                {' · '}
-                <span className="warn-t">{t('shell.pill.quiet', { count: counts.quiet })}</span>
-              </>
-            ) : null}
             {counts.silent ? (
               <>
-                {counts.holding || waiting || counts.connected || counts.quiet ? ' · ' : null}
+                {counts.holding || waiting || counts.connected ? ' · ' : null}
                 <span className="warn-t">{t('shell.pill.silent', { count: counts.silent })}</span>
               </>
             ) : null}
@@ -467,8 +448,7 @@ export function AgentsMenuBody({
                 </span>
               ) : null}
               {a.mcpMissing ? (
-                <span className="flag" title={t('shell.flag.noMcpTip')}>
-                  <Icon name="warn" />
+                <span className="flag soft" title={t('shell.flag.noMcpTip')}>
                   {t('shell.flag.noMcp')}
                 </span>
               ) : null}
@@ -552,7 +532,7 @@ function AgentsPill() {
         disabled={offline}
         onClick={() => setOpen((o) => !o)}
       >
-        <AgentsMark kind={mark} quiet={!offline && counts.quiet > 0} />
+        <AgentsMark kind={mark} quiet={!offline && counts.silent > 0} />
         <PillWords summary={summary} />
         {/* Named by the words it shows, then what it opens (WCAG 2.5.3). */}
         <span className="visually-hidden"> · {t('shell.agentsTitle')}</span>

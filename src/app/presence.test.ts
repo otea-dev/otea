@@ -738,12 +738,12 @@ describe('agent presence', () => {
       expect(listAgents(ctx.db, at(T1), running)[0]?.status).toBe('connected');
     });
 
-    it('is listening while it waits, and working again once it calls after its handoff', () => {
+    it('is listening while it waits, and a call that takes no item does not make it work', () => {
       waitBeat(ctx.db, { agent: 'claude', channel: 'cli', waiter: 500 }, at(T0)).run();
       expect(listAgents(ctx.db, at(T0_20S), running)[0]?.status).toBe('listening');
 
       seeAgent(ctx.db, { agent: 'claude', channel: 'cli', call: true }, at(T2));
-      expect(listAgents(ctx.db, at(T2), running)[0]?.status).toBe('working');
+      expect(listAgents(ctx.db, at(T2), running)[0]?.status).toBe('listening');
     });
 
     it('is silent, not away, while it holds a live lease nothing says ended', () => {

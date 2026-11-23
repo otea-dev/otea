@@ -21,6 +21,12 @@ export function Unheard({
         {t('listen.noAgentsNotice')}
       </p>
     );
+  if (hearing.kind === 'connected')
+    return (
+      <p className={className} role="status" data-unheard="calm">
+        {t('listen.connected', { count: hearing.agents.length, agent: hearing.agents[0] ?? '' })}
+      </p>
+    );
   if (hearing.kind === 'working')
     return (
       <p className={className} role="status" data-unheard="calm">
@@ -43,11 +49,14 @@ export function Unheard({
 export function UnheardMark({
   busy,
   nobody = false,
+  connected = [],
 }: {
   busy: readonly string[];
   nobody?: boolean;
+  // The agents connected but not waiting (status connected): said calmly too.
+  connected?: readonly string[];
 }) {
-  const { text, calm } = unheardWords(busy, nobody);
+  const { text, calm } = unheardWords(busy, nobody, connected);
   return (
     <span className="mpt" data-unheard={calm ? 'calm' : ''}>
       <span className="sep">·</span>

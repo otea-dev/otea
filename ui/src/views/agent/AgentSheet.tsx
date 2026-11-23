@@ -90,7 +90,7 @@ function Stand({
   if (!row) return <>{t('agent.stand.away', { time: agoLabel(presence.lastSeen, now) })}</>;
   if (row.state === 'work' && it)
     return <>{tx('agent.stand.work', { title: <em>{it.title}</em>, time: since })}</>;
-  if (row.state === 'quiet' && it)
+  if (row.quiet && it)
     return <>{tx('agent.stand.quiet', { title: <em>{it.title}</em>, time: clockOf(row.since) })}</>;
   if (row.state === 'wait' && it)
     return (

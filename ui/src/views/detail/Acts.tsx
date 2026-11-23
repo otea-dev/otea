@@ -11,7 +11,7 @@ import { C } from '../../motion/curves.ts';
 import { reduced } from '../../motion/reduced.ts';
 import { parseOptions } from '../../options.ts';
 import { keepInView } from '../../phone/keep-in-view.ts';
-import { statusOf } from '../../presence.ts';
+import { statusWord } from '../../presence.ts';
 import type { ItemView, TypeView } from '../../types.ts';
 import { closerOf, type Facts } from './facts.ts';
 import { resumedToastOf, stuckToastOf, toastOf } from './frame.ts';
@@ -26,15 +26,6 @@ import type { Pick } from './pick.ts';
 // agent's or a closed item's turn.
 // When the item changes, the old block and the new are both present while one leaves and the other
 // arrives, and the box's height glides (mock:3150-3162).
-
-// The word beside an agent in the reassign menu: the server's status, said in Spanish.
-const STATUS_WORD = {
-  working: 'sheet.stuck.working',
-  listening: 'sheet.stuck.free',
-  connected: 'sheet.stuck.free',
-  silent: 'sheet.stuck.silent',
-  away: 'sheet.stuck.quiet',
-} as const;
 
 export type ActsMode = 'moves' | 'pick' | 'qa' | 'stuck' | 'aside' | 'wait' | 'receipt' | 'read';
 
@@ -547,7 +538,7 @@ export function Acts({
             .map((a) => (
               <MenuItem
                 key={a.name}
-                small={t(STATUS_WORD[statusOf(a)])}
+                small={statusWord(a)}
                 onPick={() => {
                   setReassign(null);
                   void app.reassign(

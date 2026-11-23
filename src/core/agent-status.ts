@@ -5,9 +5,11 @@
 // The command line and MCP get it as the same field of that JSON (otea whoami picks names by its own
 // rule, for names, and says no status).
 //
-//   working    holds an item it works on, or called Otea lately and did not just hand its work off
+//   working    holds an item it works on, on a live lease: nothing else makes it work
 //   listening  waits in otea wait: what the person does on the desk reaches it
-//   connected  heard (an MCP server open, a recent call) but not waiting: it hears nothing
+//   connected  heard (an MCP server open, a recent call) but not waiting: it hears nothing. An
+//              agent that only called Otea (a profile, a next that took nothing, the command that
+//              handed its work off) holds nothing: it is connected, between two items
 //   silent     holds a live lease, gave no sign for a while, and nothing says its session ended
 //   away       not connected
 //
@@ -22,12 +24,6 @@ export type StatusFacts = {
   // How many items it holds on a live lease.
   holding: number;
   waiting: boolean;
-  // It ran an otea command within the listening window.
-  called: boolean;
-  // Its last act was letting go of its work (a handoff or a release): it is between two items, not
-  // at work, until it calls again later. A call in the same millisecond as the release is part of
-  // it: the tie counts as handed off.
-  handedOff: boolean;
   // A question of its own waits for the person to answer.
   asking: boolean;
   sessionEnded: boolean;
@@ -37,7 +33,5 @@ export function agentStatus(f: StatusFacts): AgentStatus {
   if (!f.live) return f.holding > 0 && !f.sessionEnded ? 'silent' : 'away';
   const idle = f.waiting ? 'listening' : 'connected';
   if (f.asking) return idle;
-  if (f.holding > 0) return 'working';
-  if (f.called && !f.handedOff) return 'working';
-  return idle;
+  return f.holding > 0 ? 'working' : idle;
 }

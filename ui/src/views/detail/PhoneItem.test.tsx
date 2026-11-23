@@ -127,9 +127,15 @@ describe('reviewing an item on the phone', () => {
         ...review.transitions.slice(1),
       ],
     };
-    // An agent connected but idle in its chat: the alarm. With none connected at all, no alarm.
+    // An agent with no signal: the alarm. One connected but idle in its chat is calm (P5-F12), as
+    // is none connected at all.
     const idle = { name: 'Mender', harness: null, holding: [], lastSeen: ago(0.5), live: true };
-    const listening = [{ ...idle, waiting: false, listening: true }];
+    const connected = [{ ...idle, waiting: false, listening: true, status: 'connected' }];
+    expect(dock(render(onward, true, connected))).toContain('data-unheard="calm"');
+    expect(dock(render(onward, true, connected))).toContain(
+      'Mender está conectado; lo verá cuando vuelva a esperar.',
+    );
+    const listening = [{ ...idle, live: false, waiting: false, status: 'silent' }];
     expect(dock(render(onward, true, listening))).toContain('data-unheard=""');
     expect(dock(render(onward, true, listening))).toContain('<b>Nadie está escuchando.</b>');
     expect(dock(render(onward))).toContain('data-unheard="calm"');

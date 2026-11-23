@@ -26,13 +26,11 @@ export const shell = {
   'shell.pill.waiting': { one: '{count} listening', other: '{count} listening' },
   'shell.pill.connected': { one: '{count} connected', other: '{count} connected' },
   'shell.pill.silent': { one: '{count} no signal', other: '{count} no signal' },
-  'shell.pill.quiet': { one: '{count} quiet', other: '{count} quiet' },
   'shell.pill.noProfile': { one: '{count} without a profile', other: '{count} without a profile' },
   'shell.pill.of': 'of {count}',
   'shell.row.open': '{agent}: open its sheet',
   'shell.row.work': 'working on',
-  'shell.row.quiet': 'quiet since {time} ·',
-  'shell.row.quietRan': 'quiet since {time} · its lease ran out',
+  'shell.row.quiet': 'no signal since {time} ·',
   'shell.row.wait': 'waits for your answer ·',
   'shell.row.idle': 'listening · free since {time}',
   'shell.row.connected': 'connected · not listening now: not waiting for new work',
@@ -44,7 +42,7 @@ export const shell = {
   'shell.flag.changed': 'changed {time}',
   'shell.flag.noMcp': 'MCP not connected',
   'shell.flag.noMcpTip':
-    "It asked to connect over MCP (otea connect), but its harness never loaded Otea's server: it was declined when asked, or never added. It still works through the otea command.",
+    "It asked to connect over MCP (otea connect), but its harness never loaded Otea's server: it was declined when asked, or never added. It works through the otea command, a valid way: nothing needs fixing if it does its job.",
   'shell.flag.mcpUnused': 'connected by CLI, MCP unused',
   'shell.flag.mcpUnusedTip':
     "Its harness loaded Otea's MCP server, but this agent works with the otea command. It works the same: nothing needs fixing.",

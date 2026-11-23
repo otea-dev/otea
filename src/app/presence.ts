@@ -639,19 +639,13 @@ export function listAgents(
     // It was seen lately (a command-line agent between its commands); a profile given for it by
     // the person, with no sighting of its own, is no act.
     const active = connectedAt !== null && since(lastSeen, ACTIVE_WINDOW_MS);
-    // It ran an otea command within the listening window: still at work, between two items too
-    // (P7-R2-9). What it holds counts only while it is heard so (P7-R3-10).
+    // It ran an otea command within the listening window: connected, though that is no work (P6-F1):
+    // only a lease it holds makes it work. What it holds counts only while it is heard (P7-R3-10).
     const called = calledLately(record.actedAt, at);
     const declared = declaredOf.get(name);
     const mcp = mcpOf(record);
     const live = !ended && (listening || active || called);
     const waiting = within(waits.get(name)) && !gone;
-    const release = released.get(name);
-    // Its last act was to let go: between two items, not at work, until it calls again.
-    const handedOff =
-      release !== undefined &&
-      held.length === 0 &&
-      Date.parse(record.actedAt ?? record.lastSeen) <= Date.parse(release);
     const sessionEnded = silenced(name);
     return {
       name,
@@ -666,8 +660,6 @@ export function listAgents(
         live,
         holding: held.length,
         waiting,
-        called,
-        handedOff,
         asking: askers.has(name),
         sessionEnded: sessionEnded || ended,
       }),

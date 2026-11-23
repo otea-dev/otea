@@ -39,7 +39,7 @@ import type { Catalog } from './i18n.ts';
 //   triage            triaje
 //   brief             encargo
 //   template          plantilla
-//   quiet             callado
+//   agent status      trabajando, escuchando, conectado, sin señal, ausente (las del servidor; ninguna otra)
 //   On the way        En camino
 //   Closed            Cerrados
 //   Questions for you Preguntas para ti
