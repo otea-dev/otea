@@ -596,6 +596,18 @@ export function updateProjectIcon(db: DatabaseSync, icon: string | null): void {
   db.prepare('UPDATE project SET icon = ?').run(icon);
 }
 
+// The language the project's own words are made in, null until it is settled (app/project-language.ts).
+export function selectProjectLang(db: DatabaseSync): string | null {
+  const row = db.prepare('SELECT lang FROM project').get() as { lang: string | null } | undefined;
+  return row?.lang ?? null;
+}
+
+// `onlyIfUnset` settles the language once, whichever of two processes opening a project at the same
+// time gets there first; without it the language is changed.
+export function updateProjectLang(db: DatabaseSync, lang: string, onlyIfUnset = false): void {
+  db.prepare(`UPDATE project SET lang = ?${onlyIfUnset ? ' WHERE lang IS NULL' : ''}`).run(lang);
+}
+
 // A repo of the project: the name its items give it, and what identifies it (core/repo.ts).
 export type RepoRecord = { name: string; identity: string };
 

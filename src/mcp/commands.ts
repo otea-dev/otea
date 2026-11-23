@@ -50,6 +50,8 @@ export const CLI_ONLY_COMMANDS = [
   'stats',
   'projects list',
   'projects current',
+  // The language of what Otea makes for the project is the person's to set.
+  'projects lang',
   'projects add',
   'projects relink',
   'projects forget',

@@ -110,13 +110,13 @@ describe('run', () => {
       const bare = await otea('projects');
       expect(bare.code).toBe(2);
       expect(bare.err).toContain(
-        '"projects" needs a command: list, current, add, relink, forget (otea projects <command> --help)',
+        '"projects" needs a command: list, current, lang, add, relink, forget (otea projects <command> --help)',
       );
 
       const rename = await otea('projects', 'rename', 'x');
       expect(rename.code).toBe(2);
       expect(rename.err).toContain(
-        'Unknown command "projects rename": otea projects takes list, current, add, relink, forget',
+        'Unknown command "projects rename": otea projects takes list, current, lang, add, relink, forget',
       );
 
       const repos = await otea('repos', 'rename', 'api', 'web');
