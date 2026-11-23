@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchItem,
+  fetchItems,
+  fetchSession,
   freshPairingCode,
   reassignItem,
   restartItem,
   resumeItem,
   undoRelease,
 } from './api.ts';
+import { resetSync, syncNow } from './offline/sync-state.ts';
 
 // Retomar, Reasignar and their Deshacer, as the UI asks the server.
 
@@ -80,5 +83,50 @@ describe('an item opened by its link', () => {
     );
     expect(await fetchItem('NOPE-99', new AbortController().signal)).toBeNull();
     expect(asked).toEqual(['/api/items/NOPE-99?missing=null']);
+  });
+});
+
+// P8-F4: a browser whose sign-in ran out reads 401 «unauthorized» on everything; the app must know
+// the session is gone, not take it for an empty project or a PC that does not answer.
+describe('a session that ran out, from the UI', () => {
+  const refused = () =>
+    new Response(JSON.stringify({ error: { code: 'unauthorized', message: 'Sign in' } }), {
+      status: 401,
+    });
+  const answer = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+  const signal = () => new AbortController().signal;
+
+  afterEach(() => resetSync());
+
+  it('notes it on a refused read, and lifts it on the next read the PC answers', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => refused()),
+    );
+    await expect(fetchItems(signal())).rejects.toThrow();
+    expect(syncNow().signedOut).toBe(true);
+    // Nothing says the PC is down: it answered, and said no.
+    expect(syncNow().offline).toBe(false);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => answer([])),
+    );
+    await fetchItems(signal());
+    expect(syncNow().signedOut).toBeUndefined();
+  });
+
+  it('is not lifted by the session read, which the PC answers to anyone', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => refused()),
+    );
+    await expect(fetchItems(signal())).rejects.toThrow();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => answer({ canWrite: false })),
+    );
+    await fetchSession(signal());
+    expect(syncNow().signedOut).toBe(true);
   });
 });
