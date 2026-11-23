@@ -127,6 +127,7 @@ import {
   relinkPath,
 } from './projects.ts';
 import { generateVapidKeys, type PushSender, type VapidKeys, webPushSender } from './push.ts';
+import { roundSame } from './round-same.ts';
 import {
   type Client,
   deviceCookie,
@@ -765,6 +766,9 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       .get('/items/:id/diff-files', async (c) =>
         c.json({ mismatch: await diffFilesOff(project, c.req.param('id')) }),
       )
+      // A round whose work holds the same files as the round it answers (P5-F2): the desk says so
+      // before the person approves a change that did not happen.
+      .get('/items/:id/round-same', (c) => c.json({ same: roundSame(project, c.req.param('id')) }))
       .get('/items/:id/opened', (c) =>
         c.json({ evidence: openedFiles(project, c.req.param('id')) }),
       )

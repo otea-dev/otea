@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { getItem } from '../app/items.ts';
 import { liveBoardOf } from '../app/next.ts';
 import type { Project } from '../app/project.ts';
-import { approvedTipOf } from '../app/tips.ts';
+import { approvedTipOf, type Tip } from '../app/tips.ts';
 import { commitsAddedSince } from '../cli/gitrepo.ts';
 import { isClosed, positionOf } from '../core/board/engine.ts';
 import { guardedBranch } from '../core/board/model.ts';
@@ -10,12 +10,14 @@ import { guardedBranch } from '../core/board/model.ts';
 // What moved on the remote branch of an item in review since its handoff (P3C-R3-1): a clone
 // without Otea's hook can push to it while the person reads what was handed off, and the desk says
 // so before they approve. `handed` is the commit handed off, `now` the one the remote has, `added`
-// the commits on it that were not handed off, each with its author.
+// the commits on it that were not handed off, each with its author. `onBase`: the branch is the base
+// itself, on a board kept on main (P1-F1), and `now` is where this checkout has it, not the remote.
 export type Drift = {
   branch: string;
   handed: string;
   now: string;
   added: { commit: string; author: string }[];
+  onBase?: true;
 };
 
 // Git runs off the request's thread: asking the remote can take seconds.
@@ -49,6 +51,50 @@ async function remoteOf(cwd: string, branch: string): Promise<string> {
   }
 }
 
+// What this checkout's base holds that the handoff of a board kept on main did not (P1-F1): the
+// commits after the handed-off one, which a push of the base takes in too, whoever made them. A
+// board kept on main works one change at a time, so none is another item's work. Null while the base
+// is where the handoff left it, or this checkout lacks the commit handed off.
+async function baseDrift(project: Project, base: string, tip: Tip): Promise<Drift | null> {
+  const cwd = project.root;
+  try {
+    const now = await git(cwd, 'rev-parse', '--verify', '--quiet', `refs/heads/${base}^{commit}`);
+    if (now === '' || now === tip.commit || !(await has(cwd, tip.commit))) return null;
+    const ahead = await git(cwd, 'merge-base', '--is-ancestor', tip.commit, now).then(
+      () => true,
+      () => false,
+    );
+    const listed = ahead
+      ? await git(
+          cwd,
+          'log',
+          '--reverse',
+          '--format=%h%x09%an',
+          '--abbrev=7',
+          `${tip.commit}..${now}`,
+        )
+      : '';
+    const added = listed
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => {
+        const [commit = '', author = ''] = line.split('\t');
+        return { commit, author };
+      });
+    // Not ahead: the base was rewritten since, and no new commit explains where it is.
+    if (ahead && added.length === 0) return null;
+    return {
+      branch: base,
+      handed: tip.commit.slice(0, 7),
+      now: now.slice(0, 7),
+      added,
+      onBase: true,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // One answer per branch and handed-off commit for a few seconds: the page asks again on each look.
 const FRESH_MS = 20_000;
 const asked = new Map<string, { at: number; drift: Promise<Drift | null> }>();
@@ -63,9 +109,10 @@ export async function branchDrift(project: Project, id: string): Promise<Drift |
   const position = positionOf(item.state);
   if (!guard || isClosed(position) || position.phase === 'doing') return null;
   const branch = String(item.fields[guard.id] ?? '').trim();
-  if (branch === '' || branch === guard.guard.base) return null;
+  if (branch === '') return null;
   const tip = approvedTipOf(project, item.id, branch);
   if (!tip || tip.unchanged) return null;
+  if (branch === guard.guard.base) return baseDrift(project, branch, tip);
   const key = [project.root, branch, tip.commit].join('\0');
   const now = Date.now();
   const known = asked.get(key);

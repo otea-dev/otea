@@ -155,7 +155,7 @@ import {
 } from '../app/repos.ts';
 import { startProject } from '../app/start.ts';
 import type { TailscaleCli } from '../app/tailscale.ts';
-import { approvedTipOf } from '../app/tips.ts';
+import { approvedTipOf, repeatsLastRound } from '../app/tips.ts';
 import {
   addTopic,
   answerTopic,
@@ -1942,15 +1942,32 @@ function handedBranch(
       `${item.id} not handed off: ${branch} was never pushed to ${state.push}. Push it first (git push -u ${state.push} ${branch}), then hand it off again: ${frozen}, so no push of it gets through until the review ends.`,
     );
   }
-  const warning = unpushed
-    ? `Note: ${branch} was never pushed to ${state.push}. If the person reviews it on the forge (a pull request), they cannot see it there: ${frozen}.`
-    : undefined;
   const unchanged =
     base &&
     hands &&
     move.actor.kind === 'agent' &&
     forward &&
     pushState(cwd, branch)?.kind === 'pushed';
+  // A round that holds the same files as the one it answers (an empty commit, the old diff) is said
+  // here and in the review; it is not refused, since an answer to a question changes no file
+  // (P5-F2).
+  const again =
+    tip && hands && forward && step?.reviewer !== 'none' && !unchanged
+      ? repeatsLastRound(project, item.id, item.state, tip)
+      : undefined;
+  const notes = [
+    ...(unpushed
+      ? [
+          `Note: ${branch} was never pushed to ${state.push}. If the person reviews it on the forge (a pull request), they cannot see it there: ${frozen}.`,
+        ]
+      : []),
+    ...(again
+      ? [
+          `Note: ${branch} holds the same files as round ${again.round} (${again.commit.slice(0, 7)}): nothing changed since that round, and the review says so. If the person asked for a change, make it and hand off again.`,
+        ]
+      : []),
+  ];
+  const warning = notes.length === 0 ? undefined : notes.join('\n');
   const said = unchanged
     ? `${item.id} goes to review with no commit: ${branch} holds nothing the remote lacks, so the person reviews no code change and the push gate does not wait on it.`
     : undefined;
