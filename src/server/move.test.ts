@@ -4,6 +4,7 @@ import { createItem, getItem, moveItem } from '../app/items.ts';
 import { claimItem } from '../app/leases.ts';
 import type { Project } from '../app/project.ts';
 import type { Actor } from '../core/item.ts';
+import { SURFACE_HEADER } from '../core/surface.ts';
 import { createServer, type OteaServer } from './server.ts';
 import { LOCAL_HOST, memoryProject, SESSION_COOKIE, TOKEN } from './testing.ts';
 
@@ -86,7 +87,19 @@ describe('POST /api/items/:id/move', () => {
       to: 'todo',
       reason: 'Add tests',
       channel: 'ui',
+      surface: 'api',
     });
+  });
+
+  // P1-S1: with the person's session cookie, a plain HTTP call moves an item exactly as a click
+  // does. The page says it is the page (a header only it sends), so the record tells the two apart:
+  // the desk's own move, and a direct call that never went through it.
+  it('records whether the person moved it from the desk or with a direct API call', async () => {
+    await move('TASKS-1', { to: 'todo', reason: 'again' }, { [SURFACE_HEADER]: '1' });
+    expect(getItem(project, 'TASKS-1').events.at(-1)?.data.surface).toBe('desk');
+
+    await move('TASKS-1', { to: 'in_progress' });
+    expect(getItem(project, 'TASKS-1').events.at(-1)?.data.surface).toBe('api');
   });
 
   it.each([{ to: 'todo' }, { to: 'todo', reason: '  ' }])(

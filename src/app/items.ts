@@ -9,6 +9,7 @@ import { type Actor, formatItemId } from '../core/item.ts';
 import { activeLease, type Lease } from '../core/lease.ts';
 import { type ItemType, typeFor, typeOf } from '../core/preset.ts';
 import { type ChildrenSummary, childrenSummary, type RelationRef } from '../core/relations.ts';
+import type { Surface } from '../core/surface.ts';
 import { itemMoves } from '../core/views.ts';
 import { type Closing, closesOf, type Turn, turnOf, type Workflow } from '../core/workflow.ts';
 import { findBoardOfCollection } from '../store/boards.ts';
@@ -402,6 +403,8 @@ export type MoveItemInput = {
   to: string;
   actor: Actor;
   channel: Channel;
+  // Where the person's request came from (core/surface.ts), kept on the move's event.
+  surface?: Surface;
   reason?: string;
   // On a board: the note of a handoff, kept with the round (a step that asks for one reads the
   // reason when no note is given).
@@ -488,7 +491,12 @@ export function moveItem(ctx: Context, input: MoveItemInput, now = systemClock):
     assertDraftPublished(ctx, item.id, closesOf(workflow, to));
     assertCanLeave(type, item.state, to, item.fields);
     assertMayEnter(ctx, item, workflow, to, at);
-    const data = { ...(reason ? { reason } : {}), ...(note ? { note } : {}), channel };
+    const data = {
+      ...(reason ? { reason } : {}),
+      ...(note ? { note } : {}),
+      channel,
+      ...(input.surface === undefined ? {} : { surface: input.surface }),
+    };
     const live = liveBoardOf(ctx, item.collection);
     if (live) assertPicked(live.def, item, { to, actor }, input.choice);
     if (input.choice) {

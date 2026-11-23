@@ -161,6 +161,7 @@ import {
   pinRequest,
   reassignRequest,
   relinkRequest,
+  surfaceOf,
   undoRequest,
   updateRequest,
 } from './writes.ts';
@@ -686,7 +687,12 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       .post('/items/:id/move', async (c) => {
         assertWritable(c, auth);
         const request = await moveRequest(c);
-        const item = moveItem(project, { id: c.req.param('id'), ...request, ...HUMAN_IN_UI });
+        const item = moveItem(project, {
+          id: c.req.param('id'),
+          ...request,
+          ...HUMAN_IN_UI,
+          surface: surfaceOf(c),
+        });
         feed.notify();
         return c.json(item);
       })
@@ -856,7 +862,7 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         const id = c.req.param('id');
         const item =
           'from' in undo
-            ? undoMove(project, { id, from: undo.from, ...HUMAN_IN_UI })
+            ? undoMove(project, { id, from: undo.from, ...HUMAN_IN_UI, surface: surfaceOf(c) })
             : undoRelease(project, { id, ...HUMAN_IN_UI });
         feed.notify();
         return c.json(item);
