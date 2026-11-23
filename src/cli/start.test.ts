@@ -59,7 +59,8 @@ describe('otea start', () => {
   afterEach(async () => {
     await stopWhatRuns(repo.dir);
     rmSync(join(home(), SERVE_FILE), { force: true });
-    rmSync(join(home(), SERVE_LOG), { force: true });
+    // On Windows the server's log stays open a moment after the process is gone: wait it out.
+    rmSync(join(home(), SERVE_LOG), { force: true, maxRetries: 20, retryDelay: 250 });
     repo.remove();
     for (const folder of folders.splice(0)) {
       rmSync(folder, { recursive: true, force: true, maxRetries: 10 });
