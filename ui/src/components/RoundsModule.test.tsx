@@ -96,6 +96,53 @@ describe('the rounds’ route', () => {
   });
 });
 
+// P5-F1: Comparar rondas showed two identical pictures with no word when a round attached the very
+// file of the round before.
+describe('Comparar rondas when a round attached the same file again', () => {
+  const withFiles = {
+    ...bug,
+    layout: { ...bug.layout, evidence: [{ module: 'files', id: 'efile' }] },
+  };
+  const shot = (id: number, at: string, sha256: string) => ({
+    id,
+    itemId: 'ERR-2',
+    role: 'single' as const,
+    module: 'efile',
+    kind: 'image' as const,
+    filename: 'icono.png',
+    contentType: 'image/png',
+    size: 4,
+    sha256,
+    caption: null,
+    createdAt: `2026-11-12T${at}:00.000Z`,
+    actor: scout,
+    channel: 'cli',
+  });
+  const render = (second: string) =>
+    renderToStaticMarkup(
+      <RoundsModule
+        item={{ ...fixed, evidence: [shot(1, '20:15', 'aa'), shot(2, '20:25', second)] }}
+        type={withFiles}
+        entry={{ module: 'rounds' }}
+        canWrite
+      />,
+    );
+
+  it('says nothing changed when the bytes are the same', () => {
+    setLanguage('es');
+    const html = render('aa');
+    expect(html).toContain('Comparar rondas');
+    expect(html).toContain('Igual que la ronda 1: el archivo no cambió');
+  });
+
+  it('says nothing when the bytes changed', () => {
+    setLanguage('es');
+    const html = render('bb');
+    expect(html).toContain('Comparar rondas');
+    expect(html).not.toContain('no cambió');
+  });
+});
+
 describe('the count of rounds, as the row says it', () => {
   it('names the round under way once it was sent back, as the row does', () => {
     setLanguage('es');
