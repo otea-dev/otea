@@ -198,6 +198,7 @@ export const detail = {
   'evidence.rounds': 'Compare rounds',
   'evidence.roundTag': 'round {n}',
   'evidence.compareWithRound': 'Compare with round {n}',
+  'evidence.sameAsRound': 'Same as round {n}: the file did not change',
   'evidence.backToGallery': 'Back to the gallery',
   'compare.title': 'Compare rounds',
   'compare.mode': 'How to look at A and B',

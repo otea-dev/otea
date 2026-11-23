@@ -14,7 +14,7 @@ import {
 import { useFileUrl } from '../evidence-files.ts';
 import { type PlainKey, t } from '../i18n/i18n.ts';
 import { Button } from '../kit/index.ts';
-import { comparedFiles, type Round, roundFiles } from '../rounds.ts';
+import { comparedFiles, type Round, roundFiles, sameBytes } from '../rounds.ts';
 import type { Evidence } from '../types.ts';
 
 const MODE_LABEL: Readonly<Record<CompareMode, PlainKey>> = {
@@ -259,6 +259,11 @@ export function CompareRounds({ rounds, modules, marks, onMark }: CompareRoundsP
           <span className="cr-tag cr-legend">{t('compare.legend')}</span>
         ) : null}
       </div>
+      {sameBytes(fileA, fileB) ? (
+        <p className="t-cap ev-same" role="status">
+          {t('evidence.sameAsRound', { n: Math.min(a.n, b.n) })}
+        </p>
+      ) : null}
       {clocked ? (
         <div className="cr-clock">
           <Button
