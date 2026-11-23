@@ -99,13 +99,13 @@ describe('a write on an item waits its turn as the claim does', () => {
     ).toThrow(`${behind} not claimed: ${top} lands in main first (order 1), then ${behind}`);
   });
 
-  it('never binds the person, whoever holds the item', () => {
-    const { ctx, first } = two();
-    expect(
-      updateItem(ctx, { id: first, fields: { commit: 'abc1234' }, actor: you }, now).fields,
-    ).toMatchObject({ commit: 'abc1234' });
-    expect(() =>
-      updateItem(ctx, { id: first, fields: { commit: 'abc1234' }, actor: agent('quill') }, now),
-    ).toThrow(/claude-b/);
+  // The queue check is the agents': the same write on the item behind claude-b's landing is the
+  // person's to make, and an agent's to be refused.
+  it('never binds the person to the queue an agent waits in', () => {
+    const { ctx, first, second } = two();
+    const write = (actor: ReturnType<typeof agent> | typeof you) =>
+      updateItem(ctx, { id: second, fields: { commit: 'abc1234' }, actor }, now);
+    expect(() => write(agent('quill'))).toThrow(`${second} not claimed: claude-b lands ${first}`);
+    expect(write(you).fields).toMatchObject({ commit: 'abc1234' });
   });
 });

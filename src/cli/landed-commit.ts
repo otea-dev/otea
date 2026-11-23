@@ -64,7 +64,7 @@ function remoteOfBase(cwd: string, base: string): string | undefined {
 }
 
 // The work the person approved: what the item's handoff into review recorded (app/tips.ts).
-export type ApprovedWork = { commit: string; unchanged?: true };
+export type ApprovedWork = { commit: string };
 
 // The refusal of a handoff whose `name` field does not hold a commit of `base` as it stands now, or
 // undefined when it does. Every commit it names must be in the base: with a remote, on the remote's
@@ -95,6 +95,7 @@ export function landedCommitRefusal(
   const listed = commits.map((each) => each.word).join(', ');
   const remote = remoteOfBase(cwd, base);
   const upstream = remote === undefined ? undefined : `${remote}/${base}`;
+  let noRemoteBase = false;
   if (remote !== undefined) {
     const fetched = run(
       cwd,
@@ -104,12 +105,17 @@ export function landedCommitRefusal(
       remote,
       `+refs/heads/${base}:refs/remotes/${remote}/${base}`,
     );
-    // A remote with no base yet holds nothing: the commits below are then not pushed.
-    if ('error' in fetched && !/couldn't find remote ref/i.test(fetched.error)) {
+    // A remote with no base branch holds nothing, whatever an old remote-tracking ref of it still
+    // says: the commits below are then not pushed.
+    noRemoteBase = 'error' in fetched && /couldn't find remote ref/i.test(fetched.error);
+    if ('error' in fetched && !noRemoteBase) {
       return `${name}: could not reach ${remote} (${fetched.error}), so Otea cannot tell whether ${listed} is on ${upstream}. Check the connection and hand it off again in a moment.`;
     }
   }
   const local = commitOf(cwd, `refs/heads/${base}`);
+  if (remote !== undefined && noRemoteBase) {
+    return `${name}: ${remote} has no ${base} branch, so ${listed} is not pushed. Push it first (git push ${remote} ${base}), then hand it off again.`;
+  }
   for (const { word, full } of commits) {
     if (upstream === undefined) {
       if (local === undefined) {
@@ -130,12 +136,19 @@ export function landedCommitRefusal(
     }
     return `${name}: commit ${word} is not on ${upstream}. Write the hash of a commit of ${base} that is pushed (git rev-parse --short ${upstream}).`;
   }
-  if (approved === undefined || approved.unchanged) return undefined;
+  if (approved === undefined) return undefined;
   const work = commitOf(cwd, approved.commit);
   if (work === undefined) {
     return `${name}: this checkout lacks the commit the person approved (${approved.commit.slice(0, 7)}), so it cannot tell that ${listed} holds it. Fetch it, then hand it off again.`;
   }
-  if (commits.some(({ full }) => holds(cwd, full, work) || landedIn(cwd, work, full))) {
+  // What it changes may be in the commit as a rebase or a squash leaves it; and it must be built on
+  // what the approved commit was built on, or an empty approved change (which any commit
+  // "contains") would pass for an older one.
+  const parent = commitOf(cwd, `${work}^`);
+  const holdsWork = ({ full }: { full: string }) =>
+    holds(cwd, full, work) ||
+    (landedIn(cwd, work, full) && (parent === undefined || holds(cwd, full, parent)));
+  if (commits.some(holdsWork)) {
     return undefined;
   }
   return `${name}: ${listed} does not hold the work the person approved (${work.slice(0, 7)}): it is an older commit of ${base}. Write the hash of the commit where that work landed (git rev-parse --short ${base} once it is there).`;

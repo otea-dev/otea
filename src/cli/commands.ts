@@ -1726,10 +1726,9 @@ function refuseUnlandedCommit(project: Project, cwd: string, move: BoardMoveInpu
   if (!hand || hand.req === 'no' || typeof value !== 'string' || value.trim() === '') return;
   const branch = String(item.fields[guard.id] ?? '').trim();
   const tip = branch === '' ? undefined : approvedTipOf(project, item.id, branch);
-  const approved = tip && {
-    commit: tip.commit,
-    ...(tip.unchanged ? { unchanged: true as const } : {}),
-  };
+  // A tip recorded as unchanged (main held nothing the remote lacked at the handoff) is checked
+  // too: an agent that pushed before handing off got it that way, and wrote an older hash.
+  const approved = tip && { commit: tip.commit };
   const refused = landedCommitRefusal(cwd, part.name, value, base, approved);
   if (refused) throw new OteaError('missing_fields', `${item.id} not handed off: ${refused}`);
 }
