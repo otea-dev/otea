@@ -261,13 +261,14 @@ describe('the agents menu’s rows', () => {
     expect(agentRows([agent('Ivy', { harness: 'cli' })], items, NOW)[0]?.harness).toBe('cli');
   });
 
-  it('keeps an agent gone quiet on its expired lease, its item stuck', () => {
+  // P6-F2: an agent whose lease ran out reads «sin señal» like any silent one, never a word of its own.
+  it('keeps an agent with no signal on its expired lease, its item stuck', () => {
     const rows = agentRows([agent('Kiln', { live: false, lastSeen: ago(12) })], items, NOW);
     expect(rows).toEqual([
       expect.objectContaining({
         name: 'Kiln',
-        quiet: true,
-        state: 'quiet',
+        silent: true,
+        state: 'silent',
         held: [{ id: 'CRE-44', title: 'Tortuga musgosa', look: 'stuck' }],
       }),
     ]);
@@ -282,7 +283,7 @@ describe('the agents menu’s rows', () => {
     expect(agentRows([agent('Old', { live: false })], items, NOW)).toEqual([]);
   });
 
-  it('puts what asks for attention first: quiet, then working, then waiting, then idle', () => {
+  it('puts what asks for attention first: no signal, then working, then waiting, then idle', () => {
     const rows = agentRows(
       [
         agent('Idle', { lastSeen: ago(0) }),
@@ -295,14 +296,13 @@ describe('the agents menu’s rows', () => {
       feed,
     );
     expect(rows.map((r) => r.name)).toEqual(['Kiln', 'Scout', 'Quill', 'Idle']);
-    // The quiet one is no listener: idle counts only those listening with nothing held.
+    // The one with no signal is no listener: idle counts only those listening with nothing held.
     expect(agentCounts(rows)).toEqual({
-      live: 4,
+      live: 3,
       holding: 1,
       idle: 2,
       connected: 0,
-      quiet: 1,
-      silent: 0,
+      silent: 1,
       noProfile: 4,
     });
   });
@@ -339,7 +339,7 @@ describe('the agents pill', () => {
     });
   });
 
-  it('lets a quiet agent win over one without a profile, and that over the total', () => {
+  it('lets an agent with no signal win over one without a profile, and that over the total', () => {
     const a = (name: string, o: Partial<Agent> = {}) => agent(name, { profile: opus, ...o });
     const quiet = agentRows(
       [a('a', { holding: ['W'] }), a('q', { live: false, lastSeen: ago(12) }), agent('n')],
@@ -349,7 +349,7 @@ describe('the agents pill', () => {
     expect(pillSummary('live', quiet)).toEqual({
       kind: 'working',
       count: 1,
-      extra: { kind: 'quiet', n: 1 },
+      extra: { kind: 'silent', n: 1 },
     });
     expect(pillSummary('live', rows([a('a'), agent('n', { profile: null })]))).toEqual({
       kind: 'waiting',
@@ -358,9 +358,9 @@ describe('the agents pill', () => {
     });
   });
 
-  it('never counts an agent gone quiet as listening: with only it, nobody is connected', () => {
+  it('never counts an agent with no signal as listening: with only it, the pill says so, not «sin agentes»', () => {
     const quiet = agentRows([agent('q', { live: false, lastSeen: ago(12) })], stuck, NOW);
-    expect(pillSummary('live', quiet)).toEqual({ kind: 'none', quiet: 1 });
+    expect(pillSummary('live', quiet)).toEqual({ kind: 'silent', count: 1 });
     expect(pillMark('live', quiet)).toBe('none');
   });
 
@@ -373,8 +373,8 @@ describe('the agents pill', () => {
       [...stuck, held],
       NOW,
     );
-    expect(quiet[0]).toMatchObject({ quiet: true, working: false, state: 'quiet' });
-    expect(pillSummary('live', quiet)).toEqual({ kind: 'none', quiet: 1 });
+    expect(quiet[0]).toMatchObject({ silent: true, working: false, state: 'silent' });
+    expect(pillSummary('live', quiet)).toEqual({ kind: 'silent', count: 1 });
     expect(pillMark('live', quiet)).toBe('none');
   });
 

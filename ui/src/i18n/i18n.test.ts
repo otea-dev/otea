@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AGENT_STATUSES } from '../../../src/core/agent-status.ts';
 import { ageLabel, agoLabel, momentLabel } from '../format.ts';
 import { leaseLeft } from '../lease.ts';
 import { en } from './en.ts';
@@ -33,6 +34,18 @@ const holes = (message: string | Plural) =>
 describe('the catalogs', () => {
   it('give Spanish every English key and no other', () => {
     expect(Object.keys(es).sort()).toEqual(Object.keys(en).sort());
+  });
+
+  // One vocabulary for what an agent is doing (src/core/agent-status.ts): working, listening,
+  // connected, silent, away. P6-F2: «callado» and «vencida» were two more words for one of them.
+  it('label each of the server’s agent statuses, and keep no other word for one', () => {
+    for (const status of AGENT_STATUSES) {
+      expect(es[`agent.status.${status}` as keyof typeof es], status).toBeTruthy();
+      expect(en[`agent.status.${status}` as keyof typeof en], status).toBeTruthy();
+    }
+    for (const [key, message] of Object.entries(es)) {
+      expect(forms(message).join(' '), key).not.toMatch(/callad|vencid/i);
+    }
   });
 
   it('keep each message’s holes and shape, and leave none empty', () => {
@@ -170,7 +183,7 @@ describe('times and lists in Spanish', () => {
     expect(agoLabel(ago(5 * 1440), now)).toBe('hace 5 d');
     const lease = { holder: 'claude', expiresAt: new Date(now + 12 * 60_000).toISOString() };
     expect(leaseLeft(lease, now)).toBe('quedan 12 min');
-    expect(leaseLeft({ ...lease, expiresAt: ago(1) }, now)).toBe('vencida');
+    expect(leaseLeft({ ...lease, expiresAt: ago(1) }, now)).toBe('sin señal');
     expect(momentLabel('2026-10-28T12:31:00.000Z', now, 'UTC')).toBe('28 oct, 12:31');
     expect(momentLabel('2025-01-02T09:05:00.000Z', now, 'UTC')).toBe('2 ene 2025, 09:05');
     expect(listOf(['A', 'B', 'C'])).toBe('A, B y C');

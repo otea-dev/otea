@@ -76,14 +76,41 @@ describe('an agent that hands off on a board', () => {
     expect(statusAt(ctx, 41)).toBe('connected');
   });
 
-  it('works again once it calls after the handoff', () => {
+  // P9-F4: the agent runs `otea next` after the handoff, as its guide says, and the desk read
+  // «está trabajando» while it held nothing. A call is not work: only a lease is.
+  it('stays connected when it calls after the handoff and takes nothing', () => {
     const ctx = memoryContext();
     const item = working(ctx);
     seeAgent(ctx.db, { agent: 'kiln', channel: 'cli', call: true }, at(40));
     handoffItem(ctx, { id: item.id, actor: kiln, channel: 'cli' }, at(41));
     seeAgent(ctx.db, { agent: 'kiln', channel: 'cli', call: true }, at(100));
 
+    expect(statusAt(ctx, 101)).toBe('connected');
+  });
+
+  it('works again once it claims something else', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+    handoffItem(ctx, { id: item.id, actor: kiln, channel: 'cli' }, at(41));
+    const other = createItem(
+      ctx,
+      { collection: 'Criaturas', title: 'Rana', fields: { fdesc: 'Verde' }, actor: you },
+      at(50),
+    );
+    claimItem(ctx, { id: other.id, actor: kiln }, at(100));
+
     expect(statusAt(ctx, 101)).toBe('working');
+  });
+});
+
+// P6-F1: `otea profile` or `otea next` alone made the chip say «1 trabajando» beside a menu row
+// that said «conectado».
+describe('an agent that only called Otea', () => {
+  it('is connected, not working, while it holds nothing', () => {
+    const ctx = memoryContext();
+    seeAgent(ctx.db, { agent: 'kiln', channel: 'cli', call: true }, at(0));
+
+    expect(statusAt(ctx, 5)).toBe('connected');
   });
 });
 
@@ -107,8 +134,8 @@ describe('an agent whose question waits for the person', () => {
 });
 
 describe('a lease that runs out', () => {
-  // It called Otea inside the listening window, so it is still at work, whatever its lease did.
-  it('leaves an agent that called within 150 seconds working', () => {
+  // It called Otea inside the listening window, so it is connected, but it holds nothing now.
+  it('leaves an agent that called within 150 seconds connected, holding nothing', () => {
     const ctx = memoryContext();
     const item = working(ctx);
     claimItem(ctx, { id: item.id, actor: kiln, ttlMs: 30_000 }, at(1));
@@ -116,7 +143,7 @@ describe('a lease that runs out', () => {
 
     const [kilnNow] = listAgents(ctx.db, at(100), () => true);
     expect(kilnNow?.holding).toEqual([]);
-    expect(kilnNow?.status).toBe('working');
+    expect(kilnNow?.status).toBe('connected');
   });
 
   it('leaves one that did not call for a while away, holding nothing', () => {
