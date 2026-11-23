@@ -645,6 +645,19 @@ describe('uninstall writes nothing it was not asked to', () => {
     expect(existsSync(home)).toBe(false);
     expect(existsSync(join(repo.dir, 'AGENTS.md'))).toBe(false);
   });
+
+  // Ctrl+C at the "Type yes" prompt: it ends the command with 130 and deletes nothing.
+  it('--purge-data deletes nothing when Ctrl+C answers the prompt', async () => {
+    const interrupted = cliAt(repo.dir, {}, undefined, undefined, async () => {
+      throw new DOMException('The operation was aborted', 'AbortError');
+    });
+
+    const result = await interrupted('uninstall', '--only', 'machine', '--purge-data');
+
+    expect(result.code).toBe(130);
+    expect(result.err).toContain('Nothing was deleted');
+    expect(existsSync(home)).toBe(true);
+  });
 });
 
 describe('--purge-data with a server running', () => {

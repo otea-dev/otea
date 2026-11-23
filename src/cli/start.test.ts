@@ -406,22 +406,42 @@ describe('otea start', () => {
 
     // A script, a pipe or an agent never waits on a question.
     it.each([
-      ['--json', ['--json']],
-      ['--yes', ['--yes']],
-      ['--template', ['--template', 'todos']],
+      ['--json', ['--json'], []],
+      ['--no-board', ['--no-board'], []],
+      ['--template', ['--template', 'todos'], ['To-dos']],
+      ['--yes', ['--yes'], ['Changes']],
     ])(
       'never asks with %s',
-      async (_name, extra) => {
+      async (_name, extra, boards) => {
         const { asked, cli } = typing('1');
 
         const started = await cli()('start', '--no-open', '--port', '0', ...extra);
 
         expect(started.code).toBe(0);
         expect(asked).toEqual([]);
-        expect(made(started)).toEqual(extra.includes('--template') ? ['To-dos'] : []);
+        expect(made(started)).toEqual(boards);
       },
       120_000,
     );
+
+    // --yes is yes to the default the question shows: changes in a git repo, to-dos in a folder.
+    it('takes the default board with --yes in a plain folder, and --no-board never mixes with it', async () => {
+      const folder = realpathSync.native(mkdtempSync(join(tmpdir(), 'otea-folder-')));
+      folders.push(folder);
+      const { asked, cli } = typing('1');
+
+      const started = await cli(folder)('start', '--no-open', '--port', '0', '--yes');
+      expect(started.code).toBe(0);
+      expect(made(started)).toEqual(['To-dos']);
+
+      for (const clash of [['--yes'], ['--template', 'todos']]) {
+        const refused = await cli()('start', '--no-open', '--no-board', ...clash);
+        expect(refused.code).toBe(2);
+        expect(refused.err).toContain('--no-board');
+      }
+      expect(asked).toEqual([]);
+      expect((await cliAt(repo.dir)('projects', 'current')).code).not.toBe(0);
+    }, 120_000);
 
     it('never asks an agent, which is refused before anything', async () => {
       const asked: string[] = [];
