@@ -88,6 +88,7 @@ import {
 import { type Proof, proofsFrom, provedPoints } from '../core/board/proofs.ts';
 import { type ItemQuestion, openQuestion, questionsOf } from '../core/board/questions.ts';
 import { evidenceByName, readFieldInput, stateByName, stateName } from '../core/board/reading.ts';
+import { repeatedFresh, repeatedLines } from '../core/board/repeats.ts';
 import { readDefinition } from '../core/board/schema.ts';
 import { OteaError } from '../core/errors.ts';
 import type { Actor } from '../core/item.ts';
@@ -1692,12 +1693,23 @@ export function handoffItem(
       ...(input.reason === undefined ? {} : { reason: input.reason }),
     });
     if (!result.ok) refuse(board.def, item, result, input.way, facts);
+    // A file new this round with the bytes of the round before is taken, and said (P5-F1).
+    const repeated =
+      step && input.actor.kind === 'agent'
+        ? repeatedFresh(
+            board.def,
+            step,
+            historyFor(item, board.def, selectEvents(ctx.db, item.id)),
+            facts.evidence,
+          )
+        : [];
     const moved = land(ctx, item, board, result.to, { ...input, ...(note ? { note } : {}) }, at);
     if (result.back && !isClosed(result.to)) {
       const round = itemOnBoard(ctx, requireItem(ctx.db, item.id), board.def).round;
       return { item: moved, text: takenBackText(board.def, item.id, result.to.step, round) };
     }
-    return { item: moved, text: handedText(board.def, item.id, result.to) };
+    const handed = handedText(board.def, item.id, result.to);
+    return { item: moved, text: [handed, ...repeatedLines(repeated)].join('\n') };
   });
 }
 
