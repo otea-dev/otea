@@ -11,7 +11,14 @@ import { landedIn } from './gitrepo.ts';
 const HASH = /\b[0-9a-f]{7,64}\b/gi;
 const GIT_MS = 30_000;
 // A fetch asks for no password and opens no prompt: it fails, saying so, in a session nobody sees.
-const QUIET = { ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' };
+// Its messages are read, so git speaks English whatever the person's language is.
+const QUIET = {
+  ...process.env,
+  GIT_TERMINAL_PROMPT: '0',
+  GCM_INTERACTIVE: 'never',
+  LC_ALL: 'C',
+  LANGUAGE: 'C',
+};
 
 type Ran = { out: string } | { error: string };
 
