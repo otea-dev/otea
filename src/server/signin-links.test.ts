@@ -1,5 +1,13 @@
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -100,6 +108,71 @@ describe('single-use sign-in links', () => {
     expect(results.filter((result) => result === 'true')).toHaveLength(1);
     expect(results.filter((result) => result === 'false')).toHaveLength(5);
   }, 60_000);
+
+  // The one-moment test above passes by luck on most runs: two processes have to read before either
+  // removes. The same race, run round after round by processes that stay up, shows it every time.
+  it('is used up by exactly one process in every one of many rounds of simultaneous redeems', async () => {
+    const rounds = 150;
+    const processes = 4;
+    const links = Array.from({ length: rounds }, () => issueSignInLink(home));
+    writeFileSync(join(home, 'links'), links.join('\n'));
+    const script = [
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      'const [module, home, go] = process.argv.slice(1);',
+      "const links = fs.readFileSync(path.join(home, 'links'), 'utf8').split('\\n');",
+      'import(module).then((m) => {',
+      "  console.log('ready');",
+      '  links.forEach((link, round) => {',
+      '    while (!fs.existsSync(path.join(go, String(round)))) {}',
+      '    console.log(m.redeemSignInLink(home, link));',
+      '  });',
+      '});',
+    ].join(' ');
+    const go = join(home, 'rounds');
+    mkdirSync(go);
+    const lines: string[][] = [];
+    const children = Array.from({ length: processes }, (_, index) => {
+      lines[index] = [];
+      const child = spawn(
+        process.execPath,
+        [
+          '--disable-warning=ExperimentalWarning',
+          '-e',
+          script,
+          new URL('./signin-links.ts', import.meta.url).href,
+          home,
+          go,
+        ],
+        { stdio: ['ignore', 'pipe', 'inherit'] },
+      );
+      let pending = '';
+      child.stdout.on('data', (chunk) => {
+        const parts = (pending + String(chunk)).split('\n');
+        pending = parts.pop() ?? '';
+        lines[index]?.push(...parts.map((part) => part.trim()));
+      });
+      return new Promise<void>((resolve) => child.on('close', () => resolve()));
+    });
+    const everyone = (count: number) => lines.every((own) => own.length >= count);
+    const until = async (done: () => boolean) => {
+      const limit = Date.now() + 45_000;
+      while (!done() && Date.now() < limit) await new Promise((resolve) => setTimeout(resolve, 5));
+    };
+
+    await until(() => everyone(1));
+    for (let round = 0; round < rounds; round += 1) {
+      writeFileSync(join(go, String(round)), '');
+      await until(() => everyone(round + 2));
+    }
+    await Promise.all(children);
+
+    const wins = Array.from(
+      { length: rounds },
+      (_, round) => lines.filter((own) => own[round + 1] === 'true').length,
+    );
+    expect(wins.filter((count) => count !== 1)).toEqual([]);
+  }, 90_000);
 
   it('does not clear a link another process is still writing, and survives a missing folder', () => {
     // issuing the first link finds no folder yet, and no error comes of sweeping it.
