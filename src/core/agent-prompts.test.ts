@@ -53,6 +53,24 @@ describe('the start prompt', () => {
     );
   });
 
+  // P9-F1: the first contact was five paragraphs, the first of them 250 words. Each step is a line
+  // that names it, with a short line for each thing to do; the pasted text stays a list of lines
+  // (the desk shows one paragraph a line).
+  for (const lang of ['en', 'es'] as const) {
+    it(`is a list of short lines under five steps, not walls of text (${lang})`, () => {
+      for (const repo of [true, false]) {
+        const lines = startPrompt(lang, repo).split('\n');
+        const words = (line: string) => line.split(/\s+/).length;
+
+        expect(lines.filter((line) => /^[1-5]\. /.test(line))).toHaveLength(5);
+        expect(Math.max(...lines.map(words))).toBeLessThanOrEqual(70);
+        expect(lines.filter((line) => line.startsWith('- ')).length).toBeGreaterThan(15);
+        expect(new Set(lines).size).toBe(lines.length);
+        expect(lines.some((line) => line.trim() === '')).toBe(false);
+      }
+    });
+  }
+
   it('tells the agent connect prints the MCP server it adds to its own harness', () => {
     expect(startPrompt('en')).toContain(
       "prints the MCP server to add to your own harness's config: add it yourself",
