@@ -119,9 +119,15 @@ describe('serve', () => {
     const { out } = await terminal('serve', '--port', '0', '--no-open');
     const [, origin = '', id = ''] = /^Otea running at (\S+)\/p\/([a-z0-9-]+)\/\n/.exec(out) ?? [];
 
-    expect(out).toBe(
-      `Otea running at ${origin}/p/${id}/\nSign a browser in at ${signInFor(origin, token(), id)} (it holds this computer's Otea key: keep it to yourself)\n`,
-    );
+    // P3-F5: what is printed is a single-use token, never the key.
+    const link = new RegExp(
+      `^Otea running at ${origin}/p/${id}/\\nSign a browser in at (${origin}/auth\\?token=[A-Za-z0-9_-]{43}&next=${encodeURIComponent(`/p/${id}/`)}) \\(works once, within 10 minutes; run the command again for another\\)\\n$`,
+    ).exec(out)?.[1];
+    expect(link).toBeDefined();
+    expect(out).not.toContain(token());
+    expect((await fetch(link ?? '', { redirect: 'manual' })).status).toBe(302);
+    expect((await fetch(link ?? '', { redirect: 'manual' })).status).toBe(401);
+    // The key signs in as before.
     const signIn = await fetch(signInFor(origin, token(), id), { redirect: 'manual' });
     expect(signIn.status).toBe(302);
   });
@@ -130,9 +136,12 @@ describe('serve', () => {
     const { out } = await otea('serve', '--port', '0', '--no-open');
     const [, origin = '', id = ''] = /^Otea running at (\S+)\/p\/([a-z0-9-]+)\/\n/.exec(out) ?? [];
 
-    expect(out).toBe(
-      `Otea running at ${origin}/p/${id}/\nSign a browser in at ${signInFor(origin, token(), id)} (it holds this computer's Otea key: keep it to yourself)\n`,
+    expect(out).toMatch(
+      new RegExp(
+        `^Otea running at ${origin}/p/${id}/\\nSign a browser in at ${origin}/auth\\?token=[A-Za-z0-9_-]{43}&next=`,
+      ),
     );
+    expect(out).not.toContain(token());
     interrupt.abort();
     interrupt = new AbortController();
     const terminal = cliAt(repo.dir, {}, interrupt.signal, undefined, undefined, undefined, true);

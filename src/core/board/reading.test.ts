@@ -38,6 +38,16 @@ describe('reading a board item by names', () => {
     });
   });
 
+  // P1-F6: `attach --module terminal` failed where only the name "Terminal output" worked.
+  it('takes evidence by its kind or the start of its name when that names exactly one', () => {
+    expect(evidenceByName(def, 'video')).toBe('eanim');
+    expect(evidenceByName(def, 'Animac')).toBe('eanim');
+    expect(evidenceByName(def, 'cambios')).toBe('ecode');
+    // Two parts begin with an a: no guess between them.
+    expect(() => evidenceByName(def, 'a')).toThrowError(/has no evidence "a"/);
+    expect(() => evidenceByName(def, '')).toThrowError(/has no evidence ""/);
+  });
+
   it('says a review in the board’s language and reads it in either language', () => {
     const english = creatures();
     english.title = 'Title';

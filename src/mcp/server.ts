@@ -1,22 +1,16 @@
 import { type CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
-import { type ZodType, z } from 'zod';
 import type { Harness } from '../app/presence.ts';
 import { NO_TAILSCALE } from '../app/tailscale.ts';
-import {
-  type Command,
-  errorData,
-  type Input,
-  type OptionSpec,
-  UsageError,
-} from '../cli/command.ts';
+import { type Command, errorData, type Input, UsageError } from '../cli/command.ts';
 import { NO_FORGE } from '../cli/forge.ts';
 import { OTEA_VERSION } from '../cli/version.ts';
 import { agentGuideFor } from '../core/agent-guide.ts';
 import { OteaError } from '../core/errors.ts';
 import { type Actor, agentActor, assertAgentName, PERSON_READER } from '../core/item.ts';
-import { parseDuration } from '../core/lease.ts';
+import { parseWaitTimeout } from '../core/lease.ts';
 import { AGENT_COMMANDS, NAMELESS_READS, READ_ONLY, toolName } from './commands.ts';
+import { inputSchema, optionValues } from './schema.ts';
 import { mcpWords } from './words.ts';
 
 export { AGENT_COMMANDS, CLI_ONLY_COMMANDS, toolName } from './commands.ts';
@@ -25,6 +19,8 @@ export { AGENT_COMMANDS, CLI_ONLY_COMMANDS, toolName } from './commands.ts';
 // --field-file reads a file or stdin for a long value, which a tool call carries as it is.
 export const OMITTED_OPTIONS: Readonly<Record<string, readonly string[]>> = {
   events: ['follow'],
+  // An MCP client names its own harness.
+  next: ['harness'],
   create: ['field-file'],
   update: ['field-file'],
 };
@@ -36,9 +32,9 @@ const WAIT_MAX = { text: '15m', ms: 15 * 60_000 };
 
 const NOTES: Readonly<Record<string, string>> = {
   attach:
-    'file is a path on this machine, which the server reads; a relative one is resolved against the directory otea mcp runs in. The file goes to an evidence module of the item type that accepts it: pass module (its id, shown by show) when several do, and role before or after for a compare.',
+    'file is a path on this machine, which the server reads; a relative one is resolved against the directory otea mcp runs in. module: the name show lists, or the kind (log, images).',
   'board draft':
-    'Pass id (the Pedido) or new (the name of a board the person asked you for, with why); not both. file is a path on this machine, which the server reads; a relative one is resolved against the directory otea mcp runs in.',
+    'Hand the board JSON in as definition (an object or a string): a tool call has no stdin to pipe it on, and no file is needed. file is a path on this machine, resolved against the directory otea mcp runs in. Pass id, new or change: one of them.',
   events:
     'Returns the events after the event id given to since, one a line with its id first; call it again with the last id to read newer ones.',
   wait: `Gives up after timeout (default ${WAIT_TIMEOUT}, at most ${WAIT_MAX.text}) with a result, not an error, that says nothing arrived; call it again to keep waiting.`,
@@ -80,24 +76,6 @@ type Values = Record<string, unknown>;
 // A record a command printed one by one (events): its data and its text.
 type Printed = { data: unknown; text: string };
 
-// A number an option takes (a note's, an event id) may come as a JSON number: it is read as its
-// digits, as the CLI reads it.
-const NUMBERED = new Set(['n', 'event id']);
-
-function optionSchema(spec: OptionSpec): ZodType {
-  if (spec.flag) return z.boolean().optional();
-  const numbered = NUMBERED.has(spec.placeholder ?? '');
-  const text = numbered ? z.union([z.string(), z.number()]) : z.string();
-  const value = spec.choices ? z.enum(spec.choices as [string, ...string[]]) : text;
-  const said = spec.about ?? spec.placeholder;
-  const described = said ? value.describe(said) : value;
-  if (spec.multiple) return z.array(described).optional();
-  return spec.required ? described : described.optional();
-}
-
-// Every tool takes the agent making the call, so subagents on one server stay apart.
-const AS = z.string().optional().describe('your agent name; each subagent its own');
-
 const NAME_YOURSELF = 'pass as with your agent name on every call';
 
 // A server started under a name (otea mcp --as) is that agent's: a call names it, or one of its
@@ -112,22 +90,12 @@ export function assertPinnedName(pinned: string | undefined, agent: string | und
   );
 }
 
-function inputSchema(command: Command) {
-  const omitted = OMITTED_OPTIONS[command.name] ?? [];
-  const shape: Record<string, ZodType> = { as: AS };
-  for (const arg of command.args) {
-    if (arg.endsWith('?')) shape[arg.slice(0, -1)] = z.string().optional();
-    else shape[arg] = z.string();
-  }
-  for (const [name, spec] of Object.entries(command.options)) {
-    if (!omitted.includes(name)) shape[name] = optionSchema(spec);
-  }
-  return z.object(shape);
-}
-
 function waitValues(values: Values): Values {
-  const timeout = typeof values.timeout === 'string' ? values.timeout : WAIT_TIMEOUT;
-  const ms = parseDuration(timeout);
+  const given = values.timeout;
+  // A bare number is seconds, as on the command line.
+  const timeout =
+    typeof given === 'string' || typeof given === 'number' ? String(given) : WAIT_TIMEOUT;
+  const ms = parseWaitTimeout(timeout);
   if (ms !== undefined && ms > WAIT_MAX.ms) {
     throw new UsageError(`--timeout must be at most ${WAIT_MAX.text} over MCP`);
   }
@@ -146,7 +114,12 @@ function inputFor(
 ): Input {
   const option = (name: string) => {
     const value = values[name];
-    return typeof value === 'string' || typeof value === 'number' ? String(value) : undefined;
+    if (typeof value === 'string' || typeof value === 'number') return String(value);
+    // The board JSON, given as an object, as the JSON it is.
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      return JSON.stringify(value);
+    }
+    return undefined;
   };
   const agent = typeof values.as === 'string' && values.as !== '' ? values.as : context.agent;
   // A name the CLI refuses is refused before the server hears it, so it never shows as an agent.
@@ -232,7 +205,8 @@ async function callCommand(
   let input: Input | undefined;
   const done = context.calling?.(command.name);
   try {
-    const given = command.name === 'wait' ? waitValues(values) : values;
+    const named = optionValues(command, values);
+    const given = command.name === 'wait' ? waitValues(named) : named;
     input = inputFor(command, given, context, signal, records, harness, seen);
     const output = await command.execute(input);
     if (context.json) {
@@ -288,9 +262,11 @@ function inMcpWords(data: unknown, commands: readonly Command[]): unknown {
 export function createMcpServer(commands: readonly Command[], context: McpContext): McpServer {
   // Otea's agent guide as the server's instructions: clients such as Claude Code put them in the
   // agent's context when it connects.
+  // In the words of the tools it serves: `next { claim: true }`, not `otea next --claim`, which no
+  // client of this server can run (the board tool gives the same guide the same way, P8-F4).
   const server = new McpServer(
     { name: 'otea', version: OTEA_VERSION },
-    { instructions: agentGuideFor(context.topics ?? false) },
+    { instructions: mcpWords(agentGuideFor(context.topics ?? false), commands) },
   );
   // The client names itself in initialize: its clientInfo is the harness the agent works through.
   const harness = (): Harness | undefined => {
@@ -307,8 +283,13 @@ export function createMcpServer(commands: readonly Command[], context: McpContex
     server.registerTool(
       toolName(name),
       {
-        description: note ? `${command.summary}. ${note}` : command.summary,
-        inputSchema: inputSchema(command),
+        // The command's own words speak of flags (--way, --note): here they are parameters.
+        description: mcpWords(note ? `${command.summary}. ${note}` : command.summary, commands),
+        inputSchema: inputSchema(
+          command,
+          OMITTED_OPTIONS[command.name] ?? [],
+          context.agent !== undefined,
+        ),
         annotations: { readOnlyHint: READ_ONLY.has(name) },
       },
       (values: Values, { mcpReq }) =>

@@ -533,7 +533,8 @@ describe('wait', () => {
     [['--turn', 'none'], '--turn must be one of agent, human'],
     [['--turn', 'robot'], '--turn must be one of agent, human'],
     [[], 'Missing --turn for "otea wait"'],
-    [['--turn', 'agent', '--timeout', '10'], '--timeout must be a positive duration'],
+    [['--turn', 'agent', '--timeout', 'soon'], '--timeout must be a positive duration'],
+    [['--turn', 'agent', '--timeout', '0'], '--timeout must be a positive duration'],
   ])('rejects %j as usage', async (argv, message) => {
     const { code, err } = await otea('wait', ...argv);
 
@@ -541,4 +542,64 @@ describe('wait', () => {
     expect(err).toContain(message);
     expect(err).toContain(USAGE);
   });
+
+  // P1-F6, P2-F5: a bare number is what a person types first, and it is seconds.
+  it('takes --timeout as a bare number of seconds, and says it back with its unit', async () => {
+    const started = Date.now();
+    const { code, err } = await otea('wait', '--turn', 'human', '--timeout', '1');
+
+    expect(Date.now() - started).toBeGreaterThanOrEqual(1000);
+    expect(code).toBe(13);
+    expect(err).toContain('No item reached the human turn within 1s');
+  });
+
+  // P1-F9, P2-F5: a wait whose shell ended stops by design, and says what to do next.
+  it('tells an agent whose wait ended with its shell to run it again from a shell that stays open', async () => {
+    const log = join(repo.dir, 'wait-stderr.log');
+    const starter = [
+      "const c = require('node:child_process').spawn(process.execPath, process.argv.slice(1), { detached: true, stdio: ['ignore', 'ignore', require('node:fs').openSync(process.env.WAIT_LOG, 'a')] });",
+      'c.unref();',
+      'console.log(c.pid);',
+      'setTimeout(() => {}, 60_000);',
+    ].join(' ');
+    const parent = spawn(
+      process.execPath,
+      [
+        '-e',
+        starter,
+        '--disable-warning=ExperimentalWarning',
+        MAIN,
+        'wait',
+        '--turn',
+        'human',
+        '--collection',
+        'tasks',
+        '--timeout',
+        '1m',
+      ],
+      {
+        cwd: repo.dir,
+        env: { ...process.env, OTEA_AGENT: 'claude', WAIT_LOG: log },
+        stdio: ['ignore', 'pipe', 'ignore'],
+      },
+    );
+    const pid = await new Promise<number>((resolve) =>
+      parent.stdout
+        .setEncoding('utf8')
+        .once('data', (line: string) => resolve(Number(line.trim()))),
+    );
+    try {
+      await delay(1500);
+      parent.kill();
+      await until(() => existsSync(log) && readFileSync(log, 'utf8').includes('Stopped'), 20_000);
+      const said = readFileSync(log, 'utf8');
+      expect(said).toContain('Stopped waiting: the session that started it ended');
+      expect(said).toContain('from a shell that stays open');
+      expect(said).toContain('`&`');
+    } finally {
+      parent.kill();
+      if (processAlive(pid)) process.kill(pid);
+      await until(() => released(repo.dir), 20_000);
+    }
+  }, 60_000);
 });

@@ -1,4 +1,12 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, posix, win32 } from 'node:path';
 import { repoOfItem } from '../app/gates.ts';
 import type { Item } from '../app/items.ts';
@@ -91,21 +99,49 @@ const flat = (text: string) =>
 // Otea is gone) the file itself holds, which must be a plain command line, and compared whole: a
 // hook with a line more, a line less or a line changed is the person's, or an edit of it.
 export function isOteaOwnHook(content: string): boolean {
+  return ownCommand(content) !== undefined;
+}
+
+// The command an Otea hook runs, and the lines it says its Otea is gone with, when the hook is
+// exactly one an Otea wrote (isOteaOwnHook).
+function ownCommand(content: string): { found: string; gone: string[] } | undefined {
   const lines = flat(content).split('\n');
   const found = lines
     .map((line) => /^ {6}(.+?) check --gate push --branch /.exec(line)?.[1])
     .find((command) => command !== undefined);
-  if (found === undefined || !COMMAND.test(found)) return false;
+  if (found === undefined || !COMMAND.test(found)) return undefined;
   const missing = lines.findIndex((line) => line.startsWith('if ! {'));
   const gone = missing < 0 ? [] : lines.slice(missing, missing + 4);
-  if (gone.length > 0 && !MISSING_LINE.test(gone[0] ?? '')) return false;
+  if (gone.length > 0 && !MISSING_LINE.test(gone[0] ?? '')) return undefined;
   const candidates = [
     ...LEGACY_HOOKS.map((legacy) => legacyHook(found, legacy)),
     modernHook(found, '# otea-hook-version: 2', []),
     modernHook(found, VERSION, gone),
   ];
   const given = flat(content);
-  return candidates.some((candidate) => flat(candidate) === given);
+  return candidates.some((candidate) => flat(candidate) === given) ? { found, gone } : undefined;
+}
+
+// Rewrites a pre-push hook an older Otea wrote to the current version, keeping the command it runs,
+// and says its path; nothing when the hook is current, or is not exactly one an Otea wrote (a line
+// of the person's, or an edit, keeps it as it is: they update it with otea hook install --git).
+// The file is replaced whole by a rename, so a push that is running it reads the old one to its
+// end; where the system will not rename over it (an open file on Windows) it stays as it was.
+export function refreshOutdatedGitHook(cwd: string): string | undefined {
+  if (gitHookKind(cwd) !== 'outdated') return undefined;
+  const path = gitHookFile(cwd);
+  const next = `${path}.otea-new`;
+  try {
+    const own = ownCommand(readFileSync(path, 'utf8'));
+    if (own === undefined) return undefined;
+    writeFileSync(next, modernHook(own.found, VERSION, own.gone), { mode: 0o755 });
+    chmodSync(next, 0o755);
+    renameSync(next, path);
+    return path;
+  } catch {
+    rmSync(next, { force: true });
+    return undefined;
+  }
 }
 
 // Checks every branch the push writes to or deletes on the remote, not the local branch it sends

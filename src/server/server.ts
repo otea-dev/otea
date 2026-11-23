@@ -191,6 +191,8 @@ export type ServerOptions = {
   pollIntervalMs?: number;
   uiDir?: string;
   token?: string;
+  // Takes a single-use sign-in link a command printed in place of `token` (see signin-links.ts).
+  redeemSignInLink?: (given: string) => boolean;
   // LAN access open from the start, for a caller that listens on every interface itself: the
   // addresses of this computer a paired device may reach it at, and the names (its mDNS
   // `<hostname>.local`) that resolve to one of them.
@@ -1060,7 +1062,7 @@ export function createServer(
     }
     await next();
   });
-  mountAuth(app, options.token, boundPort);
+  mountAuth(app, options.token, boundPort, options.redeemSignInLink);
   const keys = options.notify?.keys ?? generateVapidKeys();
   const sender = options.notify?.sender ?? webPushSender(keys);
   const hosts = new Map<string, Host>();

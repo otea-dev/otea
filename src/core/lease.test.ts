@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Actor } from './item.ts';
-import { activeLease, assertMayWrite, leaseExpiry, parseDuration } from './lease.ts';
+import {
+  activeLease,
+  assertMayWrite,
+  leaseExpiry,
+  parseDuration,
+  parseWaitTimeout,
+} from './lease.ts';
 
 const lease = { holder: 'claude', expiresAt: '2026-01-01T00:15:00.000Z' };
 
@@ -19,6 +25,23 @@ describe('parseDuration', () => {
       expect(parseDuration(text)).toBeUndefined();
     },
   );
+});
+
+// How long a wait may last: `600` is `600s`, and `600s` and `10m` are what they say.
+describe('parseWaitTimeout', () => {
+  it.each([
+    ['600', 600_000],
+    ['1', 1000],
+    ['600s', 600_000],
+    ['10m', 600_000],
+    ['1h', 3_600_000],
+  ])('parses %s', (text, ms) => {
+    expect(parseWaitTimeout(text)).toBe(ms);
+  });
+
+  it.each(['0', '-5', '1.5', '10 s', '10x', 'soon', ''])('rejects %j', (text) => {
+    expect(parseWaitTimeout(text)).toBeUndefined();
+  });
 });
 
 describe('leaseExpiry', () => {

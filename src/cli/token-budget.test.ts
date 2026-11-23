@@ -116,7 +116,10 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // again, as an agent set one aside right after Retomar with their note unanswered (P7-R3-8;
   // measured at 5314).
   // Raised for --brief on next and show (measured at 5408).
-  tools: { mcp: 5450 },
+  // Raised for the schemas an agent could not fill in (P8-F5; measured at 5931): `as` required where
+  // a call needs a name, an example item id and the relation kinds, the timeout typed as seconds or
+  // a duration, the board JSON as board_draft's own argument (P8-F2), and model and effort on next.
+  tools: { mcp: 5950 },
   // Otea's agent guide, the server's instructions: in every MCP agent's context from the start, so
   // it buys only what agents keep getting wrong. Measured at 203. Raised to 270 for the line on
   // declaring the profile every agent and subagent must keep current (measured at 246). Raised to

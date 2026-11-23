@@ -81,6 +81,7 @@ import {
   mergeFirstFor,
   nextFor,
   offerableTo,
+  offeredLine,
   rowFactsOf,
   sendBackItem,
   wokeLines,
@@ -113,6 +114,7 @@ import {
 } from '../app/presence.ts';
 import { priorityOf } from '../app/priority.ts';
 import {
+  type DeclaredProfileView,
   declareProfile,
   presetProfile,
   profileCommand,
@@ -185,7 +187,7 @@ import { EVIDENCE_ROLES, type EvidenceRole, MAX_EVIDENCE_MB } from '../core/evid
 import type { FieldValues } from '../core/fields.ts';
 import { assertIconName } from '../core/icons.ts';
 import { type Actor, assertAgentName } from '../core/item.ts';
-import { parseDuration } from '../core/lease.ts';
+import { parseDuration, parseWaitTimeout } from '../core/lease.ts';
 import { profileLine } from '../core/profile.ts';
 import { describeRelation, RELATION_KINDS } from '../core/relations.ts';
 import { timeText } from '../core/time.ts';
@@ -194,6 +196,11 @@ import { DEFAULT_PORT } from '../server/hosts.ts';
 import { machineProjects, type ServedProject } from '../server/hub.ts';
 import { formatCode } from '../server/lan.ts';
 import { ensureVapidKeys } from '../server/push.ts';
+import {
+  issueSignInLink,
+  redeemSignInLink,
+  SIGNIN_LINK_LIFETIME_MS,
+} from '../server/signin-links.ts';
 import { ensureUiToken, readUiToken } from '../server/token.ts';
 import {
   type EventFilter,
@@ -219,6 +226,7 @@ import {
   inspectServer,
   type Launch,
   SERVE_LOG,
+  type ServerState,
   stopServer,
   unresponsiveText,
 } from './daemon.ts';
@@ -254,6 +262,7 @@ import {
   type HookChange,
   installGitHook,
   outdatedGitHookLine,
+  refreshOutdatedGitHook,
   removeClaudeHook,
   removeGitHook,
 } from './hooks.ts';
@@ -261,7 +270,7 @@ import { mergedOutside, mergedOutsideLine } from './merged-outside.ts';
 import { boardsOf, eventData, itemCollections, itemData, readableEvent } from './names.ts';
 import { watchOwner } from './owner.ts';
 import { PHONE_COMMANDS } from './phone.ts';
-import { portFrom, portToOpen, projectPage } from './ports.ts';
+import { portFrom, portToOpen, portToStart, projectPage } from './ports.ts';
 import { probeSignIn } from './probe.ts';
 import { readServeFile, removeServeFile, writeServeFile } from './serve-file.ts';
 import { statsText } from './stats.ts';
@@ -796,6 +805,16 @@ function mcpEntryFor(input: Pick<Input, 'oteaOnPath' | 'home'>, id: string) {
 const HARNESS_PERMISSIONS =
   "Have your harness allow, for this project: otea (its commands and its MCP tools), git push to the items' branches (Otea's pre-push hook still checks each push) and git worktree add. Otea writes no harness config: docs/working-with-agents.md, «What your harness must allow», has examples.";
 
+// An outdated pre-push hook that is exactly one an Otea wrote is updated by whichever command sees
+// it first, so the warning does not come back on every command and push (P10-F2): the rule is the
+// one hook remove follows, a file that is exactly Otea's and nothing else.
+function refreshedHookLine(cwd: string): string | undefined {
+  const path = refreshOutdatedGitHook(cwd);
+  return path === undefined
+    ? undefined
+    : `Updated ${path}, a pre-push hook an older Otea wrote, to this version: a push now stops when Otea cannot check it (otea hook remove --git takes it out)`;
+}
+
 // What otea connect --check says: whether the agent named (or any agent) was heard through Otea's
 // MCP server in this project.
 function mcpCheck(project: Project, agent: string | undefined, now = systemClock): Output {
@@ -844,7 +863,7 @@ function mcpCheck(project: Project, agent: string | undefined, now = systemClock
 const connect: Command = {
   name: 'connect',
   summary:
-    "Connect agents to Otea, the same for every harness: add (or refresh) Otea's block in AGENTS.md and print the MCP server an agent adds to its own harness's config (otea mcp --project <id>: Otea writes no harness config). --as with --model and --effort also declares the profile that agent runs as, and notes it asked for MCP, so the desk warns while its harness never loads the server. --check says whether the agent (--as) or any agent was heard through the MCP server",
+    "Connect agents to Otea, the same for every harness: add (or refresh) Otea's block in AGENTS.md and print the MCP server an agent adds to its own harness's config (otea mcp --project <id>: Otea writes no harness config). --as with --model and --effort also declares the profile that agent runs as, and notes it asked for MCP, so the desk warns while its harness never loads the server. --check says whether the agent (--as) or any agent was heard through the MCP server. --cli (or --no-mcp) is for an agent that works from the command line only: it prints no MCP server, only a short note",
   args: [],
   // --as is a global option; it is named here so the usage line shows it.
   options: {
@@ -853,6 +872,8 @@ const connect: Command = {
     effort: { placeholder: 'level' },
     harness: { placeholder: 'name' },
     check: { flag: true },
+    cli: { flag: true },
+    'no-mcp': { flag: true },
   },
   execute: async (input) => {
     const { cwd, option, flag } = input;
@@ -860,16 +881,26 @@ const connect: Command = {
     if (name !== undefined) assertAgentName(name);
     if (flag('check')) {
       const checked = withProject(cwd, (project) => mcpCheck(project, name));
+      const refreshed = refreshedHookLine(cwd);
+      const withRefresh =
+        refreshed === undefined
+          ? checked
+          : {
+              ...checked,
+              data: { ...(checked.data as object), refreshedGitHook: refreshed },
+              text: `${checked.text}\n${refreshed}`,
+            };
       const outdated = outdatedGitHookLine(cwd);
-      if (outdated === undefined) return checked;
+      if (outdated === undefined) return withRefresh;
       return {
-        ...checked,
-        data: { ...(checked.data as object), outdatedGitHook: outdated },
-        text: `${checked.text}\n${outdated}`,
+        ...withRefresh,
+        data: { ...(withRefresh.data as object), outdatedGitHook: outdated },
+        text: `${withRefresh.text}\n${outdated}`,
       };
     }
     const model = option('model');
     const effort = option('effort');
+    const cliOnly = flag('cli') || flag('no-mcp');
     const { root, id } = withProject(cwd, (project) => {
       if (name !== undefined) {
         if (model !== undefined && effort !== undefined) {
@@ -884,7 +915,8 @@ const connect: Command = {
             `Give the profile ${name} runs as: --model <id> --effort <level>, exactly as its harness names them (such as claude-opus-5-5 and high)`,
           );
         }
-        markMcpAsked(project.db, name, systemClock());
+        // An agent on the command line only asked for no MCP: the desk has nothing to warn about.
+        if (!cliOnly) markMcpAsked(project.db, name, systemClock());
       }
       return { root: project.root, id: project.identity.id };
     });
@@ -892,6 +924,18 @@ const connect: Command = {
     // read it there.
     const here = checkoutRoot(cwd) ?? root;
     const agentsMd = writeAgentsMd(here);
+    const agentsLine = `${AGENTS_MD_TEXT[agentsMd.action](agentsMd.path)}: every agent that reads AGENTS.md finds Otea there`;
+    if (cliOnly) {
+      const as = name ?? '<name>';
+      return {
+        data: { agentsMd, ...(name === undefined ? {} : { agent: name }) },
+        text: [
+          agentsLine,
+          HARNESS_PERMISSIONS,
+          `You work from the command line, with no MCP server. Start with otea board, then otea next --as ${as}; run otea connect without --cli for the MCP server entry instead.`,
+        ].join('\n'),
+      };
+    }
     const { entry, usePath, onPath } = mcpEntryFor(input, id);
     const mcp = { name: MCP_SERVER, ...entry };
     const old = oldMcpEntry(here);
@@ -1285,7 +1329,7 @@ function draftFile(cwd: string, file: string, piped?: string): string {
     if (piped?.trim()) return piped;
     throw new OteaError(
       'missing_fields',
-      'Nothing came on stdin: pipe the board JSON into otea board draft --file - (a here-document of your shell), or give --file a path',
+      'Nothing came on stdin: pipe the board JSON into otea board draft --file - (a here-document of your shell), give --file a path, or pass the JSON itself as --definition (over MCP, board_draft takes it as definition)',
     );
   }
   const path = resolve(cwd, file);
@@ -1315,9 +1359,30 @@ function studioLink(project: Project, board: string): string {
 }
 
 // otea board draft --new: the agent the person asked for a board starts it; the person publishes.
-function proposeBoard(input: Input, name: string, piped?: string): Output {
-  const why = input.option('why')?.trim() ?? '';
+// Where the board JSON an agent hands in comes from: --definition, the JSON itself (a client with
+// no shell has no stdin to pipe it on, nor a file to write: P8-F2), else --file, a path or `-` for
+// what is piped in. `piped` is read before the command opens the project.
+async function draftSource(input: Input): Promise<{ file?: string; piped?: string }> {
+  const definition = input.option('definition');
+  if (definition !== undefined) {
+    if (input.option('file') !== undefined) {
+      throw new UsageError('Give --definition (the board JSON) or --file, not both');
+    }
+    return { file: '-', piped: definition };
+  }
   const file = input.option('file');
+  return {
+    ...(file === undefined ? {} : { file }),
+    ...(file === '-' ? { piped: await input.stdin() } : {}),
+  };
+}
+
+function proposeBoard(
+  input: Input,
+  name: string,
+  { file, piped }: { file?: string; piped?: string },
+): Output {
+  const why = input.option('why')?.trim() ?? '';
   const template = input.option('template');
   return withAgent(input, (project) => {
     if (why === '')
@@ -1350,9 +1415,12 @@ function proposeBoard(input: Input, name: string, piped?: string): Output {
 
 // otea board draft --change: the agent the person asked to change a published board opens the
 // change on a Pedido it holds; the live board works on, and the person publishes it in Studio.
-function proposeChange(input: Input, board: string, piped?: string): Output {
+function proposeChange(
+  input: Input,
+  board: string,
+  { file, piped }: { file?: string; piped?: string },
+): Output {
   const why = input.option('why')?.trim() ?? '';
-  const file = input.option('file');
   return withAgent(input, (project) => {
     if (why === '')
       throw new OteaError('missing_fields', 'Say what to change: --why "<what to change>"');
@@ -1385,6 +1453,10 @@ const boardDraft: Command = {
   args: ['id?'],
   options: {
     file: { placeholder: 'board.json' },
+    definition: {
+      placeholder: 'board JSON',
+      about: 'the board JSON itself, in place of --file (a client with no shell has no stdin)',
+    },
     new: { placeholder: 'name' },
     why: { placeholder: 'what it is for' },
     template: { placeholder: 'key' },
@@ -1396,20 +1468,20 @@ const boardDraft: Command = {
     const change = input.option('change');
     if ([id, name, change].filter((given) => given !== undefined).length > 1)
       throw new UsageError('Give the Pedido, --new <name> or --change <board>, only one');
-    // --file - takes the board JSON from stdin (P1-R3-10).
-    const piped = input.option('file') === '-' ? await input.stdin() : undefined;
-    if (name !== undefined) return proposeBoard(input, name, piped);
+    // --file - takes the board JSON from stdin (P1-R3-10); --definition is the JSON itself.
+    const source = await draftSource(input);
+    if (name !== undefined) return proposeBoard(input, name, source);
     if (change !== undefined) {
       if (input.option('template') !== undefined)
         throw new UsageError('--template goes with --new <name>');
-      return proposeChange(input, change, piped);
+      return proposeChange(input, change, source);
     }
     if (id === undefined) throw new UsageError('Give the Pedido, or --new <name> for a new board');
     if (input.option('why') !== undefined)
       throw new UsageError('--why goes with --new <name> or --change <board>');
     if (input.option('template') !== undefined)
       throw new UsageError('--template goes with --new <name>');
-    const file = input.option('file');
+    const { file, piped } = source;
     return withAgent(input, (project) => {
       if (file === undefined) {
         const definition = draftToStartFrom(project, id);
@@ -1541,13 +1613,32 @@ const next: Command = {
   summary:
     'Say which item to take now on the published boards (or in --collection), sent-back ones first, then approved work, then new, each in the Matrix order, and what its step asks: what it starts with, the instructions, the handoff and where it goes next; when there is none, what to do meanwhile. Never offers an item another agent holds or was just offered; --claim also claims it in the same call. --brief leaves out the board and step instructions: only to read again an item you hold and already read',
   args: [],
-  options: { collection: {}, claim: { flag: true }, ...BRIEFING },
+  options: {
+    collection: {},
+    claim: { flag: true },
+    // A subagent has a profile of its own to declare before its first next: given here, one call
+    // does both (P1-F6).
+    model: { placeholder: 'id', about: 'declares your profile first, as profile does' },
+    effort: { placeholder: 'level' },
+    harness: { placeholder: 'name' },
+    ...BRIEFING,
+  },
   execute: (input) => {
     const collection = input.option('collection');
     const claim = input.flag('claim');
     const { actor, channel } = input;
     const brief = input.flag('brief');
+    const model = input.option('model');
+    const effort = input.option('effort');
+    const given = input.option('harness');
     return withAgent(input, (project) => {
+      if (model !== undefined || effort !== undefined) {
+        declareFromOptions(input, project, {
+          ...(model === undefined ? {} : { model }),
+          ...(effort === undefined ? {} : { effort }),
+          ...(given === undefined ? {} : { given }),
+        });
+      }
       const profile = requireProfile(project.db, actor.name, { channel, confirmed: true });
       const answer = nextFor(project, actor.name, {
         ...(collection === undefined ? {} : { collection }),
@@ -1564,7 +1655,10 @@ const next: Command = {
       // their turn, and the person's answer on the desk went unheard.
       const text = [
         ...(outside ? [outside] : []),
-        answer.text,
+        // Looking is not free: no other agent is offered it meanwhile (P1-F4), so it is said.
+        answer.item !== null && answer.offered
+          ? `${answer.text}\n${offeredLine(answer.item)}`
+          : answer.text,
         ...(shared ? [shared] : []),
         ...topicLines(project, actor.name, answer.brief === true),
         // A brief next leaves out what the agent already read, the profile line too.
@@ -2049,9 +2143,12 @@ const stats: Command = {
 
 function durationFrom(name: string, value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
-  const duration = parseDuration(value);
+  const bare = name === 'timeout';
+  const duration = bare ? parseWaitTimeout(value) : parseDuration(value);
   if (duration === undefined) {
-    throw new UsageError(`--${name} must be a positive duration such as 90s, 15m or 1h`);
+    throw new UsageError(
+      `--${name} must be a positive duration such as ${bare ? '600 (seconds), ' : ''}90s, 15m or 1h`,
+    );
   }
   return duration;
 }
@@ -2059,6 +2156,12 @@ function durationFrom(name: string, value: string | undefined): number | undefin
 const ttlFrom = (value: string | undefined) => durationFrom('ttl', value);
 
 const TTL = { ttl: { placeholder: 'duration' } };
+
+// A wait ends with the shell that started it, so an agent is never left listening for nobody. It
+// says what to do: a `wait &` inside a short command, or a subshell that returns, ends it at once
+// (P1-F9, P2-F5); the harness's own background task or shell lasts. docs/agents.md says the same.
+const WAIT_ORPHANED =
+  "Stopped waiting: the session that started it ended. Run otea wait again from a shell that stays open: your harness's background task or shell, not `&` or a subshell inside a short command, which ends it with that command";
 
 // Lease expiry writes nothing, so a wait for unclaimed items also checks again on this timer.
 const LEASE_RECHECK_MS = 1000;
@@ -2197,19 +2300,21 @@ const wait: Command = {
     if ('data' in result) return result;
     if (result.stopped === 'timeout') {
       const asked = result.asked.join(', ');
+      // A bare number of seconds reads back as what it means.
+      const within = /^\d+$/.test(timeout ?? '') ? `${timeout}s` : timeout;
       const said =
         asked === ''
-          ? `No item reached the ${turn} turn within ${timeout}`
-          : `The person has not answered your question on ${asked} within ${timeout}`;
+          ? `No item reached the ${turn} turn within ${within}`
+          : `The person has not answered your question on ${asked} within ${within}`;
       // A timeout is no end of the work: an agent waits again, with the exact command.
       const again =
         input.actor.kind === 'agent' && turn === 'agent'
-          ? `; keep waiting: ${keepWaitingCommand(input.actor.name, filter.collection)}`
+          ? `; a timeout is no failure, keep waiting: ${keepWaitingCommand(input.actor.name, filter.collection, filter.availableTo !== undefined)}`
           : '';
       throw new CommandFailure('timeout', `${said}${again}`);
     }
     if (owner.orphaned()) {
-      throw new CommandFailure('interrupted', 'Stopped waiting: the session that started it ended');
+      throw new CommandFailure('interrupted', WAIT_ORPHANED);
     }
     throw new CommandFailure('interrupted', 'Interrupted while waiting');
   },
@@ -2399,6 +2504,33 @@ function nameTold(
   };
 }
 
+// Declares the agent's profile from --model and --effort (what it already declared fills the one
+// left out; the first time both are needed).
+function declareFromOptions(
+  { actor, channel, harness }: Pick<Input, 'actor' | 'channel' | 'harness'>,
+  project: Project,
+  {
+    model,
+    effort,
+    given,
+  }: { model?: string | undefined; effort?: string | undefined; given?: string | undefined },
+): DeclaredProfileView {
+  const known = findProfile(project.db, actor.name);
+  const declaredModel = model ?? known?.profile.model;
+  const declaredEffort = effort ?? known?.profile.effort;
+  if (declaredModel === undefined || declaredEffort === undefined) {
+    throw new UsageError('Declare both --model <id> and --effort <level> the first time');
+  }
+  return declareProfile(project.db, {
+    agent: actor.name,
+    channel,
+    harness,
+    model: declaredModel,
+    effort: declaredEffort,
+    ...(given === undefined ? {} : { given }),
+  });
+}
+
 // The profile an agent runs as: declared with --model and --effort (--harness too for a
 // command-line agent the first time; an MCP client names its own), or shown without them.
 const profileCommandSpec: Command = {
@@ -2412,7 +2544,7 @@ const profileCommandSpec: Command = {
     harness: { placeholder: 'name' },
   },
   execute: (input) => {
-    const { actor, channel, harness, option } = input;
+    const { actor, channel, option } = input;
     const model = option('model');
     const effort = option('effort');
     const given = option('harness');
@@ -2429,19 +2561,7 @@ const profileCommandSpec: Command = {
           text: profileText(actor.name, view, known.confirmed, channel),
         };
       }
-      const declaredModel = model ?? known?.profile.model;
-      const declaredEffort = effort ?? known?.profile.effort;
-      if (declaredModel === undefined || declaredEffort === undefined) {
-        throw new UsageError('Declare both --model <id> and --effort <level> the first time');
-      }
-      const declared = declareProfile(project.db, {
-        agent: actor.name,
-        channel,
-        harness,
-        model: declaredModel,
-        effort: declaredEffort,
-        ...(given === undefined ? {} : { given }),
-      });
+      const declared = declareFromOptions(input, project, { model, effort, given });
       return { data: declared, text: profileText(actor.name, declared.profile, true, channel) };
     });
   },
@@ -2969,6 +3089,7 @@ async function serveUntil(
   try {
     const server = createServer(source, {
       token,
+      redeemSignInLink: (given) => redeemSignInLink(home, given),
       machine,
       computer: hostname(),
       tailscale,
@@ -3054,17 +3175,27 @@ function ownerGoneText(started: number): string {
   return `serve stopped: the process that started it (${started}) ended, as when the terminal or the agent session that ran it closes. To keep it running on its own, start it with otea serve start, and stop it with otea serve stop.`;
 }
 
+// The sign-in link for a person to open by hand, which a transcript or a log may keep: the page's
+// own link with a single-use token in place of the long-lived key (P3-F5). It works once, for ten
+// minutes; the server it signs in to redeems it from the Otea home.
+function singleUseSignIn(signInUrl: string): string {
+  const link = issueSignInLink(oteaHome());
+  const url = new URL(signInUrl);
+  url.searchParams.set('token', link);
+  return url.toString();
+}
+
+const SINGLE_USE_NOTE = `works once, within ${SIGNIN_LINK_LIFETIME_MS / 60_000} minutes; run the command again for another`;
+
 // What to do after a server answers: sign a browser in on the project's page, or print the link
-// for the person (or the agent that relays it) when --no-open. The link carries the server's key:
-// it is never in --json.
+// for the person (or the agent that relays it) when --no-open. The printed link is single-use, never
+// the server's key; it is never in --json.
 async function signInLines(
   { flag, openUrl, warn }: Pick<Input, 'flag' | 'openUrl' | 'warn'>,
   signInUrl: string,
 ): Promise<string[]> {
   if (flag('no-open')) {
-    return [
-      `Sign a browser in at ${signInUrl} (it holds this computer's Otea key: keep it to yourself)`,
-    ];
+    return [`Sign a browser in at ${singleUseSignIn(signInUrl)} (${SINGLE_USE_NOTE})`];
   }
   await openUrl(signInUrl).catch((error: unknown) => {
     const reason = error instanceof Error ? error.message : String(error);
@@ -3080,13 +3211,52 @@ function daemonLaunch(): Launch {
   return { command, args: OTEA.args, ...(OTEA.env ? { env: OTEA.env } : {}) };
 }
 
+// This computer's background server, started when none runs. Its port is --port, else the port it
+// last ran on (P6-F4: a restart kept at 4400 broke the bookmarks and the sign-in of the port before),
+// else 4400. `notes` say what a person would otherwise not know: that the port came from the last
+// run, or that --port was ignored because a server already runs on another.
+async function ensureDesk(
+  { option, warn }: Pick<Input, 'option' | 'warn'>,
+  home: string,
+): Promise<{
+  state: Extract<ServerState, { kind: 'running' }>;
+  started: boolean;
+  notes: string[];
+  ignoredPort?: number;
+}> {
+  const { port, remembered } = portToStart(option('port'), home);
+  let desk: Awaited<ReturnType<typeof ensureServer>>;
+  try {
+    desk = await ensureServer(home, { port, launch: daemonLaunch(), warn });
+  } catch (error) {
+    if (remembered && error instanceof Error) {
+      error.message += `\nIt tried port ${port}, where this computer's server last ran; --port picks another`;
+    }
+    throw error;
+  }
+  const { state, started } = desk;
+  if (!started && option('port') !== undefined && port !== 0 && port !== state.port) {
+    return {
+      state,
+      started,
+      ignoredPort: port,
+      notes: [
+        `--port ${port} was ignored: the server already runs on port ${state.port}. To move it, run otea serve stop, then otea serve start --port ${port}`,
+      ],
+    };
+  }
+  const notes =
+    started && remembered ? [`It uses port ${port}, where it last ran (--port picks another)`] : [];
+  return { state, started, notes };
+}
+
 const serveStart: Command = {
   name: 'serve start',
-  summary: `Start this computer's otea serve in the background, on its own: it keeps running after the terminal or the agent's session that started it ends, until otea serve stop. Answers once it serves (default port ${DEFAULT_PORT}), then opens this project's page signed in (--no-open prints the sign-in link instead). One server runs per Otea home: when it runs already, this only opens this project there, and --port waits for the next start. It never opens Otea to the local network at start, and --lan is refused: a phone needs the foreground otea serve --lan or the desktop app. Its output (no sign-in link) is in serve.log in the Otea home`,
+  summary: `Start this computer's otea serve in the background, on its own: it keeps running after the terminal or the agent's session that started it ends, until otea serve stop. Answers once it serves (on --port, else the port it last ran on, else ${DEFAULT_PORT}), then opens this project's page signed in (--no-open prints a single-use sign-in link instead, never the key). One server runs per Otea home: when it runs already, this only opens this project there, and a --port that differs says it was ignored (otea serve stop first moves it). It never opens Otea to the local network at start, and --lan is refused: a phone needs the foreground otea serve --lan or the desktop app. Its output (no sign-in link) is in serve.log in the Otea home`,
   args: [],
   options: { port: {}, 'no-open': { flag: true }, lan: { flag: true } },
   execute: async (input) => {
-    const { cwd, option, flag, warn } = input;
+    const { cwd, flag } = input;
     if (flag('lan')) {
       throw new UsageError(
         'otea serve start never opens Otea to the local network, so no listener runs there unattended: for a phone, run otea serve --lan in a terminal of your own, or open the Otea desktop app',
@@ -3094,11 +3264,7 @@ const serveStart: Command = {
     }
     const here = projectHere(cwd);
     const home = oteaHome();
-    const { state, started } = await ensureServer(home, {
-      port: portFrom(option('port')),
-      launch: daemonLaunch(),
-      warn,
-    });
+    const { state, started, notes, ignoredPort } = await ensureDesk(input, home);
     const { url, signInUrl } = pages(state.url, state.token, here);
     const signIn = await signInLines(input, signInUrl);
     const { pid, port } = state;
@@ -3106,8 +3272,14 @@ const serveStart: Command = {
       ? `Otea running in the background at ${url} (pid ${pid}; stop it with otea serve stop; log: ${join(home, SERVE_LOG)})`
       : `Otea already runs on this computer (pid ${pid}): this project is at ${url}`;
     return {
-      data: { url, pid, port, ...(started ? {} : { attached: true }) },
-      text: [where, ...signIn].join('\n'),
+      data: {
+        url,
+        pid,
+        port,
+        ...(started ? {} : { attached: true }),
+        ...(ignoredPort === undefined ? {} : { ignoredPort }),
+      },
+      text: [where, ...notes, ...signIn].join('\n'),
     };
   },
 };
@@ -3165,7 +3337,7 @@ const serveStatus: Command = {
 // otea start: the person's first minutes in one command (README, Getting started).
 const start: Command = {
   name: 'start',
-  summary: `For you, not for an agent, in the project's folder: set everything up for a first session in one command, and say what is ready. It creates the project when there is none (otea init), starts this computer's background server and opens the desk signed in (otea serve start; --no-open prints the sign-in link instead, --port picks the port for a first start), offers a first board from a template when the project has none of its own (--template <key> names one, none skips it; asked at a terminal when not given; otherwise no board is made and your agent designs the boards with you, the report saying how to start from a template instead); the board and the text are in the language you use (${LANGUAGE_RULE}) or the one --lang gives, once, which is how to force one, and the report says which; it prints the text to paste into your agent's chat (otea prompt) with the MCP server it adds to its own config. It looks before it acts: run again, it changes nothing that exists and says what was already there. An agent never runs it: it connects with otea connect and never starts the desk`,
+  summary: `For you, not for an agent, in the project's folder: set everything up for a first session in one command, and say what is ready. It creates the project when there is none (otea init), starts this computer's background server and opens the desk signed in (otea serve start; --no-open prints a single-use sign-in link instead, --port picks the port for a first start, and a later start keeps the port it last ran on), offers a first board from a template when the project has none of its own (--template <key> names one, none skips it; asked at a terminal when not given; otherwise no board is made and your agent designs the boards with you, the report saying how to start from a template instead); the board and the text are in the language you use (${LANGUAGE_RULE}) or the one --lang gives, once, which is how to force one, and the report says which; it prints the text to paste into your agent's chat (otea prompt) with the MCP server it adds to its own config. It looks before it acts: run again, it changes nothing that exists and says what was already there. An agent never runs it: it connects with otea connect and never starts the desk`,
   details: TEMPLATE_LIST,
   args: [],
   options: {
@@ -3175,7 +3347,7 @@ const start: Command = {
     'no-open': { flag: true },
   },
   execute: async (input) => {
-    const { cwd, option, agent, warn } = input;
+    const { cwd, option, agent } = input;
     if (agent !== undefined) {
       throw new OteaError(
         'forbidden',
@@ -3199,11 +3371,7 @@ const start: Command = {
     // The background server serves this project: a local one is remembered for it first.
     const here = projectHere(cwd);
     const home = oteaHome();
-    const { state, started } = await ensureServer(home, {
-      port: portFrom(option('port')),
-      launch: daemonLaunch(),
-      warn,
-    });
+    const { state, started, notes } = await ensureDesk(input, home);
     const { url, signInUrl } = pages(state.url, state.token, here);
     // Opening a browser prints nothing. With --no-open the link is yours alone, in a block of its
     // own above the text for the agent, so the two are never copied together: it holds this
@@ -3213,8 +3381,8 @@ const start: Command = {
     const signIn = noOpen
       ? [
           '',
-          "Sign-in link, for you only (it holds this computer's Otea key: never paste it to your agent):",
-          `  ${signInUrl}`,
+          `Sign-in link, for you only (${SINGLE_USE_NOTE}; never paste it to your agent):`,
+          `  ${singleUseSignIn(signInUrl)}`,
         ]
       : [];
     const { entry } = mcpEntryFor(input, report.project.id);
@@ -3250,6 +3418,7 @@ const start: Command = {
       boardsLine,
       langLine,
       deskLine,
+      ...notes,
       ...signIn,
       '',
       "Next, paste this into your agent's chat (otea prompt prints it again):",
@@ -3714,7 +3883,10 @@ const check: Command = {
   },
   execute: async (input) => {
     const gate = input.required('gate');
-    // The hook runs this check on every push: the person sees an outdated hook there.
+    // The hook runs this check on every push: an outdated one that is exactly Otea's is brought up
+    // to date here, once (P10-F2); one with edits or lines of the person's is said on every push.
+    const refreshed = refreshedHookLine(input.cwd);
+    if (refreshed !== undefined) input.warn(refreshed);
     const outdated = outdatedGitHookLine(input.cwd);
     if (outdated !== undefined) input.warn(outdated);
     let result: GateCheck;

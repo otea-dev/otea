@@ -207,7 +207,7 @@ Then [give your agent the text](#give-your-agent-the-text).
    It does the first minutes for you, and says what it did:
 
    - makes the project when there is none (what `otea init` does);
-   - starts the desk in the background (`otea serve start`) and opens it in your browser, signed in; `--no-open` prints the sign-in link instead;
+   - starts the desk in the background (`otea serve start`) and opens it in your browser, signed in; `--no-open` prints a sign-in link instead (single-use, good for 10 minutes: it is never the key); it keeps the port it last ran on;
    - offers a first board from a template (`--template <key>` names one, `none` skips it), or leaves the boards for your agent to design with you;
    - prints the text to paste into your agent's chat, and the MCP server it adds to its own config.
 
