@@ -49,10 +49,10 @@ function handoffWhy(missing: readonly Missing[]): string {
     const what = parts.map(({ name, reason, fresh, points, group }) => {
       const said =
         reason === 'group' && group
-          ? t('refusal.why.group', {
+          ? t(group.fresh ? 'refusal.why.groupFresh' : 'refusal.why.group', {
               min: group.min,
               list: listOr(group.parts),
-              have: group.have,
+              count: group.have,
             })
           : reason === 'missing' && fresh
             ? t('refusal.why.fresh')

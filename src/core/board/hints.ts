@@ -41,7 +41,12 @@ export function instructionHints(def: BoardDefinition): Hint[] {
       out.push({ code: 'instructions_missing', step: step.id, params });
       continue;
     }
-    const required = new Set(step.hand.filter(({ req }) => req !== 'no').map(({ ref }) => ref));
+    // What the handoff asks for: its required parts and the members of an "at least N of" group,
+    // each optional alone but asked for by the group.
+    const required = new Set([
+      ...step.hand.filter(({ req }) => req !== 'no').map(({ ref }) => ref),
+      ...(step.groups ?? []).flatMap(({ parts }) => parts),
+    ]);
     const carried = new Set([...startsWith(def, step.id).map(({ ref }) => ref), ...def.anytime]);
     const asked = new Set<string>();
     for (const ref of doer.flatMap(mentionedRefs)) {

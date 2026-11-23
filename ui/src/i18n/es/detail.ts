@@ -238,7 +238,14 @@ export const detail = {
     'Los agentes adjuntan {accepts}: dos versiones, A y B, para elegir sin saber cuál es cuál.',
   'evidence.required': 'obligatorio',
   'evidence.gap.required': '{name}: obligatorio, todavía sin adjuntar',
-  'evidence.gap.group': '{name}: al menos {min} de {list} ({have} adjuntados)',
+  'evidence.gap.group': {
+    one: '{name}: al menos {min} de {list} ({count} adjuntado)',
+    other: '{name}: al menos {min} de {list} ({count} adjuntados)',
+  },
+  'evidence.gap.groupFresh': {
+    one: '{name}: al menos {min} de {list}, de esta ronda ({count} adjuntado)',
+    other: '{name}: al menos {min} de {list}, de esta ronda ({count} adjuntados)',
+  },
   'evidence.gap.optional': '+ {list} (opcionales, sin cargar)',
   'evidence.files': '{label}: archivos',
   'evidence.latest': 'último',
@@ -333,6 +340,8 @@ export const detail = {
     one: 'Tu nota en este archivo',
     other: 'Tus notas en este archivo · {count}',
   },
+  'notes.left.empty': 'Tus notas en este archivo',
+  'notes.left.emptyHint': 'Las notas que dejes sobre él aparecen aquí.',
   'notes.review.optional': 'Opcional: tus comentarios ya van con la devolución.',
   'notes.left.edit': 'Editar',
   'notes.left.remove': 'Quitar',
@@ -667,6 +676,13 @@ export const detail = {
     one: 'No se entregó {id}: falta {list}.',
     other: 'No se entregó {id}: faltan {list}.',
   },
+  // Aprobar una entrega cuyo grupo «al menos N de» se queda corto: se pregunta una vez, no se impide.
+  'bi.approve.short': {
+    one: '{list} no llega a lo que pide el paso. Pulsa {action} otra vez para aprobar igualmente.',
+    other:
+      '{list} no llegan a lo que pide el paso. Pulsa {action} otra vez para aprobar igualmente.',
+  },
+  'bi.approve.shortOne': '{name} ({have} de {min})',
   'bi.hand.note': 'Nota de la entrega',
   'bi.hand.missing': 'falta',
   'bi.hand.optional': 'opcional',

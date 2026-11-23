@@ -134,7 +134,14 @@ export const common = {
   'refusal.why.fresh': 'new this round',
   'refusal.why.unchecked': 'every box ticked',
   'refusal.why.unproved': 'a proof for {list}',
-  'refusal.why.group': 'at least {min} of {list}; {have} attached',
+  'refusal.why.group': {
+    one: 'at least {min} of {list}; {count} attached',
+    other: 'at least {min} of {list}; {count} attached',
+  },
+  'refusal.why.groupFresh': {
+    one: 'at least {min} of {list}, new this round; {count} attached',
+    other: 'at least {min} of {list}, new this round; {count} attached',
+  },
   'refusal.why.note': 'a note',
   'refusal.why.part': 'its part {list} is not finished',
   'refusal.why.partsUnmerged': {

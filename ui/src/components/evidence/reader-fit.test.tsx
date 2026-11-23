@@ -83,4 +83,30 @@ describe('the reader’s picture as notes are left on it', () => {
     act(() => root.unmount());
     host.remove();
   });
+
+  // P5-F9: the list's room is there before the first note, so leaving one moves nothing: the view
+  // loses no height and the mark the person is working on stays where it was.
+  it('keeps the notes list’s room from the start, empty, and fills it with the first note', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const draw = (notes: ItemNote[]) => {
+      const note: ReaderNote = { onSend: async () => true, left: notes, pending: () => true };
+      act(() =>
+        root.render(<EvidenceReader evidence={[shot]} at={0} onAt={() => {}} note={note} />),
+      );
+    };
+    draw([]);
+    const room = host.querySelector('.ev-reader-left');
+    expect(room?.classList.contains('ev-left-none')).toBe(true);
+    expect(room?.querySelector('li')).toBeNull();
+
+    draw([left]);
+    const filled = host.querySelector('.ev-reader-left');
+    expect(filled?.classList.contains('ev-left-none')).toBe(false);
+    expect(filled?.querySelectorAll('li')).toHaveLength(1);
+    expect(host.querySelectorAll('.ev-reader-left')).toHaveLength(1);
+    act(() => root.unmount());
+    host.remove();
+  });
 });

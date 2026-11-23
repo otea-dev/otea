@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { timeText } from '../time.ts';
 import type { Missing } from './engine.ts';
-import { boardText, handedText, idleText, nextText, noWayText, refusalText } from './next.ts';
+import {
+  boardText,
+  FRESH_RULE,
+  handedText,
+  idleText,
+  nextText,
+  noWayText,
+  refusalText,
+} from './next.ts';
 import { creatures, step, tareasDeRepo } from './testing.ts';
 
 describe('nextText of a Done item that names no branch', () => {
@@ -451,7 +459,8 @@ describe('refusalText', () => {
         { ref: 'eart', name: 'Arte conceptual', reason: 'not_new', fresh: true },
         { ref: 'fsteps', name: 'Comprobaciones', reason: 'unchecked', fresh: false },
       ],
-      'Not handed off CRI-12: missing Arte conceptual (new this round) and Comprobaciones (every box ticked).\nAttach or fill them with otea attach CRI-12 / otea update CRI-12, then call handoff again.',
+      // P7-F8: a part new in each round that holds only earlier files says to attach it again.
+      `Not handed off CRI-12: missing Arte conceptual (new this round) and Comprobaciones (every box ticked).\nAttach or fill them with otea attach CRI-12 / otea update CRI-12, then call handoff again.\n${FRESH_RULE}`,
     ],
     [
       'asks for the note a sent-back round needs, saying why',

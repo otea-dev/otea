@@ -239,7 +239,14 @@ export const detail = {
     'Agents attach {accepts}: two versions, A and B, to pick from without knowing which is which.',
   'evidence.required': 'required',
   'evidence.gap.required': '{name}: required, not attached yet',
-  'evidence.gap.group': '{name}: at least {min} of {list} ({have} attached)',
+  'evidence.gap.group': {
+    one: '{name}: at least {min} of {list} ({count} attached)',
+    other: '{name}: at least {min} of {list} ({count} attached)',
+  },
+  'evidence.gap.groupFresh': {
+    one: '{name}: at least {min} of {list}, new this round ({count} attached)',
+    other: '{name}: at least {min} of {list}, new this round ({count} attached)',
+  },
   'evidence.gap.optional': '+ {list} (optional, not provided)',
   'evidence.files': '{label}: files',
   'evidence.latest': 'latest',
@@ -328,6 +335,8 @@ export const detail = {
   'notes.pick.placeholder': 'What should the agent look at here?',
   'notes.pick.send': 'Leave note',
   'notes.left.title': { one: 'Your note on this file', other: 'Your notes on this file · {count}' },
+  'notes.left.empty': 'Your notes on this file',
+  'notes.left.emptyHint': 'The notes you leave on it are listed here.',
   'notes.review.optional': 'Optional: your comments already go with the send-back.',
   'notes.left.edit': 'Edit',
   'notes.left.remove': 'Remove',
@@ -659,6 +668,12 @@ export const detail = {
     one: 'Not handed off {id}: {list} is missing.',
     other: 'Not handed off {id}: {list} are missing.',
   },
+  // Approving a delivery whose "at least N of" group is short: asked once, never a hold (P5-F5).
+  'bi.approve.short': {
+    one: '{list} is short of what the step asks for. Press {action} again to approve anyway.',
+    other: '{list} are short of what the step asks for. Press {action} again to approve anyway.',
+  },
+  'bi.approve.shortOne': '{name} ({have} of {min})',
   'bi.hand.note': 'Handoff note',
   'bi.hand.missing': 'missing',
   'bi.hand.optional': 'optional',

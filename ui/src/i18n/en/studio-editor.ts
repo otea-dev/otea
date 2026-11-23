@@ -121,6 +121,8 @@ export const studioEditor = {
   'bs.editor.group.remove': 'Remove this group',
   'bs.editor.group.conseq':
     'The agent attaches whichever of these fit the work. It cannot hand off with fewer than {min}.',
+  'bs.editor.group.conseq_fresh':
+    'The agent attaches whichever of these fit the work. It cannot hand off with fewer than {min}, and after a send-back they must be attached again: files from the earlier round do not count.',
   'bs.editor.ways.to_done': 'ends here',
   'bs.editor.ways.to_step': 'skips the steps in between',
   'bs.editor.ways.approve': 'When you approve it you choose: Approve {ways}.',
@@ -234,7 +236,7 @@ export const studioEditor = {
   'bs.editor.pick.field': 'Something to fill',
   'bs.editor.pick.field_gloss': 'a text, a choice, a level, a date…',
   'bs.editor.pick.evidence': 'Something to show',
-  'bs.editor.pick.evidence_gloss': 'images, a video or GIF, code, a log…',
+  'bs.editor.pick.evidence_gloss': 'images and GIFs, a video, code, a log…',
   'bs.editor.pick.reuse': 'Something it already has',
   'bs.editor.pick.reuse_gloss': 'asked for before, now here too',
   'bs.editor.pick.reuse_none': 'nothing to reuse yet',

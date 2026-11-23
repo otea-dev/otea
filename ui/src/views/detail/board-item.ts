@@ -830,6 +830,17 @@ export function handRefusal(
   });
 }
 
+// What approving says once when an "at least N of" group of the delivery is short (P5-F5): the
+// groups, how many they hold of how many they ask, and that pressing the move again approves. Never
+// a hold: the person decides. Null when no group is short.
+export function shortGroupCaution(groups: EvidenceGaps['groups'], action: string): string | null {
+  if (groups.length === 0) return null;
+  const list = listOf(
+    groups.map(({ name, have, min }) => t('bi.approve.shortOne', { name, have, min })),
+  );
+  return t('bi.approve.short', { list, action, count: groups.length });
+}
+
 // When the round of the step the item is on began (the engine's count): the pieces of evidence a
 // note can be on are those attached from then on.
 export function roundStartOf(def: BoardDefinition, item: ItemLike): string | undefined {
@@ -846,7 +857,14 @@ export function roundStartOf(def: BoardDefinition, item: ItemLike): string | und
 // the review. A file with no bytes counts as nothing, as the handoff counts it.
 export type EvidenceGaps = {
   required: { ref: string; name: string }[];
-  groups: { id: string; name: string; min: number; have: number; parts: string[] }[];
+  groups: {
+    id: string;
+    name: string;
+    min: number;
+    have: number;
+    parts: string[];
+    fresh?: true;
+  }[];
   optional: string[];
 };
 
@@ -882,7 +900,16 @@ export function evidenceGaps(
   }
   const groups = groupStates(def, step, facts).flatMap(({ group, state }) =>
     state.have < state.min
-      ? [{ id: group.id, name: group.name, min: state.min, have: state.have, parts: state.parts }]
+      ? [
+          {
+            id: group.id,
+            name: group.name,
+            min: state.min,
+            have: state.have,
+            parts: state.parts,
+            ...(state.fresh ? { fresh: true as const } : {}),
+          },
+        ]
       : [],
   );
   return { required, groups, optional };

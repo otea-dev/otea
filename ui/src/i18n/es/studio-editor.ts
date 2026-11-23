@@ -120,6 +120,8 @@ export const studioEditor = {
   'bs.editor.group.remove': 'Quitar este grupo',
   'bs.editor.group.conseq':
     'El agente adjunta las que encajen con el trabajo. No puede entregar con menos de {min}.',
+  'bs.editor.group.conseq_fresh':
+    'El agente adjunta las que encajen con el trabajo. No puede entregar con menos de {min}, y tras una devolución hay que volver a adjuntarlas: no valen los archivos de la ronda anterior.',
   'bs.editor.ways.to_done': 'termina aquí',
   'bs.editor.ways.to_step': 'salta los pasos de en medio',
   'bs.editor.ways.approve': 'Al aprobar eliges: Aprobar {ways}.',
@@ -231,7 +233,7 @@ export const studioEditor = {
   'bs.editor.pick.field': 'Algo que rellenar',
   'bs.editor.pick.field_gloss': 'un texto, una opción, un nivel, una fecha…',
   'bs.editor.pick.evidence': 'Algo que mostrar',
-  'bs.editor.pick.evidence_gloss': 'imágenes, un vídeo o GIF, código, un log…',
+  'bs.editor.pick.evidence_gloss': 'imágenes y GIF, un vídeo, código, un log…',
   'bs.editor.pick.reuse': 'Algo que ya trae',
   'bs.editor.pick.reuse_gloss': 'pedido antes, ahora también aquí',
   'bs.editor.pick.reuse_none': 'nada para reutilizar todavía',

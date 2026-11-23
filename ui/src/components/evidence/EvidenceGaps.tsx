@@ -17,10 +17,10 @@ export function EvidenceGaps({ gaps, required = false }: { gaps: Gaps; required?
       ))}
       {gaps.groups.map((group) => (
         <p key={group.id} className="ev-gap miss" data-group={group.id}>
-          {t('evidence.gap.group', {
+          {t(group.fresh ? 'evidence.gap.groupFresh' : 'evidence.gap.group', {
             name: group.name,
             min: group.min,
-            have: group.have,
+            count: group.have,
             list: listOr(group.parts),
           })}
         </p>

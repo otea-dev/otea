@@ -1,9 +1,19 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { compileBoard } from '../../../src/core/board/compile.ts';
 import { changePlan } from '../../../src/core/board/plan.ts';
 import { problemsOf } from '../../../src/core/board/problems.ts';
 import { cambios, creatures, errores, step } from '../../../src/core/board/testing.ts';
+import { moduleAccepts } from '../../../src/core/placement.ts';
 import { setLanguage } from '../i18n/i18n.ts';
-import { changeText, doesText, kindName, problemText, reviewsText, targetName } from './words.ts';
+import {
+  changeText,
+  doesText,
+  kindGloss,
+  kindName,
+  problemText,
+  reviewsText,
+  targetName,
+} from './words.ts';
 
 afterEach(() => setLanguage('en'));
 
@@ -56,7 +66,7 @@ describe('who and kinds', () => {
     expect(doesText('you')).toBe('lo haces tú');
     expect(reviewsText('none')).toBe('nadie lo revisa');
     expect(reviewsText('any')).toBe('otro agente lo revisa');
-    expect(kindName('video')).toBe('Vídeo o GIF');
+    expect(kindName('video')).toBe('Vídeo');
     expect(targetName(creatures(), 'done')).toBe('Hecho');
     expect(targetName(creatures(), 'sanimate')).toBe('Animar');
   });
@@ -128,4 +138,36 @@ describe('the later settings, in words', () => {
       'Every new item skips Completar: the form already asks for everything it hands, so it never runs. Make one of those fields optional or turn off “Start directly at…”.',
     );
   });
+});
+
+// P5-F1: «Vídeo o GIF» refused a .gif. What a kind's name and gloss promise is what its module takes.
+describe('what a kind of evidence promises', () => {
+  const kinds = ['images', 'video', 'audio', 'code', 'log', 'diagram', 'file'] as const;
+
+  it.each(['en', 'es'] as const)(
+    'is every extension and GIF its name and gloss mention, in %s',
+    (language) => {
+      setLanguage(language);
+      for (const kind of kinds) {
+        const def = creatures();
+        def.parts.eproof = { id: 'eproof', name: 'Proof', kind, hint: '', options: [] };
+        def.steps[0]?.hand.push({ ref: 'eproof', req: 'no', fresh: false });
+        const [type] = compileBoard('bkinds', 1, def).types;
+        const entry = Object.values(type?.layout ?? {})
+          .flat()
+          .flatMap((e) => ('module' in e ? [e] : []))
+          .find(({ id }) => id === 'eproof');
+        if (!entry) throw new Error(`no module for ${kind}`);
+        const said = `${kindName(kind)} ${kindGloss(kind)}`;
+        const promised = [
+          ...(said.match(/\.[a-z0-9]+/g) ?? []),
+          ...(/\bGIF/i.test(said) ? ['.gif'] : []),
+        ];
+        for (const extension of promised)
+          expect(moduleAccepts(entry, `file${extension}`), `${kind} promises ${extension}`).toBe(
+            true,
+          );
+      }
+    },
+  );
 });

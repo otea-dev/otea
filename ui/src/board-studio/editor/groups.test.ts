@@ -7,10 +7,12 @@ import { creatures } from '../../../../src/core/board/testing.ts';
 import {
   addGroup,
   groupable,
+  groupFresh,
   removeGroup,
   removePart,
   renameGroup,
   setFresh,
+  setGroupFresh,
   setGroupMin,
   setRequirement,
   toggleGroupPart,
@@ -111,6 +113,31 @@ describe('a group of evidence built in Studio', () => {
     expect(hand('eshot')?.fresh).toBe(false);
     removeGroup(def, 'sanimate', id);
     expect(animar.groups).toBeUndefined();
+  });
+
+  // P5-F2: a new group starts new in each round, so a send-back is not answered with what the first
+  // round attached; one switch turns the whole group, never a mix of this round's files and last's.
+  it('starts new in each round, turns as a whole, and lends its way to a part that joins', () => {
+    const { def, animar } = board();
+    const fresh = (ref: string) => animar.hand.find((entry) => entry.ref === ref)?.fresh;
+    const id = addGroup(def, 'sanimate', 'Prueba') ?? '';
+    const group = animar.groups?.[0];
+    if (!group) throw new Error('no group');
+    expect([fresh('eanim'), fresh('eshot'), fresh('elog')]).toEqual([true, true, true]);
+    expect(groupFresh(animar, group)).toBe(true);
+
+    setGroupFresh(def, 'sanimate', id, false);
+    expect([fresh('eanim'), fresh('eshot'), fresh('elog')]).toEqual([false, false, false]);
+    expect(groupFresh(animar, group)).toBe(false);
+    // The required description is not the group's: it keeps its own way.
+    expect(fresh('fdesc')).toBe(false);
+
+    // A part that leaves and comes back takes the way of the group it joins.
+    toggleGroupPart(def, 'sanimate', id, 'elog');
+    setGroupFresh(def, 'sanimate', id, true);
+    toggleGroupPart(def, 'sanimate', id, 'elog');
+    expect(fresh('elog')).toBe(true);
+    expect(problemsOf(def, {})).toEqual([]);
   });
 
   it('asks the handoff for a new file from a member made new each round', () => {

@@ -9,6 +9,7 @@ import {
   EVIDENCE_SHOWS,
   type EvidenceKind,
   type FieldKind,
+  type Group,
   isEvidenceKind,
   type Lead,
   MOTIVE,
@@ -358,7 +359,8 @@ export function groupable(def: BoardDefinition, step: Step): string[] {
 }
 
 // A new group of every optional evidence of the step, asking for one: the person takes out what
-// does not belong.
+// does not belong. It starts new in each round: a send-back then asks the group for a file of the
+// new round, so a returned round never goes back with only what the first one attached (P5-F2).
 export function addGroup(def: BoardDefinition, stepId: string, name: string): string | undefined {
   const step = stepOf(def, stepId);
   if (!step) return undefined;
@@ -366,7 +368,25 @@ export function addGroup(def: BoardDefinition, stepId: string, name: string): st
   if (parts.length === 0) return undefined;
   const id = ids('g');
   step.groups = [...(step.groups ?? []), { id, name, parts, min: 1 }];
+  for (const hand of step.hand) if (parts.includes(hand.ref)) hand.fresh = true;
   return id;
+}
+
+// Whether the group is new in each round: every one of its parts is (a send-back empties it).
+export function groupFresh(step: Step, group: Group): boolean {
+  return (
+    group.parts.length > 0 &&
+    group.parts.every((ref) => step.hand.find((h) => h.ref === ref)?.fresh === true)
+  );
+}
+
+// Turns the whole group new in each round, or lets what it holds carry over from one round to the
+// next. Its parts follow together, so a group never counts a mix of this round's files and last's.
+export function setGroupFresh(def: BoardDefinition, stepId: string, id: string, fresh: boolean) {
+  const step = stepOf(def, stepId);
+  const group = groupOf(def, stepId, id);
+  if (!step || !group) return;
+  for (const hand of step.hand) if (group.parts.includes(hand.ref)) hand.fresh = fresh;
 }
 
 function groupOf(def: BoardDefinition, stepId: string, id: string) {
@@ -397,7 +417,11 @@ export function toggleGroupPart(
   if (group.parts.includes(ref)) {
     if (group.parts.length > 1) group.parts = group.parts.filter((r) => r !== ref);
   } else if (groupable(def, step).includes(ref)) {
+    // A part joining takes the group's way: new in each round, or carried over.
+    const fresh = groupFresh(step, group);
     group.parts = step.hand.map((h) => h.ref).filter((r) => r === ref || group.parts.includes(r));
+    const joined = step.hand.find((h) => h.ref === ref);
+    if (joined && joined.req === 'no') joined.fresh = fresh;
   }
   group.min = Math.max(1, Math.min(group.min, group.parts.length));
   tidyGroups(step);
