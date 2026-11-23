@@ -105,6 +105,22 @@ export const READ_ONLY = new Set([
 // call that names nobody reads it, and nobody is seen.
 export const NAMELESS_READS = new Set(['topic list', 'topic show']);
 
+// The options of a command its tool does not take. A tool call answers once, so it cannot follow
+// the event log; --field-file reads a file or stdin for a long value, which a tool call carries as
+// it is.
+export const OMITTED_OPTIONS: Readonly<Record<string, readonly string[]>> = {
+  events: ['follow'],
+  // An MCP client names its own harness.
+  next: ['harness'],
+  create: ['field-file'],
+  update: ['field-file'],
+};
+
+// Options whose mention in a text is not turned into a parameter: the tool has none to name
+// (a long value goes in field as it is), so a text that says --field-file stays as the CLI says
+// it. The other omitted options only appear in the tool descriptions, which read as parameters.
+export const NO_PARAMETER: ReadonlySet<string> = new Set(['field-file']);
+
 // A tool is named after its command, with words joined by underscores (send-back is send_back).
 export function toolName(command: string): string {
   return command.replace(/[ -]/g, '_');

@@ -1380,6 +1380,13 @@ async function draftSource(input: Input): Promise<{ file?: string; piped?: strin
     return { file: '-', piped: definition };
   }
   const file = input.option('file');
+  // A tool call has no stdin to read the board from: say where it goes, not a command to pipe
+  // into, which an MCP agent cannot run.
+  if (file === '-' && input.channel === 'mcp') {
+    throw new UsageError(
+      'file "-" reads the board JSON from stdin, which a tool call does not have: give the JSON as definition (an object or a string), or file as a path on this machine',
+    );
+  }
   return {
     ...(file === undefined ? {} : { file }),
     ...(file === '-' ? { piped: await input.stdin() } : {}),
