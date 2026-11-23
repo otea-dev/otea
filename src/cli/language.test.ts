@@ -3,6 +3,7 @@ import { listBoardSummaries } from '../app/boards.ts';
 import { rememberLanguage } from '../app/language.ts';
 import { openMachine } from '../app/machine.ts';
 import { openProject } from '../app/project.ts';
+import { startProject } from '../app/start.ts';
 import { createServer } from '../server/server.ts';
 import { LOCAL_HOST, memoryProject, SESSION_COOKIE, TOKEN } from '../server/testing.ts';
 import { type Cli, cliAt, tempGitRepo } from './testing.ts';
@@ -61,6 +62,23 @@ describe('the language of what the CLI makes', () => {
     clearDeskLanguage();
     vi.unstubAllEnvs();
     repo.remove();
+  });
+
+  // P8-F2: two otea start runs with the same arguments said "Language: English" and then "Language:
+  // Spanish" because the desk had changed language in between.
+  it('starts in the same language twice, whatever language the desk moved to in between', async () => {
+    await switchDeskTo('en');
+    const first = await startProject(repo.dir, {});
+
+    await switchDeskTo('es');
+    const second = await startProject(repo.dir, {});
+
+    expect(first.created).toBe(true);
+    expect(second.created).toBe(false);
+    expect(first.lang).toBe('en');
+    expect(second.lang).toBe('en');
+    expect(second.prompt).toBe(first.prompt);
+    expect(second.prompt).toBe((await person('prompt', '--lang', 'en')).out.trimEnd());
   });
 
   it('is English for a board added after the desk was switched to English', async () => {

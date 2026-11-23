@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { rememberLanguage } from '../app/language.ts';
+import { withMachine } from '../app/machine.ts';
 import { processAlive } from '../app/presence.ts';
 import { isListedKey } from '../core/board/templates.ts';
 import { SERVE_LOG } from './daemon.ts';
@@ -149,6 +151,40 @@ describe('otea start', () => {
     );
     // With a board made, the agent's text is the one that joins it, in Spanish.
     expect(started.out).toContain('Empieza a trabajar en este proyecto');
+  }, 120_000);
+
+  // P8-F2: the second run, with the same arguments, said Spanish after the desk changed language. The
+  // language is the project's, set when it was made; the desk's own does not move it.
+  it('says the same language on a second run after the desk changed its own', async () => {
+    const languageLine = (result: Result) =>
+      result.out.split('\n').find((line) => line.startsWith('Language:'));
+    try {
+      withMachine(process.env, (machine) => rememberLanguage(machine, 'en'));
+      const first = await person(
+        repo.dir,
+        'start',
+        '--no-open',
+        '--port',
+        '0',
+        '--template',
+        'none',
+      );
+      withMachine(process.env, (machine) => rememberLanguage(machine, 'es'));
+      const second = await person(
+        repo.dir,
+        'start',
+        '--no-open',
+        '--port',
+        '0',
+        '--template',
+        'none',
+      );
+
+      expect(languageLine(first)).toContain('Language: English');
+      expect(languageLine(second)).toBe(languageLine(first));
+    } finally {
+      withMachine(process.env, (machine) => rememberLanguage(machine, 'en'));
+    }
   }, 120_000);
 
   // With no one to ask, no board is made for the person: they leave with the way to one (an agent,
