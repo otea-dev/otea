@@ -52,9 +52,10 @@ async function remoteOf(cwd: string, branch: string): Promise<string> {
 }
 
 // What this checkout's base holds that the handoff of a board kept on main did not (P1-F1): the
-// commits after the handed-off one, which a push of the base takes in too, whoever made them. A
-// board kept on main works one change at a time, so none is another item's work. Null while the base
-// is where the handoff left it, or this checkout lacks the commit handed off.
+// commits after the handed-off one, which a push of the base takes in too, whoever made them (the
+// items of boards kept on main hold each other until they land, but the person, another board or a
+// clone can still commit to main). Null while the base is where the handoff left it, or this
+// checkout lacks the commit handed off.
 async function baseDrift(project: Project, base: string, tip: Tip): Promise<Drift | null> {
   const cwd = project.root;
   try {

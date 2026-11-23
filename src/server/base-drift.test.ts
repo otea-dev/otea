@@ -14,8 +14,7 @@ const SLOW = { timeout: 60_000 };
 
 // P1-F1: on a board kept on main, commits that landed on main after the handoff passed without a
 // word between the person's review and their Push; the review warned only on boards with a branch.
-// The desk names them before the person approves. (A board kept on main works one change at a time,
-// so a commit past the handoff is never the work of another item of it.)
+// The desk names them before the person approves.
 describe('GET /api/items/:id/drift on a board kept on main', () => {
   let repo: TempRepo;
   let project: Project;
