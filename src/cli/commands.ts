@@ -285,7 +285,7 @@ import { watchOwner } from './owner.ts';
 import { PHONE_COMMANDS } from './phone.ts';
 import { portFrom, portToOpen, portToStart, projectPage } from './ports.ts';
 import { probeSignIn } from './probe.ts';
-import { readServeFile, removeServeFile, writeServeFile } from './serve-file.ts';
+import { readServeFile, removeServeFile, serverVersionNote, writeServeFile } from './serve-file.ts';
 import { statsText } from './stats.ts';
 import {
   dataTargets,
@@ -295,6 +295,7 @@ import {
   uninstallRepos,
   uninstallServer,
 } from './uninstall.ts';
+import { OTEA_VERSION } from './version.ts';
 
 // The text names an item's type only when its collection's preset has several.
 function typesShown(project: Project): (item: { collection: string }) => boolean {
@@ -3297,7 +3298,7 @@ async function serveUntil(
     }
     writeServeFile(
       home,
-      { port: listening.port, pid: process.pid, links: true },
+      { port: listening.port, pid: process.pid, links: true, version: OTEA_VERSION },
       unattended && port !== 0,
     );
     const sync = setInterval(() => server.sync(), SYNC_EVERY_MS);
@@ -3444,7 +3445,9 @@ async function ensureDesk(
   }
   const notes =
     started && remembered ? [`It uses port ${port}, where it last ran (--port picks another)`] : [];
-  return { state, started, notes };
+  // A server an upgrade left running is not the installed Otea: say so, never restart it unasked.
+  const outdated = started ? undefined : serverVersionNote(readServeFile(home), OTEA_VERSION);
+  return { state, started, notes: outdated ? [...notes, outdated] : notes };
 }
 
 const serveStart: Command = {
@@ -3524,9 +3527,21 @@ const serveStatus: Command = {
       throw new CommandFailure('not_running', 'otea serve is not running; run "otea serve start"');
     }
     const { url, pid, port } = state;
+    const info = readServeFile(home);
+    const note = serverVersionNote(info, OTEA_VERSION);
     return {
-      data: { running: true, url, pid, port },
-      text: `otea serve is running at ${url} (pid ${pid}, port ${port})`,
+      data: {
+        running: true,
+        url,
+        pid,
+        port,
+        ...(info?.version ? { version: info.version } : {}),
+        ...(note ? { restart: true } : {}),
+      },
+      text: [
+        `otea serve is running at ${url} (pid ${pid}, port ${port}${info?.version ? `, Otea ${info.version}` : ''})`,
+        ...(note ? [note] : []),
+      ].join('\n'),
     };
   },
 };
@@ -3752,13 +3767,19 @@ const open: Command = {
           `No sign-in link: the Otea server running here (pid ${running.pid}) is from an older Otea and cannot take single-use links. Run otea serve stop, then otea serve start, and run otea open --no-open again`,
         );
       }
-      return { data: { url }, text: (await signInLines({ flag, openUrl, warn }, link)).join('\n') };
+      const lines = await signInLines({ flag, openUrl, warn }, link);
+      const outdated = serverVersionNote(running, OTEA_VERSION);
+      return { data: { url }, text: [...lines, ...(outdated ? [outdated] : [])].join('\n') };
     }
     await openUrl(link).catch((error: unknown) => {
       const reason = error instanceof Error ? error.message : String(error);
       throw new Error(`Could not open a browser (${reason})`);
     });
-    return { data: { url }, text: `Opened Otea at ${url}` };
+    const outdated = serverVersionNote(readServeFile(home), OTEA_VERSION);
+    return {
+      data: { url },
+      text: [`Opened Otea at ${url}`, ...(outdated ? [outdated] : [])].join('\n'),
+    };
   },
 };
 
