@@ -1,18 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { BoardRecord } from '../app/boards.ts';
 import type { Project } from '../app/project.ts';
-import { LANGUAGE_HEADER } from '../core/board/template-words.ts';
 import { findVersion } from '../store/boards.ts';
 import { createServer, type OteaServer } from './server.ts';
 import { LOCAL_HOST, memoryProject, SESSION_COOKIE, TOKEN } from './testing.ts';
 
-// The desk says the language on its screen with every request, and a board made in Spanish comes
-// back in it: in Spanish for a Spanish desk and in English for an English one, one stored board.
+// A board's own words (its steps, fields, options, item names) are read in the language the board
+// was made in, which is the one the agent reads it in: whatever language the desk's screen is in,
+// and whoever asks (the desk, the phone). The desk's screen language is for its own chrome.
 describe('a board read by desks in two languages', () => {
   let project: Project;
   let server: OteaServer;
 
-  const call = async (method: string, path: string, payload?: unknown, lang?: string) => {
+  // `screen` is what a desk of an older build sent as its screen language: it changes nothing.
+  const call = async (method: string, path: string, payload?: unknown, screen?: string) => {
     const response = await server.app.request(`/p/memory-aaaaaa/api${path}`, {
       method,
       ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
@@ -21,13 +22,33 @@ describe('a board read by desks in two languages', () => {
         origin: `http://${LOCAL_HOST}`,
         cookie: SESSION_COOKIE,
         'content-type': 'application/json',
-        ...(lang === undefined ? {} : { [LANGUAGE_HEADER]: lang }),
+        ...(screen === undefined ? {} : { 'x-otea-lang': screen }),
       },
     });
     // A board reads as { record, problems }; a board written as the record itself.
     return {
       status: response.status,
+      headers: response.headers,
       body: (await response.json()) as BoardRecord & { record: BoardRecord },
+    };
+  };
+
+  const made = async (lang: 'en' | 'es') => {
+    const board = await call('POST', '/boards', {
+      name: lang === 'en' ? 'Bugs' : 'Errores',
+      lang,
+      template: 'bug-reports',
+    });
+    expect(board.status).toBe(201);
+    return board.body.id;
+  };
+
+  const namesOf = async (id: string, screen?: string) => {
+    const { record } = (await call('GET', `/boards/${id}`, undefined, screen)).body;
+    const def = record.draft?.definition ?? record.live?.definition;
+    return {
+      steps: def?.steps.map(({ name }) => name),
+      parts: Object.values(def?.parts ?? {}).map(({ name }) => name),
     };
   };
 
@@ -41,166 +62,94 @@ describe('a board read by desks in two languages', () => {
     project.db.close();
   });
 
-  it('says the steps and fields in the language each desk sends, from one stored board', async () => {
-    const made = await call('POST', '/boards', {
-      name: 'Errores',
-      lang: 'es',
-      template: 'bug-reports',
-    });
-    expect(made.status).toBe(201);
-    const { id } = made.body;
-    const published = await call('POST', `/boards/${id}/publish`, { moves: {} });
-    expect(published.status).toBe(200);
+  it('says an English board in English on a Spanish screen, and a Spanish one in Spanish on an English screen', async () => {
+    const english = await made('en');
+    const spanish = await made('es');
+
+    for (const screen of ['es', 'en', undefined]) {
+      const read = await namesOf(english, screen);
+      expect(read.steps).toEqual(['Complete', 'Triage', 'Fix', 'Land']);
+      expect(read.parts).toContain('What they reported');
+    }
+    for (const screen of ['es', 'en', undefined]) {
+      const read = await namesOf(spanish, screen);
+      expect(read.steps).toEqual(['Completar', 'Triar', 'Arreglar', 'Integrar']);
+      expect(read.parts).toContain('Lo que reportaron');
+    }
+  });
+
+  it('gives the desk the states of a published board in the words the agent reads, on every screen', async () => {
+    const id = await made('en');
+    expect((await call('POST', `/boards/${id}/publish`, { moves: {} })).status).toBe(200);
     const stored = findVersion(project.db, id, 1)?.definition;
 
-    const names = async (lang?: string) => {
-      const { record } = (await call('GET', `/boards/${id}`, undefined, lang)).body;
-      const def = record.live?.definition;
-      return {
-        steps: def?.steps.map(({ name }) => name),
-        parts: Object.values(def?.parts ?? {}).map(({ name }) => name),
-      };
+    const labels = async (screen: string) => {
+      const response = await server.app.request('/p/memory-aaaaaa/api/presets', {
+        headers: { host: LOCAL_HOST, cookie: SESSION_COOKIE, 'x-otea-lang': screen },
+      });
+      const presets = (await response.json()) as {
+        types: { labels?: Record<string, { states: Record<string, string> }> }[];
+      }[];
+      // The board's own preset is the one with a step "Fix".
+      return presets
+        .flatMap(({ types }) => types)
+        .flatMap(({ labels: byLang }) =>
+          Object.entries(byLang ?? {}).map(([lang, words]) => ({
+            lang,
+            states: Object.values(words.states),
+          })),
+        )
+        .filter(({ states }) => states.some((state) => state.startsWith('Fix')));
     };
-    const spanish = await names('es');
-    const english = await names('en');
-    expect(spanish.steps).toEqual(['Completar', 'Triar', 'Arreglar', 'Integrar']);
-    expect(spanish.parts).toContain('Lo que reportaron');
-    expect(english.steps).toEqual(['Complete', 'Triage', 'Fix', 'Land']);
-    expect(english.parts).toContain('What they reported');
-    // A desk that says nothing is read in the language it last told the server, else as made.
-    expect((await names()).steps).toEqual(spanish.steps);
-    await call('POST', '/language', { lang: 'en' });
-    expect((await names()).steps).toEqual(english.steps);
-    // Nothing of it changed what is stored.
+
+    for (const screen of ['es', 'en']) {
+      const found = await labels(screen);
+      // The desk picks the labels of its own screen language; whichever it picks says the board's.
+      expect(found.map(({ lang }) => lang).sort()).toEqual(['en', 'es']);
+      for (const { states } of found) {
+        expect(states).toContain('Triage');
+        expect(states).not.toContain('Triar');
+        expect(states).not.toContain('Arreglar');
+      }
+    }
     expect(findVersion(project.db, id, 1)?.definition).toBe(stored);
   });
 
-  // The editor opens a draft in Spanish, the person switches the desk to English, and the editor's
-  // autosave sends the Spanish words it holds under an English header: the server reconciles
-  // against the language the draft was read in (`readIn`), not the one the request says, so the
-  // snapshot survives and the draft still reads in both languages.
-  it('keeps the snapshot when the desk switches language under an open editor', async () => {
-    const made = await call('POST', '/boards', {
-      name: 'Errores',
-      lang: 'es',
-      template: 'bug-reports',
-    });
-    const { id } = made.body;
-    const opened = (await call('GET', `/boards/${id}`, undefined, 'es')).body.record;
-    const draft = opened.draft?.definition;
-    const [first] = draft?.steps ?? [];
-    if (!draft || !first) throw new Error('no draft');
-    expect(first.name).toBe('Completar');
+  // The editor opens a draft on a Spanish screen and the person changes a step: the autosave must
+  // keep what the template said in the other words. The editor reads, and saves, in the board's
+  // language, so nothing the person did not touch is taken for a change.
+  it('saves a draft keeping the template words the person did not touch', async () => {
+    const id = await made('en');
+    const draft = (await call('GET', `/boards/${id}`, undefined, 'es')).body.record.draft
+      ?.definition;
+    const second = draft?.steps[1];
+    if (!draft || !second) throw new Error('no draft');
+    expect(draft.snapshot).toBeDefined();
+    const kept = Object.keys(draft.snapshot ?? {});
+    second.name = 'Look at it';
 
-    // The edit made after the switch: the second step's name, typed in Spanish.
-    const second = draft.steps[1];
-    if (!second) throw new Error('no second step');
-    second.name = 'Mirar a ojo';
-    const autosaved = await call(
-      'PUT',
-      `/boards/${id}/draft`,
-      { definition: draft, baseVersion: null, readIn: 'es' },
-      'en',
-    );
-    expect(autosaved.status).toBe(200);
-
-    const stepsIn = async (lang: string) =>
-      (await call('GET', `/boards/${id}`, undefined, lang)).body.record.draft?.definition.steps.map(
-        ({ name }) => name,
-      );
-    // What was not touched still follows the language; the edit is the person's in both.
-    expect(await stepsIn('en')).toEqual(['Complete', 'Mirar a ojo', 'Fix', 'Land']);
-    expect(await stepsIn('es')).toEqual(['Completar', 'Mirar a ojo', 'Arreglar', 'Integrar']);
-  });
-
-  // A save that does not say the language it was read in would be reconciled against the desk's
-  // today, which strips the snapshot after a switch: it is refused, never guessed.
-  it('refuses a draft save that does not say the language it was read in', async () => {
-    const made = await call('POST', '/boards', {
-      name: 'Errores',
-      lang: 'es',
-      template: 'bug-reports',
-    });
-    const { id } = made.body;
-    const draft = made.body.draft?.definition;
-    if (!draft) throw new Error('the board has no draft');
-
-    const refused = await call(
-      'PUT',
-      `/boards/${id}/draft`,
-      { definition: draft, baseVersion: null },
-      'en',
-    );
-    expect(refused.status).toBe(400);
-    const wrong = await call(
-      'PUT',
-      `/boards/${id}/draft`,
-      { definition: draft, baseVersion: null, readIn: 'xx' },
-      'en',
-    );
-    expect(wrong.status).toBe(400);
-    // Nothing was saved over the draft.
-    expect(
-      (await call('GET', `/boards/${id}`, undefined, 'es')).body.record.draft?.definition.steps[0]
-        ?.name,
-    ).toBe('Completar');
-  });
-
-  it('keeps the words a person wrote when the desk switches language', async () => {
-    const made = await call('POST', '/boards', {
-      name: 'Errores',
-      lang: 'es',
-      template: 'bug-reports',
-    });
-    const { id } = made.body;
-    const draft = made.body.draft?.definition;
-    if (!draft) throw new Error('the board has no draft');
-    const [first] = draft.steps;
-    if (!first) throw new Error('no step');
-    first.name = 'Revisar a mano';
     const saved = await call(
       'PUT',
       `/boards/${id}/draft`,
-      { definition: draft, baseVersion: null, readIn: 'es' },
+      { definition: draft, baseVersion: null },
       'es',
     );
     expect(saved.status).toBe(200);
 
-    const english = await call('GET', `/boards/${id}`, undefined, 'en');
-    expect(english.body.record.draft?.definition.steps.map(({ name }) => name)).toEqual([
-      'Revisar a mano',
-      'Triage',
-      'Fix',
-      'Land',
-    ]);
+    const after = (await call('GET', `/boards/${id}`, undefined, 'es')).body.record.draft
+      ?.definition;
+    expect(after?.steps.map(({ name }) => name)).toEqual(['Complete', 'Look at it', 'Fix', 'Land']);
+    // Only the changed word lost its snapshot.
+    expect(Object.keys(after?.snapshot ?? {}).sort()).toEqual(
+      kept.filter((path) => path !== `steps.${second.id}.name`).sort(),
+    );
   });
 
-  it('answers desks in two languages at once, each in its own, and says the answer depends on it', async () => {
-    const made = await call('POST', '/boards', {
-      name: 'Errores',
-      lang: 'es',
-      template: 'bug-reports',
-    });
-    const { id } = made.body;
-    const read = async (lang: string) => {
-      const response = await server.app.request(`/p/memory-aaaaaa/api/boards/${id}`, {
-        headers: { host: LOCAL_HOST, cookie: SESSION_COOKIE, [LANGUAGE_HEADER]: lang },
-      });
-      const { record } = (await response.json()) as { record: BoardRecord };
-      return { vary: response.headers.get('vary'), step: record.draft?.definition.steps[0]?.name };
-    };
-
-    const answers = await Promise.all(
-      ['es', 'en', 'es', 'en', 'en', 'es'].map((lang) => read(lang)),
-    );
-    expect(answers.map(({ step }) => step)).toEqual([
-      'Completar',
-      'Complete',
-      'Completar',
-      'Complete',
-      'Complete',
-      'Completar',
-    ]);
-    expect(answers[0]?.vary?.toLowerCase()).toContain(LANGUAGE_HEADER);
+  it('answers the same whatever the screen, so nothing it caches depends on it', async () => {
+    const id = await made('en');
+    const a = await call('GET', `/boards/${id}`, undefined, 'es');
+    const b = await call('GET', `/boards/${id}`, undefined, 'en');
+    expect(a.body).toEqual(b.body);
+    expect(a.headers.get('vary')?.toLowerCase() ?? '').not.toContain('x-otea-lang');
   });
 });
