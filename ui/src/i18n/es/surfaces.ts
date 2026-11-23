@@ -173,6 +173,8 @@ export const surfaces = {
   'signedOut.state': 'sin sesión',
   'signedOut.how': 'Para volver a entrar, ejecuta esto en la carpeta del proyecto:',
   'signedOut.then': 'Abre un enlace nuevo, con la sesión iniciada. Luego vuelve aquí y reintenta.',
+  'signedOut.noBrowser':
+    '¿Sin navegador que abrir ahí (una sesión remota o sin pantalla)? Esto imprime un enlace para abrir a mano, una sola vez y durante diez minutos:',
   'signedOut.app': 'En la app de escritorio, ciérrala y ábrela de nuevo.',
   'signedOut.retry': 'Volver a intentar',
   'signedOut.trying': 'Intentando…',

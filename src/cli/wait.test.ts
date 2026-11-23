@@ -173,6 +173,23 @@ describe('wait', () => {
       );
     });
 
+    // P1-F4: without --unclaimed a wait wakes for any item on the turn, as documented, so a held one
+    // came back at once and read as a wait that does not wait. It now says why, and what to run.
+    it('says an item another agent holds woke a plain wait, and how to wait for work it can take', async () => {
+      await otea('claim', 'TASKS-1', '--as', 'codex');
+
+      const { out } = await otea('wait', '--turn', 'agent');
+
+      expect(out).toMatch(/^TASKS-1 /);
+      expect(out).toContain('TASKS-1 is held by codex until ');
+      expect(out).toContain(
+        'this wait wakes for held items too; to wait only for work you can take: otea wait --turn agent --unclaimed --as claude',
+      );
+      const taken = await otea('wait', '--turn', 'agent', '--unclaimed');
+      expect(taken.out).toMatch(/^TASKS-2 /);
+      expect(taken.out).not.toContain('is held by');
+    });
+
     it('returns an item once the lease on it expires, though nothing is written', async () => {
       // The clock stands still until the test moves it past the lease; timers stay real, so the
       // wait polls as it does. On the wall clock a loaded machine took longer than the lease from

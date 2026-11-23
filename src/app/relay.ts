@@ -1,10 +1,11 @@
-import { type AgentChannel, authorizeRelay } from '../core/authority.ts';
+import { type AgentChannel, authorizeRelay, relayableMoves } from '../core/authority.ts';
 import { isClosed, positionOf, stateOf } from '../core/board/engine.ts';
 import { DROPPED, stepById } from '../core/board/model.ts';
 import { OteaError } from '../core/errors.ts';
 import { assertCanLeave } from '../core/fields.ts';
 import type { Actor } from '../core/item.ts';
 import { activeLease } from '../core/lease.ts';
+import { stateLabel, transitionsBetween, type Workflow } from '../core/workflow.ts';
 import { transaction } from '../store/database.ts';
 import { type EventRecord, type ItemRecord, selectEvents } from '../store/queries.ts';
 import { typeOfItem } from './collections.ts';
@@ -82,6 +83,7 @@ export function relayDecision(ctx: Context, input: RelayInput, now = systemClock
       ...(reason === undefined ? {} : { reason }),
       via: 'relay',
     });
+    assertRelayable(workflow, item, to);
     authorizeRelay(workflow, item.state, to, reason);
     assertCanLeave(type, item.state, to, item.fields);
     const at = now();
@@ -98,6 +100,30 @@ export function relayDecision(ctx: Context, input: RelayInput, now = systemClock
     };
     return landMove(ctx, workflow, item, move, data, { via });
   });
+}
+
+// A decision the person gives while they review a step: an approval, a send-back. An item still in
+// its agent's hands has none to relay, and "Cannot move from X to X" said nothing of why (P8-F5).
+function assertRelayable(workflow: Workflow, item: ItemRecord, to: string): void {
+  if (transitionsBetween(workflow, item.state, to).length > 0) return;
+  const position = positionOf(item.state);
+  if (isClosed(position) || position.phase !== 'doing') return;
+  const at = stateLabel(workflow, item.state);
+  // A drop with motives is several states with one name.
+  const names = [
+    ...new Set(
+      relayableMoves(workflow, item.state).map(({ to: target }) => stateLabel(workflow, target)),
+    ),
+  ];
+  const only =
+    names.length === 0
+      ? 'nothing can be relayed on it now'
+      : `a relay can only move it to ${names.join(', ')} now`;
+  throw new OteaError(
+    'invalid_transition',
+    `Not relayed: ${item.id} is not in review, it is at ${at}, where its agent works: a send-back or an approval is relayed only while the person reviews it. It reaches review when its agent hands it off (otea handoff ${item.id}); until then ${only}.`,
+    { kind: 'move', why: 'no_move', from: item.state, to },
+  );
 }
 
 // A board may turn relay off, because Otea cannot check that the person said what the agent quotes.

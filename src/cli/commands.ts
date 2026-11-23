@@ -198,7 +198,7 @@ import type { FieldValues } from '../core/fields.ts';
 import { assertIconName } from '../core/icons.ts';
 import { type Actor, assertAgentName } from '../core/item.ts';
 import { parseDuration, parseWaitTimeout } from '../core/lease.ts';
-import { profileLine } from '../core/profile.ts';
+import { profileLine, UNKNOWN } from '../core/profile.ts';
 import { describeRelation, RELATION_KINDS } from '../core/relations.ts';
 import { timeText } from '../core/time.ts';
 import { TURNS, type Turn } from '../core/workflow.ts';
@@ -874,7 +874,7 @@ function mcpCheck(project: Project, agent: string | undefined, now = systemClock
 const connect: Command = {
   name: 'connect',
   summary:
-    "Connect agents to Otea, the same for every harness: add (or refresh) Otea's block in AGENTS.md and print the MCP server an agent adds to its own harness's config (otea mcp --project <id>: Otea writes no harness config). --as with --model and --effort also declares the profile that agent runs as, and notes it asked for MCP, so the desk warns while its harness never loads the server. --check says whether the agent (--as) or any agent was heard through the MCP server. --cli (or --no-mcp) is for an agent that works from the command line only: it prints no MCP server, only a short note",
+    "Connect agents to Otea, the same for every harness: add (or refresh) Otea's block in AGENTS.md and print the MCP server an agent adds to its own harness's config (otea mcp --project <id>: Otea writes no harness config). --as also declares the profile that agent runs as (--model and --effort, --harness; one it is not given stays as declared, else unknown), and notes it asked for MCP, so the desk warns while its harness never loads the server. --check says whether the agent (--as) or any agent was heard through the MCP server. --cli (or --no-mcp) is for an agent that works from the command line only: it prints no MCP server, only a short note",
   args: [],
   // --as is a global option; it is named here so the usage line shows it.
   options: {
@@ -914,17 +914,17 @@ const connect: Command = {
     const cliOnly = flag('cli') || flag('no-mcp');
     const { root, id } = withProject(cwd, (project) => {
       if (name !== undefined) {
-        if (model !== undefined && effort !== undefined) {
+        // A model or an effort it is not given stays what the agent declared, else unknown: some
+        // harnesses tell the agent neither, and it declares it itself in its first session (P8-F3).
+        const known = findProfile(project.db, name);
+        const harness = option('harness');
+        if (model !== undefined || effort !== undefined || harness !== undefined || !known) {
           presetProfile(project.db, {
             agent: name,
-            model,
-            effort,
-            given: option('harness'),
+            model: model ?? known?.profile.model ?? UNKNOWN,
+            effort: effort ?? known?.profile.effort ?? UNKNOWN,
+            given: harness,
           });
-        } else if (!findProfile(project.db, name)) {
-          throw new UsageError(
-            `Give the profile ${name} runs as: --model <id> --effort <level>, exactly as its harness names them (such as claude-opus-5-5 and high)`,
-          );
         }
         // An agent on the command line only asked for no MCP: the desk has nothing to warn about.
         if (!cliOnly) markMcpAsked(project.db, name, systemClock());
@@ -2381,7 +2381,18 @@ const wait: Command = {
           : laterLine(project, found.id, me);
       // That the person took it up again, and their unanswered notes (P7-R3-8, P5-R3-8).
       const woken = 'text' in found ? [] : wokeLines(project, found.id);
-      const added = [merges, later, ...woken].filter((line) => line !== undefined);
+      // Without --unclaimed any item on the turn wakes the wait, one another agent holds too (P1-F4):
+      // it said nothing of why it came back at once, and read as a wait that does not wait.
+      const held =
+        'text' in found ||
+        input.actor.kind !== 'agent' ||
+        turn !== 'agent' ||
+        filter.availableTo !== undefined ||
+        !found.lease ||
+        found.lease.holder === me
+          ? undefined
+          : `${found.id} is held by ${found.lease.holder} until ${timeText(found.lease.expiresAt)}; this wait wakes for held items too; to wait only for work you can take: ${keepWaitingCommand(me, filter.collection)}`;
+      const added = [merges, later, held, ...woken].filter((line) => line !== undefined);
       const woke = added.length === 0 ? row : { ...row, text: [row.text, ...added].join('\n') };
       // While topics are on, what woke the agent reminds it to record side questions.
       const reminded = 'topics' in found ? woke : withTopicsReminder(project, input.actor, woke);
@@ -3674,10 +3685,10 @@ function notRunning(message: string): CommandFailure {
 const open: Command = {
   name: 'open',
   summary:
-    "Open this project's page on this computer's running otea serve in the browser, signed in to act on items",
+    "Open this project's page on this computer's running otea serve in the browser, signed in to act on items. --no-open opens nothing and prints a fresh single-use sign-in link instead (works once, within 10 minutes), for a browser you open by hand: a headless or remote session, or the page that says your session ran out",
   args: [],
-  options: { port: {} },
-  execute: async ({ cwd, option, openUrl }) => {
+  options: { port: {}, 'no-open': { flag: true } },
+  execute: async ({ cwd, option, flag, openUrl, warn }) => {
     const here = projectHere(cwd);
     const home = oteaHome();
     const port = portToOpen(option('port'));
@@ -3688,6 +3699,10 @@ const open: Command = {
     if (probe === 'down') throw notRunning(`No Otea server answers on port ${port}`);
     if (probe === 'other')
       throw notRunning(`The Otea server on port ${port} is another Otea home's (OTEA_HOME)`);
+    // The link is the person's to open by hand, single-use and never the key, as serve --no-open's.
+    if (flag('no-open')) {
+      return { data: { url }, text: (await signInLines({ flag, openUrl, warn }, link)).join('\n') };
+    }
     await openUrl(link).catch((error: unknown) => {
       const reason = error instanceof Error ? error.message : String(error);
       throw new Error(`Could not open a browser (${reason})`);

@@ -332,8 +332,12 @@ describe('the Code on main board', () => {
     const refused = await otea('claim', other);
     expect(refused.code).not.toBe(0);
     expect(refused.err).toContain(
-      `${other} not claimed: mo works on main with ${id} now, and ${other} waits for it: this board works straight on main, so one agent at a time`,
+      `${other} not claimed: mo works on main with ${id} now (its lease runs until `,
     );
+    expect(refused.err).toContain(
+      `, and ${other} waits for it: this board works straight on main, so one agent at a time`,
+    );
+    expect(refused.err).toContain('Items that do not work on main can be taken now: otea next.');
 
     // Another agent holds work on some other board: the notice does not send this one to a worktree.
     await mo('release', id);

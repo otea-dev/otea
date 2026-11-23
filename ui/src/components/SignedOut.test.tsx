@@ -62,7 +62,11 @@ describe('the app without its sign-in', () => {
     const view = show({ sync: { offline: false, syncedAt: 1, signedOut: true } });
     expect(shown(view.root)).toBe(false);
     expect(view.root.querySelector('.signed-out')?.textContent).toContain('Tu sesión caducó');
-    expect(view.root.querySelector('.pj-cmd code')?.textContent).toBe('otea open');
+    // P8-F4: and, for a session with no browser to open (headless, remote), the command that prints
+    // a fresh link instead.
+    expect(
+      [...view.root.querySelectorAll('.signed-out .pj-cmd code')].map((code) => code.textContent),
+    ).toEqual(['otea open', 'otea open --no-open']);
     await press(buttonNamed(view.root, 'Volver a intentar'));
     expect(retry).toHaveBeenCalledTimes(1);
     view.unmount();

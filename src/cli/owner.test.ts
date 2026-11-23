@@ -1,3 +1,8 @@
+import { spawn } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   ownerChain,
@@ -159,6 +164,46 @@ describe('the processes that own a command', () => {
         owner.stop();
       }
     });
+
+    // A wait whose parent shell ends while the command still loads reads the system's own process
+    // (pid 1 on macOS and Linux) as its parent when it first asks, and watched that for good: pid 1
+    // never ends, so the wait ran to its timeout. The parent is the one the process started under.
+    // On Windows an ended parent's id stays as `ppid`, so only macOS and Linux can show the failure;
+    // there the watch reads the system's own process before the fix and never stops.
+    it('takes the parent the process started under, so one that ended before the watch began is gone', async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'otea-owner-'));
+      const [go, done, script] = ['go', 'done', 'child.mjs'].map((name) => join(dir, name));
+      writeFileSync(
+        script as string,
+        `import { existsSync, writeFileSync } from 'node:fs';
+const [, , owner, go, done] = process.argv;
+// The command's start-up: its modules load, then it has other work before it watches its parent.
+const { watchOwner } = await import(owner);
+while (!existsSync(go)) await new Promise((resolve) => setTimeout(resolve, 20));
+const watch = watchOwner(new AbortController().signal, { list: async () => undefined, everyMs: 50 });
+watch.signal.addEventListener('abort', () => { writeFileSync(done, 'gone'); process.exit(0); });
+setTimeout(() => { writeFileSync(done, 'never'); process.exit(0); }, 8000);
+`,
+      );
+      const owner = pathToFileURL(fileURLToPath(new URL('./owner.ts', import.meta.url))).href;
+      // The parent starts the command and ends at once, as a shell that ran it in the background.
+      const parent = spawn(
+        process.execPath,
+        [
+          '-e',
+          `require('node:child_process').spawn(process.execPath, ['--disable-warning=ExperimentalWarning', ${JSON.stringify(script)}, ${JSON.stringify(owner)}, ${JSON.stringify(go)}, ${JSON.stringify(done)}], { detached: true, stdio: 'ignore', windowsHide: true }).unref()`,
+        ],
+        { stdio: 'ignore', windowsHide: true },
+      );
+      try {
+        await new Promise((resolve) => parent.once('exit', resolve));
+        writeFileSync(go as string, '');
+        await until(() => existsSync(done as string), 20_000);
+        expect(readFileSync(done as string, 'utf8')).toBe('gone');
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }, 30_000);
 
     it('stops with the command interrupted, not orphaned', () => {
       const interrupt = new AbortController();

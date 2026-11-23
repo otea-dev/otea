@@ -38,11 +38,15 @@ export type DeclaredProfileView = {
 const named = (harness: Harness | undefined) =>
   harness && harness.name !== CLI_HARNESS.name ? harness.name : undefined;
 
-// The harness of a declaration: the MCP client's, else the one named, else the one known.
+// The harness of a declaration: the one the agent names, else the one it declared before, else the
+// MCP client's. The agent knows the tool it runs in: several agents behind one client (a script, a
+// bridge) each say theirs, and the client's name must not override it (P8-F3). A profile preset for
+// the command line (`cli`) is no declaration of a harness.
 function harnessOf(db: DatabaseSync, input: ProfileInput): string | undefined {
-  if (input.channel === 'mcp' && named(input.harness)) return named(input.harness);
   if (input.given !== undefined) return input.given;
   const known = findProfile(db, input.agent)?.profile.harness;
+  if (known && known !== CLI_HARNESS.name) return known;
+  if (input.channel === 'mcp' && named(input.harness)) return named(input.harness);
   if (known) return known;
   const seen = findAgent(db, input.agent)?.harness;
   return seen && seen !== CLI_HARNESS.name ? seen : undefined;

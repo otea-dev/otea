@@ -50,7 +50,7 @@ describe('landing in the order the person set', () => {
     setOrder(ctx, { collection: def.name, ids: [first, second], actor: you }, now);
 
     expect(() => claimItem(ctx, { id: second, actor: agent('quill') }, now)).toThrow(
-      `${second} not claimed: ${first} lands in main first (order 1), then ${second}: one agent lands at a time on main, in the person's order, so no landing conflicts with another under way. Take other work meanwhile: otea next.`,
+      `${second} not claimed: ${first} lands in main first (order 1), then ${second}: one agent lands at a time on main, in the person's order, so no landing conflicts with another under way. Items that do not land in main can be taken now: otea next.`,
     );
     expect(claimItem(ctx, { id: first, actor: agent('quill') }, now).lease?.holder).toBe('quill');
   });
@@ -68,8 +68,11 @@ describe('landing in the order the person set', () => {
     expect(idle.text).toContain(
       `${second} waits to land in main: claude-b lands ${first} there now; one agent lands at a time on main, in the person's order.`,
     );
+    // P1-S4: which item holds main and until when, and that what does not land there goes on.
     expect(() => claimItem(ctx, { id: second, actor: agent('quill') }, now)).toThrow(
-      `${second} not claimed: claude-b lands ${first} in main now; ${second} lands after it: one agent lands at a time on main, in the person's order, so no landing conflicts with another under way. Take other work meanwhile: otea next.`,
+      new RegExp(
+        `^${second} not claimed: claude-b lands ${first} in main now \\(its lease runs until \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} UTC\\); ${second} lands after it: one agent lands at a time on main, in the person's order, so no landing conflicts with another under way\\. Items that do not land in main can be taken now: otea next\\.$`,
+      ),
     );
 
     updateItemState(ctx.db, first, 'done', now());
