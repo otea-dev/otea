@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ago, item } from '../derive/fixtures.ts';
-import { findItems, SEARCH_MAX } from './search.ts';
+import { findItems, indexItems, SEARCH_MAX } from './search.ts';
 
 // The phone's search finds items by what they say, as the desk's search reads words.
 
@@ -10,8 +10,9 @@ const all = [
   item({ id: 'CAM-3', title: 'Revisar la API de pagos', updatedAt: ago(5) }),
   item({ id: 'CAM-4', title: 'Login con Google', turn: 'none', closes: 'done', updatedAt: ago(1) }),
 ];
+const index = indexItems(all);
 
-const ids = (search: string) => findItems(all, search).map((found) => found.id);
+const ids = (search: string) => findItems(index, search).map((found) => found.id);
 
 describe('findItems', () => {
   it('finds by a word of the title, with no care for accents or case', () => {
@@ -22,6 +23,17 @@ describe('findItems', () => {
   it('finds by a value of a field, and by a plural or the start of a word', () => {
     expect(ids('migraciones')).toEqual(['CAM-2']);
     expect(ids('estil')).toEqual(['CAM-2']);
+  });
+
+  it('finds by the first letters of the word being typed, from the first one', () => {
+    expect(ids('l')).toEqual(expect.arrayContaining(['CAM-1', 'CAM-4']));
+    expect(ids('lo')).toEqual(['CAM-1', 'CAM-4']);
+    expect(ids('mo')).toEqual(['CAM-2']);
+    // Words before it are whole, as on the desk; the one typed counts by its start.
+    expect(ids('corregir lo')).toEqual(['CAM-1', 'CAM-4']);
+    expect(ids('corregir lo')[0]).toBe('CAM-1');
+    // A space ends the word: «lo » is whole now, and no item holds it.
+    expect(ids('lo ')).toEqual([]);
   });
 
   it('puts an id typed whole first, then the item holding most of the words', () => {
@@ -39,6 +51,6 @@ describe('findItems', () => {
     const many = Array.from({ length: SEARCH_MAX + 10 }, (_, n) =>
       item({ id: `X-${n}`, title: 'tarea común' }),
     );
-    expect(findItems(many, 'tarea')).toHaveLength(SEARCH_MAX);
+    expect(findItems(indexItems(many), 'tarea')).toHaveLength(SEARCH_MAX);
   });
 });

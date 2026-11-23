@@ -1920,6 +1920,23 @@
     width: 18px;
     height: 18px;
   }
+  /* With the magnifier beside it, the agents pill gives way first (its words shorten with an
+     ellipsis) and the project pill keeps room for its name, down to 320 px. */
+  .pill {
+    min-width: 120px;
+  }
+  .tb-end {
+    flex: 0 1 auto;
+  }
+  .tb-end .apill {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .apill > span:not(.amw) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
   /* The sheet keeps one height as the results come and go, and sits on the keyboard (--kb). */
   .nsheet.search {

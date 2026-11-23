@@ -174,8 +174,6 @@ export const surfaces = {
   'signedOut.how': 'Para volver a entrar, ejecuta esto en la carpeta del proyecto:',
   'signedOut.then': 'Abre un enlace nuevo, con la sesión iniciada. Luego vuelve aquí y reintenta.',
   'signedOut.app': 'En la app de escritorio, ciérrala y ábrela de nuevo.',
-  'signedOut.phone':
-    'Un teléfono que estaba emparejado se empareja de nuevo desde el equipo, en Configuración › Teléfono.',
   'signedOut.retry': 'Volver a intentar',
   'signedOut.trying': 'Intentando…',
   'projects.label': 'proyectos',
