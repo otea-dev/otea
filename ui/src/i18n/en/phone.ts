@@ -10,6 +10,13 @@ export const phone = {
   'phone.desk': 'Studio and Settings are on the computer.',
   'phone.newItem': 'New item',
   'phone.close': 'Close',
+  // Search items: the magnifier in the top bar
+  'phone.search': 'Search',
+  'phone.search.field': 'Search items',
+  'phone.search.placeholder': 'A title, an id or a word',
+  'phone.search.hint': 'Searches the titles, the ids and what each item’s fields say.',
+  'phone.search.none': 'No item says “{search}”.',
+  'phone.search.count': { one: '{count} item', other: '{count} items' },
   // Quick capture (mock screen 3)
   'phone.capture.board': 'Board: {board}. Change it',
   'phone.capture.here': 'this board',

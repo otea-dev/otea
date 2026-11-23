@@ -84,6 +84,12 @@ describe('the bottom buttons', () => {
     expect(rules(phone, '.tabbar')).toMatch(/min-height:\s*var\(--tabbar-h\)/);
     expect(rules(phone, '.install-banner')).toMatch(/bottom:\s*calc\(var\(--tabbar-h\)/);
   });
+
+  it('never lies over what the page rests on its foot: the install banner waits for it (P7-F1)', () => {
+    // The language note, a docked page and the next-step card each take the foot of the screen.
+    for (const rest of ['.language-note-host', '.p-dock', '.nextstep'])
+      expect(rules(phone, `body:has(${rest}) .install-banner`), rest).toMatch(/display:\s*none/);
+  });
 });
 
 describe('a finger’s size: every control on the phone is at least 44 px (#34)', () => {
