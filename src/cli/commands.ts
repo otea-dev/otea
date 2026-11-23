@@ -782,7 +782,7 @@ function mcpInstructionText(entry: McpEntry): string[] {
   const env = Object.entries(entry.env ?? {}).map(([name, value]) => `${name}=${value}`);
   const json = JSON.stringify({ [MCP_SERVER]: entry });
   return [
-    "To use Otea's MCP tools, add this MCP server to your harness's MCP config yourself, for this project only: in the project's own config file or your harness's project scope. Never edit your user or global config: the server is pinned to this project. It is a local stdio server; Otea writes no harness config:",
+    "To use Otea's MCP tools, add this MCP server to your harness's MCP config yourself, for this project only (its own config file or your harness's project scope, never your user or global config: the server is pinned to this project). It is a local stdio server, and Otea writes no harness config:",
     indent(
       columns([
         ['name', MCP_SERVER],
@@ -792,9 +792,9 @@ function mcpInstructionText(entry: McpEntry): string[] {
       ]),
     ),
     `As JSON: ${json}`,
-    "That JSON is one shape; every harness has its own, and may skip a server in another shape without a word: translate it to your harness's schema, or add the server with your harness's own mcp add command, at project scope. The usual project files, as examples: Claude Code: .mcp.json (under mcpServers); OpenCode: opencode.json (under mcp.servers, with type local, command as one array of the command and its args, and env as environment); Codex: .codex/config.toml (a [mcp_servers.<name>] table); Gemini CLI: .gemini/settings.json (under mcpServers). The README has each one in full.",
-    "It names no agent: each session names itself (--as; MCP tools: as). If your harness already has a server named otea that runs anything else (an older Otea, or mcp --as <name>), replace it for this project with this one. If your harness must restart or reload to load the server, ask the person for it now, before you go on, and to reopen this same conversation with your harness's resume option, if it has one, so you keep what was said; Otea keeps every item and board draft either way. Approve it if your harness asks, then call any Otea tool. Until then, and whenever MCP is off, the otea command does the same.",
-    'Run otea connect --check now (with --as <name>), and again after that call: only it tells whether the server loaded, and the desk warns until it does.',
+    "That JSON is one shape, and a harness may skip a server in another shape without a word: translate it to your harness's schema, or use its own mcp add command, at project scope. Examples: Claude Code: .mcp.json (under mcpServers); OpenCode: opencode.json (under mcp.servers, with type local, command as one array of the command and its args, and env as environment); Codex: .codex/config.toml (a [mcp_servers.<name>] table); Gemini CLI: .gemini/settings.json (under mcpServers). The README has each in full.",
+    "If your harness already has a server named otea that runs anything else (an older Otea, or mcp --as <name>), replace it for this project with this one. If your harness must restart or reload to load the server, ask the person for it now, before you go on, and to reopen this same conversation with your harness's resume option, if it has one, so you keep what was said; Otea keeps every item and board draft either way. Approve it if your harness asks, then call any Otea tool. Until then, and whenever MCP is off, the otea command does the same.",
+    'Then run otea connect --check (with --as <name>), and again after that call: only it tells whether the server loaded, and the desk warns until it does.',
   ];
 }
 
@@ -813,7 +813,7 @@ function mcpEntryFor(input: Pick<Input, 'oteaOnPath' | 'home'>, id: string) {
 // What an agent's harness must let it run for Otea's flow, said the same for every harness: Otea
 // writes no harness config, and the docs give an example per harness.
 const HARNESS_PERMISSIONS =
-  "Have your harness allow, for this project: otea (its commands and its MCP tools), git push to the items' branches (Otea's pre-push hook still checks each push) and git worktree add. Otea writes no harness config: docs/working-with-agents.md, «What your harness must allow», has examples.";
+  "Have your harness allow, for this project: otea (its commands and its MCP tools), git push to the items' branches (Otea's pre-push hook still checks each push) and git worktree add (docs/working-with-agents.md, «What your harness must allow», has examples).";
 
 // An outdated pre-push hook that is exactly one an Otea wrote is updated by whichever command sees
 // it first, so the warning does not come back on every command and push (P10-F2): the rule is the
@@ -962,11 +962,11 @@ const connect: Command = {
       ...(usePath
         ? []
         : [
-            `Warning: ${
+            `Note: ${
               onPath === undefined
                 ? 'no otea is on your PATH'
-                : `the otea on your PATH (${onPath.file}) is not this install`
-            }, so the entry below runs the otea running now (${OTEA_MAIN}) by its absolute path.`,
+                : `the otea on your PATH (${onPath.file}) is another install`
+            }, so the entry below runs this one (${OTEA_MAIN}) by its absolute path.`,
           ]),
       ...mcpInstructionText(entry),
       ...(old

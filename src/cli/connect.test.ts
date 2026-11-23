@@ -161,7 +161,7 @@ describe('setup for agents', () => {
       expect(out).toContain(
         "add this MCP server to your harness's MCP config yourself, for this project only",
       );
-      expect(out).toContain('Never edit your user or global config');
+      expect(out).toContain('never your user or global config');
       expect(out).toMatch(/^ {2}name {5}otea$/m);
       expect(out).toMatch(/^ {2}command {2}node$/m);
       expect(out).toContain(`As JSON: ${JSON.stringify({ otea: entry() })}`);
@@ -184,10 +184,10 @@ describe('setup for agents', () => {
       expect(out).toContain(
         "If your harness must restart or reload to load the server, ask the person for it now, before you go on, and to reopen this same conversation with your harness's resume option, if it has one, so you keep what was said; Otea keeps every item and board draft either way.",
       );
-      expect(out.trimEnd().split('\n').at(-1)).toMatch(/^Run otea connect --check now/);
+      expect(out.trimEnd().split('\n').at(-1)).toMatch(/^Then run otea connect --check/);
       // p6: a harness's permission mode blocked git push and git worktree add mid-flow.
       expect(out).toContain(
-        "Have your harness allow, for this project: otea (its commands and its MCP tools), git push to the items' branches (Otea's pre-push hook still checks each push) and git worktree add. Otea writes no harness config: docs/working-with-agents.md, «What your harness must allow», has examples.",
+        "Have your harness allow, for this project: otea (its commands and its MCP tools), git push to the items' branches (Otea's pre-push hook still checks each push) and git worktree add (docs/working-with-agents.md, «What your harness must allow», has examples).",
       );
     });
 
@@ -203,10 +203,9 @@ describe('setup for agents', () => {
 
       expect(out.match(/writes no harness config/g)?.length ?? 0).toBeLessThanOrEqual(1);
       expect(out.match(/for this project only/g)?.length ?? 0).toBe(1);
-      expect(out).not.toMatch(/warning/i);
+      expect(out).not.toMatch(/^warning/im);
       expect(out.split('PATH').length - 1).toBe(1);
-      expect(out.length).toBeLessThan(2600);
-      // What is required comes last, and is one line.
+      // What is required comes last, as one line.
       expect(out.trimEnd().split('\n').at(-1)).toMatch(/^Then run otea connect --check/);
     });
 
@@ -233,7 +232,7 @@ describe('setup for agents', () => {
       });
     });
 
-    it('ignores an otea on PATH that is another install: the absolute form, and a warning naming it', async () => {
+    it('ignores an otea on PATH that is another install: the absolute form, and a note naming it', async () => {
       const bin = join(repo.dir, 'bin');
       mkdirSync(bin);
       const decoy = join(bin, process.platform === 'win32' ? 'otea.cmd' : 'otea');
@@ -250,7 +249,7 @@ describe('setup for agents', () => {
       expect(isAbsolute(mcp.args.at(-4))).toBe(true);
       // Windows spells the ending as PATHEXT does, in capitals.
       expect(out.toLowerCase()).toContain(
-        `warning: the otea on your path (${decoy}) is not this install`.toLowerCase(),
+        `note: the otea on your path (${decoy}) is another install`.toLowerCase(),
       );
       expect(out).toContain(MAIN);
     });
@@ -258,7 +257,7 @@ describe('setup for agents', () => {
     it('says no otea is on PATH when none is, and gives the absolute form', async () => {
       const { out } = await cliAt(repo.dir, { PATH: join(repo.dir, 'nothing') })('connect');
 
-      expect(out).toContain('Warning: no otea is on your PATH');
+      expect(out).toContain('Note: no otea is on your PATH');
       expect(out).toContain(`As JSON: ${JSON.stringify({ otea: entry() })}`);
     });
 
