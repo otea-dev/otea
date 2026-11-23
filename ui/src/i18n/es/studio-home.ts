@@ -117,7 +117,7 @@ export const studioHome = {
   'bs.ask.open': 'Abrirlo',
 
   // Un tablero publicado.
-  'bs.board.create': 'Crear · {item}',
+  'bs.board.create': 'Crear {item}',
   'bs.board.version': 'v{version}',
   'bs.board.changes': 'tienes cambios sin publicar',
   'bs.board.nothingIn': 'Nada en {step} ahora.',

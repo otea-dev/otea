@@ -2,6 +2,7 @@ import { type ReactNode, useId, useState } from 'react';
 import { useApp } from '../../app/context.tsx';
 import { NoteText } from '../../components/NoteText.tsx';
 import { Prof } from '../../components/Prof.tsx';
+import { itemWord } from '../../format.ts';
 import { listOr, t, tx } from '../../i18n/i18n.ts';
 import {
   Button,
@@ -455,7 +456,7 @@ export function PartsSection({
             }
           >
             <Icon name="plus" />
-            {t('bi.parts.add', { item: childItem, id: item.id })}
+            {t('bi.parts.add', { item: itemWord(childItem), id: item.id })}
           </button>
         </div>
       ) : null}

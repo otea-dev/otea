@@ -9,6 +9,15 @@ const SAID = {
   implements: 'said.implements',
 } as const;
 
+// A board's item word ("Pieza", "Bug") as it reads after a verb: "Crear pieza", "New bug". An
+// acronym or a word with its own capitals ("CAM", "iOS") stays as written.
+export function itemWord(word: string): string {
+  const trimmed = word.trim();
+  return /^\p{Lu}\p{Ll}/u.test(trimmed)
+    ? trimmed.replace(/^\p{Lu}/u, (c) => c.toLowerCase())
+    : trimmed;
+}
+
 // A stored relation as a sentence, the way the CLI says it.
 export function relationSentence(kind: string, from: string, to: string): string {
   const key = SAID[kind as keyof typeof SAID];
