@@ -184,6 +184,7 @@ describe('serve', () => {
       pid: process.pid,
       links: true,
       version: OTEA_VERSION,
+      owner: 'foreground',
     });
     expect(existsSync(join(repo.dir, '.otea', 'serve.json'))).toBe(false);
 
