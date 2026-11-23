@@ -70,7 +70,7 @@ import {
 } from './board-item.ts';
 import { cautionKeyOf, useCaution } from './caution.ts';
 import { Details, detailCells } from './Details.tsx';
-import { useDiffOffTip } from './diff-tip.ts';
+import { useDiffFiles, useDiffOffTip } from './diff-tip.ts';
 import { useDrift } from './drift.ts';
 import { boardFactsOf, factsOf, standAgentOf, standOf } from './facts.ts';
 import { pressInView, toastOf } from './frame.ts';
@@ -212,6 +212,8 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   const outside = useMergedOutside(item.id, strip?.key === 'landing', item.updatedAt);
   // While the person reviews it: whether the attached diff comes from another tip (P1-R3-1).
   const off = useDiffOffTip(item.id, strip?.key === 'frozen', item.updatedAt);
+  // And whether it names other files than the work handed off changes (P1-F2).
+  const files = useDiffFiles(item.id, strip?.key === 'frozen', item.updatedAt);
   const split = live?.split;
   const childSummary =
     split && split.board !== SAME ? summaries.find((b) => b.id === split.board) : undefined;
@@ -832,7 +834,13 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
               checks={
                 <>
                   {/* Its branch and where it stands: «fusionada» once merged, as on the desk (WF-3). */}
-                  <BranchLine strip={strip} drift={drift} outside={outside} off={off} />
+                  <BranchLine
+                    strip={strip}
+                    drift={drift}
+                    outside={outside}
+                    off={off}
+                    files={files}
+                  />
                   {hand.length ? (
                     <HandChecklist item={item} rows={hand} canWrite={app.session.canWrite} />
                   ) : null}
@@ -1137,7 +1145,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                   />
                 ) : null}
               </div>
-              <BranchLine strip={strip} drift={drift} outside={outside} off={off} />
+              <BranchLine strip={strip} drift={drift} outside={outside} off={off} files={files} />
               {block?.request ? (
                 <DraftRequestLine
                   request={block.request}

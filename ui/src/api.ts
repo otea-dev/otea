@@ -3,6 +3,7 @@ import { withoutUndone } from '../../src/core/board/history.ts';
 import type { PerformanceView } from '../../src/core/board/performance.ts';
 import type { NotifyPrefs } from '../../src/core/notify/planner.ts';
 import { SURFACE_HEADER } from '../../src/core/surface.ts';
+import type { DiffFilesOff } from '../../src/server/diff-files.ts';
 import type { DiffOffTip } from '../../src/server/diff-tip.ts';
 import type { Drift } from '../../src/server/drift.ts';
 import type { FeedEvent } from './activity.ts';
@@ -308,6 +309,17 @@ export async function fetchDiffOffTip(id: string, signal: AbortSignal): Promise<
   const url = `/api/items/${encodeURIComponent(id)}/diff-tip`;
   const body = (await (await get(url, signal)).json()) as { off: DiffOffTip | null };
   return body.off;
+}
+
+// Whether the files the attached diff names are not the files the work handed off changes
+// (src/server/diff-files.ts, P1-F2): null when they match, or when the PC cannot tell.
+export async function fetchDiffFiles(
+  id: string,
+  signal: AbortSignal,
+): Promise<DiffFilesOff | null> {
+  const url = `/api/items/${encodeURIComponent(id)}/diff-files`;
+  const body = (await (await get(url, signal)).json()) as { mismatch: DiffFilesOff | null };
+  return body.mismatch;
 }
 
 export async function postOpened(id: string, evidence: number): Promise<void> {

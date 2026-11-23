@@ -34,7 +34,7 @@ import {
   type StepRounds,
   type WaitRow,
 } from './board-item.ts';
-import { type DiffOffTip, diffOffTipText } from './diff-tip.ts';
+import { type DiffFilesOff, type DiffOffTip, diffFilesText, diffOffTipText } from './diff-tip.ts';
 import { type Drift, driftText } from './drift.ts';
 import type { MergedOutside } from './merged-outside.ts';
 
@@ -271,11 +271,13 @@ export function BranchLine({
   drift = null,
   outside = null,
   off = null,
+  files = null,
 }: {
   strip: BranchStrip | null;
   drift?: Drift | null;
   outside?: MergedOutside | null;
   off?: DiffOffTip | null;
+  files?: DiffFilesOff | null;
 }) {
   if (!strip) return null;
   const said = branchSaid(strip, outside);
@@ -288,7 +290,7 @@ export function BranchLine({
       <span className="bsaid">{said}</span>
     </div>
   );
-  if (!drift && !off) return line;
+  if (!drift && !off && !files) return line;
   return (
     <>
       {line}
@@ -302,6 +304,12 @@ export function BranchLine({
         <div className="bstrip drift" data-c role="status">
           <Icon name="warn" />
           <span>{diffOffTipText(off)}</span>
+        </div>
+      ) : null}
+      {files ? (
+        <div className="bstrip drift" data-c role="status">
+          <Icon name="warn" />
+          <span>{diffFilesText(files)}</span>
         </div>
       ) : null}
     </>

@@ -759,6 +759,11 @@ export const detail = {
       'El diff adjunto no sale de lo entregado en {branch} ({tip}): {files} no coinciden con esa punta. Aprobar aprueba lo entregado, no el diff.',
   },
   'bi.branch.diffOffMore': '{count} más',
+  'bi.branch.diffFiles':
+    'El diff adjunto no coincide con lo que aterriza. El diff {diff}; lo entregado cambia {landed}. Aprobar aprueba lo entregado, no el diff.',
+  'bi.branch.diffFilesNames': 'nombra {files}',
+  'bi.branch.diffFilesNone': 'no nombra ningún archivo',
+  'bi.branch.diffFilesNothing': 'ningún archivo',
   'bi.branch.moved':
     'La rama cambió en el remoto después de la entrega: ahora está en {now}. Aprobar aprueba solo lo entregado, {handed}.',
   'bi.request.board': 'Tablero {name}',
