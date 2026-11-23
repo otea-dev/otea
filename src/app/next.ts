@@ -2136,7 +2136,12 @@ export function assertBranchMayChange(
 // (P1-F3). It can be filled once the item reaches that step.
 export function assertLaterFieldsStay(
   ctx: Context,
-  item: { id: string; collection: string; state: string },
+  item: {
+    id: string;
+    collection: string;
+    state: string;
+    fields: Readonly<Record<string, unknown>>;
+  },
   changes: Readonly<Record<string, unknown>>,
 ): void {
   const board = liveBoardOf(ctx, item.collection);
@@ -2145,7 +2150,8 @@ export function assertLaterFieldsStay(
   const later = laterFields(board.def, position.step);
   for (const ref of Object.keys(changes)) {
     const step = later.get(ref);
-    if (!step) continue;
+    // A value it already has is no change: a form that sends every field back is not refused.
+    if (!step || changes[ref] === item.fields[ref]) continue;
     const name = board.def.parts[ref]?.name ?? ref;
     const review = stepById(board.def, position.step)?.name ?? position.step;
     throw new OteaError(

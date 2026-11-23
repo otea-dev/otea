@@ -1,6 +1,7 @@
 import { PERSON_READER } from '../item.ts';
 import { timeText } from '../time.ts';
 import { mappedScales, rolePart, viewsOf } from './analysis.ts';
+import { choiceLines, type ItemChoice } from './choices.ts';
 import {
   backTarget,
   backWaysOf,
@@ -25,13 +26,6 @@ import {
   whenHolds,
 } from './engine.ts';
 import { mentionText } from './mentions.ts';
-import { type Lang, LEVEL_SAID, TITLE_NAME, YES_NO_SAID, YES_NO_VALUE } from './template-words.ts';
-
-// The language the board was made in (reading.ts's langOf, which reads next.ts): its values are
-// given to the agent in it, as the board stores and accepts them.
-const boardLangOf = (def: BoardDefinition): Lang => (def.title === TITLE_NAME.es ? 'es' : 'en');
-
-import { choiceLines, type ItemChoice } from './choices.ts';
 import {
   type BoardDefinition,
   DONE,
@@ -51,6 +45,8 @@ import {
 } from './model.ts';
 import { type ItemNote, notesBlock, notesHandLine, notesRefusal } from './notes.ts';
 import { answersBlock, type ItemQuestion, waitingAnswerText } from './questions.ts';
+import { langOf } from './reading.ts';
+import { type Lang, LEVEL_SAID, TITLE_NAME, YES_NO_SAID, YES_NO_VALUE } from './template-words.ts';
 
 // The one writer of what an agent reads: `next`'s answer for an item at a step, the refusal of a
 // handoff and the line after one. Studio's "Lo que lee el agente" calls the same functions on the
@@ -680,7 +676,7 @@ function partLines(def: BoardDefinition, hands: readonly Hand[], input: NextInpu
           : `optional${fresh}`;
     const mark = missing ? '✗' : hand.req === 'always' ? '✓' : '·';
     const proof = part.kind === 'check' && part.proof ? ', each ticked point with its proof' : '';
-    const line = `  ${mark} ${part.name}: ${req}${proof}${missing ? ` (${reasonText(missing)})` : ''}${choicesText(part, hand.req !== 'no', boardLangOf(def))}`;
+    const line = `  ${mark} ${part.name}: ${req}${proof}${missing ? ` (${reasonText(missing)})` : ''}${choicesText(part, hand.req !== 'no', langOf(def))}`;
     return part.hint && hand.req !== 'no' ? [line, `      what goes here: ${part.hint}`] : [line];
   });
 }
@@ -712,7 +708,7 @@ function estimateLines(def: BoardDefinition, input: NextInput): string[] {
   const names = empty.map(({ name }) => name).join(', ');
   const flags = empty.map(({ name }) => ` --field "${name}=…"`).join('');
   // What each takes, so the agent never has to look for it elsewhere.
-  const lang = boardLangOf(def);
+  const lang = langOf(def);
   const values = empty.flatMap((part) => {
     const takes = choicesText(part, false, lang).replace(/^; /, '');
     return takes ? [`    ${part.name}: ${takes}`] : [];
@@ -848,11 +844,11 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
         ? starts.length === 0
           ? []
           : [
-              `  fields: ${JSON.stringify(Object.fromEntries(starts.map(({ part }) => [part.name, valueText(part, input, boardLangOf(def))])))}`,
+              `  fields: ${JSON.stringify(Object.fromEntries(starts.map(({ part }) => [part.name, valueText(part, input, langOf(def))])))}`,
             ]
         : starts.map(({ part, from }) => {
             const origin = from ? ` (from ${stepById(def, from)?.name ?? from})` : '';
-            return `  ${part.name}${origin}: ${valueText(part, input, boardLangOf(def))}`;
+            return `  ${part.name}${origin}: ${valueText(part, input, langOf(def))}`;
           });
     lines.push(...section('Starts with', given));
   }
@@ -1528,7 +1524,7 @@ function whoReviews(step: Step): string {
 // look for them elsewhere (an agent once read otea.db for a choice's options).
 function fieldValueLines(def: BoardDefinition): string[] {
   const used = usedRefs(def);
-  const lang = boardLangOf(def);
+  const lang = langOf(def);
   return Object.values(def.parts).flatMap((part) => {
     const takes = used.has(part.id) ? choicesText(part, false, lang).replace(/^; /, '') : '';
     return takes ? [`  ${part.name}: ${takes}`] : [];
