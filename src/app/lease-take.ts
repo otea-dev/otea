@@ -10,6 +10,7 @@ import {
   leaseHeld,
 } from '../core/lease.ts';
 import { timeText } from '../core/time.ts';
+import { findBoardOfCollection } from '../store/boards.ts';
 import {
   appendEvent,
   clearLease,
@@ -17,6 +18,8 @@ import {
   selectEvents,
   takeLease,
 } from '../store/queries.ts';
+import type { Context } from './context.ts';
+import { assertNotBehindInQueue } from './next.ts';
 import { sessionEnded, sessionRuns } from './presence.ts';
 
 // Why a claim of an item whose lease ran out is refused while its holder's session runs.
@@ -61,12 +64,8 @@ export function takeItem(
 // Whether the actor may write the item now: no other agent holds it (assertMayWrite), and an agent
 // whose own lease ran out, or that the person freed it from, claims it again first. Its work may
 // have gone to another agent meanwhile; writing on as if it still held it would hand off over them.
-export function assertMayWriteItem(
-  db: DatabaseSync,
-  item: ItemRecord,
-  actor: Actor,
-  at: string,
-): void {
+export function assertMayWriteItem(ctx: Context, item: ItemRecord, actor: Actor, at: string): void {
+  const { db } = ctx;
   const lease = activeLease(item.lease, at);
   assertMayWrite(item.id, lease, actor);
   if (actor.kind !== 'agent' || lease) return;
@@ -86,4 +85,10 @@ export function assertMayWriteItem(
       `The person freed ${item.id} from you at ${timeText(last.at)}; ${again}`,
     );
   }
+  // Never claimed: the wait the claim keeps for an item that is not its turn to land is the
+  // write's too. A claim the landing queue refused was got round by updating and handing off
+  // anyway (P1-F1). An item of no board (a preset's) is queued by nothing.
+  const board = findBoardOfCollection(db, item.collection);
+  if (board === undefined || board.liveVersion === null) return;
+  assertNotBehindInQueue(ctx, item, actor.name, at);
 }
