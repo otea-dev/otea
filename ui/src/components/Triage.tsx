@@ -59,7 +59,11 @@ import {
 } from '../triage.ts';
 import type { Evidence, Item, ItemView, Move } from '../types.ts';
 import { useStudioBoard } from '../views/board/studio-board.tsx';
-import type { ItemBoardBlock } from '../views/detail/board-item.ts';
+import {
+  evidenceGaps,
+  type ItemBoardBlock,
+  shortGroupCaution,
+} from '../views/detail/board-item.ts';
 import { toastOf } from '../views/detail/frame.ts';
 import { draftWaitsOf } from '../views/detail/moves.ts';
 import { threadOf } from '../views/detail/notes.ts';
@@ -310,6 +314,9 @@ type RoundShown = {
   files: Evidence[];
   gate: Gate | undefined;
   picks?: string[] | undefined;
+  // What approving says once when an "at least N of" group of the delivery is short (P5-F5): the
+  // card holds the first approval, by button or by swipe, and the next one for the same line goes.
+  caution?: string | null | undefined;
   pending: boolean;
   // The compare parts of its type judged blind, by module id: their sides are A and B.
   blind?: ReadonlySet<string>;
@@ -396,6 +403,15 @@ export function TriCard({
   // The card under the top one waits complete (inert): it is the same card, brought forward.
   const ready = !!plan;
 
+  // Aprobar with a group short asks once: the first approval says the line and is held, the next
+  // one for the same line goes through. Anything that changes the line asks again.
+  const [warned, setWarned] = useState<string | null>(null);
+  const line = round.caution ?? null;
+  const askFirst = (): boolean => {
+    if (line === null || warned === line) return false;
+    setWarned(line);
+    return true;
+  };
   const approve = () => {
     if (pick) {
       askPick(item.id);
@@ -404,6 +420,7 @@ export function TriCard({
     }
     if (!forward) return;
     setNoteFor(null);
+    if (askFirst()) return;
     if (forward.reasonRequired) setNotes(true);
     else onDecide('approve');
   };
@@ -480,6 +497,11 @@ export function TriCard({
     const x = heldAt(el);
     const side = releaseDirection({ dx: x, vx, width: el.offsetWidth });
     const move = side === 'right' ? forward : side === 'left' ? back : undefined;
+    // A swipe to approve with a group short comes home and says so: it asks once, as a press does.
+    if (side === 'right' && move && askFirst()) {
+      home.current = springHome(el, x, vx);
+      return;
+    }
     if (side && move && !move.reasonRequired) {
       onDecide(side === 'right' ? 'approve' : 'send', '', { x, v: vx });
       return;
@@ -581,6 +603,11 @@ export function TriCard({
       ) : pick ? (
         <p className="tc-wait" id={pickId} data-pick="">
           {t('triage.pickNote')}
+        </p>
+      ) : null}
+      {line !== null && warned === line ? (
+        <p className="tc-wait tc-caution" role="status">
+          {line}
         </p>
       ) : null}
       {/* The hint names both ways: said only while both are open. */}
@@ -858,6 +885,7 @@ export function Triage() {
       files,
       gate: held ? { to: held.to, note: approvalWaitWords(held.missing) } : undefined,
       picks: def ? pickAt(def, view)?.forward : undefined,
+      caution: def ? shortGroupCaution(evidenceGaps(def, view).groups, t('triage.approve')) : null,
       pending,
       blind: blindPartsOf(type),
     };
