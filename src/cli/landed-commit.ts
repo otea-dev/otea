@@ -52,12 +52,21 @@ const commitOf = (cwd: string, ref: string): string | undefined =>
 
 // Whether a commit changes no file: against its first parent, or against nothing for a root. A
 // commit git cannot read counts as changing files, never a refusal made on a guess.
+// The person's own diff config (a hidden submodule, an external diff tool) must not decide it.
 function changesNothing(cwd: string, commit: string): boolean {
   const parent = commitOf(cwd, `${commit}^`);
+  const tree = [
+    '-c',
+    'diff.ignoreSubmodules=none',
+    'diff-tree',
+    '-r',
+    '--name-only',
+    '--no-ext-diff',
+    '--ignore-submodules=none',
+    '--no-commit-id',
+  ];
   const names =
-    parent === undefined
-      ? git(cwd, 'diff-tree', '--root', '-r', '--name-only', '--no-commit-id', commit)
-      : git(cwd, 'diff', '--name-only', parent, commit);
+    parent === undefined ? git(cwd, ...tree, '--root', commit) : git(cwd, ...tree, parent, commit);
   return names === '';
 }
 
@@ -248,10 +257,11 @@ export function landedCommitRefusal(
     }
   }
   // A commit that changes no file (git commit --allow-empty) is a new hash of the base with no work
-  // in it (P1-F2): one that changes something among those named is enough.
-  const empty = holding.filter(({ full }) => changesNothing(cwd, full));
-  const [first] = empty;
-  if (first && empty.length === holding.length) {
+  // in it (P1-F2). Only commits that change something are judged for being this item's own: an
+  // empty one beside another item's commit must not pass for the item's.
+  const [first] = holding;
+  holding = holding.filter(({ full }) => !changesNothing(cwd, full));
+  if (holding.length === 0 && first) {
     return `${name}: commit ${first.word} changes no files, so it is no work landed (a commit made with git commit --allow-empty is a new hash and nothing else). Commit this item's own change and write the hash of that commit (git rev-parse --short HEAD).`;
   }
   const taken = new Map<string, string>();
