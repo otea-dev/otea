@@ -217,6 +217,52 @@ describe('the Code on main board', () => {
     rmSync(origin, { recursive: true, force: true, maxRetries: 10 });
   });
 
+  // P1-F3: an item that made no commit went Done writing the hash of main, which was the commit of
+  // another item, and one made before it was taken. The commit it writes is its own.
+  it('closes Subir with no commit another item landed with, and none made before the item was taken', async () => {
+    const put = (item: string, value: string) =>
+      otea('update', item, '--field', `Commit subido=${value}`);
+    const first = await doing('Regar', 'Subir');
+    expect((await otea('claim', first)).code).toBe(0);
+    change('regar.py', 'print(2)\n');
+    const head = git('rev-parse', '--short', 'HEAD');
+    expect((await put(first, head)).code).toBe(0);
+    const landed = await otea('handoff', first);
+    expect(landed.code, landed.err).toBe(0);
+
+    const second = await doing('Riego doble', 'Subir');
+    expect((await otea('claim', second)).code).toBe(0);
+    expect((await put(second, head)).code).toBe(0);
+    const reused = await otea('handoff', second);
+    expect(reused.code).not.toBe(0);
+    expect(reused.err).toContain(
+      `${second} not handed off: Commit subido: commit ${head} is already the commit ${first} landed with`,
+    );
+
+    // A commit made before the item was taken is not its work, however it got to main.
+    execFileSync(
+      'git',
+      ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'old'],
+      {
+        cwd: repo.dir,
+        stdio: 'pipe',
+        env: { ...process.env, GIT_COMMITTER_DATE: '2020-01-01T00:00:00Z' },
+      },
+    );
+    const old = git('rev-parse', '--short', 'HEAD');
+    expect((await put(second, old)).code).toBe(0);
+    const before = await otea('handoff', second);
+    expect(before.code).not.toBe(0);
+    expect(before.err).toContain(`commit ${old} was made before this item was taken`);
+
+    // Its own commit, made after it was taken, closes it.
+    change('riego.py', 'print(3)\n');
+    expect((await put(second, git('rev-parse', '--short', 'HEAD'))).code).toBe(0);
+    const own = await otea('handoff', second);
+    expect(own.code, own.err).toBe(0);
+    expect(own.out).toContain(`${second} is Done`);
+  });
+
   // P1-F2: the board says to work on main with no branch, and the notice said to make a worktree
   // of its own: three agents committing in one checkout broke the index and one handed off
   // another's commit. The board takes one agent at a time on main, and the notice agrees.
