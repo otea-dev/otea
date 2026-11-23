@@ -112,7 +112,7 @@ export const studioHome = {
   'bs.ask.open': 'Open it',
 
   // A published board.
-  'bs.board.create': 'Create · {item}',
+  'bs.board.create': 'New {item}',
   'bs.board.version': 'v{version}',
   'bs.board.changes': 'you have unpublished changes',
   'bs.board.nothingIn': 'Nothing in {step} now.',

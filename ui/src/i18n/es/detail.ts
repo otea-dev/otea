@@ -698,7 +698,7 @@ export const detail = {
   'proof.open.log': 'Abrir el log en {what}',
   'proof.open.test': 'Abrir el informe del test {what}',
   'bi.parts.none': 'todavía no tiene partes',
-  'bi.parts.add': 'Crear · {item}, parte de {id}',
+  'bi.parts.add': 'Crear {item}, parte de {id}',
   'bi.links.title': 'Enlaces',
   'bi.links.gloss': 'entre ítems de cualquier tablero',
   'bi.links.by': 'Lo frena',

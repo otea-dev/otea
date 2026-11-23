@@ -6,6 +6,7 @@ import { sentenceNode } from '../../board-studio/editor/SentenceText.tsx';
 import { summary } from '../../board-studio/editor/sentences.ts';
 import { boardOfCollection, boardsOf, useBoards } from '../../board-studio/home/boards-store.ts';
 import { doesText, reviewsText } from '../../board-studio/words.ts';
+import { itemWord } from '../../format.ts';
 import { t, tx } from '../../i18n/i18n.ts';
 import { Button } from '../../kit/Button.tsx';
 import { Icon } from '../../kit/Icon.tsx';
@@ -65,7 +66,7 @@ export function BoardActs({ studio, canWrite }: { studio: StudioBoard; canWrite:
       {canWrite ? (
         <Button variant="primary" onClick={() => app.newItem({ board: collection })}>
           <Icon name="plus" />
-          {t('bs.board.create', { item: studio.live.item })}
+          {t('bs.board.create', { item: itemWord(studio.live.item) })}
         </Button>
       ) : null}
       {app.session.canConfigure ? (
@@ -146,7 +147,7 @@ export function Teach({ board, studio }: { board: string; studio: StudioBoard })
     <p className="teach">
       {tx('bs.board.teach', {
         board,
-        create: <b>{t('bs.board.create', { item: studio.live.item })}</b>,
+        create: <b>{t('bs.board.create', { item: itemWord(studio.live.item) })}</b>,
         step: <b>{first?.name ?? '—'}</b>,
         does: doesText(first?.doer ?? 'any'),
       })}

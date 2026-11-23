@@ -4,6 +4,7 @@ import {
   ageLabel,
   describeEvent,
   formatTime,
+  itemWord,
   momentLabel,
   momentParts,
   relayOf,
@@ -166,5 +167,14 @@ describe('momentParts', () => {
       day: '2 Jan 2025',
       time: '09:05',
     });
+  });
+});
+
+describe('itemWord', () => {
+  it('reads an item word after a verb: lower-cased, unless it is an acronym', () => {
+    expect(itemWord('Pieza')).toBe('pieza');
+    expect(itemWord('Tarea de repo')).toBe('tarea de repo');
+    expect(itemWord('CAM')).toBe('CAM');
+    expect(itemWord('iOS')).toBe('iOS');
   });
 });

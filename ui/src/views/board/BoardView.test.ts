@@ -188,10 +188,11 @@ describe('a board Studio shapes', () => {
     ),
   });
 
-  it('offers one way to create: Crear · Bug in its head, no Nuevo ítem in the toolbar', () => {
+  it('offers one way to create, an action and not a step name: Crear bug in its head, no Nuevo ítem in the toolbar', () => {
     studied.board = shaped();
     const html = render('list');
-    expect(html).toContain('Crear · Bug');
+    expect(html).toContain('Crear bug');
+    expect(html).not.toContain('Crear · Bug');
     expect(html).not.toContain('Nuevo ítem');
     expect(html).not.toContain('newb');
   });
@@ -199,7 +200,7 @@ describe('a board Studio shapes', () => {
   it('keeps Nuevo ítem out for whoever may not write, as the head does', () => {
     studied.board = shaped();
     const html = render('list', seed, false, false);
-    expect(html).not.toContain('Crear · Bug');
+    expect(html).not.toContain('Crear bug');
     expect(html).not.toContain('newb');
   });
 });
@@ -250,7 +251,7 @@ describe('a board on the phone (mobile mock 4)', () => {
       ),
     };
     const html = render('list', seed, true);
-    expect(html).not.toContain('Crear · Bug');
+    expect(html).not.toContain('Crear bug');
     expect(html).not.toContain('Editar tablero');
     expect(html).not.toContain('bv-acts');
   });
