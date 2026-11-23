@@ -1,6 +1,7 @@
 import {
   type CSSProperties,
   type Ref,
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -17,7 +18,7 @@ import { stateWordIn } from '../preset-words.ts';
 import type { CollectionView, Item } from '../types.ts';
 import { BottomSheet } from './BottomSheet.tsx';
 import { useKeyboardInset } from './CaptureSheet.tsx';
-import { findItems } from './search.ts';
+import { findItems, indexItems } from './search.ts';
 import { closeSearch, useSearchOpen } from './search-open.ts';
 
 // The phone's search (the magnifier in the top bar): a sheet from below with the field focused, so
@@ -36,7 +37,9 @@ const NODE: Record<Look, NodeKind> = {
 };
 
 export type SearchBodyProps = {
+  // What is in the field, and the search the rows answer (it follows the field a moment later).
   search: string;
+  asked: string;
   found: readonly Item[];
   now: number;
   collectionOf: (name: string) => CollectionView | undefined;
@@ -47,6 +50,7 @@ export type SearchBodyProps = {
 
 export function SearchBody({
   search,
+  asked,
   found,
   now,
   collectionOf,
@@ -54,7 +58,7 @@ export function SearchBody({
   onSearch,
   onOpen,
 }: SearchBodyProps) {
-  const typed = search.trim() !== '';
+  const typed = asked.trim() !== '';
   return (
     <div className="search-body">
       <div className="srch-field" data-i="">
@@ -79,7 +83,7 @@ export function SearchBody({
         </p>
       ) : found.length === 0 ? (
         <p className="srch-note" role="status" data-i="">
-          {t('phone.search.none', { search: search.trim() })}
+          {t('phone.search.none', { search: asked.trim() })}
         </p>
       ) : (
         <>
@@ -122,7 +126,11 @@ export function SearchSheet() {
   // A row takes the sheet away at once; the scrim, Escape or a flick take it down the way it came.
   const [now, setNow] = useState(false);
   const inset = useKeyboardInset(open);
-  const found = useMemo(() => findItems(app.all, search), [app.all, search]);
+  // Every item folded and split once per change of the list; typing only compares words, and the
+  // rows follow the field a moment later, so a key never waits for them.
+  const index = useMemo(() => indexItems(app.all), [app.all]);
+  const asked = useDeferredValue(search);
+  const found = useMemo(() => findItems(index, asked), [index, asked]);
 
   // Each opening starts blank.
   if (open && seq !== seen) {
@@ -162,6 +170,7 @@ export function SearchSheet() {
     >
       <SearchBody
         search={search}
+        asked={asked}
         found={found}
         now={app.now}
         collectionOf={app.collectionOf}

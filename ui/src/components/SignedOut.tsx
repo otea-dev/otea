@@ -46,18 +46,25 @@ function BrokenRoute({ desk }: { desk: string }) {
 // Stands in for the app while the PC refuses this browser's reads for want of its sign-in.
 export function SignedOutGate({ children }: { children: ReactNode }) {
   const app = useApp();
-  if (!app.sync.signedOut) return children;
-  return <SignedOut onRetry={app.retry} phone={app.phone} />;
+  const out = app.sync.signedOut === true;
+  // The app stays mounted under the page, only hidden: what was being typed (a note, a capture, a
+  // search) is still there when the sign-in comes back. It takes no box of its own while it shows.
+  return (
+    <>
+      <div className="signed-out-app" style={{ display: out ? 'none' : 'contents' }}>
+        {children}
+      </div>
+      {out ? <SignedOut onRetry={app.retry} /> : null}
+    </>
+  );
 }
 
 export type SignedOutProps = {
   // Reads everything again now.
   onRetry: () => void;
-  // On the phone, a phone that was paired is paired again from the computer, and the page says so.
-  phone?: boolean;
 };
 
-export function SignedOut({ onRetry, phone = false }: SignedOutProps) {
+export function SignedOut({ onRetry }: SignedOutProps) {
   useLanguage();
   const [trying, setTrying] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -80,7 +87,7 @@ export function SignedOut({ onRetry, phone = false }: SignedOutProps) {
           <p>{t('signedOut.how')}</p>
           <CopyCommand command="otea open" />
           <p className="so-then">{t('signedOut.then')}</p>
-          <p className="so-then">{t(phone ? 'signedOut.phone' : 'signedOut.app')}</p>
+          <p className="so-then">{t('signedOut.app')}</p>
         </div>
         <div className="pair-bar">
           <Button variant="primary" disabled={trying} aria-busy={trying} onClick={retry}>

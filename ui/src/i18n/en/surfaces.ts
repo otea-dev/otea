@@ -168,8 +168,6 @@ export const surfaces = {
   'signedOut.how': 'To get back in, run this in the project’s folder:',
   'signedOut.then': 'It opens a new link, signed in. Then come back here and try again.',
   'signedOut.app': 'In the desktop app, close it and open it again.',
-  'signedOut.phone':
-    'A phone that was paired is paired again from the computer, in Settings › Phone.',
   'signedOut.retry': 'Try again',
   'signedOut.trying': 'Trying…',
   'projects.label': 'projects',
