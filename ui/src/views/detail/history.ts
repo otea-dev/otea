@@ -15,6 +15,7 @@ import {
   QUESTION_ASKED,
 } from '../../../../src/core/board/questions.ts';
 import { stateName } from '../../../../src/core/board/reading.ts';
+import { isSurface, type Surface } from '../../../../src/core/surface.ts';
 import { describeEvent, formatTime, momentParts, relayOf } from '../../format.ts';
 import { type PlainKey, t } from '../../i18n/i18n.ts';
 import type { AgentProfile } from '../../presence.ts';
@@ -22,6 +23,12 @@ import { fieldWord, keptStateWord, valueWord } from '../../preset-words.ts';
 import { profilePair } from '../../profile-words.ts';
 import { isSetAside, SET_ASIDE_LIFTED } from '../../set-aside.ts';
 import type { ItemEvent, TypeView } from '../../types.ts';
+
+const FROM: Record<Surface, PlainKey> = {
+  desk: 'sheet.h.fromDesk',
+  phone: 'sheet.h.fromPhone',
+  api: 'sheet.h.fromApi',
+};
 
 // The item's history as the sheet's lane says it (SPEC §10.3, mock:638-649, 2736-2739): newest
 // first, a dot per event (yours blue, agents ink, a ring when an agent relayed your words), the
@@ -107,7 +114,15 @@ export function historyOf(
     // A relayed move is the agent's word that the person said it, so it names the agent, never
     // «you» (P1-F1). (An answer noted from the chat, otea answer, still reads as yours.)
     const relayedMove = relay !== null && e.type === 'transitioned';
-    const who = relayedMove ? relay.via : human || relay ? t('sheet.d.youLower') : e.actor.name;
+    // A move of yours says where it came from, so one made with a plain HTTP call is no click
+    // (P1-S1); a relayed one names the agent instead.
+    const from = human && !relay && e.type === 'transitioned' ? e.data.surface : undefined;
+    const way = isSurface(from) ? ` · ${t(FROM[from])}` : '';
+    const who = relayedMove
+      ? relay.via
+      : human || relay
+        ? `${t('sheet.d.youLower')}${way}`
+        : e.actor.name;
     const base = {
       id: e.id,
       when: whenOf(e.at, now),

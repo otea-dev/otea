@@ -194,6 +194,36 @@ describe('the history, newest first, in words', () => {
     expect(lines[1]?.when).toMatch(/^today \d\d:\d\d$/);
     expect(lines.at(-1)?.when).toMatch(/^today|yesterday/);
   });
+
+  // P1-S1: with the person's session, a plain HTTP call moves an item as a click does; the record
+  // says which it was, and a move made before it was kept says nothing.
+  describe('where the person’s move came from', () => {
+    afterEach(() => setLanguage('en'));
+    const whoOf = (data: Record<string, unknown>) =>
+      historyOf(
+        [ev('transitioned', you, { from: 'verify', to: 'fixed', ...data })],
+        bug,
+        word,
+        NOW,
+      )[0]?.who;
+
+    it('names the desk, the phone, and a direct API call in plain words', () => {
+      expect(whoOf({ surface: 'desk' })).toBe('you · on the desk');
+      expect(whoOf({ surface: 'phone' })).toBe('you · from the phone');
+      expect(whoOf({ surface: 'api' })).toBe(
+        'you · by a direct API call, not from the desk or the phone',
+      );
+      expect(whoOf({})).toBe('you');
+      setLanguage('es');
+      expect(whoOf({ surface: 'api' })).toBe(
+        'tú · con una llamada directa a la API, no desde el escritorio ni el teléfono',
+      );
+    });
+
+    it('leaves a relayed move as it was: it names the agent that relayed it', () => {
+      expect(whoOf({ surface: 'ui', via: 'Kiln', quote: 'dale' })).toBe('Kiln');
+    });
+  });
 });
 
 describe('the history of a stuck item you took in hand', () => {
