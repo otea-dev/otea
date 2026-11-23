@@ -4,7 +4,7 @@ Otea is licensed under the AGPL-3.0 (see [LICENSE](LICENSE)). The web app and th
 
 The fonts come from npm, through [Fontsource](https://fontsource.org), and are not committed to this repository. The web app loads them in `ui/src/main.tsx`. The desktop app embeds Schibsted Grotesk in the window it shows while the installer runs (`desktop/src/main.ts`), and copies all three into its project picker (`desktop/build.mjs`).
 
-The npm packages Otea is built from carry their own license files in their packages; see `package.json` and `desktop/package.json`.
+The npm packages Otea is built from carry their own license files in their packages; see `package.json` and `desktop/package.json`. The published CLI bundles those packages into `dist/cli`, with each one's license in `dist/cli/THIRD_PARTY_LICENSES.txt`.
 
 ## Fonts
 
