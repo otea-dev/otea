@@ -103,6 +103,11 @@ export const shell = {
   'prefs.sec.app': 'Aplicación',
   'prefs.sec.session': 'Sesión',
   'prefs.sec.about': 'Acerca de',
+  // La línea de la versión (Configuración y Preferencias › Acerca de)
+  'version.copy': 'Copiar la versión y el sistema, para un reporte de error',
+  'version.copied': 'copiado',
+  'version.stale':
+    'Esta página es de Otea {page}, pero el servidor ejecuta la {server}. Recárgala para ponerla al día; si sigue igual, cierra y vuelve a abrir la aplicación.',
 
   // La nota de la primera vez, cuando el navegador eligió un idioma que no es el inglés
   'languageNote.label': 'Idioma',

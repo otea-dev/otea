@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../app/context.tsx';
 import { PageSection } from '../components/PageSection.tsx';
 import { focusSettings } from '../components/settings-focus.ts';
+import { VersionLine } from '../components/VersionLine.tsx';
 import { isStandalone } from '../home-screen.ts';
 import { t } from '../i18n/i18n.ts';
 import { Icon } from '../kit/Icon.tsx';
@@ -65,6 +66,7 @@ export function PreferencesView({
             <dt>{t('prefs.server')}</dt>
             <dd>{server}</dd>
           </dl>
+          <VersionLine />
         </PageSection>
       </div>
     </div>

@@ -28,6 +28,7 @@ import type {
   ProjectOverview,
   ProjectSettings,
   ProjectView,
+  ServerVersion,
   Session,
   TailscaleGuide,
   TestPush,
@@ -125,6 +126,17 @@ export function evidenceFileUrl(id: number): string {
 
 export async function fetchSession(signal: AbortSignal): Promise<Session> {
   return (await get(SESSION_PATH, signal)).json();
+}
+
+// The Otea the server runs, and the system it runs on: what Settings and Preferences show, and
+// the report a person copies from them. Read as any other call, so only a signed-in page gets it.
+export async function fetchServerVersion(signal: AbortSignal): Promise<ServerVersion> {
+  const response = await get('/api/version', signal);
+  const body = (await response.json().catch(() => undefined)) as Partial<ServerVersion> | undefined;
+  // A server from before this call answers 404: it has no version to show, never a made-up one.
+  if (!response.ok || typeof body?.version !== 'string' || typeof body.platform !== 'string')
+    throw new Error('no version');
+  return { version: body.version, platform: body.platform };
 }
 
 export async function fetchCollections(signal: AbortSignal): Promise<CollectionView[]> {

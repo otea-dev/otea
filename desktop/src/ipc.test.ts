@@ -22,6 +22,7 @@ function fakeDesk() {
     dismissNotice: vi.fn(),
     bringToFront: vi.fn(() => false),
     setBringToFront: vi.fn((on: boolean) => on),
+    appVersion: vi.fn(() => '1.2.3'),
   } satisfies Desk;
 }
 
@@ -120,6 +121,16 @@ describe('the preferences calls', () => {
     await expect(invoke('prefs:get-front', STRANGER)).rejects.toThrow();
     await expect(invoke('prefs:set-front', PICKER, true)).rejects.toThrow();
     expect(desk.setBringToFront).toHaveBeenCalledTimes(1);
+  });
+
+  it('say the app version to the project server page only', async () => {
+    const desk = fakeDesk();
+    const { ipc, invoke } = fakeIpc();
+    wirePrefs(ipc, desk);
+    expect(await invoke('prefs:get-version', DESK)).toBe('1.2.3');
+    for (const url of [STRANGER, PICKER, undefined])
+      await expect(invoke('prefs:get-version', url)).rejects.toThrow();
+    expect(desk.appVersion).toHaveBeenCalledTimes(1);
   });
 
   it('tell the preload whether its page is the project server page', () => {

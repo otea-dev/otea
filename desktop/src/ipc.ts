@@ -28,6 +28,8 @@ export type Desk = {
   dismissNotice(): void;
   bringToFront(): boolean;
   setBringToFront(on: boolean): boolean;
+  // The desktop app's own version (its package's), for the report Settings lets a person copy.
+  appVersion(): string;
 };
 
 // The picker's calls, answered only for the picker's own page.
@@ -75,6 +77,11 @@ export function wirePrefs(ipc: Ipc, desk: Desk): void {
     const on = booleanArg(arg);
     if (on === undefined) throw new Error('a boolean is expected');
     return desk.setBringToFront(on);
+  });
+  // Which desktop app this is: a version string, nothing about the machine. Takes no argument.
+  ipc.handle('prefs:get-version', (event) => {
+    guard(event);
+    return desk.appVersion();
   });
   // The preload asks, once per page, whether to expose the preferences bridge: it does only on the
   // page of the project's own server. The answer is a boolean, never the server's address.

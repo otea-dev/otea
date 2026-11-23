@@ -75,6 +75,7 @@ import {
 import { topicsEverywhere } from '../app/topics-everywhere.ts';
 import { undoMove } from '../app/undo.ts';
 import { mergedOutside } from '../cli/merged-outside.ts';
+import { OTEA_VERSION } from '../cli/version.ts';
 import { agentPrompt, connectFacts, isPromptKind, PROMPT_KINDS } from '../core/agent-prompts.ts';
 import { PERIOD_HINT, parsePeriod } from '../core/board/performance.ts';
 import { LANGS, LANGUAGE_HEADER, type Lang } from '../core/board/template-words.ts';
@@ -346,6 +347,9 @@ function machineApi(doors: Doors): Hono<OteaEnv> {
           canConfigure: auth.canConfigure(c),
         }),
       )
+      // Which Otea answers, for the page that shows it and the report a person makes from it. Read
+      // like every other call (a signed-in browser or a paired device), never open like /session.
+      .get('/version', (c) => c.json({ version: OTEA_VERSION, platform: process.platform }))
       // The language the person's desk is in, kept for what is made without a desk (otea init, otea
       // board add): the desk says it when it opens while none is kept, and on every switch.
       .get('/language', (c) => c.json({ language: storedLanguage(machine) ?? null }))
