@@ -108,6 +108,28 @@ describe('a returned round and the evidence new in each round', () => {
       attach('eart', 'the same bytes');
       expect(hand).not.toThrow();
     });
+
+    // P5-F1: taking it is right (an unchanged file can be the answer); saying so is the courtesy,
+    // for the agent now and in the review for the person.
+    it('takes the same bytes but says so in the handoff line, naming the earlier round', () => {
+      attach('eart', 'the same bytes');
+      hand();
+      sendBackItem(project, { id, actor: you, channel: 'ui', reason: 'Otra vez' }, now);
+      claimItem(project, { id, actor: quill }, now);
+      attach('eart', 'the same bytes');
+      const { text } = hand();
+      expect(text).toMatch(/^Handed off\./);
+      expect(text).toContain('Arte conceptual: same bytes as round 1');
+    });
+
+    it('says nothing when the new file has other bytes, or in a first round', () => {
+      attach('eart', 'first bytes');
+      expect(hand().text).not.toContain('same bytes');
+      sendBackItem(project, { id, actor: you, channel: 'ui', reason: 'Otra vez' }, now);
+      claimItem(project, { id, actor: quill }, now);
+      attach('eart', 'other bytes');
+      expect(hand().text).not.toContain('same bytes');
+    });
   });
 
   // P7-F8: a part marked new each round must be attached again after a send-back, even unchanged;
