@@ -52,9 +52,22 @@ export function todayCounts(feed: readonly FeedEvent[], ctx: TodayContext): Toda
     const to = path.indexOf(String(e.data.to));
     return from >= 0 && to >= 0 ? to <= from : !!reasonOf(e);
   };
+  // Who put each item on the step it stands on, read in the order things happened: an approval is
+  // of what an agent handed you. An item you created or moved there yourself (Marcar hecho on your
+  // own step) is work you did. Unknown (the feed is a window) counts as handed.
+  const enteredBy = new Map<string, 'agent' | 'you'>();
+  const chronological = [...feed].sort(
+    (a, b) => Date.parse(a.at) - Date.parse(b.at) || a.id - b.id,
+  );
   const out: Today = { handed: 0, approved: 0, sent: 0 };
-  for (const e of feed) {
-    if (e.type !== 'transitioned' || Date.parse(e.at) < from) continue;
+  for (const e of chronological) {
+    const doneByAgent = e.actor.kind === 'agent' && typeof e.data.via !== 'string';
+    if (e.type === 'created') enteredBy.set(e.itemId, doneByAgent ? 'agent' : 'you');
+    if (e.type !== 'transitioned') continue;
+    // A relayed move is your word carried by an agent, on work that agent did.
+    const mine = enteredBy.get(e.itemId) === 'you' && typeof e.data.via !== 'string';
+    enteredBy.set(e.itemId, doneByAgent ? 'agent' : 'you');
+    if (Date.parse(e.at) < from) continue;
     // Otea reading an item onto its board is nobody's approval or send-back.
     if (e.data.reason === 'migrate') continue;
     // Nor is publishing a board: the items it moves to their new steps, and the Pedido it closes.
@@ -69,7 +82,7 @@ export function todayCounts(feed: readonly FeedEvent[], ctx: TodayContext): Toda
     }
     if (to.closes === 'discarded') continue;
     if (to.turn === 'agent' && sentBack(e)) out.sent++;
-    else out.approved++;
+    else if (!mine) out.approved++;
   }
   return out;
 }

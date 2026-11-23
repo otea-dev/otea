@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import type { FeedEvent } from '../../activity.ts';
 import { agent, ago, item, MIN, moved, NOW, officialType, you } from '../../derive/fixtures.ts';
 import { setLanguage } from '../../i18n/i18n.ts';
 import { atascoDek, oldestWaiting, quietOnes, tocaDek } from './dek.ts';
@@ -70,6 +71,34 @@ describe('what happened today', () => {
       moved('E', 'accepted', you, { minutes: 20, from: 'reported', reason: 'Bien visto.' }),
     ];
     expect(todayCounts(feed, ctx(items))).toEqual({ handed: 0, approved: 1, sent: 2 });
+  });
+
+  // P4-F4: Marcar hecho on your own step is a to-do you did, not an agent's work you approved.
+  it('does not count work you did yourself as an approval, only what an agent handed you', () => {
+    const items = [
+      item({ id: 'M', state: 'fixed', turn: 'none' }),
+      item({ id: 'N', state: 'fixed', turn: 'none' }),
+      item({ id: 'P', state: 'fixed', turn: 'none' }),
+    ];
+    const made = (itemId: string, state: string): FeedEvent => ({
+      ...moved(itemId, state, you, { minutes: 90 }),
+      type: 'created',
+      data: { state },
+    });
+    const feed = [
+      // M: created on your own step and marked done by you.
+      made('M', 'verify'),
+      moved('M', 'fixed', you, { minutes: 20, from: 'verify' }),
+      // N: an agent handed it to you, then you approved it.
+      made('N', 'fixing'),
+      moved('N', 'verify', agent('mender'), { minutes: 60, from: 'fixing' }),
+      moved('N', 'fixed', you, { minutes: 15, from: 'verify' }),
+      // P: you moved it to another step of yours first, then marked it done.
+      made('P', 'fixing'),
+      moved('P', 'verify', you, { minutes: 60, from: 'fixing' }),
+      moved('P', 'fixed', you, { minutes: 10, from: 'verify' }),
+    ];
+    expect(todayCounts(feed, ctx(items)).approved).toBe(1);
   });
 
   it('never counts publishing a board as an approval: neither the Pedido it closes nor the items it moves', () => {
