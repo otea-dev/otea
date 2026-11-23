@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AGENTS_BLOCK } from '../app/agents.ts';
 import { AGENT_GUIDE } from '../core/agent-guide.ts';
 import { createMcpServer } from '../mcp/server.ts';
+import { mcpWords } from '../mcp/words.ts';
 import { COMMANDS } from './commands.ts';
 import { type Cli, cliAt, presetCollection, tempGitRepo } from './testing.ts';
 
@@ -70,13 +71,20 @@ describe("Otea's agent guide", () => {
     }
   });
 
-  it('is the MCP server instructions', async () => {
+  // P8-F4: a client that reads only the instructions has no shell to run `otea next --claim` in, so
+  // it reads the guide in the words of the tools it has, as the board tool gives it.
+  it('is the MCP server instructions, in the words of the tools', async () => {
     const server = createMcpServer(COMMANDS, { cwd: repo.dir, warn: () => {} });
     const client = new Client({ name: 'test', version: '0' });
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     await server.connect(serverSide);
     await client.connect(clientSide);
-    expect(client.getInstructions()).toBe(AGENT_GUIDE);
+    const instructions = client.getInstructions() ?? '';
+    expect(instructions).toBe(mcpWords(AGENT_GUIDE, COMMANDS));
+    expect(instructions).toContain('claim { id: "<id>" }');
+    expect(instructions).toContain('next { claim: true }');
+    expect(instructions).not.toContain('otea next');
+    expect(instructions).not.toContain('otea claim');
     await client.close();
   });
 

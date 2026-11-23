@@ -112,7 +112,10 @@ describe('mcp server', () => {
         const expected = [
           'as',
           ...(command?.args ?? []).map((arg) => arg.replace(/\?$/, '')),
-          ...Object.keys(command?.options ?? {}).filter((name) => !omitted.includes(name)),
+          // A parameter has underscores where the option has hyphens (topic_list's all_projects).
+          ...Object.keys(command?.options ?? {})
+            .filter((name) => !omitted.includes(name))
+            .map((name) => name.replaceAll('-', '_')),
         ];
         expect(Object.keys(tool.inputSchema.properties ?? {}).sort(), tool.name).toEqual(
           expected.sort(),
@@ -642,9 +645,9 @@ describe('mcp server', () => {
       try {
         const reply = await call('claim', { id: 'TASKS-1' }, bare);
 
+        // `as` is required in the tool's schema where a call needs a name: the client refuses it.
         expect(reply.isError).toBe(true);
-        expect(error(reply).code).toBe('unnamed_agent');
-        expect(error(reply).message).toContain('as');
+        expect(reply.content[0]?.text).toMatch(/\bas\b/);
         expect((await call('claim', { id: 'TASKS-1', as: 'scout' }, bare)).isError).toBeFalsy();
       } finally {
         await bare.close();
@@ -665,7 +668,9 @@ describe('mcp server', () => {
           await json('topic', 'list', '--search', 'commonjs'),
         );
         expect(shown.isError, shown.content[0]?.text).toBeFalsy();
-        expect(error(await call('topic_add', { question: 'q' }, bare)).code).toBe('unnamed_agent');
+        const unnamed = await call('topic_add', { question: 'q' }, bare);
+        expect(unnamed.isError).toBe(true);
+        expect(unnamed.content[0]?.text).toMatch(/\bas\b/);
         const project = openProject(repo.dir);
         try {
           expect(listAgents(project.db).map(({ name }) => name)).toEqual(['claude']);

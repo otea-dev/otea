@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -351,6 +351,104 @@ describe('otea board draft --new', () => {
     } finally {
       await client.close();
     }
+  });
+
+  // P8-F2: over MCP there is no stdin to pipe the JSON on, and no file is wanted in the repo: the
+  // board comes as the tool's own argument.
+  describe('with the board JSON as an argument', () => {
+    type Reply = { isError?: boolean; content: { text: string }[] };
+
+    const mcp = async () => {
+      const server = createMcpServer(COMMANDS, { json: true, cwd: repo.dir, warn: () => {} });
+      const client = new Client({ name: 'test', version: '0' });
+      const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverSide);
+      await client.connect(clientSide);
+      return client;
+    };
+
+    const start = async () =>
+      JSON.parse(
+        (await otea('board', 'draft', '--new', 'Borrador', '--why', 'Para probar', '--json')).out,
+      );
+
+    it('hands a draft in over MCP as an object, leaving no file behind', async () => {
+      const made = await start();
+      const definition = JSON.parse((await otea('board', 'draft', made.item)).out);
+      const client = await mcp();
+      try {
+        const reply = (await client.callTool({
+          name: 'board_draft',
+          arguments: { as: 'claude', id: made.item, definition },
+        })) as Reply;
+
+        expect(reply.isError, reply.content[0]?.text).toBeFalsy();
+        expect(JSON.parse(reply.content[0]?.text ?? '')).toMatchObject({
+          evidence: { filename: 'board.json' },
+        });
+        expect(existsSync(join(repo.dir, 'board.json'))).toBe(false);
+      } finally {
+        await client.close();
+      }
+    });
+
+    it('takes the JSON as a string, and proposes a board with it in one call', async () => {
+      const made = await start();
+      const definition = JSON.parse((await otea('board', 'draft', made.item)).out);
+      const client = await mcp();
+      try {
+        const reply = (await client.callTool({
+          name: 'board_draft',
+          arguments: {
+            as: 'claude',
+            new: 'Criaturas',
+            why: 'Del pantano',
+            definition: JSON.stringify({ ...definition, name: 'Criaturas' }),
+          },
+        })) as Reply;
+
+        expect(reply.isError, reply.content[0]?.text).toBeFalsy();
+        expect(JSON.parse(reply.content[0]?.text ?? '').submitted).toBeTruthy();
+        expect(boards()).toContain('Criaturas');
+      } finally {
+        await client.close();
+      }
+    });
+
+    it('is --definition on the command line, and refuses it beside --file', async () => {
+      const made = await start();
+      const definition = JSON.parse((await otea('board', 'draft', made.item)).out);
+
+      const handed = await otea(
+        'board',
+        'draft',
+        made.item,
+        '--definition',
+        JSON.stringify(definition),
+      );
+      expect(handed.code, handed.err).toBe(0);
+      expect(handed.out).toContain(`Handed in the board draft on ${made.item}`);
+
+      const both = await otea(
+        'board',
+        'draft',
+        made.item,
+        '--definition',
+        JSON.stringify(definition),
+        '--file',
+        'board.json',
+      );
+      expect(both.code).toBe(2);
+      expect(both.err).toContain('--definition (the board JSON) or --file, not both');
+    });
+
+    it('names the definition argument where the instructions say how to hand it in', async () => {
+      const made = await start();
+
+      const shown = await otea('show', made.item);
+
+      expect(shown.out).toContain("board_draft's definition argument");
+    });
   });
 });
 

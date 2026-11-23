@@ -110,9 +110,11 @@ describe('serve start, status and stop', () => {
   it('keeps the sign-in key out of its log, which only its owner reads', async () => {
     const started = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
     expect(started.code).toBe(0);
-    // The command prints the link for the person or agent that ran it; the server does not.
+    // The command prints a link for the person or agent that ran it, never the key (P3-F5); the
+    // server prints none.
     const token = ensureUiToken(home());
-    expect(started.out).toContain(token);
+    expect(started.out).toContain('/auth?token=');
+    expect(started.out).not.toContain(token);
 
     const log = readFileSync(join(home(), SERVE_LOG), 'utf8');
     expect(log).toContain('Otea running at');
@@ -122,6 +124,83 @@ describe('serve start, status and stop', () => {
       expect(statSync(join(home(), SERVE_LOG)).mode & 0o777).toBe(0o600);
     }
   }, 60_000);
+
+  // P3-F5: the printed link signs the desk in once, within minutes; the key stays in the home.
+  it('prints a single-use sign-in link that the running server takes once, in place of the key', async () => {
+    const started = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
+    expect(started.code).toBe(0);
+    const link = /Sign a browser in at (\S+) \(works once/.exec(started.out)?.[1];
+    if (!link) throw new Error(`no sign-in link in: ${started.out}`);
+    expect(started.out).toContain('works once, within 10 minutes');
+    expect(link).not.toContain(ensureUiToken(home()));
+
+    const first = await fetch(link, { redirect: 'manual' });
+    const second = await fetch(link, { redirect: 'manual' });
+
+    expect(first.status).toBe(302);
+    expect(first.headers.get('set-cookie')).toContain(`=${ensureUiToken(home())}`);
+    expect(second.status).toBe(401);
+    // A second start prints another one, and the key still signs in (otea open uses it).
+    const again = await spawnCli(repo.dir, 'serve', 'start', '--no-open');
+    expect(/Sign a browser in at (\S+) /.exec(again.out)?.[1]).not.toBe(link);
+    const origin = new URL(link).origin;
+    expect(
+      (await fetch(`${origin}/auth?token=${ensureUiToken(home())}`, { redirect: 'manual' })).status,
+    ).toBe(302);
+  }, 60_000);
+
+  // P6-F4: a restart without --port came back on 4400, and the bookmarks of the port before died.
+  it('starts again on the port it last ran on, and says so', async () => {
+    const first = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
+    expect(first.code).toBe(0);
+    const before = readServeFile(home());
+    if (!before) throw new Error('serve start left no serve.json');
+    expect((await spawnCli(repo.dir, 'serve', 'stop')).code).toBe(0);
+    await until(() => !processAlive(before.pid), 15_000);
+
+    const again = await spawnCli(repo.dir, 'serve', 'start', '--no-open');
+
+    expect(again.code, again.err).toBe(0);
+    expect(readServeFile(home())?.port).toBe(before.port);
+    expect(again.out).toContain(`It uses port ${before.port}, where it last ran`);
+  }, 90_000);
+
+  // P6-F5: --port 4917 against a server on 4916 was ignored without a word.
+  it('says --port was ignored when the server already runs on another port', async () => {
+    const first = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
+    expect(first.code).toBe(0);
+    const running = readServeFile(home());
+    if (!running) throw new Error('serve start left no serve.json');
+    const other = running.port === 4917 ? 4918 : 4917;
+
+    const asked = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', String(other));
+    const json = await spawnCli(
+      repo.dir,
+      'serve',
+      'start',
+      '--no-open',
+      '--port',
+      String(other),
+      '--json',
+    );
+    const same = await spawnCli(
+      repo.dir,
+      'serve',
+      'start',
+      '--no-open',
+      '--port',
+      String(running.port),
+    );
+
+    expect(asked.code).toBe(0);
+    expect(asked.out).toContain(
+      `--port ${other} was ignored: the server already runs on port ${running.port}`,
+    );
+    expect(asked.out).toContain('otea serve stop');
+    expect(JSON.parse(json.out)).toMatchObject({ port: running.port, ignoredPort: other });
+    expect(same.out).not.toContain('was ignored');
+    expect(readServeFile(home())?.port).toBe(running.port);
+  }, 90_000);
 
   it('refuses --lan: no listener on the network runs unattended', async () => {
     const refused = await spawnCli(repo.dir, 'serve', 'start', '--lan');

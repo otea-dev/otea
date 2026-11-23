@@ -24,7 +24,7 @@ function call(
     .find(
       (candidate) =>
         text.startsWith(candidate, start) &&
-        /^(\s|$|[,.;)`])/.test(text.slice(start + candidate.length)),
+        /^(\s|$|[,.;:)`])/.test(text.slice(start + candidate.length)),
     );
   const command = name && commands.find((candidate) => candidate.name === name);
   if (!name || !command) return undefined;
@@ -41,19 +41,21 @@ function call(
       const spec = command.options[option];
       if (!spec) break;
       at += space.length + token.length;
+      // A tool's parameter has underscores where the option has hyphens (all-projects).
+      const key = option.replaceAll('-', '_');
       if (spec.flag) {
-        pairs.push(`${option}: true`);
+        pairs.push(`${key}: true`);
         continue;
       }
       const after = text.slice(at);
       const gap = after.match(/^ +/)?.[0] ?? '';
       const value = after.slice(gap.length).match(TOKEN)?.[0];
       if (!gap || !value || value.startsWith('--')) {
-        pairs.push(option);
+        pairs.push(key);
         continue;
       }
       at += gap.length + value.length;
-      pairs.push(`${option}: ${quoted(value)}`);
+      pairs.push(`${key}: ${quoted(value)}`);
       continue;
     }
     const arg = args[0];
@@ -91,14 +93,18 @@ export function mcpWords(text: string, commands: readonly Command[]): string {
       at += line.length;
       continue;
     }
-    const option = text.slice(at).match(/^--([a-z][a-z0-9-]*)(?: ("[^"]*"))?/);
+    // A placeholder after it (`--as <name>`) is the value: `{ as: <name> }`.
+    const option = text.slice(at).match(/^--([a-z][a-z0-9-]*)(?: ("[^"]*"|<[^>\s]+>))?/);
     if (option && (at === 0 || /[\s(`"']/.test(text[at - 1] ?? ''))) {
-      out += option[2] === undefined ? `{ ${option[1]} }` : `{ ${option[1]}: ${option[2]} }`;
+      const key = (option[1] ?? '').replaceAll('-', '_');
+      out += option[2] === undefined ? `{ ${key} }` : `{ ${key}: ${option[2]} }`;
       at += option[0].length;
       continue;
     }
     out += text[at];
     at += 1;
   }
-  return out;
+  // The guide names the tool beside each command ("(MCP: ask)", "(MCP tools: as)"): here that is
+  // the text itself.
+  return out.replace(/ \(MCP(?: tools)?: [a-z_]+\)/g, '');
 }

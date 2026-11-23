@@ -160,13 +160,22 @@ export function attachedPart(part: Part, id = '<id>', file = '<file>'): OteaErro
   );
 }
 
-// The evidence part a reader names (`--module Bocetos`), as the module id it was compiled to.
+// The evidence part a reader names (`--module Bocetos`), as the module id it was compiled to: by its
+// name or id, else by its kind (`--module log`), else by the start of its name (`--module terminal`
+// for "Terminal output"), each when it names exactly one part (P1-F6).
 export function evidenceByName(def: BoardDefinition, key: string): string {
   const part = partByName(def, key);
   if (part && isEvidence(part)) return part.id;
+  const evidence = namedParts(def).filter(isEvidence);
+  const wanted = fold(key);
+  const byKind = evidence.filter((candidate) => fold(candidate.kind) === wanted);
+  const byStart =
+    wanted === '' ? [] : evidence.filter((candidate) => fold(candidate.name).startsWith(wanted));
+  const only = [byKind, byStart].find((found) => found.length === 1)?.[0];
+  if (only) return only.id;
   throw new OteaError(
     'evidence_not_accepted',
-    `${def.name} has no evidence "${key}"; its evidence is ${namesOf(namedParts(def).filter(isEvidence))}`,
+    `${def.name} has no evidence "${key}"; its evidence is ${namesOf(evidence)}`,
   );
 }
 

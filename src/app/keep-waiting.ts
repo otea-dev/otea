@@ -9,8 +9,8 @@ function on(collection: string | undefined): string {
 }
 
 // otea wait for the agent's next item, named as it is on every call.
-export function keepWaitingCommand(agent: string, collection?: string): string {
-  return `otea wait --turn agent --unclaimed${on(collection)} --as ${agent}`;
+export function keepWaitingCommand(agent: string, collection?: string, unclaimed = true): string {
+  return `otea wait --turn agent${unclaimed ? ' --unclaimed' : ''}${on(collection)} --as ${agent}`;
 }
 
 // The wait and the next as the agent runs them: on the command line with its name; over MCP as the

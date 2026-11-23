@@ -4,7 +4,7 @@ import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createBoard, publishBoard, saveDraft } from '../app/boards.ts';
 import { getItem } from '../app/items.ts';
-import { sendBackItem } from '../app/next.ts';
+import { offeredLine, sendBackItem } from '../app/next.ts';
 import { openProject } from '../app/project.ts';
 import { handoffCheck, positionOf } from '../core/board/engine.ts';
 import { nextText, refusalText } from '../core/board/next.ts';
@@ -86,8 +86,52 @@ describe('next and the board moves', () => {
     }
     expect(code).toBe(0);
     expect(out).toBe(
-      `${expected}\n\n${reminder('quill')}\n\nWhen you finish and otea next --as quill has nothing: otea wait --turn agent --unclaimed --as quill in the background if you can.\n`,
+      `${expected}\n${offeredLine('CRI-1')}\n\n${reminder('quill')}\n\nWhen you finish and otea next --as quill has nothing: otea wait --turn agent --unclaimed --as quill in the background if you can.\n`,
     );
+  });
+
+  // P1-F4: looking reserves the item for two minutes, so a call that only reads says so.
+  it('says an item it offers without --claim is reserved for the agent, and one it claims is not', async () => {
+    const looked = await json('next', '--as', 'quill');
+    expect(looked.text).toContain(offeredLine('CRI-1'));
+    expect(looked.text).toContain('Offered to you for 2 min, not claimed');
+    // What the line says is so: another agent is offered nothing meanwhile.
+    expect((await json('next', '--as', 'kiln')).item).toBeNull();
+
+    await otea('claim', 'CRI-1', '--as', 'quill');
+    const again = await json('next', '--as', 'quill');
+    expect(again.item).toBe('CRI-1');
+    expect(again.text).not.toContain('Offered to you');
+  });
+
+  it('says nothing of an offer when --claim takes the item in the same call', async () => {
+    const taken = await json('next', '--claim', '--as', 'quill');
+
+    expect(taken.item).toBe('CRI-1');
+    expect(taken.text).not.toContain('Offered to you');
+  });
+
+  // P1-F6: a subagent declares its profile before its first next; one call does both.
+  it('declares the profile from --model and --effort in the same call, for an agent with none', async () => {
+    const bare = await otea('next', '--as', 'quill-sub');
+    expect(bare.code).not.toBe(0);
+    expect(bare.err).toContain('has no profile yet');
+
+    const declared = await json(
+      'next',
+      '--as',
+      'quill-sub',
+      '--model',
+      'claude-haiku-5',
+      '--effort',
+      'low',
+      '--harness',
+      'claude-code',
+    );
+
+    expect(declared.profile).toMatchObject({ model: 'claude-haiku-5', effort: 'low' });
+    expect(declared.item).toBe('CRI-1');
+    expect(declared.text).toContain('Your profile: claude-haiku-5 · low');
   });
 
   it('leaves Pedidos out of the boards it names while nothing was ever asked there', async () => {

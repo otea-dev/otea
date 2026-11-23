@@ -74,14 +74,22 @@ export function nextPage(next: string | undefined): string {
   return next !== undefined && PROJECT_PAGE.test(next) ? next : '/';
 }
 
-export function mountAuth(app: Hono<OteaEnv>, token: string | undefined, port: Port): void {
+// `redeem` takes a single-use link a command printed in place of the key (signin-links.ts): the
+// browser it signs in gets the same session as the key's.
+export function mountAuth(
+  app: Hono<OteaEnv>,
+  token: string | undefined,
+  port: Port,
+  redeem: (given: string) => boolean = () => false,
+): void {
   app.get('/auth', (c) => {
     c.header('referrer-policy', 'no-referrer');
     c.header('cache-control', 'no-store');
     const given = c.req.query('token') ?? '';
     // The sign-in link is for this computer's browser; a device on the LAN pairs instead.
     const local = clientOf(c).kind === 'local';
-    if (!local || token === undefined || !sameToken(given, token)) return c.html(BAD_LINK, 401);
+    if (!local || token === undefined) return c.html(BAD_LINK, 401);
+    if (!sameToken(given, token) && !redeem(given)) return c.html(BAD_LINK, 401);
     setCookie(c, sessionCookie(port()), token, { path: '/', httpOnly: true, sameSite: 'Strict' });
     return c.redirect(nextPage(c.req.query('next')), 302);
   });

@@ -16,6 +16,13 @@ export function parseDuration(text: string): number | undefined {
   return Number(match[1]) * (UNIT_MS[match[2]] ?? 0);
 }
 
+// How long a wait may last: a duration, or a bare number of seconds (`600` is `600s`), which is
+// what a person types first (P1-F6, P2-F5). A lease's ttl stays strict: a bare 15 there could be
+// seconds or minutes.
+export function parseWaitTimeout(text: string): number | undefined {
+  return /^[1-9][0-9]*$/.test(text) ? Number(text) * 1000 : parseDuration(text);
+}
+
 export function leaseExpiry(at: string, ttlMs: number): string {
   return new Date(Date.parse(at) + ttlMs).toISOString();
 }

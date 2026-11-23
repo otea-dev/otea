@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { oteaLauncher } from '../app/launcher.ts';
 import type { ForgeCli, Ruleset } from './forge.ts';
-import { installGitHook } from './hooks.ts';
+import { installGitHook, isOteaOwnHook } from './hooks.ts';
 import { type Cli, cliAt, tempGitRepo } from './testing.ts';
 
 describe('hook', () => {
@@ -148,17 +148,70 @@ describe('hook', () => {
       ]);
     });
 
-    it('says where the person and the agent look that a hook an older Otea wrote is outdated, and leaves it until hook install', async () => {
+    // P10-F2: a hook that is exactly one an older Otea wrote is brought up to date by the first
+    // command that sees it, so the warning does not come back on every push.
+    it('rewrites a hook that is exactly an older Otea’s, once, keeping the command it runs', async () => {
       const person = cliAt(repo.dir);
       expect((await person('init', '--template', 'none')).code).toBe(0);
       repo.write('.git/hooks/pre-push', OLD_HOOK);
+
+      const first = await otea('check', '--gate', 'push', '--branch', 'feature', '--repo');
+      const updated = `Updated ${join(repo.dir, '.git', 'hooks', 'pre-push')}, a pre-push hook an older Otea wrote`;
+      expect(first.err).toContain(updated);
+      expect(first.err).not.toContain('run otea hook install --git');
+      const hook = read('.git/hooks/pre-push');
+      expect(hook.split('\n').slice(0, 3)).toEqual([
+        '#!/bin/sh',
+        '# otea-hook: pre-push',
+        '# otea-hook-version: 3',
+      ]);
+      expect(hook).toContain('      otea check --gate push --branch "$branch" --repo --commits');
+      // Its own, current hook: Otea still takes it out, and says nothing more of it.
+      expect(isOteaOwnHook(hook)).toBe(true);
+      const second = await otea('check', '--gate', 'push', '--branch', 'feature', '--repo');
+      expect(second.err).not.toContain('older Otea');
+      expect((await otea('connect', '--check')).out).not.toContain('older Otea');
+      expect((await otea('hook', 'remove', '--git')).code).toBe(0);
+    });
+
+    it('rewrites it from connect --check too, and says so', async () => {
+      expect((await cliAt(repo.dir)('init', '--template', 'none')).code).toBe(0);
+      repo.write('.git/hooks/pre-push', OLD_HOOK);
+
+      const connected = await otea('connect', '--check');
+
+      expect(connected.out).toContain('a pre-push hook an older Otea wrote, to this version');
+      expect(read('.git/hooks/pre-push')).toContain('# otea-hook-version: 3');
+    });
+
+    it('leaves an older hook with a line of the person’s as it is, and says so on every push', async () => {
+      expect((await cliAt(repo.dir)('init', '--template', 'none')).code).toBe(0);
+      const mine = OLD_HOOK.replace('exit 0\n', 'echo mine\nexit 0\n');
+      repo.write('.git/hooks/pre-push', mine);
+
+      const check = await otea('check', '--gate', 'push', '--branch', 'feature', '--repo');
+      const again = await otea('check', '--gate', 'push', '--branch', 'feature', '--repo');
+
+      for (const said of [check.err, again.err]) {
+        expect(said).toContain('is a pre-push hook an older Otea wrote');
+        expect(said).not.toContain('Updated');
+      }
+      expect(read('.git/hooks/pre-push')).toBe(mine);
+    });
+
+    it('says where the person and the agent look that a hook an older Otea wrote is outdated, and leaves it until hook install', async () => {
+      const person = cliAt(repo.dir);
+      expect((await person('init', '--template', 'none')).code).toBe(0);
+      // A line of the person's keeps it from being rewritten by itself.
+      const edited = OLD_HOOK.replace('exit 0\n', 'echo mine\nexit 0\n');
+      repo.write('.git/hooks/pre-push', edited);
       const stale = `${join(repo.dir, '.git', 'hooks', 'pre-push')} is a pre-push hook an older Otea wrote, which lets a push through when Otea cannot check it: run otea hook install --git in ${repo.dir} to update it`;
 
       const check = await otea('check', '--gate', 'push', '--branch', 'feature', '--repo');
       expect(check.err).toContain(stale);
       const connected = await otea('connect', '--check');
       expect(connected.out).toContain(stale);
-      expect(read('.git/hooks/pre-push')).toBe(OLD_HOOK);
+      expect(read('.git/hooks/pre-push')).toBe(edited);
 
       const install = await otea('hook', 'install', '--git');
       expect(install.out).toContain(`Rewrote ${join(repo.dir, '.git', 'hooks', 'pre-push')}`);

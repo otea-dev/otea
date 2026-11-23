@@ -300,6 +300,33 @@ describe('setup for agents', () => {
       expect(existsSync(join(repo.dir, 'AGENTS.md'))).toBe(false);
     });
 
+    // P8-F8: an agent on the command line only has no use for the MCP server block.
+    it.each(['--cli', '--no-mcp'])(
+      'prints no MCP server with %s, declares the profile and never makes the desk wait for MCP',
+      async (flag) => {
+        const { code, out } = await otea('connect', '--as', 'claude-b', ...PROFILE, flag);
+
+        expect(code).toBe(0);
+        expect(read('AGENTS.md')).toBe(`${BLOCK}\n`);
+        expect(out).toContain(`Added the Otea block to ${join(repo.dir, 'AGENTS.md')}`);
+        expect(out).toContain('otea next --as claude-b');
+        expect(out).not.toContain('MCP server to add');
+        expect(out).not.toContain('PATH');
+        expect(out.split('\n').length).toBeLessThanOrEqual(6);
+        const { agentsMd, mcp } = JSON.parse(
+          (await otea('connect', '--as', 'claude-b', ...PROFILE, flag, '--json')).out,
+        );
+        expect(agentsMd.action).toBe('unchanged');
+        expect(mcp).toBeUndefined();
+        // It never asked for MCP: nothing to warn about while no MCP server loads.
+        expect(missing('claude-b')).toBeFalsy();
+        const profile = JSON.parse(
+          (await cliAt(repo.dir, { OTEA_AGENT: 'claude-b' })('profile', '--json')).out,
+        );
+        expect(profile.profile).toMatchObject({ model: 'claude-opus-5-5', effort: 'high' });
+      },
+    );
+
     it('declares the profile of the agent named, and the desk warns until it is heard over MCP', async () => {
       const { code } = await otea('connect', '--as', 'claude-b', ...PROFILE);
 

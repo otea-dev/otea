@@ -1070,6 +1070,9 @@ export type NextAnswer = {
   idle?: true;
   // The text is the brief one the agent asked for (see nextText's brief).
   brief?: true;
+  // The item is offered, not claimed: no other agent is offered it for OFFER_MS (see offeredLine,
+  // which the command adds to the text; show reads the same item without it).
+  offered?: true;
 };
 
 // For this long after `next` offers an item to an agent, no other agent is offered it, so two
@@ -1283,6 +1286,11 @@ function heldElsewhere(
   ];
 }
 
+// What next says of an item it offers without claiming it: for OFFER_MS no other agent is offered it.
+export function offeredLine(id: string): string {
+  return `Offered to you for ${OFFER_MS / 60_000} min, not claimed: no other agent is offered ${id} meanwhile. Claim it to work it; otherwise leave it, and it is offered again after that.`;
+}
+
 // The item the agent should take, and its text: one it holds first, then what was sent back to it,
 // then what the person pinned and the order they fixed, then reviews and work furthest along, then
 // the oldest waiting; never one another agent holds or was just offered. With `claim`, the
@@ -1416,7 +1424,7 @@ export function nextFor(
       ].join('\n'),
       ...(brief ? { brief: true as const } : {}),
       ...(sentBack === undefined ? {} : { sentBack }),
-      ...(lease ? { lease } : {}),
+      ...(lease ? { lease } : { offered: true as const }),
       ...(roundNotes.length === 0 ? {} : { notes: roundNotes }),
     };
   });
