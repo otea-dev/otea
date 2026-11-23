@@ -133,6 +133,31 @@
   padding: 2px 5px;
   border-radius: 4px;
 }
+/* A small heading inside a section («Temas», «Carpetas»): the section's own name stays in the margin. */
+.pj-subhead {
+  margin: 22px 0 10px;
+  font: 500 12px / 1.2 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.pj-you .pj-subhead,
+.pj-sec-body > .pj-subhead:first-child {
+  margin-top: 0;
+}
+.pj-you .pj-hint .btn {
+  margin-left: 4px;
+}
+/* What «Detalles técnicos» opens in Configuración: its blocks keep to the section's measure. */
+.pj-adv {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.pj-adv .pj-hint {
+  margin-top: 4px;
+}
 .pj-paths {
   display: flex;
   flex-direction: column;

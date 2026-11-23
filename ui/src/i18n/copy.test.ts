@@ -93,7 +93,6 @@ describe('the copy says one thing one way', () => {
     expect(t('settings.reposNote', files)).toBe(
       'Otea solo escribe en tus repositorios AGENTS.md, cuando un agente ejecuta otea connect, y el hook pre-push de git, si haces estricto el control. No escribe la configuración de ningún agente.',
     );
-    expect(t('settings.notChecked')).toBe('sin comprobar hasta que vuelva a aparecer');
     setLanguage('en');
     expect(t('settings.reposNote', files)).toBe(
       "Otea writes only AGENTS.md, when an agent runs otea connect, and git's pre-push hook, if you make the gate hard, into your repos. It writes no agent's config.",

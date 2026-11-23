@@ -109,7 +109,7 @@ export const phone = {
   'phone.transport.signIn':
     'Inicia sesión en este navegador con {command} para elegir cómo llega el teléfono a Otea.',
   'phone.transport.tokens':
-    'Sea cual sea el transporte, el teléfono se empareja una vez con un código de este equipo y solo entran tus dispositivos emparejados.',
+    'Sea cual sea la conexión, el teléfono se empareja una vez con un código de este equipo y solo entran tus dispositivos emparejados.',
   'phone.transport.pair': 'Emparejar un teléfono',
   // Cómo llegas a Otea: las tres opciones lado a lado, y luego los pasos guiados de Tailscale
   'phone.reach.choose': 'Cómo llegas a Otea',
@@ -122,16 +122,16 @@ export const phone = {
   'phone.reach.localGives': 'Otea al momento, sin nada abierto a la red.',
   'phone.reach.localLoses': 'El teléfono, los avisos y el uso lejos de este equipo.',
   'phone.reach.lan': 'Desde el teléfono, en tu casa',
-  'phone.reach.lanWhat': 'Rápido y básico: el teléfono abre Otea por tu wifi, con HTTP sin cifrar.',
+  'phone.reach.lanWhat': 'Rápido y básico: el teléfono abre Otea por tu wifi, sin cifrar.',
   'phone.reach.lanNeeds': 'El teléfono en la misma wifi. Nada más que instalar.',
   'phone.reach.lanGives': 'Otea en el teléfono en casa, emparejado con un código.',
   'phone.reach.lanLoses':
-    'El uso fuera de casa, y los avisos: la red local no tiene HTTPS, y los navegadores solo permiten avisos con HTTPS.',
+    'El uso fuera de casa, y los avisos: la red local no es una conexión segura, y los navegadores solo permiten avisos por una conexión segura.',
   'phone.reach.tailscale': 'Desde cualquier lugar, con Tailscale',
   'phone.reach.tailscaleWhat':
-    'Lo más robusto: Otea por HTTPS en tu propia tailnet. Tailscale es gratis para uso personal.',
+    'Lo más robusto: Otea por una conexión segura, dentro de tu red privada de Tailscale. Tailscale es gratis para uso personal.',
   'phone.reach.tailscaleNeeds': 'Tailscale en el teléfono y en este equipo, y seguir los pasos.',
-  'phone.reach.tailscaleGives': 'Otea fuera de casa, por HTTPS, con avisos.',
+  'phone.reach.tailscaleGives': 'Otea fuera de casa, con conexión segura y avisos.',
   'phone.reach.tailscaleLoses': 'Unos minutos para configurarlo, y una cuenta de Tailscale.',
   'phone.guide.title': 'Configura Tailscale, paso a paso',
   'phone.guide.lead':
@@ -144,24 +144,25 @@ export const phone = {
   'phone.guide.pending': 'pendiente',
   'phone.guide.phone': 'Instala Tailscale en el teléfono',
   'phone.guide.phoneText': 'Escanea con la cámara el código de la tienda de tu teléfono.',
-  'phone.guide.phoneSeen': 'Hay un teléfono en tu tailnet.',
+  'phone.guide.phoneSeen': 'Hay un teléfono en tu red de Tailscale.',
   'phone.guide.phoneUnseen':
-    'Se marca como hecho junto con el paso 3: cuando este equipo inicia sesión en Tailscale y ve el teléfono en tu tailnet.',
+    'Se marca como hecho junto con el paso 3: cuando este equipo inicia sesión en Tailscale y ve el teléfono en tu red.',
   'phone.guide.android': 'Google Play · Android',
   'phone.guide.ios': 'App Store · iPhone',
   'phone.guide.pc': 'Instala Tailscale en este equipo',
   'phone.guide.pcText': 'Descárgalo del sitio de Tailscale, o instálalo con:',
   'phone.guide.signIn': 'Inicia sesión con la misma cuenta en los dos',
   'phone.guide.signInText':
-    'Abre Tailscale en este equipo y en el teléfono, e inicia sesión con la misma cuenta: los dos entran en tu tailnet.',
+    'Abre Tailscale en este equipo y en el teléfono, e inicia sesión con la misma cuenta: los dos entran en tu red de Tailscale.',
   'phone.guide.signedIn':
-    'Este equipo ya inició sesión. Todavía no aparece un teléfono en la misma tailnet.',
-  'phone.guide.signInDone': 'Este equipo y un teléfono están en tu tailnet.',
+    'Este equipo ya inició sesión. Todavía no aparece un teléfono en la misma red.',
+  'phone.guide.signInDone': 'Este equipo y un teléfono están en tu red de Tailscale.',
   'phone.guide.https': 'Activa HTTPS',
   'phone.guide.httpsText':
     'En la consola de administración, en la página DNS: activa MagicDNS si está apagado y, en HTTPS Certificates, elige Enable HTTPS.',
   'phone.guide.dnsPage': 'Abrir la página DNS',
-  'phone.guide.httpsDone': 'MagicDNS y los certificados HTTPS están activados en tu tailnet.',
+  'phone.guide.httpsDone':
+    'MagicDNS y los certificados HTTPS están activados en tu red de Tailscale.',
   'phone.guide.serve': 'Da a Otea su dirección HTTPS',
   'phone.guide.serveText':
     'Este comando hace que Tailscale responda en {url} con su propio certificado y lo pase a Otea en este equipo. Lo ve solo tu tailnet (serve, nunca funnel). Sigue activo después de reiniciar.',
@@ -194,7 +195,7 @@ export const phone = {
     'Para usar Otea fuera de este equipo, Tailscale tiene que estar conectado en el teléfono. Si Otea no abre allí, revisa eso primero.',
   'phone.status.phone': 'teléfono',
   'phone.status.phoneOffline': 'Tu teléfono no está conectado a Tailscale ahora',
-  'phone.status.transport': 'transporte',
+  'phone.status.transport': 'conexión',
   'phone.status.url': 'dirección',
   'phone.status.reachable': 'alcanzable',
   'phone.status.yes': 'Otea responde',
@@ -215,9 +216,9 @@ export const phone = {
     'Tailscale está detenido en este equipo. Ejecuta esto para volver a conectarlo:',
   'phone.ts.logIn': 'Abrir la página de inicio de sesión',
   'phone.ts.noMagicDns':
-    'MagicDNS está desactivado en tu tailnet. Actívalo en la configuración de DNS; las tailnets nuevas lo traen activado.',
+    'MagicDNS está desactivado en tu red de Tailscale. Actívalo en la configuración de DNS; las redes nuevas lo traen activado.',
   'phone.ts.noHttps':
-    'Los certificados HTTPS están desactivados en tu tailnet. Actívalos en la configuración de DNS.',
+    'Los certificados HTTPS están desactivados en tu red de Tailscale. Actívalos en la configuración de DNS.',
   'phone.ts.dnsSettings': 'Abrir la configuración de DNS',
   'phone.ts.taken':
     '{url} ya lleva a {target}, no a este Otea. Si es otro Otea tuyo, úsalo desde allí; si ya no lo usas, libéralo con esto y vuelve a comprobar:',

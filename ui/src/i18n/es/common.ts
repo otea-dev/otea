@@ -86,7 +86,7 @@ export const common = {
     other: '{count} agentes están trabajando y lo verán cuando vuelvan a esperar.',
   },
   'listen.notice':
-    '{lead} Ningún agente espera con otea wait: esto queda aquí hasta que uno vuelva. Pídele a tu agente que siga atento con {command}.',
+    '{lead} Ningún agente está atento ahora: esto queda aquí hasta que uno vuelva. Pídele a tu agente que siga atento con {command}.',
   'listen.working': {
     one: '{agent} está trabajando; lo verá cuando vuelva a esperar.',
     other: '{count} agentes están trabajando; lo verán cuando vuelvan a esperar.',

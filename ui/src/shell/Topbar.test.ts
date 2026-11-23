@@ -273,8 +273,11 @@ describe('the agents menu', () => {
   it('states the rule the header counts by: a lease alone connects no agent', () => {
     const html = menu();
     expect(html).toContain(
-      'conectado: su servidor MCP de Otea está abierto o usó Otea en los últimos dos minutos y medio; una reserva sola no cuenta. Escucha solo mientras otea wait corre',
+      'conectado: tiene Otea abierto o lo usó en los últimos dos minutos y medio; tener un ítem en mano no basta. Escucha solo mientras espera trabajo nuevo',
     );
+    // P4-F3: no commands or protocol names in the menu's own words.
+    expect(html).not.toContain('MCP de Otea está abierto');
+    expect(html).not.toContain('otea wait corre');
     const holder = agent('Mender', { holding: ['ERR-231'], live: false, lastSeen: ago(4) });
     const rows = agentRows([holder], items, NOW);
     expect(pillSummary('live', rows)).toEqual({ kind: 'none' });
@@ -293,7 +296,7 @@ describe('the agents menu', () => {
           onPerformance: () => undefined,
         }),
       ),
-    ).toContain('a lease alone does not count');
+    ).toContain('holding an item is not enough');
   });
 
   it('heads with the project and what they do, one gone quiet in warn', () => {
@@ -386,7 +389,7 @@ describe('the agents menu', () => {
       '<b>Conectar un agente</b><small>una instrucción para pegar en su chat</small>',
     );
     expect(html).toContain(
-      'conectado: su servidor MCP de Otea está abierto o usó Otea en los últimos dos minutos y medio',
+      'conectado: tiene Otea abierto o lo usó en los últimos dos minutos y medio',
     );
   });
 });

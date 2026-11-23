@@ -107,7 +107,7 @@ export const phone = {
   'phone.transport.signIn':
     'Sign this browser in with {command} to choose how a phone reaches Otea.',
   'phone.transport.tokens':
-    'Whatever the transport, a phone pairs once with a code from this computer, and only your paired devices get in.',
+    'However it connects, a phone pairs once with a code from this computer, and only your paired devices get in.',
   'phone.transport.pair': 'Pair a phone',
   // How you reach Otea: the three options side by side, then the guided path to Tailscale
   'phone.reach.choose': 'How you reach Otea',
@@ -120,16 +120,17 @@ export const phone = {
   'phone.reach.localGives': 'Otea right away, with nothing open to the network.',
   'phone.reach.localLoses': 'The phone, notifications and use away from this computer.',
   'phone.reach.lan': 'From your phone, at home',
-  'phone.reach.lanWhat': 'Quick and basic: the phone opens Otea over your Wi‑Fi, in plain HTTP.',
+  'phone.reach.lanWhat': 'Quick and basic: the phone opens Otea over your Wi‑Fi, unencrypted.',
   'phone.reach.lanNeeds': 'The phone on the same Wi‑Fi. Nothing else to install.',
   'phone.reach.lanGives': 'Otea on the phone at home, paired with a code.',
   'phone.reach.lanLoses':
-    'Use away from home, and notifications: there is no HTTPS on the local network, and browsers allow push only over HTTPS.',
+    'Use away from home, and notifications: the local network is not a secure connection, and browsers allow notifications only over a secure one.',
   'phone.reach.tailscale': 'From anywhere, with Tailscale',
   'phone.reach.tailscaleWhat':
-    'The most robust: Otea over HTTPS on your own tailnet. Tailscale is free for personal use.',
+    'The most robust: Otea over a secure connection, inside your own private Tailscale network. Tailscale is free for personal use.',
   'phone.reach.tailscaleNeeds': 'Tailscale on the phone and on this computer, and the steps below.',
-  'phone.reach.tailscaleGives': 'Otea away from home, over HTTPS, with notifications.',
+  'phone.reach.tailscaleGives':
+    'Otea away from home, over a secure connection, with notifications.',
   'phone.reach.tailscaleLoses': 'A few minutes to set it up, and a Tailscale account.',
   'phone.guide.title': 'Set up Tailscale, step by step',
   'phone.guide.lead':
@@ -142,23 +143,23 @@ export const phone = {
   'phone.guide.pending': 'to do',
   'phone.guide.phone': 'Install Tailscale on the phone',
   'phone.guide.phoneText': 'Scan the code for your phone’s store with its camera.',
-  'phone.guide.phoneSeen': 'A phone is on your tailnet.',
+  'phone.guide.phoneSeen': 'A phone is on your Tailscale network.',
   'phone.guide.phoneUnseen':
-    'It turns done together with step 3: once this computer is signed in to Tailscale and sees the phone on your tailnet.',
+    'It turns done together with step 3: once this computer is signed in to Tailscale and sees the phone on your network.',
   'phone.guide.android': 'Google Play · Android',
   'phone.guide.ios': 'App Store · iPhone',
   'phone.guide.pc': 'Install Tailscale on this computer',
   'phone.guide.pcText': 'Download it from Tailscale’s site, or install it with:',
   'phone.guide.signIn': 'Sign in with the same account on both',
   'phone.guide.signInText':
-    'Open Tailscale on this computer and on the phone, and log in with the same account: both join your tailnet.',
-  'phone.guide.signedIn': 'This computer is signed in. No phone shows on the same tailnet yet.',
-  'phone.guide.signInDone': 'This computer and a phone are on your tailnet.',
+    'Open Tailscale on this computer and on the phone, and log in with the same account: both join your Tailscale network.',
+  'phone.guide.signedIn': 'This computer is signed in. No phone shows on the same network yet.',
+  'phone.guide.signInDone': 'This computer and a phone are on your Tailscale network.',
   'phone.guide.https': 'Turn on HTTPS',
   'phone.guide.httpsText':
     'In the admin console, on the DNS page: turn on MagicDNS if it is off, then under HTTPS Certificates choose Enable HTTPS.',
   'phone.guide.dnsPage': 'Open the DNS page',
-  'phone.guide.httpsDone': 'MagicDNS and HTTPS certificates are on for your tailnet.',
+  'phone.guide.httpsDone': 'MagicDNS and HTTPS certificates are on for your Tailscale network.',
   'phone.guide.serve': 'Serve Otea over HTTPS',
   'phone.guide.serveText':
     'This command makes Tailscale answer {url} with its own certificate and pass it on to Otea on this computer. Only your tailnet sees it (serve, never funnel). It stays on after a restart.',
@@ -191,7 +192,7 @@ export const phone = {
     'To use Otea away from this computer, Tailscale must be connected on the phone. If Otea does not open there, check that first.',
   'phone.status.phone': 'phone',
   'phone.status.phoneOffline': 'Your phone is not connected to Tailscale right now',
-  'phone.status.transport': 'transport',
+  'phone.status.transport': 'connection',
   'phone.status.url': 'address',
   'phone.status.reachable': 'reachable',
   'phone.status.yes': 'Otea answers',
@@ -211,9 +212,9 @@ export const phone = {
   'phone.ts.stopped': 'Tailscale is stopped on this computer. Run this to connect it again:',
   'phone.ts.logIn': 'Open the login page',
   'phone.ts.noMagicDns':
-    'MagicDNS is off on your tailnet. Turn it on in the DNS settings; new tailnets have it on.',
+    'MagicDNS is off on your Tailscale network. Turn it on in the DNS settings; new networks have it on.',
   'phone.ts.noHttps':
-    'HTTPS certificates are off on your tailnet. Turn them on in the DNS settings.',
+    'HTTPS certificates are off on your Tailscale network. Turn them on in the DNS settings.',
   'phone.ts.dnsSettings': 'Open the DNS settings',
   'phone.ts.taken':
     '{url} already forwards to {target}, not to this Otea. If that is another Otea of yours, use it from there; if you no longer use it, free it with this, then check again:',
