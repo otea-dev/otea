@@ -1,5 +1,5 @@
 import type { Command, OptionSpec } from '../cli/command.ts';
-import { AGENT_COMMANDS, toolName } from './commands.ts';
+import { AGENT_COMMANDS, NO_PARAMETER, toolName } from './commands.ts';
 
 // A token of a command line: a quoted value, or a run up to a space or the punctuation that ends a
 // sentence or a parenthesis.
@@ -58,7 +58,7 @@ function call(
     if (token.startsWith('--')) {
       const option = token.slice(2);
       const spec = command.options[option];
-      if (!spec) break;
+      if (!spec || NO_PARAMETER.has(option)) break;
       at += space.length + token.length;
       // A tool's parameter has underscores where the option has hyphens (all-projects).
       const key = option.replaceAll('-', '_');
@@ -91,18 +91,21 @@ function call(
   return { said: pairs.length > 0 ? `${tool} { ${pairs.join(', ')} }` : tool, end: at };
 }
 
-// Whether the words before `at` are another tool's command line (`git push --force-with-lease`):
-// its flags are its own, whatever Otea names an option the same.
-function foreignCommand(text: string, at: number): boolean {
-  let start = at;
-  while (
-    start > 0 &&
-    !/[\n`(;]/.test(text[start - 1] ?? '') &&
-    !/[.:]\s/.test(text.slice(start - 2, start))
-  ) {
-    start -= 1;
-  }
-  return /(?:^|[\s"'])(?:git|gh|npm|npx|node|pnpm|yarn)\s[^`()\n]*$/.test(text.slice(start, at));
+// Whether `at` is inside the command line of a tool other than Otea (`cargo fmt --check`, `git log
+// --since "2 days ago"`): its flags are its own, whatever Otea calls an option the same. A command
+// line is a backtick span, a `$` line or a line of a fenced block; one that starts with otea is
+// Otea's. A flag in prose, or alone in a span (`--reason`), is not in a command line.
+function otherToolsLine(text: string, at: number): boolean {
+  const lineStart = text.lastIndexOf('\n', at - 1) + 1;
+  const before = text.slice(lineStart, at);
+  const fenced = (text.slice(0, lineStart).match(/^[ \t]*```/gm) ?? []).length % 2 === 1;
+  let line: string | undefined;
+  if (fenced) line = before;
+  else if (/^\s*\$ /.test(before)) line = before.replace(/^\s*\$ /, '');
+  else if ((before.match(/`/g) ?? []).length % 2 === 1)
+    line = before.slice(before.lastIndexOf('`') + 1);
+  const first = line?.trim().replace(/^\$ /, '').split(/\s+/)[0];
+  return first !== undefined && /^[a-z][\w./-]*$/i.test(first) && first !== 'otea';
 }
 
 // What Otea tells an agent, in the words of the MCP tools it calls: `otea wait --turn agent`
@@ -114,6 +117,7 @@ export function mcpWords(text: string, commands: readonly Command[]): string {
   const options = new Map<string, OptionSpec>([['as', {}]]);
   for (const command of commands) {
     for (const [name, spec] of Object.entries(command.options)) {
+      if (NO_PARAMETER.has(name)) continue;
       options.set(name, {
         ...options.get(name),
         ...spec,
@@ -146,7 +150,7 @@ export function mcpWords(text: string, commands: readonly Command[]): string {
       option &&
       known &&
       (at === 0 || /[\s(`"']/.test(text[at - 1] ?? '')) &&
-      !foreignCommand(text, at)
+      !otherToolsLine(text, at)
     ) {
       const key = (option[1] ?? '').replaceAll('-', '_');
       const value =

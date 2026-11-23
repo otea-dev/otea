@@ -9,21 +9,17 @@ import { agentGuideFor } from '../core/agent-guide.ts';
 import { OteaError } from '../core/errors.ts';
 import { type Actor, agentActor, assertAgentName, PERSON_READER } from '../core/item.ts';
 import { parseWaitTimeout } from '../core/lease.ts';
-import { AGENT_COMMANDS, NAMELESS_READS, READ_ONLY, toolName } from './commands.ts';
+import {
+  AGENT_COMMANDS,
+  NAMELESS_READS,
+  OMITTED_OPTIONS,
+  READ_ONLY,
+  toolName,
+} from './commands.ts';
 import { inputSchema, optionValues, unknownParameters } from './schema.ts';
 import { mcpWords } from './words.ts';
 
-export { AGENT_COMMANDS, CLI_ONLY_COMMANDS, toolName } from './commands.ts';
-
-// A tool call answers once, so it cannot follow the event log.
-// --field-file reads a file or stdin for a long value, which a tool call carries as it is.
-export const OMITTED_OPTIONS: Readonly<Record<string, readonly string[]>> = {
-  events: ['follow'],
-  // An MCP client names its own harness.
-  next: ['harness'],
-  create: ['field-file'],
-  update: ['field-file'],
-};
+export { AGENT_COMMANDS, CLI_ONLY_COMMANDS, OMITTED_OPTIONS, toolName } from './commands.ts';
 
 // Clients time out long tool calls, so a wait gives up after this unless told otherwise, and never
 // waits longer than the cap.
