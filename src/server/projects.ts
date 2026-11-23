@@ -45,7 +45,7 @@ export type ProjectOverview = {
   topics: AnsweredTopic[];
   // Open items on an agent's turn.
   withAgents: number;
-  // The agents there that are not away, each with the server's own word for what it is doing now
+  // The agents there that are not away, and the away ones that left an item stuck, each with the server's own word for what it is doing now
   // (core/agent-status.ts): the switcher and «Todos los proyectos» say it as it is, never derive it.
   agents: AgentGlimpse[];
   open: number;
@@ -95,12 +95,19 @@ const yours = (item: Item) =>
 
 export function countsOf(project: Project): Counts {
   const open = listItems(project).filter((item) => item.turn !== 'none');
+  // Whoever let a lease run out on an open item (the item is stuck): the agent is away, and the
+  // project's own menu lists it, so every view does, in the same word.
+  const leftStuck = new Set(
+    open
+      .filter((item) => item.turn === 'agent' && item.expiredLease)
+      .map((item) => item.expiredLease?.holder),
+  );
   return {
     waiting: open.filter(yours).map((item) => withIcon(project, item)),
     topics: answeredTopics(project),
     withAgents: open.filter((item) => !yours(item)).length,
     agents: listAgents(project.db)
-      .filter((agent) => agent.status !== 'away')
+      .filter((agent) => agent.status !== 'away' || leftStuck.has(agent.name))
       .map((agent) => ({ name: agent.name, status: agent.status, holding: agent.holding.length })),
     open: open.length,
   };

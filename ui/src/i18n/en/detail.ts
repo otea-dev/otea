@@ -871,7 +871,7 @@ export const detail = {
   'agent.chip': 'agent',
   'agent.from': 'from the agents menu',
   'agent.stand.work': 'Working on {title}, for {time}.',
-  'agent.stand.quiet': 'No signal since {time} on {title}: its lease ran out.',
+  'agent.stand.quiet': 'Away since {time}: its lease on {title} ran out.',
   'agent.stand.lapsed':
     'Connected: its lease on {title} ran out at {time}, but it may still be at work on it.',
   'agent.stand.wait': 'Waiting for {answer} on {title}, for {time}.',
@@ -888,6 +888,7 @@ export const detail = {
   'agent.unconfirmed': 'not confirmed in this session',
   'agent.noProfile': 'No profile',
   'agent.unknown': 'unknown',
+  'agent.unknownProfile': 'model not reported',
   'agent.trail.first': 'declared {profile}',
   'agent.trail.change': 'went from {from} to {to}',
   'agent.selfNote':
@@ -908,7 +909,7 @@ export const detail = {
   'agent.key.work': 'works',
   'agent.key.wait': 'waits',
   'agent.key.handed': 'handed over',
-  'agent.key.quiet': 'no signal',
+  'agent.key.quiet': 'away',
   'agent.can': 'Can work on',
   'agent.canGloss': 'no step asks for a profile',
   'agent.review': '{step} · review',

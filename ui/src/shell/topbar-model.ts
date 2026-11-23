@@ -45,10 +45,12 @@ export function stateLine(
     (project.agents ?? []).filter((each) => each.status === status).length;
   const working = count('working');
   const silent = count('silent');
+  const away = count('away');
   const parts = [
     waiting > 0 ? t('shell.waitingThere', { count: waiting }) : null,
     working > 0 ? t('shell.pill.working', { count: working }) : null,
     silent > 0 ? t('shell.pill.silent', { count: silent }) : null,
+    away > 0 ? t('shell.pill.away', { count: away }) : null,
   ].filter((part): part is string => part !== null);
   return parts.length > 0 ? parts.join(' · ') : null;
 }
@@ -264,6 +266,9 @@ export function agentCounts(rows: readonly AgentRow[]): {
   idle: number;
   connected: number;
   silent: number;
+  // Gone (not connected) with its lease run out on an item it left stuck: «ausente», never a
+  // signal that stopped.
+  away: number;
   noProfile: number;
 } {
   const holding = rows.filter((a) => a.working).length;
@@ -273,7 +278,8 @@ export function agentCounts(rows: readonly AgentRow[]): {
     holding,
     idle: free.filter((a) => a.waiting).length,
     connected: free.filter((a) => !a.waiting).length,
-    silent: rows.filter((a) => a.silent).length,
+    silent: rows.filter((a) => a.silent && !a.quiet).length,
+    away: rows.filter((a) => a.quiet).length,
     noProfile: rows.filter((a) => !a.profile).length,
   };
 }
@@ -299,14 +305,15 @@ export function pillMark(connection: Connection, rows: readonly AgentRow[]): Pil
 
 // The pill's second datum, in grey or in warn: one with no signal wins over one without a profile,
 // which wins over the total ("de 3") beside those working. Never more than two data on the pill.
-export type PillExtra = { kind: 'silent' | 'noProfile' | 'of'; n: number } | null;
+export type PillExtra = { kind: 'silent' | 'away' | 'noProfile' | 'of'; n: number } | null;
 
 export type PillSummary =
   | { kind: 'offline' }
   | { kind: 'none' }
-  // Nobody connected, but an agent gave no signal (on a live lease, or on one that ran out and left
-  // its item stuck): not an empty room, and not at work either.
+  // Nobody connected, but an agent gave no signal (on a live lease) or is away (its lease ran out
+  // and left its item stuck): not an empty room, and not at work either.
   | { kind: 'silent'; count: number }
+  | { kind: 'away'; count: number }
   | { kind: 'working' | 'waiting' | 'connected'; count: number; extra: PillExtra };
 
 // What the pill says (mock §1): what happens, not how many there are. "2 trabajando" before "3
@@ -314,16 +321,21 @@ export type PillSummary =
 export function pillSummary(connection: Connection, rows: readonly AgentRow[]): PillSummary {
   if (connection === 'reconnecting') return { kind: 'offline' };
   const c = agentCounts(rows);
-  if (c.live === 0) return c.silent > 0 ? { kind: 'silent', count: c.silent } : { kind: 'none' };
+  if (c.live === 0) {
+    if (c.silent > 0) return { kind: 'silent', count: c.silent };
+    return c.away > 0 ? { kind: 'away', count: c.away } : { kind: 'none' };
+  }
   const working = c.holding > 0;
   const extra: PillExtra =
     c.silent > 0
       ? { kind: 'silent', n: c.silent }
-      : c.noProfile > 0
-        ? { kind: 'noProfile', n: c.noProfile }
-        : working && c.live > c.holding
-          ? { kind: 'of', n: c.live }
-          : null;
+      : c.away > 0
+        ? { kind: 'away', n: c.away }
+        : c.noProfile > 0
+          ? { kind: 'noProfile', n: c.noProfile }
+          : working && c.live > c.holding
+            ? { kind: 'of', n: c.live }
+            : null;
   if (working) return { kind: 'working', count: c.holding, extra };
   // Connected but none waiting: nobody hears the desk, and the pill does not say "escuchando".
   return c.idle > 0

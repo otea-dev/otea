@@ -22,10 +22,10 @@ describe('Prof', () => {
   it('says once a profile the agent could read none of', () => {
     setLanguage('es');
     expect(renderToStaticMarkup(<Prof profile={{ model: 'unknown', effort: 'unknown' }} />)).toBe(
-      '<span class="prof">desconocido</span>',
+      '<span class="prof">modelo sin informar</span>',
     );
     expect(
       renderToStaticMarkup(<Prof profile={{ model: 'unknown', effort: 'unknown' }} paren />),
-    ).toBe('<span class="prof">(desconocido)</span>');
+    ).toBe('<span class="prof">(modelo sin informar)</span>');
   });
 });

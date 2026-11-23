@@ -299,9 +299,9 @@ describe('the agents menu', () => {
     ).toContain('holding an item is not enough');
   });
 
-  it('heads with the project and what they do, one with no signal in warn', () => {
+  it('heads with the project and what they do, one away in warn', () => {
     expect(menu()).toContain(
-      '<div class="plabel" data-i=""><span>agentes en Hollowmere</span><span class="sum"><b>1 trabajando</b> · 1 escuchando · <span class="warn-t">1 sin señal</span></span></div>',
+      '<div class="plabel" data-i=""><span>agentes en Hollowmere</span><span class="sum"><b>1 trabajando</b> · 1 escuchando · <span class="warn-t">1 ausente</span></span></div>',
     );
   });
 
@@ -334,9 +334,9 @@ describe('the agents menu', () => {
       }),
     );
     expect(html).toMatch(
-      /<span class="flag soft" title="Pidió conectarse por MCP[^"]*">MCP sin conectar<\/span>/,
+      /<span class="flag soft" title="Pidió conectarse por MCP[^"]*">trabaja por comandos<\/span>/,
     );
-    expect(menu()).not.toContain('MCP sin conectar');
+    expect(menu()).not.toContain('trabaja por comandos');
   });
 
   // P6-R2-10: the harness loaded the server, the agent used the command line, and the desk said
@@ -358,9 +358,9 @@ describe('the agents menu', () => {
       }),
     );
     expect(html).toMatch(
-      /<span class="flag soft" title="Su harness cargó el servidor MCP de Otea[^"]*">conectado por CLI, MCP sin usar<\/span>/,
+      /<span class="flag soft" title="Su harness cargó el servidor MCP de Otea[^"]*">trabaja por comandos<\/span>/,
     );
-    expect(html).not.toContain('MCP sin conectar');
+    expect(html).not.toContain('MCP sin');
   });
 
   // P5-F12: an agent that handed off and is not in otea wait is connected, a calm state; its row
@@ -385,9 +385,12 @@ describe('the agents menu', () => {
         onPerformance: () => undefined,
       }),
     );
+    // One plain statement: the count says «conectado», and the row never says «no escucha».
     expect(html).toContain(
-      '<span class="verb">conectado · no escucha ahora: no espera trabajo nuevo</span>',
+      '<span class="verb">conectado · libre; verá lo nuevo cuando vuelva a esperar</span>',
     );
+    expect(html).not.toContain('no escucha');
+    expect(html).not.toContain('MCP');
     expect(html).not.toContain('verb warn-t');
   });
 
@@ -399,10 +402,12 @@ describe('the agents menu', () => {
     expect(html).toMatch(/<span class="flag soft">cambió \d\d:\d\d<\/span>/);
   });
 
-  it('warns of an agent with no signal on its expired lease', () => {
+  // P6-F1: a lease that ran out leaves the agent away, the server's word for it: «ausente».
+  it('warns of an agent away on its expired lease, in the word the server gives', () => {
     const html = menu();
     expect(html).toContain('<span class="htag">claude-code</span>');
-    expect(html).toMatch(/class="held warn">.*sin señal desde \d\d:\d\d ·/);
+    expect(html).toMatch(/class="held warn">.*ausente desde \d\d:\d\d ·/);
+    expect(html).not.toContain('sin señal');
   });
 
   // Review of #605: the lease on CRE-44 ran out, but Kiln is connected and may still be at work on it
