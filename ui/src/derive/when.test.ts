@@ -25,7 +25,7 @@ describe('when, as a row says it', () => {
       turn: 'agent',
       expiredLease: { holder: 'kiln', expiresAt: ago(12) },
     });
-    expect(whenText(lapsed, NOW)).toEqual({ text: 'vencida', warn: true });
+    expect(whenText(lapsed, NOW)).toEqual({ text: 'sin señal', warn: true });
   });
 
   it('counts your turn from when it began, not from the item’s last change (P1-6)', () => {

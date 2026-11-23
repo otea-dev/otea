@@ -36,6 +36,13 @@ describe('anyoneWaits', () => {
     expect(anyoneWaits([agent('a'), agent('b', { waiting: true })])).toBe(true);
   });
 
+  // The server's status is the one word: a working agent is not in otea wait, whatever else says.
+  it('goes by the status the server sends when it sends one', () => {
+    expect(anyoneWaits([agent('a', { status: 'listening', waiting: true })])).toBe(true);
+    expect(anyoneWaits([agent('a', { status: 'working', waiting: true })])).toBe(false);
+    expect(anyoneWaits([agent('a', { status: 'connected' })])).toBe(false);
+  });
+
   it('is false when the agents only have their MCP server open, or none is there', () => {
     expect(anyoneWaits([agent('a', { listening: true })])).toBe(false);
     expect(anyoneWaits([])).toBe(false);
@@ -60,10 +67,12 @@ describe('unheard', () => {
     expect(unheard(item({ turn: 'none' }), [], NOW)).toBe(false);
   });
 
-  it('leaves alone an item its holder works on now, and marks one whose holder went idle', () => {
+  // The server says whether the holder works (status): the desk works out nothing of its own.
+  it('leaves alone an item its holder works on now, and marks one whose holder does not', () => {
     const lease = { holder: 'a', expiresAt: inMinutes(10) };
-    expect(unheard(item({ lease }), [agent('a')], NOW)).toBe(false);
-    expect(unheard(item({ lease }), [agent('a', { lastSeen: ago(10) })], NOW)).toBe(true);
+    const works = agent('a', { holding: ['TASK-1'], status: 'working' });
+    expect(unheard(item({ lease }), [works], NOW)).toBe(false);
+    expect(unheard(item({ lease }), [agent('a', { status: 'connected' })], NOW)).toBe(true);
   });
 
   // P7-R3-10: its lease keeps the item after the session ended, but nobody does it.
@@ -148,13 +157,40 @@ describe('hearing', () => {
     expect(hearing(undefined, [], NOW)).toBeNull();
   });
 
-  it('names the agents at work while none waits, else raises the alarm', () => {
+  it('names the agents at work while none waits', () => {
     const called = agent('a', { actedAt: ago(1), status: 'working' });
     expect(hearing([called], [], NOW)).toEqual({ kind: 'working', agents: ['a'] });
+  });
+
+  // P5-F12, P2-F4: an agent that just handed off is connected, not in otea wait. The desk lit
+  // «Nadie está escuchando» in red beside a pill that said «1 conectado»; it says, calmly, that the
+  // connected agent will see it when it waits again.
+  it('says a connected agent will see it when it waits again, never the alarm', () => {
     const idle = agent('a', { actedAt: ago(10), status: 'connected' });
-    expect(hearing([idle], [], NOW)).toEqual({ kind: 'unheard' });
-    // Connected and idle in its chat: nobody hears the desk, and that is the alarm.
-    expect(hearing([agent('a', { listening: true })], [], NOW)).toEqual({ kind: 'unheard' });
+    expect(hearing([idle], [], NOW)).toEqual({ kind: 'connected', agents: ['a'] });
+    // Connected and idle in its chat: it hears nothing now, and it is still no silence to fix.
+    expect(hearing([agent('a', { listening: true })], [], NOW)).toEqual({
+      kind: 'connected',
+      agents: ['a'],
+    });
+    // An agent at work, or one connected, beats one with no signal.
+    const silent = agent('s', { live: false, holding: ['TASK-2'], status: 'silent' });
+    expect(hearing([silent, idle], [], NOW)).toEqual({ kind: 'connected', agents: ['a'] });
+  });
+
+  it('raises the alarm only when the agents that remain gave no signal', () => {
+    const silent = agent('s', { live: false, holding: ['TASK-2'], status: 'silent' });
+    expect(hearing([silent], [], NOW)).toEqual({ kind: 'unheard' });
+  });
+
+  it('words a queued item calmly for a connected agent, in both languages', () => {
+    setLanguage('es');
+    expect(unheardWords([], false, ['a'])).toEqual({
+      text: 'en cola: a está conectado',
+      calm: true,
+    });
+    setLanguage('en');
+    expect(unheardWords([], false, ['a'])).toEqual({ text: 'queued: a is connected', calm: true });
   });
 
   // «Nadie está escuchando» in red read as a fault when no agent existed at all: that is not a

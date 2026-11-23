@@ -299,9 +299,9 @@ describe('the agents menu', () => {
     ).toContain('holding an item is not enough');
   });
 
-  it('heads with the project and what they do, one gone quiet in warn', () => {
+  it('heads with the project and what they do, one with no signal in warn', () => {
     expect(menu()).toContain(
-      '<div class="plabel" data-i=""><span>agentes en Hollowmere</span><span class="sum"><b>1 trabajando</b> · 1 escuchando · <span class="warn-t">1 callado</span></span></div>',
+      '<div class="plabel" data-i=""><span>agentes en Hollowmere</span><span class="sum"><b>1 trabajando</b> · 1 escuchando · <span class="warn-t">1 sin señal</span></span></div>',
     );
   });
 
@@ -315,8 +315,9 @@ describe('the agents menu', () => {
     );
   });
 
-  // It asked for MCP (otea connect) and its harness never loaded Otea's server.
-  it('flags in warn an agent whose MCP never connected, saying why on hover', () => {
+  // P6-F6: it asked for MCP (otea connect) and its harness never loaded Otea's server. The agent
+  // works through the command line, a valid way: the flag is a grey note, never a red warning.
+  it('notes in grey an agent whose MCP never connected, saying why on hover', () => {
     setLanguage('es');
     const rows = agentRows([agent('Quill', { mcpMissing: true, profile: opus })], items, NOW);
     const html = renderIn(
@@ -333,7 +334,7 @@ describe('the agents menu', () => {
       }),
     );
     expect(html).toMatch(
-      /<span class="flag" title="Pidió conectarse por MCP[^"]*"><svg[\s\S]*?<\/svg>MCP sin conectar<\/span>/,
+      /<span class="flag soft" title="Pidió conectarse por MCP[^"]*">MCP sin conectar<\/span>/,
     );
     expect(menu()).not.toContain('MCP sin conectar');
   });
@@ -362,6 +363,32 @@ describe('the agents menu', () => {
     expect(html).not.toContain('MCP sin conectar');
   });
 
+  // P5-F12: an agent that handed off and is not in otea wait is connected, a calm state; its row
+  // was lit in the warning tone as if something failed.
+  it('says an agent that is connected but not waiting calmly, not in warn', () => {
+    setLanguage('es');
+    const rows = agentRows(
+      [agent('Quill', { status: 'connected', waiting: false, profile: opus })],
+      items,
+      NOW,
+    );
+    const html = renderIn(
+      testApp(),
+      createElement(AgentsMenuBody, {
+        project: 'Hollowmere',
+        rows,
+        counts: agentCounts(rows),
+        now: NOW,
+        onOpen: () => undefined,
+        onActivity: () => undefined,
+        onConnect: () => undefined,
+        onPerformance: () => undefined,
+      }),
+    );
+    expect(html).toContain('<span class="verb">conectado · no escucha: no está en otea wait</span>');
+    expect(html).not.toContain('verb warn-t');
+  });
+
   it('marks a profile missing in warn, unconfirmed or just changed in grey', () => {
     const html = menu();
     expect(html).toMatch(/<span class="flag"><svg[\s\S]*?<\/svg>sin perfil<\/span>/);
@@ -370,10 +397,10 @@ describe('the agents menu', () => {
     expect(html).toMatch(/<span class="flag soft">cambió \d\d:\d\d<\/span>/);
   });
 
-  it('warns of an agent gone quiet on its expired lease', () => {
+  it('warns of an agent with no signal on its expired lease', () => {
     const html = menu();
     expect(html).toContain('<span class="htag">claude-code</span>');
-    expect(html).toMatch(/class="held warn">.*callado desde \d\d:\d\d ·/);
+    expect(html).toMatch(/class="held warn">.*sin señal desde \d\d:\d\d ·/);
   });
 
   it('opens the agent’s sheet from its whole row', () => {
