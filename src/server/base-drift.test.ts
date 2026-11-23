@@ -113,4 +113,58 @@ describe('GET /api/items/:id/drift on a board kept on main', () => {
       expect(heard.added).toContainEqual({ commit: extra, author: 'Diego' });
     },
   );
+
+  // A merge brings its own commits, named; the merge commit itself says nothing more.
+  it('leaves merge commits aside and names the commits they bring', SLOW, async () => {
+    let side = '';
+    await reviewed(() => {
+      git('checkout', '-q', '-b', 'side');
+      side = commit('side.txt', 'lado\n');
+      git('checkout', '-q', 'main');
+      git('merge', '--no-ff', '-q', '-m', 'merge side', 'side');
+    });
+    expect(await drift()).toMatchObject({ added: [{ commit: side, author: 't' }] });
+  });
+
+  // The base rewritten since the handoff: the same change as a new commit (a rebase, a reworded
+  // message) is nothing new, so the desk says only where main is now.
+  it('says where main is now when it was rewritten with no new change', SLOW, async () => {
+    let now = '';
+    await reviewed(() => {
+      const handed = git('rev-parse', 'HEAD');
+      git('checkout', '-q', '-B', 'main', 'HEAD~1');
+      execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'cherry-pick', handed], {
+        cwd: repo.dir,
+        stdio: 'pipe',
+        env: { ...process.env, GIT_COMMITTER_DATE: '2030-01-01T00:00:00Z' },
+      });
+      now = git('rev-parse', '--short=7', 'HEAD');
+    });
+    expect(await drift()).toMatchObject({ onBase: true, now, added: [] });
+  });
+
+  it('names the first twenty commits and counts the rest', SLOW, async () => {
+    let first = '';
+    await reviewed(() => {
+      for (let at = 0; at < 22; at++) {
+        const made = commit(`f${at}.txt`, `${at}\n`);
+        if (at === 0) first = made;
+      }
+    });
+    const heard = (await drift()) as { added: { commit: string }[]; more?: number };
+    expect(heard.added).toHaveLength(20);
+    expect(heard.added[0]?.commit).toBe(first);
+    expect(heard.more).toBe(2);
+  });
+
+  // The page asks again on each look: the answer is kept for a few seconds, as the remote's is.
+  it('keeps its answer for a few seconds', SLOW, async () => {
+    let first = '';
+    await reviewed(() => {
+      first = commit('one.txt', '1\n');
+    });
+    expect(await drift()).toMatchObject({ added: [{ commit: first, author: 't' }] });
+    commit('two.txt', '2\n');
+    expect(await drift()).toMatchObject({ added: [{ commit: first, author: 't' }] });
+  });
 });

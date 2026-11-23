@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Drift } from '../../../../src/server/drift.ts';
 import { fetchDrift } from '../../api.ts';
-import { t } from '../../i18n/i18n.ts';
+import { listOf, t } from '../../i18n/i18n.ts';
 
 // A clone without Otea's hook can push to the branch while the person reviews it (P3C-R3-1): the
 // PC asks the remote (src/server/drift.ts) and the page says so under the branch, before the person
@@ -15,9 +15,13 @@ export function driftText(drift: Drift): string {
   if (drift.onBase) {
     if (drift.added.length === 0)
       return t('bi.branch.movedBase', { base: drift.branch, now: drift.now, handed: drift.handed });
-    const list = drift.added
-      .map(({ commit, author }) => t('bi.branch.driftBy', { commit, author }))
-      .join(', ');
+    // The first few are named, the rest counted: "…, and 5 more".
+    const named = drift.added.map(({ commit, author }) =>
+      t('bi.branch.driftBy', { commit, author }),
+    );
+    const list = listOf(
+      drift.more ? [...named, t('bi.branch.diffOffMore', { count: drift.more })] : named,
+    );
     return t('bi.branch.driftBase', { base: drift.branch, list, handed: drift.handed });
   }
   if (drift.added.length === 0)

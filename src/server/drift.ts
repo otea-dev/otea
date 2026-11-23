@@ -17,8 +17,13 @@ export type Drift = {
   handed: string;
   now: string;
   added: { commit: string; author: string }[];
+  // The commits there are past the first NAMED (a board kept on main), counted, not named.
+  more?: number;
   onBase?: true;
 };
+
+// A drift names at most this many commits.
+const NAMED = 20;
 
 // Git runs off the request's thread: asking the remote can take seconds.
 function git(cwd: string, ...args: string[]): Promise<string> {
@@ -65,30 +70,35 @@ async function baseDrift(project: Project, base: string, tip: Tip): Promise<Drif
       () => true,
       () => false,
     );
-    const listed = ahead
-      ? await git(
-          cwd,
-          'log',
-          '--reverse',
-          '--format=%h%x09%an',
-          '--abbrev=7',
-          `${tip.commit}..${now}`,
-        )
-      : '';
-    const added = listed
+    // As for a remote branch (commitsAddedSince): merges aside, and a commit whose change the
+    // handed-off side holds already (a rebase) is no new one.
+    const listed = await git(
+      cwd,
+      'log',
+      '--no-merges',
+      '--cherry-pick',
+      '--right-only',
+      '--reverse',
+      '--format=%h%x09%an',
+      '--abbrev=7',
+      `${tip.commit}...${now}`,
+    );
+    const all = listed
       .split(/\r?\n/)
       .filter(Boolean)
       .map((line) => {
         const [commit = '', author = ''] = line.split('\t');
         return { commit, author };
       });
-    // Not ahead: the base was rewritten since, and no new commit explains where it is.
-    if (ahead && added.length === 0) return null;
+    // Ahead with nothing to name (a merge alone): nothing to say. Not ahead and nothing new: the
+    // base was rewritten since, and the desk says only where it is now.
+    if (ahead && all.length === 0) return null;
     return {
       branch: base,
       handed: tip.commit.slice(0, 7),
       now: now.slice(0, 7),
-      added,
+      added: all.slice(0, NAMED),
+      ...(all.length > NAMED ? { more: all.length - NAMED } : {}),
       onBase: true,
     };
   } catch {
@@ -113,43 +123,52 @@ export async function branchDrift(project: Project, id: string): Promise<Drift |
   if (branch === '') return null;
   const tip = approvedTipOf(project, item.id, branch);
   if (!tip || tip.unchanged) return null;
-  if (branch === guard.guard.base) return baseDrift(project, branch, tip);
   const key = [project.root, branch, tip.commit].join('\0');
   const now = Date.now();
   const known = asked.get(key);
   if (known && now - known.at < FRESH_MS) return known.drift;
   const base = guard.guard.base;
-  const drift = (async (): Promise<Drift | null> => {
-    const cwd = project.root;
-    try {
-      const remote = await remoteOf(cwd, branch);
-      const remotes = (await git(cwd, 'remote')).split(/\r?\n/).filter(Boolean);
-      if (!remotes.includes(remote)) return null;
-      const listed = await git(cwd, 'ls-remote', '--heads', remote, `refs/heads/${branch}`);
-      const at = listed.split(/\s+/)[0] ?? '';
-      if (at === '' || at === tip.commit) return null;
-      if (!(await has(cwd, at))) {
-        await git(
-          cwd,
-          'fetch',
-          '--quiet',
-          '--no-tags',
-          remote,
-          `+refs/heads/${branch}:refs/remotes/${remote}/${branch}`,
-        );
-      }
-      const onto = base && (await has(cwd, `refs/remotes/${remote}/${base}`));
-      const start = onto ? `refs/remotes/${remote}/${base}` : undefined;
-      return {
-        branch,
-        handed: tip.commit.slice(0, 7),
-        now: at.slice(0, 7),
-        added: commitsAddedSince(cwd, tip, at, start),
-      };
-    } catch {
-      return null;
-    }
-  })();
+  const drift = (
+    branch === base ? baseDrift(project, branch, tip) : remoteDrift(project, branch, base, tip)
+  ).catch(() => null);
   asked.set(key, { at: now, drift });
   return drift;
+}
+
+// What the remote has of an item's branch that its handoff did not.
+async function remoteDrift(
+  project: Project,
+  branch: string,
+  base: string | undefined,
+  tip: Tip,
+): Promise<Drift | null> {
+  const cwd = project.root;
+  try {
+    const remote = await remoteOf(cwd, branch);
+    const remotes = (await git(cwd, 'remote')).split(/\r?\n/).filter(Boolean);
+    if (!remotes.includes(remote)) return null;
+    const listed = await git(cwd, 'ls-remote', '--heads', remote, `refs/heads/${branch}`);
+    const at = listed.split(/\s+/)[0] ?? '';
+    if (at === '' || at === tip.commit) return null;
+    if (!(await has(cwd, at))) {
+      await git(
+        cwd,
+        'fetch',
+        '--quiet',
+        '--no-tags',
+        remote,
+        `+refs/heads/${branch}:refs/remotes/${remote}/${branch}`,
+      );
+    }
+    const onto = base && (await has(cwd, `refs/remotes/${remote}/${base}`));
+    const start = onto ? `refs/remotes/${remote}/${base}` : undefined;
+    return {
+      branch,
+      handed: tip.commit.slice(0, 7),
+      now: at.slice(0, 7),
+      added: commitsAddedSince(cwd, tip, at, start),
+    };
+  } catch {
+    return null;
+  }
 }

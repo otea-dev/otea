@@ -52,4 +52,18 @@ describe('driftText', () => {
       'main cambió después de la entrega: ahora está en 9f00aa1. Aprobar aprueba solo lo entregado, a715597.',
     );
   });
+
+  it('counts the commits past the ones it names', () => {
+    const drift = {
+      branch: 'main',
+      handed: 'a715597',
+      now: '9f00aa1',
+      added: [{ commit: '9f00aa1', author: 'Diego' }],
+      more: 5,
+      onBase: true as const,
+    };
+    expect(driftText(drift)).toContain('9f00aa1 by Diego and 5 more.');
+    setLanguage('es');
+    expect(driftText(drift)).toContain('9f00aa1 de Diego y 5 más.');
+  });
 });
