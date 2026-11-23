@@ -28,6 +28,8 @@ export const phone = {
   'phone.capture.placeWhere': 'Where does the photo go?',
   'phone.capture.roleWhere': 'The photo goes as',
   'phone.capture.tooLarge': 'Over {mb} MB: it will not upload',
+  'phone.capture.unreadable':
+    "The photo can't be read any more. Remove it or pick it again; your words are kept.",
   'phone.capture.lands': 'lands in {board} › {step}',
   'phone.capture.save': 'Save',
   'phone.capture.saved': 'Saved in {board} · {id}',
@@ -37,6 +39,8 @@ export const phone = {
   'phone.capture.noBoards':
     'This project has no boards yet. They are made in Studio, on the computer; then you can jot things down here.',
   'phone.deskOnly.studio': 'Studio is on the computer.',
+  'phone.deskOnly.studioWhy':
+    'A board an agent drew waits there as a draft. Publishing it changes how everyone works, so it is read step by step on the wide screen first. Open Otea on your computer to publish it.',
   'phone.deskOnly.settings': 'Settings is on the computer.',
   'phone.deskOnly.modules': 'The module catalog is on the computer.',
   'phone.deskOnly.performance': 'Performance is on the computer.',
@@ -257,6 +261,7 @@ export const phone = {
   'install.title': 'Install Otea on your home screen',
   'install.install': 'Install',
   'install.later': 'Not now',
+  'install.manual': "This browser can't install it with one tap here. Do it by hand:",
   'install.prompt': 'It opens like an app, in its own window.',
   'install.ios': 'In Safari, tap Share, then Add to Home Screen.',
   'install.iosPush':

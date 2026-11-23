@@ -73,10 +73,18 @@ function keepInstallPrompt(event: InstallPrompt | null): void {
   for (const listener of promptListeners) listener();
 }
 
-export function promptInstall(): void {
+// True when the browser's own prompt opened; false when it has none (or it failed to open), so
+// the caller can say how to install by hand instead of doing nothing.
+export async function promptInstall(): Promise<boolean> {
   const event = installPrompt;
   keepInstallPrompt(null);
-  void event?.prompt().catch(() => undefined);
+  if (!event) return false;
+  try {
+    await event.prompt();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // How the page reaches a place in the app: a hash on this project's page moves without reloading;

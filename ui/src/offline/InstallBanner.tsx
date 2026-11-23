@@ -29,9 +29,16 @@ export type InstallBannerViewProps = {
   offer: InstallOffer;
   onInstall: () => void;
   onDismiss: () => void;
+  // The install button found no browser prompt: say so above the steps.
+  manual?: boolean;
 };
 
-export function InstallBannerView({ offer, onInstall, onDismiss }: InstallBannerViewProps) {
+export function InstallBannerView({
+  offer,
+  onInstall,
+  onDismiss,
+  manual = false,
+}: InstallBannerViewProps) {
   const box = useRef<HTMLElement>(null);
   const shown = offer !== 'none';
   // Its height, for the page to end clear of it (phone.css pads the views by --install-h): the
@@ -53,6 +60,7 @@ export function InstallBannerView({ offer, onInstall, onDismiss }: InstallBanner
   return (
     <aside ref={box} className="install-banner" aria-labelledby="install-banner-title">
       <h2 id="install-banner-title">{t('install.title')}</h2>
+      {manual ? <p role="status">{t('install.manual')}</p> : null}
       <p>{offer === 'prompt' ? t('install.prompt') : t(STEPS[offer])}</p>
       {offer === 'ios' ? <p className="install-note">{t('install.iosPair')}</p> : null}
       {offer === 'ios' ? <p className="install-note">{t('install.iosPush')}</p> : null}
@@ -88,11 +96,14 @@ export function InstallBanner() {
     window.addEventListener('appinstalled', done);
     return () => window.removeEventListener('appinstalled', done);
   }, [standalone]);
+  // The browser had no prompt to open after all: the banner stays, with this browser's steps.
+  const [byHand, setByHand] = useState(false);
+  const platform = platformOf(navigator.userAgent, navigator.maxTouchPoints);
   const offer = installOffer({
     phone: app.phone,
     standalone,
     installed,
-    platform: platformOf(navigator.userAgent, navigator.maxTouchPoints),
+    platform,
     canPrompt,
     dismissed,
   });
@@ -102,10 +113,13 @@ export function InstallBanner() {
   };
   return (
     <InstallBannerView
-      offer={offer}
+      offer={offer === 'prompt' && byHand ? platform : offer}
+      manual={byHand}
       onInstall={() => {
-        promptInstall();
-        dismiss();
+        void promptInstall().then((opened) => {
+          if (opened) dismiss();
+          else setByHand(true);
+        });
       }}
       onDismiss={dismiss}
     />

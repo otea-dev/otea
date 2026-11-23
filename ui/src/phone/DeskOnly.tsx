@@ -48,6 +48,7 @@ export function DeskOnly({ page }: { page: DeskPage }) {
             {t(`phone.deskOnly.${page}`)} {t('phone.deskOnly.text')}
           </span>
         </p>
+        {page === 'studio' ? <p className="why">{t('phone.deskOnly.studioWhy')}</p> : null}
         <div className="acts2">
           <Button variant="primary" onClick={() => app.go({ view: 'toca' })}>
             {t('boardView.missing.home')}

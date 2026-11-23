@@ -26,6 +26,7 @@ import {
   captureBoards,
   capturePayload,
   closeCapture,
+  keepDraft,
   landsStep,
   lastBoard,
   noteField,
@@ -33,8 +34,10 @@ import {
   photoName,
   photoPlaces,
   pickBoard,
+  readable,
   rememberBoard,
   samePlace,
+  takeDraft,
   useCapture,
 } from './capture.ts';
 
@@ -353,8 +356,10 @@ export function CaptureSheet() {
     setSeq(cap.seq);
     setChosen(undefined);
     setPicking(false);
-    setTitle('');
-    setNote('');
+    // Blank, but for the words a save that failed left behind (a reload brings them back too).
+    const left = takeDraft(project);
+    setTitle(left?.title ?? '');
+    setNote(left?.note ?? '');
     setPhoto(null);
     setPhotoPlace(undefined);
     file.current = null;
@@ -405,6 +410,14 @@ export function CaptureSheet() {
     if (!board || !type || posting) return;
     setPosting(true);
     setError(undefined);
+    // Whatever goes wrong from here is said in the sheet, with the words kept: never a button
+    // left busy with no word.
+    const fail = (message: string) => {
+      keepDraft(project, { title, note });
+      setPosting(false);
+      setError(message);
+    };
+    if (file.current && !(await readable(file.current))) return fail(t('phone.capture.unreadable'));
     const { fields, files } = capturePayload(type, {
       title,
       note,
@@ -435,26 +448,27 @@ export function CaptureSheet() {
       };
       const kept = await enqueue(capture);
       if (!kept.ok) {
-        setPosting(false);
-        setError(
+        return fail(
           kept.reason === 'full' ? t('offline.full', { mb: QUEUE_MAX_MB }) : t('offline.storage'),
         );
-        return;
       }
       rememberBoard(project, board.name);
       queued.current = { board: board.name };
       closeCapture();
     };
-    if (app.sync.offline && queueAvailable()) return keep();
     try {
+      if (app.sync.offline && queueAvailable()) return await keep();
       const item = await createItem(board.name, type.name, fields, undefined, files, key.current);
       rememberBoard(project, board.name);
       saved.current = { board: board.name, id: item.id };
       closeCapture();
     } catch (e) {
-      if (e instanceof Unheard && queueAvailable()) return keep();
-      setPosting(false);
-      setError(e instanceof Error ? e.message : String(e));
+      try {
+        if (e instanceof Unheard && queueAvailable()) return await keep();
+      } catch {
+        return fail(t('phone.capture.unreadable'));
+      }
+      fail(e instanceof Error ? e.message : String(e));
     }
   };
 

@@ -252,3 +252,47 @@ export function rememberBoard(project: string | undefined, board: string): void 
     // Storage off (a private window, blocked site data): the next capture starts on the first.
   }
 }
+
+// ───────── a save that failed keeps what was typed ─────────
+
+const DRAFT = 'otea.capture.draft';
+const draftKey = (project: string | undefined) => (project ? `${DRAFT}:${project}` : DRAFT);
+
+export type CaptureDraft = { title: string; note: string };
+
+// A save that came to an error keeps the words on the phone: reloading the page, or opening the
+// sheet again, brings them back instead of losing them.
+export function keepDraft(project: string | undefined, draft: CaptureDraft): void {
+  try {
+    localStorage.setItem(draftKey(project), JSON.stringify(draft));
+  } catch {
+    // Storage off: the words stay in the open sheet only.
+  }
+}
+
+// The draft a failed save left, once: reading it takes it away.
+export function takeDraft(project: string | undefined): CaptureDraft | undefined {
+  try {
+    const raw = localStorage.getItem(draftKey(project));
+    if (raw === null) return undefined;
+    localStorage.removeItem(draftKey(project));
+    const draft: unknown = JSON.parse(raw);
+    if (typeof draft !== 'object' || draft === null) return undefined;
+    const { title, note } = draft as Partial<CaptureDraft>;
+    if (typeof title !== 'string' || typeof note !== 'string') return undefined;
+    return title.trim() === '' && note.trim() === '' ? undefined : { title, note };
+  } catch {
+    return undefined;
+  }
+}
+
+// Whether the phone can still read the picked file: a photo that was moved, deleted or revoked
+// after it was picked fails here, before the upload, instead of hanging the save.
+export async function readable(file: Blob): Promise<boolean> {
+  try {
+    await file.slice(0, 1).arrayBuffer();
+    return true;
+  } catch {
+    return false;
+  }
+}

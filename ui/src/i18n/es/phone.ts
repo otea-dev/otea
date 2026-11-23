@@ -30,6 +30,8 @@ export const phone = {
   'phone.capture.placeWhere': '¿Dónde va la foto?',
   'phone.capture.roleWhere': 'La foto va como',
   'phone.capture.tooLarge': 'Pasa de {mb} MB: no se subirá',
+  'phone.capture.unreadable':
+    'La foto ya no se puede leer. Quítala o elígela otra vez; lo que escribiste se conserva.',
   'phone.capture.lands': 'llega a {board} › {step}',
   'phone.capture.save': 'Guardar',
   'phone.capture.saved': 'Guardado en {board} · {id}',
@@ -39,6 +41,8 @@ export const phone = {
   'phone.capture.noBoards':
     'Este proyecto todavía no tiene tableros. Se crean en Studio, en el equipo; después puedes anotar aquí.',
   'phone.deskOnly.studio': 'Studio está en el equipo.',
+  'phone.deskOnly.studioWhy':
+    'Un tablero que dibujó un agente espera allí como borrador. Publicarlo cambia cómo trabaja todo el mundo, así que primero se lee paso a paso en la pantalla grande. Abre Otea en tu equipo para publicarlo.',
   'phone.deskOnly.settings': 'Configuración está en el equipo.',
   'phone.deskOnly.modules': 'El catálogo de módulos está en el equipo.',
   'phone.deskOnly.performance': 'Rendimiento está en el equipo.',
@@ -262,6 +266,7 @@ export const phone = {
   'install.title': 'Instalar Otea en la pantalla de inicio',
   'install.install': 'Instalar',
   'install.later': 'Ahora no',
+  'install.manual': 'Este navegador no puede instalarla con un toque aquí. Hazlo a mano:',
   'install.prompt': 'Se abre como una app, en su propia ventana.',
   'install.ios': 'En Safari, toca Compartir y luego Agregar a inicio.',
   'install.iosPush':
