@@ -254,6 +254,7 @@ import {
 import { prState } from './gh.ts';
 import {
   branchesBrought,
+  branchCheckedOutAnywhere,
   checkedOutBranch,
   checkoutRoot,
   commitsOver,
@@ -1932,7 +1933,9 @@ function handedBranch(
 // branch's tip (P1-R3-1): an agent's handoff is refused when another open item named that branch
 // first, and, at the CLI, when the checkout it runs in is on another branch. Over MCP the server
 // runs in the checkout its session started in, which a subagent in a worktree of its own shares,
-// so the branch checked out there tells nothing; so does a detached HEAD (a rebase under way).
+// so the branch checked out there tells nothing: it is refused only when no checkout of the
+// repository (a worktree too) has the branch. A detached HEAD (a rebase under way) tells nothing
+// either way.
 function refuseOthersBranch(
   project: Project,
   cwd: string,
@@ -1949,9 +1952,18 @@ function refuseOthersBranch(
       'missing_fields',
       `${item.id} not handed off: ${name} names ${branch}, the branch ${first.id} (${first.title}, open) named first, so the review would read ${first.id}'s work and an approval would keep its tip. Each item works on its own branch: set ${name} to the branch that holds ${item.id}'s work, otea update ${item.id} --field "${name}=<branch>", then hand it off again: ${frozen}.`,
     );
-  if (move.channel === 'mcp') return;
   const on = checkedOutBranch(cwd);
   if (on === undefined || on === branch) return;
+  if (move.channel === 'mcp') {
+    // The server knows only the directory its session started in, which a subagent in a worktree
+    // of its own shares: the branch checked out there tells nothing. Any checkout of the
+    // repository that holds the Rama's branch does (P8-F1).
+    if (branchCheckedOutAnywhere(cwd, branch) !== false) return;
+    throw new OteaError(
+      'missing_fields',
+      `${item.id} not handed off: ${name} names ${branch}, but no checkout of this repository is on it (this one is on ${on}), so the review would read a branch other than the one you worked on. Check ${branch} out in the checkout you work in (git switch ${branch}, or git worktree add <dir> ${branch}), then hand it off again: ${frozen}.`,
+    );
+  }
   const set =
     on === base
       ? ''
