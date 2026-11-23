@@ -190,6 +190,10 @@ describe('the Code on main board', () => {
     const text = await handoff();
     expect(text.code).not.toBe(0);
     expect(text.err).toContain(`${landing} not handed off: Commit subido says "banana"`);
+    // Naming the way out does not skip the check: --way Done is the same handoff.
+    const way = await otea('handoff', landing, '--way', 'Done');
+    expect(way.code).not.toBe(0);
+    expect(way.err).toContain(`${landing} not handed off: Commit subido says "banana"`);
     expect((await put('deadbeef')).code).toBe(0);
     expect((await handoff()).err).toContain('no commit deadbeef in this checkout');
 

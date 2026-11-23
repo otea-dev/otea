@@ -186,7 +186,10 @@ describe('a handoff of a branch', () => {
       git('merge', '-q', '--squash', `origin/${BRANCH}`);
       git('commit', '-q', '-m', 'Regar (#12)');
       git('update-ref', 'refs/remotes/origin/main', 'main');
+      // The commit it landed as holds the approved work (a squash of it): that is what is written.
+      const landed = git('rev-parse', '--short', 'main');
       git('checkout', '-q', BRANCH);
+      expect((await otea('update', 'CAM-1', '--field', `Commit en main=${landed}`)).code).toBe(0);
 
       const handed = await land();
       expect(handed.err).toBe('');

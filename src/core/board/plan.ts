@@ -247,8 +247,8 @@ function laterBoardChanges(
     const pushNames = (def: BoardDefinition, guard: typeof part.guard) =>
       guard ? guard.push.flatMap((s) => stepById(def, s)?.name ?? []) : null;
     const [was, now] = [pushNames(live, old?.guard), pushNames(draft, part.guard)];
-    const moved = (key: 'repo' | 'base') => !same(old?.guard?.[key], part.guard?.[key]);
-    if (!same(was, now) || moved('repo') || moved('base'))
+    const moved = (key: 'repo' | 'base' | 'commit') => !same(old?.guard?.[key], part.guard?.[key]);
+    if (!same(was, now) || moved('repo') || moved('base') || moved('commit'))
       out.push({
         kind: 'guard',
         part: part.id,

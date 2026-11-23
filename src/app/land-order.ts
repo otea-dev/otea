@@ -4,8 +4,9 @@ import { activeLease } from '../core/lease.ts';
 import { type ItemRecord, selectItems, selectStateEntries } from '../store/queries.ts';
 import type { Context } from './context.ts';
 import { type LiveBoard, leftFor, liveBoardOf, liveBoards } from './next.ts';
-import { sessionEnded } from './presence.ts';
+import { sessionEnded, sessionRuns } from './presence.ts';
 import { type Priority, priorityOf } from './priority.ts';
+import { approvedTipOf } from './tips.ts';
 
 // One agent lands at a time on a base branch, and the next to land is the item highest in the
 // person's order (P1-R3-2): approved items raced into main, the lower and unordered ones landed
@@ -43,6 +44,29 @@ function landingIn(
   };
 }
 
+// An item of a board that works straight on its base that is committed there and waits for the
+// person's review (or, once approved, for the push that lands it): until then its commits are on
+// the base, so the next one starting would ride along in the push. It holds the base like work in
+// progress does. An item that made no commit (its handoff recorded no code change) holds nothing.
+function holdsBase(
+  ctx: Context,
+  board: LiveBoard,
+  item: ItemRecord,
+): { key: string; base: string } | undefined {
+  const position = positionOf(item.state);
+  if (isClosed(position) || position.phase === 'doing') return undefined;
+  const guard = guardedBranch(board.def);
+  if (!guard || workedBase(board.def) === undefined) return undefined;
+  if (!stepById(board.def, position.step)?.hand.some(({ ref }) => ref === guard.id)) {
+    return undefined;
+  }
+  const branch = String(item.fields[guard.id] ?? '').trim();
+  if (approvedTipOf(ctx, item.id, branch)?.unchanged) return undefined;
+  const base = guard.guard.base ?? 'the base';
+  const repo = guard.guard.repo === undefined ? '' : item.fields[guard.guard.repo];
+  return { key: `${typeof repo === 'string' ? repo.toLowerCase() : ''}\0${base}`, base };
+}
+
 // Why an item comes first in the person's order: what they put on top, their order on the
 // Matrix, else that it was approved first.
 function placeText(priority: Priority | undefined, work: boolean): string {
@@ -52,10 +76,12 @@ function placeText(priority: Priority | undefined, work: boolean): string {
 }
 
 // What lands before the item: `holder` lands `first` now, or `first` lands next (its `place` in
-// the person's order says why). `work`: the item does its work on the base, not lands in it.
+// the person's order says why). `work`: the item does its work on the base, not lands in it;
+// `review`: `first` is committed on the base and waits for its review or its push.
 export type LandsFirst = { first: string; base: string; work?: true } & (
   | { holder: string }
   | { place: string }
+  | { review: true }
 );
 
 // What lands in the item's base before it, for the agent asking; undefined when the item is not on
@@ -87,21 +113,40 @@ export function landsFirst(
     }),
   );
   // A landing under way: another item of the base an agent holds, unless that agent's session
-  // ended (a claim takes its lease over then, P3C-R3-11).
+  // ended (a claim takes its lease over then, P3C-R3-11). A lease that ran out while its holder's
+  // session runs is still its holder's: it may be at work on a long step with no otea call.
   const landing = waiting.flatMap(({ item: other }) => {
     const lease = activeLease(other.lease, at);
-    return lease && !sessionEnded(ctx.db, lease.holder, () => at)
-      ? [
+    const holder =
+      lease && !sessionEnded(ctx.db, lease.holder, () => at)
+        ? lease.holder
+        : !lease && other.lease && sessionRuns(ctx.db, other.lease.holder, () => at)
+          ? other.lease.holder
+          : undefined;
+    return holder === undefined
+      ? []
+      : [
           {
             first: other.id,
             base: own.base,
-            holder: lease.holder,
+            holder,
             ...(own.work ? { work: true as const } : {}),
           },
-        ]
-      : [];
+        ];
   });
   if (landing[0]) return landing[0];
+  // Work on the base waits until what is committed there has landed: an item in review, or
+  // approved and waiting for its push, still holds it.
+  if (own.work) {
+    for (const each of liveBoards(ctx)) {
+      for (const other of selectItems(ctx.db, { collection: each.collection })) {
+        const held = other.id === item.id ? undefined : holdsBase(ctx, each, other);
+        if (held?.key === own.key) {
+          return { first: other.id, base: own.base, work: true, review: true };
+        }
+      }
+    }
+  }
   const priority = priorityOf(ctx.db);
   const entered = selectStateEntries(ctx.db);
   const key = (each: ItemRecord) => [
@@ -137,6 +182,9 @@ export function landsFirst(
 export function landsFirstText(id: string, first: LandsFirst): string {
   const { base } = first;
   if (first.work) {
+    if ('review' in first) {
+      return `${id} not claimed: ${first.first} is committed on ${base} and waits for its review and its push, and ${id} waits for it: this board works straight on ${base}, so one change at a time until it has landed, or the next one's commits would ride along in that push. Take other work meanwhile: otea next.`;
+    }
     const ahead =
       'holder' in first
         ? `${first.holder} works on ${base} with ${first.first} now, and ${id} waits for it`
@@ -146,7 +194,7 @@ export function landsFirstText(id: string, first: LandsFirst): string {
   const ahead =
     'holder' in first
       ? `${first.holder} lands ${first.first} in ${base} now; ${id} lands after it`
-      : `${first.first} lands in ${base} first (${first.place}), then ${id}`;
+      : `${first.first} lands in ${base} first (${'place' in first ? first.place : ''}), then ${id}`;
   return `${id} not claimed: ${ahead}: one agent lands at a time on ${base}, in the person's order, so no landing conflicts with another under way. Take other work meanwhile: otea next.`;
 }
 
@@ -155,14 +203,16 @@ export function landsFirstLine(id: string, first: LandsFirst): string {
   const { base } = first;
   if (first.work) {
     const waits =
-      'holder' in first
-        ? `${first.holder} works on ${first.first} there now`
-        : `${first.first} goes first there (${first.place})`;
+      'review' in first
+        ? `${first.first} is committed there and waits for its review and its push`
+        : 'holder' in first
+          ? `${first.holder} works on ${first.first} there now`
+          : `${first.first} goes first there (${first.place})`;
     return `${id} waits to work on ${base}: ${waits}; one agent at a time works straight on ${base}, in the person's order.`;
   }
   const ahead =
     'holder' in first
       ? `${first.holder} lands ${first.first} there now`
-      : `${first.first} lands there first (${first.place})`;
+      : `${first.first} lands there first (${'place' in first ? first.place : ''})`;
   return `${id} waits to land in ${base}: ${ahead}; one agent lands at a time on ${base}, in the person's order.`;
 }

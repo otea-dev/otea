@@ -50,6 +50,7 @@ export type ProblemCode =
   | 'split_unknown'
   | 'guard_no_push'
   | 'guard_base'
+  | 'guard_commit'
   | 'initial_invalid'
   | 'mention_raw'
   | 'mention_unknown'
@@ -270,6 +271,13 @@ function laterProblems(
       add('error', 'guard_no_push', partAt(part.id), { part: part.name });
     if (part.guard?.base !== undefined && !isBranchName(part.guard.base))
       add('error', 'guard_base', partAt(part.id), { part: part.name });
+    // The field a handoff checks as the commit that landed must be a text field of the board. One
+    // no step hands any more (its land step was taken out) asks for nothing, so checks nothing.
+    if (part.guard?.commit !== undefined) {
+      const commit = def.parts[part.guard.commit];
+      if (!commit || commit.kind !== 'text')
+        add('error', 'guard_commit', partAt(part.id), { part: part.name });
+    }
     if (part.initial !== undefined && !initialFits(part.kind, part.options, part.initial))
       add('error', 'initial_invalid', partAt(part.id), { part: part.name });
   }

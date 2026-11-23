@@ -43,6 +43,8 @@ export const boardStudio = {
     'Each item of {board} divides into a board that no longer exists. Pick another in About the board.',
   'bs.problem.guard_no_push': '“{part}” is protected but cannot be pushed in any step.',
   'bs.problem.guard_base': 'The base branch “{part}” protects is not a branch name.',
+  'bs.problem.guard_commit':
+    'The commit field “{part}” is checked against is not a text field of this board.',
   'bs.problem.initial_invalid': '{part} starts with a value it no longer has. Pick another.',
   'bs.problem.mention_raw':
     'The instructions of {step} name something with @ and curly braces: type @ and pick it, so agents read its name.',
