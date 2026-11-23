@@ -182,7 +182,7 @@ export function repoNameAt(project: Project, cwd: string, env: Env = process.env
   const before = repoByRootOf(repos, top);
   if (before) {
     throw new UnknownRepo(
-      `cannot tell which repo ${top} is: it has an origin remote now, and ${project.identity.name} knows ${before.name} only by its first commit, which a fork shares. If this is ${before.name}, run in ${top}: otea repos add --name ${before.name} (an agent asks the person first: it says this is that repo, and a fork would say the same)`,
+      `cannot tell which repo ${top} is: a remote was added after Otea first saw it, and until now Otea knew this repo only by its first commit, as "${before.name}" in project "${project.identity.name}". A fork shares that commit, so Otea will not assume this is the same repo without the person's word. If it is, run once in ${top}: otea repos add --name ${before.name}, then push again (an agent asks the person first: it says this is that repo, and a fork would say the same)`,
     );
   }
   throw new UnknownRepo(

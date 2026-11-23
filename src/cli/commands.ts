@@ -176,7 +176,7 @@ import { watch } from '../app/watch.ts';
 import { agentGuideFor, TOPICS_REMINDER, TOPICS_RULE } from '../core/agent-guide.ts';
 import { agentPrompt, isPromptKind, PROMPT_KINDS, type PromptKind } from '../core/agent-prompts.ts';
 import { isClosed, isLandStep, positionOf, waysOf } from '../core/board/engine.ts';
-import { DONE, guardedBranch, isEvidence, stepById } from '../core/board/model.ts';
+import { DONE, guardedBranch, isEvidence, stepById, workedBase } from '../core/board/model.ts';
 import { DROPPED_NAME } from '../core/board/next.ts';
 import { attachedPart, fieldsByName, partByName, stateName } from '../core/board/reading.ts';
 import type { Lang } from '../core/board/template-words.ts';
@@ -266,6 +266,7 @@ import {
   removeClaudeHook,
   removeGitHook,
 } from './hooks.ts';
+import { landedCommitRefusal } from './landed-commit.ts';
 import { mergedOutside, mergedOutsideLine } from './merged-outside.ts';
 import { boardsOf, eventData, itemCollections, itemData, readableEvent } from './names.ts';
 import { watchOwner } from './owner.ts';
@@ -1695,6 +1696,29 @@ function boardMove(
   });
 }
 
+// A board that says a commit landed on its base (Commit pushed, Commit en main: the guard's
+// `commit` field) is told the truth: the hash an agent hands off must exist, be in the base, and,
+// where the repo has a remote, be on the remote's branch of it after a fetch (P8-F1, P9-F5). The
+// field took «banana», and the hash of a push the hook had refused, and the item went Done.
+function refuseUnlandedCommit(project: Project, cwd: string, move: BoardMoveInput): void {
+  if (move.actor.kind !== 'agent' || move.way !== undefined) return;
+  const item = getItem(project, move.id);
+  const board = liveBoardOf(project, item.collection);
+  const position = positionOf(item.state);
+  if (!board || isClosed(position) || position.phase !== 'doing') return;
+  const guard = guardedBranch(board.def);
+  const ref = guard?.guard.commit;
+  const base = guard?.guard.base;
+  const part = ref === undefined ? undefined : board.def.parts[ref];
+  if (!part || base === undefined) return;
+  const hand = stepById(board.def, position.step)?.hand.find((each) => each.ref === part.id);
+  const value = item.fields[part.id];
+  // A value still missing is the engine's refusal, in its words.
+  if (!hand || hand.req === 'no' || typeof value !== 'string' || value.trim() === '') return;
+  const refused = landedCommitRefusal(cwd, part.name, value, base);
+  if (refused) throw new OteaError('missing_fields', `${item.id} not handed off: ${refused}`);
+}
+
 // A step that hands a branch hands the work on it: an agent's handoff of one with no commits over
 // its base (the board's protected base, else origin's default branch, main or master) leaves the
 // review nothing to see. Only a branch this checkout has, here or on origin, is checked. The base
@@ -1894,6 +1918,7 @@ const handoffCommand: Command = {
     let said: string | undefined;
     const moved = boardMove(input, (project, move) => {
       refuseEmptyBranch(project, input.cwd, move);
+      refuseUnlandedCommit(project, input.cwd, move);
       const handed = handedBranch(project, input.cwd, move);
       warning = handed.warning;
       said = handed.said;
@@ -2345,7 +2370,17 @@ function sharedCheckoutLine(project: Project, input: Input, id?: string): string
       `This is the repository's main checkout, and it is on ${on}, the branch of ${holder}: do ${id ?? 'this item'} in its own git worktree (git worktree add ../<folder> -b <branch>) and leave ${holder}'s branch as it is.`,
     );
   }
-  if (others.length > 0) {
+  // On a board that works straight on its base, the work is on main with no branch, and Otea lets
+  // one agent at a time take it (land-order.ts): a worktree of its own would only move the work off
+  // the base the person reviews, so the notice must not send the agent to one (P1-F2).
+  const board =
+    id === undefined ? undefined : liveBoardOf(project, getItem(project, id).collection);
+  const base = board && workedBase(board.def);
+  if (base !== undefined && others.length > 0) {
+    lines.push(
+      `${others.join(', ')} also holds work in this project, but this board works straight on ${base} with one agent at a time, so nobody else is changing ${base} while you hold ${id}: work here, on ${base}, with no branch and no worktree.`,
+    );
+  } else if (others.length > 0) {
     lines.push(
       `${others.join(', ')} also holds work in this project, and you are in the repository's main checkout: do your work on your own branch in your own git worktree (git worktree add ../<folder> -b <branch>), never in files another agent is changing.`,
     );

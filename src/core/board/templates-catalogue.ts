@@ -952,7 +952,7 @@ const DESIGN: Template = {
       kind: 'branch',
       name: w('Branch', 'Rama'),
       hint: w('design/<id>-<topic>, made from main', 'diseno/<id>-<tema>, creada desde main'),
-      guard: { push: ['screate', 'sland'], base: 'main' },
+      guard: { push: ['screate', 'sland'], base: 'main', commit: 'fcommit' },
     },
     {
       key: 'ediff',

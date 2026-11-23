@@ -196,6 +196,22 @@ describe('nextText', () => {
     );
   });
 
+  // P1-F7: «required, new this round (not new this round)» said the same words twice, one of them
+  // denying the other. The part says it asks for a new file each round; what lacks says the file
+  // there is is the one from the round before.
+  it('says an evidence from an earlier round is not new without contradicting itself', () => {
+    const text = nextText(def, {
+      ...base,
+      round: 2,
+      position: { step: 'sconcept', phase: 'doing' },
+      missing: [{ ref: 'eart', name: 'Arte conceptual', reason: 'not_new', fresh: true }],
+    });
+    expect(text).toContain(
+      '  ✗ Arte conceptual: required, new this round (only the one from an earlier round is attached)',
+    );
+    expect(text).not.toContain('(not new this round)');
+  });
+
   it('names the person who sent it back as the person', () => {
     const text = nextText(def, {
       ...base,

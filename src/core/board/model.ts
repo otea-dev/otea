@@ -94,7 +94,10 @@ export type Part = {
   proof?: boolean;
 };
 
-export type Guard = { push: string[]; repo?: string; base?: string };
+// `commit`: the field (part id) where an agent writes the short hash of the commit that landed on
+// `base`; a handoff that records one checks that it is a commit of the base (and on the remote's
+// branch of it, where the repo has a remote), not any text (P8-F1).
+export type Guard = { push: string[]; repo?: string; base?: string; commit?: string };
 
 // How a long text shows on the item page: as text, or as options side by side (### A · Name).
 export const LONG_SHOWS = ['text', 'options'] as const;

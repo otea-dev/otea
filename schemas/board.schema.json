@@ -166,6 +166,12 @@
                 "type": "string",
                 "description": "The base branch Otea protects too: agents push or merge into it only to bring in an item that is Done",
                 "examples": ["main"]
+              },
+              "commit": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "description": "The field (part id) where the agent writes the short hash of the commit that landed on the base: a handoff checks it is a commit of the base, and on its remote branch when the repo has a remote",
+                "examples": ["fcommit"]
               }
             },
             "required": ["push"],
@@ -175,7 +181,8 @@
               {
                 "push": ["simplement"],
                 "repo": "frepo",
-                "base": "main"
+                "base": "main",
+                "commit": "fcommit"
               }
             ]
           },

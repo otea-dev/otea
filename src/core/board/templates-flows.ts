@@ -327,7 +327,7 @@ const IMPLEMENTATION: Template = {
       kind: 'branch',
       name: w('Branch', 'Rama'),
       hint: w('task/<id>-<topic>, made from main', 'tarea/<id>-<tema>, creada desde main'),
-      guard: { push: ['doit', 'land'], base: 'main' },
+      guard: { push: ['doit', 'land'], base: 'main', commit: 'commit' },
     },
     {
       key: 'commit',
@@ -492,7 +492,7 @@ export const CHANGES: Template = {
       kind: 'branch',
       name: w('Branch', 'Rama'),
       hint: w('change/<id>-<topic>, made from main', 'cambio/<id>-<tema>, creada desde main'),
-      guard: { push: ['doit', 'land'], base: 'main' },
+      guard: { push: ['doit', 'land'], base: 'main', commit: 'commit' },
     },
     {
       key: 'diff',
@@ -669,21 +669,24 @@ export const MAINLINE: Template = {
         ),
         // Every item works on main: it starts there, never typed by hand (P2S-R3-10).
         initial: 'main',
-        guard: { push: ['land'], base: 'main' },
+        guard: { push: ['land'], base: 'main', commit: 'commit' },
       };
     if (part.key === 'diff')
       return {
         ...part,
         hint: w(
-          'git diff origin/main...main, whole: the commits not pushed yet',
-          'git diff origin/main...main, completo: los commits aún sin subir',
+          'the commits not pushed yet, whole: git diff origin/main...main (a repo with no remote has no origin: git diff <the commit main was at when you took it>...main)',
+          'los commits aún sin subir, completo: git diff origin/main...main (un repo sin remoto no tiene origin: git diff <el commit en que estaba main cuando lo tomaste>...main)',
         ),
       };
     if (part.key === 'commit')
       return {
         ...part,
         name: w('Commit pushed', 'Commit subido'),
-        hint: w('the short hash of main once pushed', 'el hash corto de main una vez subido'),
+        hint: w(
+          'the short hash of main once pushed (git rev-parse --short main); with no remote, the hash of main once approved',
+          'el hash corto de main una vez subido (git rev-parse --short main); sin remoto, el hash de main una vez aprobado',
+        ),
       };
     return part;
   }),
@@ -705,12 +708,12 @@ export const MAINLINE: Template = {
         ...step,
         name: w('Push', 'Subir'),
         take: w(
-          'The person approved it: push main as it is (git push origin main). Add nothing the person did not approve; if main on the remote moved, rebase on it first. If that rebase conflicts, do not resolve it here: take it back to @{doit} with otea handoff <id> --way "@{doit}" --reason "<what conflicts>", so the resolution is reviewed.',
-          'La persona lo aprobó: sube main tal como está (git push origin main). No agregues nada que la persona no haya aprobado; si main se movió en el remoto, rebasa sobre él primero. Si ese rebase choca, no lo resuelvas aquí: regrésalo a @{doit} con otea handoff <id> --way "@{doit}" --reason "<qué choca>", para que se revise la resolución.',
+          'The person approved it: push main as it is (git push origin main). A repo with no remote (git remote shows nothing) has nowhere to push to: do not invent one, push nothing, and say in the note that main stays local; the person adds a remote with git remote add origin <url> when they want it on a server. Add nothing the person did not approve; if main on the remote moved, rebase on it first. If that rebase conflicts, do not resolve it here: take it back to @{doit} with otea handoff <id> --way "@{doit}" --reason "<what conflicts>", so the resolution is reviewed.',
+          'La persona lo aprobó: sube main tal como está (git push origin main). Un repo sin remoto (git remote no muestra nada) no tiene adónde subir: no inventes uno, no subas nada y di en la nota que main queda local; la persona agrega un remoto con git remote add origin <url> cuando quiera tenerlo en un servidor. No agregues nada que la persona no haya aprobado; si main se movió en el remoto, rebasa sobre él primero. Si ese rebase choca, no lo resuelvas aquí: regrésalo a @{doit} con otea handoff <id> --way "@{doit}" --reason "<qué choca>", para que se revise la resolución.',
         ),
         before: w(
-          'Write in @{commit} the short hash of main once pushed.',
-          'Escribe en @{commit} el hash corto de main una vez subido.',
+          'Write in @{commit} the short hash of main once pushed (git rev-parse --short main); with no remote, the hash of main as approved. Otea checks it: a hash that is not a commit of main, or that is not on origin/main when the repo has a remote, is refused.',
+          'Escribe en @{commit} el hash corto de main una vez subido (git rev-parse --short main); sin remoto, el hash de main tal como se aprobó. Otea lo comprueba: un hash que no es un commit de main, o que no está en origin/main cuando el repo tiene remoto, se rechaza.',
         ),
       };
     return step;

@@ -106,12 +106,17 @@ const part = z
           'The base branch Otea protects too: agents push or merge into it only to bring in an item that is Done',
           'main',
         ).optional(),
+        commit: idOf(
+          'The field (part id) where the agent writes the short hash of the commit that landed on the base: a handoff checks it is a commit of the base, and on its remote branch when the repo has a remote',
+          'fcommit',
+        ).optional(),
       })
       .meta(
         about('A branch field only: Otea protects the branch', {
           push: ['simplement'],
           repo: 'frepo',
           base: 'main',
+          commit: 'fcommit',
         }),
       )
       .optional(),

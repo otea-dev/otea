@@ -245,7 +245,7 @@ const VALUE_BRIEF = 500;
 const REASON: Readonly<Record<Missing['reason'], string>> = {
   group: 'not enough attached',
   missing: 'missing',
-  not_new: 'not new this round',
+  not_new: 'only the one from an earlier round is attached',
   unchecked: 'boxes still open',
   unproved: 'points without proof',
   open: 'not finished',

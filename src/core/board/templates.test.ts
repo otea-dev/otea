@@ -160,6 +160,32 @@ describe('templates', () => {
     }
   });
 
+  // P2-F1, P2-F3, P8-F9: the board asked for git push origin main and a diff against origin/main
+  // in a repo that has no remote, so no honest handoff existed. It adapts instead of refusing a
+  // first local repo: the diff says what to use with no origin, the Push step says nothing is
+  // pushed and how to add a remote, and the hash field says what it holds then.
+  it('says what Code on main does with no remote, in both languages', () => {
+    const said = { en: /no remote/, es: /sin remoto/ };
+    for (const lang of ['en', 'es'] as const) {
+      const def = instantiate(requireTemplate('mainline'), lang, {}, sequenceIds());
+      const land = def.steps.at(-1);
+      expect(land?.instructions.take).toMatch(said[lang]);
+      expect(land?.instructions.take).toMatch(/git remote add origin <url>/);
+      const parts = Object.values(def.parts);
+      expect(parts.find(({ kind }) => kind === 'code')?.hint).toMatch(said[lang]);
+      expect(parts.find(({ key }) => key === 'commit')?.hint).toMatch(said[lang]);
+    }
+  });
+
+  // P8-F1: the commit field the guard names is checked by a handoff; boards keep naming it.
+  it('names the commit field of Code on main, so a handoff checks it', () => {
+    const def = instantiate(requireTemplate('mainline'), 'en', {}, sequenceIds());
+    const branch = guardedBranch(def);
+    const commit = branch?.guard.commit ? def.parts[branch.guard.commit] : undefined;
+    expect(commit?.name).toBe('Commit pushed');
+    expect(branch?.guard.base).toBe('main');
+  });
+
   // Rama had to be typed «main» on every item of Code on main (P2S-R3-10): it starts there.
   it('starts every item of Code on main on main, a board that works straight on its base', () => {
     const def = instantiate(requireTemplate('mainline'), 'es', {}, sequenceIds());

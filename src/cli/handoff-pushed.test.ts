@@ -169,11 +169,13 @@ describe('a handoff of a branch', () => {
         project.db.close();
       }
       expect((await otea('claim', 'CAM-1')).code).toBe(0);
-      expect((await otea('update', 'CAM-1', '--field', 'Commit en main=abc1234')).code).toBe(0);
       // main moved on meanwhile, and the agent rebased the branch on it here, never pushing that.
       git('checkout', '-q', 'main');
       change('m.txt', 'main moved\n');
       git('update-ref', 'refs/remotes/origin/main', 'main');
+      // The hash it lands as is a commit of main: the handoff checks it is (P8-F1).
+      const landed = git('rev-parse', '--short', 'main');
+      expect((await otea('update', 'CAM-1', '--field', `Commit en main=${landed}`)).code).toBe(0);
       git('checkout', '-q', BRANCH);
       git('-c', 'core.editor=true', 'rebase', '-q', 'main');
     });
