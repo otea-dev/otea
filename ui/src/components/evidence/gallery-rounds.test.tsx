@@ -111,3 +111,28 @@ describe('the desk gallery across rounds', () => {
     expect(button(off, 'Comparar con la ronda')).toBeUndefined();
   });
 });
+
+// P5-F1: a part new each round is met by attaching the file again, so a round can hold the very
+// bytes of the one before. The handoff takes it (an unchanged file is a legitimate answer, as for a
+// log or a spec); the review says so, instead of showing two identical pictures with no word.
+describe('the desk gallery when a round attached the same file again', () => {
+  const same = (entry: Evidence, sha256: string): Evidence => ({ ...entry, sha256 });
+  const first = same(logo1, 'aa');
+
+  it('says so beside Comparar, and in the compare itself', () => {
+    setLanguage('es');
+    const el = draw([first, same(logo2, 'aa')], new Map([[2, 1], [4, 2]]));
+    expect(el.textContent).toContain('Igual que la ronda 1: el archivo no cambió');
+    act(() => button(el, 'Comparar con la ronda 1')?.click());
+    expect(el.querySelector('.ev-compare')?.textContent).toContain('no cambió');
+  });
+
+  it('says nothing when the bytes changed, or when no hash is known', () => {
+    setLanguage('es');
+    const changed = draw([first, same(logo2, 'bb')], new Map([[2, 1], [4, 2]]));
+    expect(changed.textContent).not.toContain('no cambió');
+    act(() => root?.unmount());
+    const unknown = draw([same(logo1, ''), same(logo2, '')], new Map([[2, 1], [4, 2]]));
+    expect(unknown.textContent).not.toContain('no cambió');
+  });
+});
