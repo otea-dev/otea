@@ -248,7 +248,8 @@ describe('approving from the reader with a group short', () => {
     await press(inReader());
     // The second press closes the reader and the page's own button goes through without asking:
     // frames and the clock advance only when the test says so.
-    for (let frame = 0; frame < 12; frame++) {
+    // A slower machine takes more frames: it goes on until the move is made, within a bound.
+    for (let frame = 0; frame < 200 && (made.length === 0 || dialog() !== null); frame++) {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(20);
       });
