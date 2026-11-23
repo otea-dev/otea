@@ -230,7 +230,6 @@ export const studioPreview = {
   'bs.preview.try.log.otherRound': '{who} pidió otra ronda de {step}.',
   'bs.preview.try.log.done': '{id} llega a Hecho.',
 
-  'bs.preview.dropped': 'Descartado',
   'bs.preview.try.labelPair': 'Probar los dos tableros',
   'bs.preview.try.bannerPair':
     'Práctica con una copia de tus dos borradores, {parent} y {child} · aquí no se guarda nada',

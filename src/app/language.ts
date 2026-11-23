@@ -9,8 +9,8 @@ import { system } from './system-locale.ts';
 
 // The language of what Otea makes for the person: the language they use at that moment. A board
 // keeps its template's words in every language (core/board/localize.ts), so switching later
-// rewrites nothing and the desk reads each board in the language on its screen; what agents write
-// is up to the agents.
+// rewrites nothing; the desk reads each board in the language it was made in, as its agent does,
+// and the screen's language is for the desk's own words; what agents write is up to the agents.
 // The desk knows the language (the person's own choice, kept as a preference of the person in the
 // machine store); a command with no desk to ask resolves it here, in one place:
 //   1. the language the desk last used,

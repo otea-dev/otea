@@ -529,7 +529,7 @@ export async function fetchProjects(signal: AbortSignal): Promise<ProjectOvervie
   return (await get('/api/projects', signal)).json();
 }
 
-// What to paste into an agent's chat, in the screen's language: without a kind, the project's
+// What to paste into an agent's chat, in the project's language: without a kind, the project's
 // moment (the first contact while it has no board of its own, then one more agent joining).
 // `first`: a join prompt for a project's first agent, which connects since nobody else works there.
 export type AgentPromptView = {
@@ -537,17 +537,16 @@ export type AgentPromptView = {
   prompt: string;
   first?: boolean;
   // For the plain words beside the prompt (core/agent-prompts.ts connectFacts): whether the work is
-  // code, and the boards the agent will work, in the screen's language.
+  // code, and the boards the agent will work, named as the agent reads them.
   code?: boolean;
   boards?: { name: string; steps: string[] }[];
 };
 
 export async function fetchAgentPrompt(
   kind: AgentPromptView['kind'] | undefined,
-  lang: string,
   signal: AbortSignal,
 ): Promise<AgentPromptView> {
-  const query = new URLSearchParams({ lang, ...(kind ? { kind } : {}) });
+  const query = new URLSearchParams(kind ? { kind } : {});
   return (await get(`/api/agent-prompt?${query}`, signal)).json();
 }
 

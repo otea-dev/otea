@@ -9,6 +9,7 @@ import {
   step,
   tareasDeRepo,
 } from '../../../../src/core/board/testing.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { setLanguage } from '../../i18n/i18n.ts';
 import type { ItemEvent, RelatedItem } from '../../types.ts';
 import {
@@ -605,10 +606,10 @@ describe('approvalRefusal: Aprobar refused in words when a wait no longer holds'
       (r) => ({ board: r.collection, step: stepOf[r.state] ?? 'Triar' }),
     );
     expect(approvalRefusal('CAM-1', waitRows(cambios(), 'sexec', links))).toBe(
-      'No se aprobó CAM-1: RT-4 (Implementar) y RT-5 (Propuesta) siguen sin terminar.',
+      'No se aprobó CAM-1: RT-4 («Implementar») y RT-5 («Propuesta») siguen sin terminar.',
     );
     expect(approvalRefusal('ERR-1', waitRows(errores(), 'sfix', { ...links, parts: [] }))).toBe(
-      'No se aprobó ERR-1: ERR-2 (Errores, Triar) lo frena y sigue sin terminar.',
+      'No se aprobó ERR-1: ERR-2 (en «Errores», paso «Triar») lo frena y sigue sin terminar.',
     );
     expect(approvalRefusal('ERR-1', [])).toBeNull();
     setLanguage('en');
@@ -628,7 +629,7 @@ describe('approvalRefusal: Aprobar refused in words when a wait no longer holds'
     expect(links.blockers[0]).toMatchObject({ closed: false, step: 'Hecho, sin fusionar' });
     const rows = waitRows(errores(), 'sfix', links);
     expect(approvalRefusal('ENT-2', rows)).toBe(
-      'No se aprobó ENT-2: ENT-1 (Entregas) lo frena y aún no se fusionó: apruébalo cuando su rama esté en la base.',
+      'No se aprobó ENT-2: ENT-1 (en «Entregas») lo frena y aún no se fusionó: apruébalo cuando su rama esté en la base.',
     );
     expect(waitBlock(rows)).toBe('espera a ENT-1, que lo frena');
     setLanguage('en');
@@ -809,9 +810,27 @@ describe('the person’s own step', () => {
       expect.objectContaining({ ref: 'fwhat', name: 'Qué propone', ok: false, required: true }),
     ]);
     expect(handRows(def, step, missing)[0]?.part?.kind).toBe('long');
-    expect(handRefusal('TAR2-1', missing)).toBe('No se entregó TAR2-1: falta Qué propone.');
+    expect(handRefusal('TAR2-1', missing)).toBe('No se entregó TAR2-1. Falta: «Qué propone».');
     expect(handRefusal('TAR2-1', [])).toBeNull();
     expect(handRows(def, step, [])[0]?.ok).toBe(true);
+  });
+
+  // The picker Rellenar opens: a Spanish desk on an English board offers Low … Critical and Yes, No.
+  it('offers the levels and yes or no of an English board in English on a Spanish desk', () => {
+    setLanguage('es');
+    const def = { ...tareasDeRepo(), lang: 'en', title: 'Title' };
+    def.parts.flevel = { id: 'flevel', name: 'Risk', kind: 'level', hint: '', options: [] };
+    def.parts.fyes = { id: 'fyes', name: 'Safe', kind: 'yesno', hint: '', options: [] };
+    const step = ownStepOf(def, { state: 'sprop', turn: 'human' });
+    if (!step) throw new Error('no own step');
+    step.hand.push({ ref: 'flevel', req: 'always', fresh: false });
+    step.hand.push({ ref: 'fyes', req: 'always', fresh: false });
+    const names = (ref: string) => {
+      const control = handRows(def, step, []).find((row) => row.ref === ref)?.control;
+      return control && 'choices' in control ? control.choices.map(({ name }) => name) : [];
+    };
+    expect(names('flevel')).toEqual(['Low', 'Medium', 'High', 'Critical']);
+    expect(names('fyes')).toEqual(['Yes', 'No']);
   });
 
   it('marks an optional deliverable done only once it holds something', () => {
@@ -870,7 +889,8 @@ describe('the person’s own step', () => {
       hint: '',
       options,
     });
-    expect(fillControl(part('level'))).toEqual({
+    const spanish = boardSpeech({ lang: 'es', title: 'Título' });
+    expect(fillControl(part('level'), spanish)).toEqual({
       choices: [
         { id: 'low', name: 'Baja' },
         { id: 'medium', name: 'Media' },
@@ -878,20 +898,49 @@ describe('the person’s own step', () => {
         { id: 'critical', name: 'Crítica' },
       ],
     });
-    expect(fillControl(part('yesno'))).toEqual({
+    expect(fillControl(part('yesno'), spanish)).toEqual({
       choices: [
         { id: 'yes', name: 'Sí' },
         { id: 'no', name: 'No' },
       ],
     });
-    expect(fillControl(part('choice', [{ id: 'c1', name: 'Bug' }]))).toEqual({
+    expect(fillControl(part('choice', [{ id: 'c1', name: 'Bug' }]), spanish)).toEqual({
       choices: [{ id: 'c1', name: 'Bug' }],
     });
-    expect(fillControl(part('number'))).toEqual({ input: 'number' });
-    expect(fillControl(part('date'))).toEqual({ input: 'date' });
-    expect(fillControl(part('url'))).toEqual({ input: 'url' });
-    expect(fillControl(part('long'))).toEqual({ input: 'long' });
-    expect(fillControl(part('text'))).toEqual({ input: 'text' });
+    expect(fillControl(part('number'), spanish)).toEqual({ input: 'number' });
+    expect(fillControl(part('date'), spanish)).toEqual({ input: 'date' });
+    expect(fillControl(part('url'), spanish)).toEqual({ input: 'url' });
+    expect(fillControl(part('long'), spanish)).toEqual({ input: 'long' });
+    expect(fillControl(part('text'), spanish)).toEqual({ input: 'text' });
+  });
+
+  // A Spanish desk on an English board: Rellenar offers the words the agent reads (Low, Yes), not
+  // the screen's (Baja, Sí).
+  it('fills a level and a yes or no in the board’s language, not the screen’s', () => {
+    setLanguage('es');
+    const def = { ...tareasDeRepo(), lang: 'en', title: 'Title' };
+    const part = (kind: Part['kind']): Part => ({
+      id: 'fx',
+      name: 'X',
+      kind,
+      hint: '',
+      options: [],
+    });
+    const english = boardSpeech(def);
+    expect(fillControl(part('level'), english)).toEqual({
+      choices: [
+        { id: 'low', name: 'Low' },
+        { id: 'medium', name: 'Medium' },
+        { id: 'high', name: 'High' },
+        { id: 'critical', name: 'Critical' },
+      ],
+    });
+    expect(fillControl(part('yesno'), english)).toEqual({
+      choices: [
+        { id: 'yes', name: 'Yes' },
+        { id: 'no', name: 'No' },
+      ],
+    });
   });
 
   it('leaves out a deliverable asked only when a field holds a value it does not hold', () => {

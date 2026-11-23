@@ -212,7 +212,7 @@ describe('Nuevo ítem', () => {
     // it can be created (P6-R2-8).
     expect(html).toContain('aria-describedby="intake-why"');
     expect(html).toContain(
-      '<span class="hint" id="intake-why" aria-live="polite">Falta Título para crear.</span>',
+      '<span class="hint" id="intake-why" aria-live="polite">Para crear falta: «Título».</span>',
     );
   });
 
@@ -300,7 +300,7 @@ describe('Te espera', () => {
     const html = renderToStaticMarkup(
       createElement('div', null, (blocks[1] as { content: ReactNode }).content),
     );
-    expect(html).toContain('Refinar · en revisión');
+    expect(html).toContain('Refinar (en revisión)');
     // The same id lives in several projects: the project's name goes right after it.
     expect(html).toContain(
       '<span class="id">SAL-12</span><span class="mpt"><span class="sep">·</span><span class="pid">Salinas</span></span>',

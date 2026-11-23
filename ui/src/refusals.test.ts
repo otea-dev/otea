@@ -10,7 +10,7 @@ const refused = (code: string, message: string, details?: unknown) => ({
 
 const reopened = refused(
   'children_open',
-  'Not approved CAMBIOS-1: 1 of its 4 Tareas de repo is not finished: TAR-6 (Implementar).',
+  'Not approved CAMBIOS-1: 1 of its 4 Tareas de repo is not finished: TAR-6 (“Implementar”).',
   {
     kind: 'approval',
     item: 'CAMBIOS-1',
@@ -31,13 +31,13 @@ describe('a refusal from the server', () => {
   it('is said in Spanish from its code and details, never as the English message', () => {
     setLanguage('es');
     expect(serverMessage(reopened, 409)).toBe(
-      'No se aprobó CAMBIOS-1: 1 de sus 4 partes sigue sin terminar: TAR-6 (Implementar).',
+      'No se aprobó CAMBIOS-1: 1 de sus 4 partes sigue sin terminar: TAR-6 («Implementar»).',
     );
   });
 
   it('is said in the English UI’s own words too', () => {
     expect(serverMessage(reopened, 409)).toBe(
-      'Not approved CAMBIOS-1: 1 of its 4 parts is not finished: TAR-6 (Implementar).',
+      'Not approved CAMBIOS-1: 1 of its 4 parts is not finished: TAR-6 (“Implementar”).',
     );
   });
 
@@ -59,11 +59,11 @@ describe('a refusal from the server', () => {
       ],
     });
     expect(serverMessage(body, 422)).toBe(
-      'No se entregó ERR-1: faltan Diff (nuevo en esta ronda) y una nota.',
+      'No se entregó ERR-1: faltan «Diff» (nuevo en esta ronda) y una nota.',
     );
     setLanguage('en');
     expect(serverMessage(body, 422)).toBe(
-      'Not handed off ERR-1: missing Diff (new this round) and a note.',
+      'Not handed off ERR-1: missing “Diff” (new this round) and a note.',
     );
   });
 
@@ -87,7 +87,7 @@ describe('a refusal from the server', () => {
       ],
     });
     expect(serverMessage(parts, 409)).toBe(
-      'No se entregó CAM-1: 2 de sus 3 partes siguen sin terminar: T-1 (Hacer) y T-2 (Hacer).',
+      'No se entregó CAM-1: 2 de sus 3 partes siguen sin terminar: T-1 («Hacer») y T-2 («Hacer»).',
     );
     const blockers = refused('blockers_open', 'x', {
       kind: 'handoff',
@@ -103,7 +103,7 @@ describe('a refusal from the server', () => {
       ],
     });
     expect(serverMessage(blockers, 409)).toBe(
-      'No se entregó CAM-1: ERR-4 (Errores, Arreglar) lo frena y sigue sin terminar.',
+      'No se entregó CAM-1: ERR-4 («Errores», «Arreglar») lo frena y sigue sin terminar.',
     );
     const unmerged = refused('blockers_open', 'x', {
       kind: 'handoff',
@@ -119,7 +119,7 @@ describe('a refusal from the server', () => {
       ],
     });
     expect(serverMessage(unmerged, 409)).toBe(
-      'No se entregó ENT-2: ENT-1 (Entregas, Hecho, sin fusionar) lo frena y aún no se fusionó.',
+      'No se entregó ENT-2: ENT-1 («Entregas», Hecho, sin fusionar) lo frena y aún no se fusionó.',
     );
     const unmergedParts = refused('children_open', 'x', {
       kind: 'handoff',

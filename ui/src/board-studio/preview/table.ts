@@ -8,6 +8,7 @@ import {
   stepById,
   usedRefs,
 } from '../../../../src/core/board/model.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { t } from '../../i18n/i18n.ts';
 import { type SampleItem, sampleValue } from './samples.ts';
 
@@ -31,7 +32,8 @@ export type TableView = {
 };
 
 const stepName = (def: BoardDefinition, item: SampleItem): string => {
-  if (item.closed) return item.look === 'dropped' ? t('bs.preview.dropped') : t('bs.done');
+  if (item.closed)
+    return item.look === 'dropped' ? boardSpeech(def).dropped : boardSpeech(def).done;
   return (item.step ? stepById(def, item.step)?.name : undefined) ?? '—';
 };
 
@@ -67,7 +69,7 @@ export function tableOf(def: BoardDefinition, items: readonly SampleItem[]): Tab
   const keys = [...new Set(items.map(keyOf))];
   if (grouped?.kind === 'level') {
     const rank = (key: string | null) =>
-      LEVELS.findIndex((level) => t(`bs.level.${level}` as 'bs.level.low') === key);
+      LEVELS.findIndex((level) => boardSpeech(def).level(level) === key);
     keys.sort((a, b) => rank(b) - rank(a));
   }
   return {

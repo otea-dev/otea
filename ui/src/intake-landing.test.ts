@@ -32,7 +32,7 @@ describe('where a new item lands', () => {
     const landing = landingOf(bug, { title: '', steps: '' });
 
     expect(landing).toMatchObject({ ready: false, kind: 'incomplete', missing: ['title'] });
-    expect(landingNote(landing)).toBe('draft · Title to create');
+    expect(landingNote(landing)).toBe('draft · missing to create: “Title”');
   });
 
   it('lands on the lane of the state it starts in', () => {

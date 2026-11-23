@@ -197,10 +197,4 @@ export const boardStudio = {
   'bs.show.ab': 'A and B, blind',
   'bs.show.strip': 'as a strip of frames',
   'bs.show.player': 'in a player',
-  'bs.level.low': 'low',
-  'bs.level.medium': 'medium',
-  'bs.level.high': 'high',
-  'bs.level.critical': 'critical',
-  'bs.yes': 'yes',
-  'bs.no': 'no',
 } as const;

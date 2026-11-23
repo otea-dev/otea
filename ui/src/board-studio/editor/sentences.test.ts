@@ -176,8 +176,9 @@ describe('waysConseq', () => {
       'Quien termina el paso elige Pulir o Hecho y dice por qué. Si eso te deja menos por revisar, te llega como pregunta.',
     );
     setLanguage('en');
+    // The board is in Spanish: its end reads Hecho on an English screen too, as its agent says it.
     expect(plain(waysConseq(def, step(def, 'sconcept')) as Sentence)).toBe(
-      'When you approve it you choose: Approve → Animar or → Done.',
+      'When you approve it you choose: Approve → Animar or → Hecho.',
     );
   });
 });

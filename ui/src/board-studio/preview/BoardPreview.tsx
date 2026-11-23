@@ -1,4 +1,5 @@
 import type { BoardDefinition } from '../../../../src/core/board/model.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { t } from '../../i18n/i18n.ts';
 import { LaneHead } from '../../lanes/LaneHead.tsx';
 import type { LaneBlock } from '../../lanes/LaneList.tsx';
@@ -42,7 +43,7 @@ export function BoardPreview({ draft }: { draft: ReadyDraft }) {
   blocks.push({
     kind: 'sec',
     key: 'sec:done',
-    title: t('bs.done'),
+    title: boardSpeech().done,
     count: done.length,
     gloss: t('bs.preview.board.doneGloss'),
   });

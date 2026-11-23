@@ -152,8 +152,18 @@ describe('the words of a scale', () => {
     expect(scaleWord(def, 'risk', 'critical', 'critical')).toBe('Crítica');
     def.analysis = { effort: 'feffort' };
     expect(scaleWord(def, 'effort', 'cs', 'S')).toBe('S');
-    setLanguage('en');
-    def.analysis = { effort: 'flevel' };
-    expect(scaleWord(def, 'effort', 'critical', 'critical')).toBe('Huge');
+  });
+
+  // A Spanish desk on an English board: the Matrix says the words the agent reads (Huge, Low), not
+  // the screen's (Enorme, Baja).
+  it('says the sizes and levels in the board’s language, not the screen’s', () => {
+    setLanguage('es');
+    const def = { ...weighed(), lang: 'en', title: 'Title' };
+    def.parts.flevel = { id: 'flevel', name: 'Level', kind: 'level', hint: '', options: [] };
+    def.analysis = { effort: 'flevel', risk: 'frisk' };
+    expect(
+      ['low', 'medium', 'high', 'critical'].map((v) => scaleWord(def, 'effort', v, v)),
+    ).toEqual(['Small', 'Medium', 'Large', 'Huge']);
+    expect(scaleWord(def, 'risk', 'low', 'low')).toBe('Low');
   });
 });

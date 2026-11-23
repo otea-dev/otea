@@ -9,6 +9,7 @@ import {
   type Target,
   workedBase,
 } from '../../../../src/core/board/model.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { listOf, listOr, t, tx } from '../../i18n/i18n.ts';
 import { Dialog } from '../../kit/pop/Dialog.tsx';
 import { Swap } from '../../kit/Swap.tsx';
@@ -335,7 +336,8 @@ function gateSentence(state: PracticeState, round: number): string {
 // Where an item of the practice stands, for the tree: its step and whose turn, or how it ended.
 function whereText(item: PracticeState): string {
   const { def, position } = item;
-  if (isClosed(position)) return position.closed === DONE ? t('bs.done') : t('bs.preview.dropped');
+  if (isClosed(position))
+    return position.closed === DONE ? boardSpeech(def).done : boardSpeech(def).dropped;
   const step = stepById(def, position.step);
   const quick = quickAction(item);
   const name = step?.name ?? '';
@@ -436,7 +438,7 @@ export function PracticeDialog({ draft, pair, open, onClose }: PracticeDialogPro
     def,
     view.closed ? DONE : { step: view.step, phase: view.phase },
     view.dips,
-    { done: t('bs.done'), dip: (n) => t('bs.preview.dip', { n }) },
+    { done: boardSpeech().done, dip: (n) => t('bs.preview.dip', { n }) },
   );
   const play = (change: (s: PracticeState, c: BoardDefinition | undefined) => PracticeState) => {
     setRun(act(run, change));

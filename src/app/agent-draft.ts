@@ -43,7 +43,6 @@ import { evidenceFile, placeFile, recordEvidence } from './evidence.ts';
 import { type Clock, insertNewItem, requireItem, systemClock } from './items.ts';
 import { liveBoardOf } from './next.ts';
 import type { Project } from './project.ts';
-import { inLanguage } from './reading-lang.ts';
 
 // "Que lo esboce un agente": the person asks on a Pedido (their words its field; how to hand the
 // draft in, its step's instructions: draft-request.ts), the board waits as a draft, the agent
@@ -601,24 +600,13 @@ export function mergeDefinitions(
 }
 
 // Reads the agent's board.json (evidence on the board's Pedido) into the draft, with what it added.
-// The merge reads the draft in the language the board was made in, whatever language the desk that
-// asked is in: the agent wrote its file from the draft as an agent reads it, so its words and the
-// draft's are in the same language and the snapshot is reconciled against that one.
+// The agent wrote its file from the draft as it reads it, in the language the board was made in, so
+// its words and the draft's are in the same language and the snapshot is reconciled against it.
 export function mergeAgentDraft(
   project: Project,
   boardId: string,
   evidenceId: number,
-  now = systemClock,
-): BoardRecord {
-  inLanguage(undefined, () => mergeAgentDraftIn(project, boardId, evidenceId, now));
-  return getBoardRecord(project, boardId);
-}
-
-function mergeAgentDraftIn(
-  project: Project,
-  boardId: string,
-  evidenceId: number,
-  now: Clock,
+  now: Clock = systemClock,
 ): BoardRecord {
   const record = getBoardRecord(project, boardId);
   const draft = record.draft;

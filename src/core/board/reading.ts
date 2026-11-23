@@ -13,7 +13,7 @@ import {
   usedRefs,
 } from './model.ts';
 import { DONE_NAME, DROPPED_NAME } from './next.ts';
-import { type Lang, LEVEL_SAID, TITLE_NAME, YES_NO_VALUE } from './template-words.ts';
+import { BOARD_WORDS, type Lang, LEVEL_SAID, TITLE_NAME, YES_NO_VALUE } from './template-words.ts';
 
 // What a reader of a board item meets and types: names, never the hidden ids under them. An agent
 // fills `--field Tamaño=Una`, attaches `--module Bocetos`, and reads `state: Concepto (in review)`;
@@ -191,7 +191,10 @@ export function evidenceByName(def: BoardDefinition, key: string): string {
 }
 
 // How a review reads after its step's name, in the board's language (Concepto (en revisión)).
-const IN_REVIEW: Readonly<Record<Lang, string>> = { en: 'in review', es: 'en revisión' };
+const IN_REVIEW: Readonly<Record<Lang, string>> = {
+  en: BOARD_WORDS.en.inReview,
+  es: BOARD_WORDS.es.inReview,
+};
 
 // A state as a reader says it: the step's name, with its review when it is one.
 export function stateName(def: BoardDefinition, state: string): string {

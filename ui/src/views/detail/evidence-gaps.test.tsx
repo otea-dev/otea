@@ -116,12 +116,14 @@ describe('the review of a delivery with mixed evidence', () => {
     expect(markup).not.toContain('data-module="recording"');
     expect(markup).not.toContain('data-module="images"');
     expect(markup).not.toContain('ev-empty');
-    expect(markup).toContain('+ Animación, Captura (optional, not provided)');
+    expect(markup).toContain('+ “Animación”, “Captura” (optional, not provided)');
   });
 
   it('says the quiet line in Spanish', () => {
     setLanguage('es');
-    expect(evidenceMarkup(delivered)).toContain('+ Animación, Captura (opcionales, sin cargar)');
+    expect(evidenceMarkup(delivered)).toContain(
+      '+ «Animación», «Captura» (opcionales, sin cargar)',
+    );
   });
 
   it('shows required evidence that is missing in red, dashed, and the group that is not met', () => {
@@ -129,7 +131,9 @@ describe('the review of a delivery with mixed evidence', () => {
     expect(markup).toContain('class="ev-empty well" data-required="true"');
     expect(markup).toContain('data-module="files"');
     expect(markup).toContain('ev-gap miss');
-    expect(markup).toContain('Prueba: at least 1 of Animación, Captura, or Salida (0 attached)');
+    expect(markup).toContain(
+      'Prueba: at least 1 of “Animación”, “Captura”, or “Salida” (0 attached)',
+    );
   });
 
   // P5-F6: «(1 adjuntados)». The count agrees with what it counts, and a group new in each round
@@ -153,14 +157,14 @@ describe('the review of a delivery with mixed evidence', () => {
       const some = hand('eshot');
       if (some) some.fresh = true;
       expect(evidenceMarkup(item([file(1, 'efile', 'informe.txt')]))).toContain(
-        'at least 2 of Animación, Captura, or Salida, new this round: Captura (0 attached)',
+        'at least 2 of “Animación”, “Captura”, or “Salida”, new this round: “Captura” (0 attached)',
       );
       for (const ref of ['eanim', 'eshot', 'elog']) {
         const part = hand(ref);
         if (part) part.fresh = true;
       }
       expect(evidenceMarkup(item([file(1, 'efile', 'informe.txt')]))).toContain(
-        'at least 2 of Animación, Captura, or Salida, each new this round (0 attached)',
+        'at least 2 of “Animación”, “Captura”, or “Salida”, each new this round (0 attached)',
       );
     } finally {
       if (originalGroups) animar.groups = originalGroups;

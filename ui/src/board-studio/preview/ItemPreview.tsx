@@ -8,7 +8,8 @@ import {
   type Step,
   stepById,
 } from '../../../../src/core/board/model.ts';
-import { listOf, listOr, t, tx } from '../../i18n/i18n.ts';
+import { boardSpeech } from '../../board-words.ts';
+import { listOf, listOr, quoted, t, tx } from '../../i18n/i18n.ts';
 import { Seg } from '../../kit/Seg.tsx';
 import { LaneList } from '../../lanes/LaneList.tsx';
 import type { Look } from '../../lanes/looks.ts';
@@ -98,7 +99,7 @@ export function ItemPreview({
   const reviewer = t('bs.preview.anotherAgent');
   const Reviewer = t('bs.preview.anotherAgentCap');
   const route = definitionRoute(def, { step: step.id, phase: at }, [], {
-    done: t('bs.done'),
+    done: boardSpeech().done,
     dip: (n) => t('bs.preview.dip', { n }),
   });
   const ways = waysOf(def, step.id);
@@ -356,7 +357,7 @@ export function GroupCheck({
           {t('bi.hand.group', {
             name: group.name,
             min: group.min,
-            list: listOr(group.parts.map((ref) => partOf(def, ref)?.name ?? ref)),
+            list: listOr(group.parts.map((ref) => quoted(partOf(def, ref)?.name ?? ref))),
           })}
         </span>
         <small>{word}</small>
@@ -412,7 +413,7 @@ function Moves({
     return (
       <div className="actions bsp-actions">
         <button type="button" className="btn primary" onClick={why}>
-          {t('bs.preview.approve', { to: first ? targetName(def, first) : t('bs.done') })}
+          {t('bs.preview.approve', { to: first ? targetName(def, first) : boardSpeech().done })}
         </button>
         {ways.length > 1 ? (
           <span className="bsp-tag">
@@ -448,7 +449,7 @@ function Moves({
       step.reviewer === 'you'
         ? t('bs.preview.wait.toYou')
         : step.reviewer === 'none'
-          ? t('bs.preview.wait.onTo', { to: first ? targetName(def, first) : t('bs.done') })
+          ? t('bs.preview.wait.onTo', { to: first ? targetName(def, first) : boardSpeech().done })
           : t('bs.preview.wait.thenReviews', { who: reviewer });
     return (
       <button type="button" className="bsp-waitline" onClick={why}>

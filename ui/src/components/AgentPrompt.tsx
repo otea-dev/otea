@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode, useCallback, useState } from 'react';
 import { type AgentPromptView, fetchAgentPrompt } from '../api.ts';
 import { useRemote } from '../hooks.ts';
-import { language, t } from '../i18n/i18n.ts';
+import { t } from '../i18n/i18n.ts';
 import { Button } from '../kit/Button.tsx';
 import { Icon } from '../kit/Icon.tsx';
 import type { Remote } from '../remote.ts';
@@ -47,17 +47,13 @@ export function withCode(text: string) {
   );
 }
 
-// The prompt the server writes for this project and this screen's language, read again when the
+// The prompt the server writes for this project, in its language, read again when the
 // project changes (`version`): who listens and what waits move.
 export function useAgentPrompt(
   kind: AgentPromptView['kind'] | undefined,
   version: number,
 ): Remote<AgentPromptView> {
-  const lang = language();
-  const load = useCallback(
-    (signal: AbortSignal) => fetchAgentPrompt(kind, lang, signal),
-    [kind, lang],
-  );
+  const load = useCallback((signal: AbortSignal) => fetchAgentPrompt(kind, signal), [kind]);
   return useRemote(load, version, 'live');
 }
 

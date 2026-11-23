@@ -1,4 +1,5 @@
 import { isEvidence, LEVELS, type Part, partOf, TITLE } from '../../../../src/core/board/model.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { t } from '../../i18n/i18n.ts';
 import { NodeGlyph } from '../../lanes/NodeGlyph.tsx';
 import { Route } from '../../views/detail/Route.tsx';
@@ -14,7 +15,7 @@ function FormInput({ part }: { part: Part }) {
   if (part.kind === 'choice' || part.kind === 'multi' || part.kind === 'level') {
     const names =
       part.kind === 'level'
-        ? LEVELS.map((level) => t(`bs.level.${level}` as 'bs.level.low'))
+        ? LEVELS.map((level) => boardSpeech().level(level))
         : part.options.map(({ name }) => name);
     return (
       <div className="bsp-chips">
@@ -93,7 +94,7 @@ export function DonePreview({ draft }: { draft: ReadyDraft }) {
   const { def } = draft;
   const reviewed = def.steps.find((step) => step.reviewer === 'you');
   const route = definitionRoute(def, 'done', reviewed ? [{ from: reviewed.id }] : [], {
-    done: t('bs.done'),
+    done: boardSpeech().done,
     dip: (n) => t('bs.preview.dip', { n }),
   });
   return (
@@ -103,7 +104,7 @@ export function DonePreview({ draft }: { draft: ReadyDraft }) {
         <span className="id">{boardPrefix(def)}-9</span>
         <span aria-hidden="true">·</span>
         <span>{def.item}</span>
-        <span className="turn other">{t('bs.done')}</span>
+        <span className="turn other">{boardSpeech().done}</span>
       </div>
       <h3 className="headline bsp-headline">{sampleTitle(def, 1)}</h3>
       <p className="standfirst bsp-stand">{t('bs.preview.done.stand')}</p>

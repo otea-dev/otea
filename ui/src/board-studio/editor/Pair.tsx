@@ -1,5 +1,6 @@
 import { Fragment, useLayoutEffect, useRef, useState } from 'react';
 import { type BoardDefinition, partOf } from '../../../../src/core/board/model.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { language, t, tx } from '../../i18n/i18n.ts';
 import { Seg } from '../../kit/Seg.tsx';
 import { C } from '../../motion/curves.ts';
@@ -280,7 +281,7 @@ function boardSentence(def: BoardDefinition) {
         after: `(${whoShort(s.doer)})`,
       })),
     ),
-    done: <b>{t('bs.done')}</b>,
+    done: <b>{boardSpeech().done}</b>,
   });
 }
 

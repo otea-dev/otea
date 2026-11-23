@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { type BoardDefinition, DONE, type Target } from '../../../../src/core/board/model.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { language, listOf, t, tx } from '../../i18n/i18n.ts';
 import { Dialog } from '../../kit/pop/Dialog.tsx';
 import { RowIcon } from '../../shell/Rail.tsx';
@@ -458,7 +459,7 @@ export function Effects({
                     {step.name}
                   </option>
                 ))}
-                <option value={DONE}>{t('bs.done')}</option>
+                <option value={DONE}>{boardSpeech().done}</option>
               </select>
             ),
           })}

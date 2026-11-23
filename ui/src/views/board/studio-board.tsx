@@ -6,6 +6,7 @@ import { sentenceNode } from '../../board-studio/editor/SentenceText.tsx';
 import { summary } from '../../board-studio/editor/sentences.ts';
 import { boardOfCollection, boardsOf, useBoards } from '../../board-studio/home/boards-store.ts';
 import { doesText, reviewsText } from '../../board-studio/words.ts';
+import { boardSpeech } from '../../board-words.ts';
 import { itemWord } from '../../format.ts';
 import { t, tx } from '../../i18n/i18n.ts';
 import { Button } from '../../kit/Button.tsx';
@@ -133,7 +134,7 @@ export function emptyStepBlocks(studio: StudioBoard): LaneBlock[] {
     {
       kind: 'sec',
       key: 'step:done',
-      title: t('bs.done'),
+      title: boardSpeech(studio.live).done,
       count: 0,
       gloss: t('bs.board.doneGloss'),
     },

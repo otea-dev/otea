@@ -29,7 +29,6 @@ import { checkGate } from './gates.ts';
 import { createItem, getItem, moveItem, showItem, updateItem } from './items.ts';
 import { itemNextText, nextFor } from './next.ts';
 import type { Project } from './project.ts';
-import { inLanguage } from './reading-lang.ts';
 import { memoryContext, projectOf } from './testing.ts';
 import { undoMove } from './undo.ts';
 
@@ -163,9 +162,8 @@ describe('an agent drafting a board', () => {
   });
 
   // An agent writes its board.json from the draft it printed, in the language the board was made in,
-  // and may leave out `lang` and `snapshot`. The person merging it from a desk in another language
-  // must not strip them: the board is the draft's, and its words read in each language afterwards.
-  it('keeps the language and the snapshot of a board whose draft the agent handed in without them, merged from another language', () => {
+  // and may leave out `lang` and `snapshot`: the board is the draft's, so the merge keeps them.
+  it('keeps the language and the snapshot of a board whose draft the agent handed in without them', () => {
     const ctx = project();
     const { board, item } = requestAgentDraft(
       ctx,
@@ -178,22 +176,19 @@ describe('an agent drafting a board', () => {
     expect(lang).toBe('es');
     expect(Object.keys(snapshot ?? {})).toContain('title');
 
-    inLanguage('en', () =>
-      submitAgentDraft(
-        ctx,
-        { id: item, text: JSON.stringify(file), actor: kiln, channel: 'cli' },
-        now,
-      ),
+    submitAgentDraft(
+      ctx,
+      { id: item, text: JSON.stringify(file), actor: kiln, channel: 'cli' },
+      now,
     );
 
-    const read = (language: 'en' | 'es' | undefined) =>
-      inLanguage(language, () => getBoardRecord(ctx, board.id).draft?.definition);
-    expect(read(undefined)?.lang).toBe('es');
-    expect(read('es')?.title).toBe('Título');
-    expect(read('en')?.title).toBe('Title');
-    // What the agent wrote is its own, in every language.
-    expect(read('en')?.steps[0]?.name).toBe('Concepto');
-    expect(read('en')?.parts.eart?.name).toBe('Arte conceptual');
+    const read = getBoardRecord(ctx, board.id).draft?.definition;
+    expect(read?.lang).toBe('es');
+    expect(read?.title).toBe('Título');
+    expect(Object.keys(read?.snapshot ?? {})).toContain('title');
+    // What the agent wrote is its own.
+    expect(read?.steps[0]?.name).toBe('Concepto');
+    expect(read?.parts.eart?.name).toBe('Arte conceptual');
   });
 
   it('says, by name, the parts no form, handoff or anytime places: no item would get them', () => {

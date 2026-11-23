@@ -23,7 +23,6 @@ import {
   type BranchStrip,
   branchSaid,
   type DraftRequest,
-  fillControl,
   type HandRow,
   type ItemLinks,
   type LinkedView,
@@ -95,7 +94,7 @@ export function HandChecklist({
     <div className="bi-check bi-hand" data-c>
       {rows.map((row) => {
         const editing = open === row.ref && !!row.part;
-        const control = row.part ? fillControl(row.part) : null;
+        const control = row.control ?? null;
         return (
           <div key={row.ref} className="bi-hrow">
             <div className={['hc', row.ok ? 'ok' : 'miss', row.required ? 'req' : ''].join(' ')}>

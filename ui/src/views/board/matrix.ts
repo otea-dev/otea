@@ -8,6 +8,7 @@ import {
   stepOf,
 } from '../../../../src/core/board/analysis.ts';
 import type { BoardDefinition } from '../../../../src/core/board/model.ts';
+import { boardSpeech, capital } from '../../board-words.ts';
 import { t } from '../../i18n/i18n.ts';
 import type { Item } from '../../types.ts';
 
@@ -30,8 +31,8 @@ export type Matrix = {
   placed: number;
 };
 
-// The words of a step of a scale. A level reads in the language on screen; when it plays the
-// effort, as sizes (Pequeño … Enorme), as the templates' own Esfuerzo does: «Esfuerzo: Crítica»
+// The words of a step of a scale. A level reads in the language of the board, the agent's, not the
+// screen's; when it plays the effort, as sizes (Pequeño … Enorme), as the templates' own Esfuerzo does: «Esfuerzo: Crítica»
 // read as a priority (P4-R2-11). Any other scale keeps its own names.
 export function scaleWord(
   def: BoardDefinition,
@@ -41,11 +42,8 @@ export function scaleWord(
 ): string {
   const part = rolePart(def, role);
   if (part?.kind !== 'level') return name;
-  const word =
-    role === 'effort'
-      ? t(`matrix.size.${value}` as 'matrix.size.low')
-      : t(`bs.level.${value}` as 'bs.level.low');
-  return word.charAt(0).toLocaleUpperCase() + word.slice(1);
+  const speech = boardSpeech(def);
+  return capital(role === 'effort' ? speech.size(value) : speech.level(value));
 }
 
 // The axes a person picked, kept only while both are still mapped and differ; else the default.

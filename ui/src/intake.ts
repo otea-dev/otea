@@ -1,6 +1,6 @@
 import { initialPosition, isClosed } from '../../src/core/board/engine.ts';
 import type { BoardDefinition } from '../../src/core/board/model.ts';
-import { presetText, t } from './i18n/i18n.ts';
+import { presetText, quoted, t } from './i18n/i18n.ts';
 import type { Lane } from './lanes/geometry.ts';
 import type { Look } from './lanes/looks.ts';
 import { type NodeKind, nodeKind } from './node-kind.ts';
@@ -105,7 +105,7 @@ export function landingNote(
 ): string {
   if (!ready) {
     const fields = missing.map((field) => fieldWord(type, field) ?? fieldLabel(field));
-    return t('intake.draft', { fields: fields.join(', ') });
+    return t('intake.draft', { fields: fields.map(quoted).join(', ') });
   }
   const state = stateWord(type, name);
   if (turn === 'human') return t('intake.landsOnYou', { state });
@@ -148,7 +148,7 @@ export function createBlocked({
     return parent.open > 0
       ? t('bi.create.pickParent', { item: parent.item })
       : t('bi.create.noParent', { board: parent.board });
-  if (missing.length > 0) return t('intake.blocked', { fields: missing.join(', ') });
+  if (missing.length > 0) return t('intake.blocked', { fields: missing.map(quoted).join(', ') });
   return undefined;
 }
 

@@ -4,9 +4,10 @@ import { LANGS, type Lang } from './template-words.ts';
 // A board says its words in every language Otea speaks. When a template makes a board, each word
 // the template gave it (a name, a hint, an instruction) is kept on the board in all those languages,
 // in `snapshot`; the board never looks at the template again, so a later release that edits or
-// removes a template touches no board that exists. The desk reads a board in the language on its
-// screen, an agent in the language it was made in (`lang`), and a word in no snapshot is the one
-// text its person wrote, the same in every language. When a person changes a word that has a
+// removes a template touches no board that exists. The desk and the agent both read a board in the
+// language it was made in (`lang`), whatever the desk's screen is in; the snapshot keeps the other
+// language's words for a board read in it, and a word in no snapshot is the one text its person
+// wrote, the same in every language. When a person changes a word that has a
 // snapshot, the snapshot of that word goes and their text stands (reconcile). Pure and
 // browser-safe.
 

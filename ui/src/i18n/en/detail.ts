@@ -664,10 +664,7 @@ export const detail = {
     other: 'waits for {list}, which hold it back',
   },
   'bi.move.deliver': 'Hand off',
-  'bi.refuse.missing': {
-    one: 'Not handed off {id}: {list} is missing.',
-    other: 'Not handed off {id}: {list} are missing.',
-  },
+  'bi.refuse.missing': 'Not handed off {id}. Missing: {list}.',
   // Approving a delivery whose "at least N of" group is short: asked once, never a hold (P5-F5).
   'bi.approve.short': {
     one: '{list} is short of what the step asks for. Press {action} again to approve anyway.',
@@ -687,11 +684,11 @@ export const detail = {
   'sheet.refused': 'Otea did not move it. See what is missing and try again.',
   'bi.toast.delivered': 'You handed off “{title}”. It moves to {state}.',
   'bi.refuse.blockers':
-    'Not approved {id}: {other} ({board}, {step}) holds it back and is still unfinished.',
+    'Not approved {id}: {other} (in {board}, step {step}) holds it back and is still unfinished.',
   'bi.refuse.blockersEnded':
-    'Not approved {id}: {other} ({board}) holds it back and is still unfinished.',
+    'Not approved {id}: {other} (in {board}) holds it back and is still unfinished.',
   'bi.refuse.blockersUnmerged':
-    'Not approved {id}: {other} ({board}) holds it back and is not merged yet: approve it once its branch is in the base.',
+    'Not approved {id}: {other} (in {board}) holds it back and is not merged yet: approve it once its branch is in the base.',
   'bi.partOf': 'Part of',
   'bi.parts.title': 'Parts',
   'bi.parts.gloss': '{ended} of {total} finished',
