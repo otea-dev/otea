@@ -36,3 +36,9 @@ export const EFFORT_SIZES = {
 
 // A yes-or-no field's values, as the board says them.
 export const YES_NO_SAID: Readonly<Record<Lang, string>> = { en: 'yes or no', es: 'sí or no' };
+
+// A yes-or-no field's stored value (yes, no) as a board in each language says it.
+export const YES_NO_VALUE: Readonly<Record<Lang, Readonly<Record<string, string>>>> = {
+  en: { yes: 'yes', no: 'no' },
+  es: { yes: 'sí', no: 'no' },
+};

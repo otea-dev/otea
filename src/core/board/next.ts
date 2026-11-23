@@ -25,7 +25,7 @@ import {
   whenHolds,
 } from './engine.ts';
 import { mentionText } from './mentions.ts';
-import { type Lang, LEVEL_SAID, TITLE_NAME, YES_NO_SAID } from './template-words.ts';
+import { type Lang, LEVEL_SAID, TITLE_NAME, YES_NO_SAID, YES_NO_VALUE } from './template-words.ts';
 
 // The language the board was made in (reading.ts's langOf, which reads next.ts): its values are
 // given to the agent in it, as the board stores and accepts them.
@@ -239,6 +239,7 @@ function valueText(part: Part, input: NextInput, lang: Lang): string {
   if (value === undefined || value === null || value === '') return '(empty)';
   // A level is stored as its key (low) and read as the board says it (baja), as show reads it.
   if (part.kind === 'level') return LEVEL_SAID[lang][String(value)] ?? String(value);
+  if (part.kind === 'yesno') return YES_NO_VALUE[lang][String(value)] ?? String(value);
   if (['choice', 'multi', 'check'].includes(part.kind)) return choiceNames(part, value);
   const text = String(value).trimEnd();
   const whole =

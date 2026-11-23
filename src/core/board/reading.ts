@@ -13,7 +13,7 @@ import {
   usedRefs,
 } from './model.ts';
 import { DONE_NAME, DROPPED_NAME } from './next.ts';
-import { type Lang, LEVEL_SAID, TITLE_NAME } from './template-words.ts';
+import { type Lang, LEVEL_SAID, TITLE_NAME, YES_NO_VALUE } from './template-words.ts';
 
 // What a reader of a board item meets and types: names, never the hidden ids under them. An agent
 // fills `--field Tamaño=Una`, attaches `--module Bocetos`, and reads `state: Concepto (in review)`;
@@ -262,6 +262,7 @@ export function langOf(def: BoardDefinition): Lang {
 // (Severidad: media), as its field's name is.
 export function valueName(part: Part, value: unknown, lang: Lang = 'en'): string {
   if (part.kind === 'level' && typeof value === 'string') return LEVEL_SAID[lang][value] ?? value;
+  if (part.kind === 'yesno' && typeof value === 'string') return YES_NO_VALUE[lang][value] ?? value;
   if (CHOICE_KINDS.includes(part.kind as never) && value !== null && value !== undefined)
     return listOf(value)
       .map((id) => part.options.find((choice) => choice.id === id)?.name ?? id)
