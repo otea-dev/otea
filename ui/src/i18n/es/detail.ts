@@ -767,6 +767,12 @@ export const detail = {
   'bi.branch.diffFilesChangesNone': 'no cambia ningún archivo',
   'bi.branch.moved':
     'La rama cambió en el remoto después de la entrega: ahora está en {now}. Aprobar aprueba solo lo entregado, {handed}.',
+  'bi.branch.driftBase':
+    '{base} tiene commits hechos después de la entrega, que no son de este ítem: {list}. Aprobar aprueba solo lo entregado, {handed}; subir {base} los sube también.',
+  'bi.branch.movedBase':
+    '{base} cambió después de la entrega: ahora está en {now}. Aprobar aprueba solo lo entregado, {handed}.',
+  'bi.branch.roundSame':
+    'Esta ronda tiene los mismos archivos que la ronda {round} ({earlier}): no cambió nada en {branch} desde esa ronda. Aprobar aprueba lo que esa ronda ya tenía.',
   'bi.request.board': 'Tablero {name}',
   'bi.request.waiting': 'espera el esbozo',
   'bi.request.arrived': 'el esbozo llegó: revísalo y publícalo',

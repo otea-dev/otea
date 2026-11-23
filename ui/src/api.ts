@@ -6,6 +6,7 @@ import { SURFACE_HEADER } from '../../src/core/surface.ts';
 import type { DiffFilesOff } from '../../src/server/diff-files.ts';
 import type { DiffOffTip } from '../../src/server/diff-tip.ts';
 import type { Drift } from '../../src/server/drift.ts';
+import type { RoundSame } from '../../src/server/round-same.ts';
 import type { FeedEvent } from './activity.ts';
 import { apiUrl } from './base.ts';
 import type { WrittenBrief } from './brief.ts';
@@ -332,6 +333,14 @@ export async function fetchDiffFiles(
   const url = `/api/items/${encodeURIComponent(id)}/diff-files`;
   const body = (await (await get(url, signal)).json()) as { mismatch: DiffFilesOff | null };
   return body.mismatch;
+}
+
+// Whether the round handed off holds the same files as the round it answers
+// (src/server/round-same.ts, P5-F2): null when it does not.
+export async function fetchRoundSame(id: string, signal: AbortSignal): Promise<RoundSame | null> {
+  const url = `/api/items/${encodeURIComponent(id)}/round-same`;
+  const body = (await (await get(url, signal)).json()) as { same: RoundSame | null };
+  return body.same;
 }
 
 export async function postOpened(id: string, evidence: number): Promise<void> {

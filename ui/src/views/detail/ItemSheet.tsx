@@ -95,6 +95,7 @@ import { ProofChecklist } from './ProofChecklist.tsx';
 import { partNames, phoneRounds, readerOf, requestLine, unopenedOf } from './phone-review.ts';
 import { pickOf, pickWays } from './pick.ts';
 import { Route } from './Route.tsx';
+import { useRoundSame } from './round-same.ts';
 import { routeIndex, routeSteps } from './route.ts';
 
 // The item's sheet content (SPEC §10.3): the bar, the headline and standfirst, the route, the moves,
@@ -214,6 +215,8 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   const off = useDiffOffTip(item.id, strip?.key === 'frozen', item.updatedAt);
   // And whether it names other files than the work handed off changes (P1-F2).
   const files = useDiffFiles(item.id, strip?.key === 'frozen', item.updatedAt);
+  // And whether this round holds the same files as the one it answers (P5-F2).
+  const same = useRoundSame(item.id, strip?.key === 'frozen', item.updatedAt);
   const split = live?.split;
   const childSummary =
     split && split.board !== SAME ? summaries.find((b) => b.id === split.board) : undefined;
@@ -840,6 +843,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                     outside={outside}
                     off={off}
                     files={files}
+                    same={same}
                   />
                   {hand.length ? (
                     <HandChecklist item={item} rows={hand} canWrite={app.session.canWrite} />
@@ -1145,7 +1149,14 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                   />
                 ) : null}
               </div>
-              <BranchLine strip={strip} drift={drift} outside={outside} off={off} files={files} />
+              <BranchLine
+                strip={strip}
+                drift={drift}
+                outside={outside}
+                off={off}
+                files={files}
+                same={same}
+              />
               {block?.request ? (
                 <DraftRequestLine
                   request={block.request}

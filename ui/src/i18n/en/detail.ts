@@ -760,6 +760,12 @@ export const detail = {
   'bi.branch.diffFilesChangesNone': 'changes no file',
   'bi.branch.moved':
     'The branch changed on the remote after the handoff: it is now at {now}. Approving approves only what was handed off, {handed}.',
+  'bi.branch.driftBase':
+    '{base} holds commits made after the handoff, which are not part of this item: {list}. Approving approves only what was handed off, {handed}; a push of {base} takes them along.',
+  'bi.branch.movedBase':
+    '{base} changed after the handoff: it is now at {now}. Approving approves only what was handed off, {handed}.',
+  'bi.branch.roundSame':
+    'This round holds the same files as round {round} ({earlier}): nothing changed in {branch} since that round. Approving approves what that round already had.',
   'bi.request.board': 'Board {name}',
   'bi.request.waiting': 'waiting for the draft',
   'bi.request.arrived': 'the draft arrived: review and publish it',

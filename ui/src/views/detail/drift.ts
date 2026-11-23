@@ -10,6 +10,16 @@ import { t } from '../../i18n/i18n.ts';
 export type { Drift };
 
 export function driftText(drift: Drift): string {
+  // On a board kept on main the base is the item's branch (P1-F1): the commits are in this
+  // checkout, whoever made them, and a push of the base takes them along.
+  if (drift.onBase) {
+    if (drift.added.length === 0)
+      return t('bi.branch.movedBase', { base: drift.branch, now: drift.now, handed: drift.handed });
+    const list = drift.added
+      .map(({ commit, author }) => t('bi.branch.driftBy', { commit, author }))
+      .join(', ');
+    return t('bi.branch.driftBase', { base: drift.branch, list, handed: drift.handed });
+  }
   if (drift.added.length === 0)
     return t('bi.branch.moved', { now: drift.now, handed: drift.handed });
   const list = drift.added

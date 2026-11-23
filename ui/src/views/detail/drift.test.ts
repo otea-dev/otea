@@ -34,4 +34,22 @@ describe('driftText', () => {
       'La rama cambió en el remoto después de la entrega: ahora está en 9f00aa1. Aprobar aprueba solo lo entregado, a752d6f.',
     );
   });
+
+  // P1-F1: on a board kept on main the base is the branch, and the commits are not a remote's.
+  it('names the commits on main after the handoff, and says a push of main takes them along', () => {
+    const drift = {
+      branch: 'main',
+      handed: 'a715597',
+      now: '9f00aa1',
+      added: [{ commit: '9f00aa1', author: 'Diego' }],
+      onBase: true as const,
+    };
+    expect(driftText(drift)).toBe(
+      'main holds commits made after the handoff, which are not part of this item: 9f00aa1 by Diego. Approving approves only what was handed off, a715597; a push of main takes them along.',
+    );
+    setLanguage('es');
+    expect(driftText({ ...drift, added: [] })).toBe(
+      'main cambió después de la entrega: ahora está en 9f00aa1. Aprobar aprueba solo lo entregado, a715597.',
+    );
+  });
 });

@@ -37,6 +37,7 @@ import {
 import { type DiffFilesOff, type DiffOffTip, diffFilesText, diffOffTipText } from './diff-tip.ts';
 import { type Drift, driftText } from './drift.ts';
 import type { MergedOutside } from './merged-outside.ts';
+import { type RoundSame, roundSameText } from './round-same.ts';
 
 // The item page of a Studio board (the mock's itemHtml, 75-cover.js): what its step waits for in
 // the checklist's words (F12), the protected branch after the buttons (F10), the notes of every
@@ -272,12 +273,14 @@ export function BranchLine({
   outside = null,
   off = null,
   files = null,
+  same = null,
 }: {
   strip: BranchStrip | null;
   drift?: Drift | null;
   outside?: MergedOutside | null;
   off?: DiffOffTip | null;
   files?: DiffFilesOff | null;
+  same?: RoundSame | null;
 }) {
   if (!strip) return null;
   const said = branchSaid(strip, outside);
@@ -290,7 +293,7 @@ export function BranchLine({
       <span className="bsaid">{said}</span>
     </div>
   );
-  if (!drift && !off && !files) return line;
+  if (!drift && !off && !files && !same) return line;
   return (
     <>
       {line}
@@ -310,6 +313,12 @@ export function BranchLine({
         <div className="bstrip drift" data-c role="status">
           <Icon name="warn" />
           <span>{diffFilesText(files)}</span>
+        </div>
+      ) : null}
+      {same ? (
+        <div className="bstrip drift" data-c role="status">
+          <Icon name="warn" />
+          <span>{roundSameText(same)}</span>
         </div>
       ) : null}
     </>
