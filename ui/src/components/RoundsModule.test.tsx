@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { creatures } from '../../../src/core/board/testing.ts';
 import { ago, officialType } from '../derive/fixtures.ts';
 import { setLanguage } from '../i18n/i18n.ts';
-import type { ItemEvent, ItemView } from '../types.ts';
+import type { ItemEvent, ItemView, TypeView } from '../types.ts';
 import { RoundsModule } from './RoundsModule.tsx';
 
 const bug = officialType('bug-triage');
@@ -99,9 +99,9 @@ describe('the rounds’ route', () => {
 // P5-F1: Comparar rondas showed two identical pictures with no word when a round attached the very
 // file of the round before.
 describe('Comparar rondas when a round attached the same file again', () => {
-  const withFiles = {
+  const withFiles: TypeView = {
     ...bug,
-    layout: { ...bug.layout, evidence: [{ module: 'files', id: 'efile' }] },
+    layout: { ...bug.layout, evidence: [{ module: 'files' as const, id: 'efile' }] },
   };
   const shot = (id: number, at: string, sha256: string) => ({
     id,
