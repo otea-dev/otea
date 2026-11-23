@@ -156,11 +156,15 @@
 /* A round that holds the very file of the round before (P5-F1). */
 .ev-same {
   margin: 8px 0 0;
-  color: var(--warn);
+  color: var(--ink-2);
+}
+/* In the gallery's tools the note takes a line of its own, above Comparar. */
+.ev-gallery-tools:has(.ev-same) {
+  flex-wrap: wrap;
 }
 .ev-gallery-tools .ev-same {
-  align-self: center;
-  margin: 0 auto 0 0;
+  flex: 1 1 100%;
+  margin: 0;
 }
 .ev-gallery > .ev-gallery-tools:first-child {
   justify-content: flex-start;
