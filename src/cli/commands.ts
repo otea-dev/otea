@@ -468,9 +468,25 @@ export const INIT_NEXT = [
   'An agent setting itself up runs otea connect --as <name> --model <id> --effort <level>; it never starts the desk for the person (if it must, otea serve --no-open).',
 ];
 
+// The same, while this computer's desk already runs (otea start, or the desktop app, did it): it
+// says so instead of telling to start a second one (P9-F3).
+export const initNext = (deskUrl: string | undefined): string[] =>
+  deskUrl === undefined
+    ? INIT_NEXT
+    : [
+        `Next: the desk already runs at ${deskUrl}, so there is nothing to start: it gives you the text to paste into your agent's chat (otea prompt prints it here).`,
+        ...INIT_NEXT.slice(1),
+      ];
+
+// The address of this computer's running desk, when one does.
+async function runningDesk(): Promise<string | undefined> {
+  const state = await inspectServer(oteaHome());
+  return state.kind === 'running' ? state.url : undefined;
+}
+
 const init: Command = {
   name: 'init',
-  summary: `Create or reuse the project at the repository root: in the Otea home ($OTEA_HOME, default ~/.otea), or with --local in .otea at the root; --join <project> links the repo to a registered project instead (refused when a project in a folder above covers it, unless --here); it makes no board unless --template <key> names one, and only on a project with no boards of its own yet: the boards of that template (${TEMPLATE_KEYS}; a set such as ideas or repos makes all of its boards); you can also pick them later in Studio or with otea board add <name> --template <key>; its boards and its Pedidos board are made in the language you use (the desk's, else this computer's, else English) and keep it; --icon gives the project an icon (without one the UI draws a monogram of its name); --agents-md also adds (or refreshes) a block in AGENTS.md telling agents to run "otea next" and "otea board"`,
+  summary: `Create or reuse the project at the repository root: in the Otea home ($OTEA_HOME, default ~/.otea), or with --local in .otea at the root; --join <project> links the repo to a registered project instead (refused when a project in a folder above covers it, unless --here); it makes no board unless --template <key> names one, and only on a project with no boards of its own yet: the boards of that template (${TEMPLATE_KEYS}; a set such as ideas or repos makes all of its boards); you can also pick them later in Studio or with otea board add <name> --template <key>; its boards and its Pedidos board are made in the language you use (the desk's, else this computer's, else English) or the one --lang gives, and keep it; --icon gives the project an icon (without one the UI draws a monogram of its name); --agents-md also adds (or refreshes) a block in AGENTS.md telling agents to run "otea next" and "otea board"`,
   details: TEMPLATE_LIST,
   args: [],
   options: {
@@ -480,8 +496,9 @@ const init: Command = {
     join: { placeholder: 'project' },
     template: { placeholder: 'key' },
     icon: { placeholder: 'icon' },
+    lang: { choices: LANGS },
   },
-  execute: ({ cwd, flag, option }) => {
+  execute: async ({ cwd, flag, option }) => {
     const target = option('join');
     const template = option('template');
     const icon = option('icon');
@@ -506,7 +523,7 @@ const init: Command = {
       // The repos at the project's folders are added now, before any clone of them is linked.
       if (target === undefined) {
         kept = template !== undefined && template !== NO_BOARDS && hasOwnBoards(project);
-        made = initBoards(project, template, defaultLang());
+        made = initBoards(project, template, (option('lang') as Lang | undefined) ?? defaultLang());
         listRepos(project);
       } else readReposAtFolder(project, root);
     } finally {
@@ -525,9 +542,10 @@ const init: Command = {
           ]
         : []),
     ];
-    if (!flag('agents-md')) return { data, text: [...lines, ...INIT_NEXT].join('\n') };
+    const next = initNext(await runningDesk());
+    if (!flag('agents-md')) return { data, text: [...lines, ...next].join('\n') };
     const agentsMd = writeAgentsMd(root);
-    const text = [...lines, AGENTS_MD_TEXT[agentsMd.action](agentsMd.path), ...INIT_NEXT];
+    const text = [...lines, AGENTS_MD_TEXT[agentsMd.action](agentsMd.path), ...next];
     return { data: { ...data, agentsMd }, text: text.join('\n') };
   },
 };
@@ -752,7 +770,7 @@ function mcpInstructionText(entry: McpEntry): string[] {
       ]),
     ),
     `As JSON: ${json}`,
-    "That JSON is one shape; every harness has its own, and may skip a server in another shape without a word: translate it to your harness's schema, or add the server with your harness's own mcp add command, at project scope. The usual project files, as examples: Claude Code: .mcp.json (under mcpServers); OpenCode: opencode.json (under mcp, with command as one array of the command and its args, and env as environment).",
+    "That JSON is one shape; every harness has its own, and may skip a server in another shape without a word: translate it to your harness's schema, or add the server with your harness's own mcp add command, at project scope. The usual project files, as examples: Claude Code: .mcp.json (under mcpServers); OpenCode: opencode.json (under mcp.servers, with type local, command as one array of the command and its args, and env as environment); Codex: .codex/config.toml (a [mcp_servers.<name>] table); Gemini CLI: .gemini/settings.json (under mcpServers). The README has each one in full.",
     "It names no agent: each session names itself (--as; MCP tools: as). If your harness already has a server named otea that runs anything else (an older Otea, or mcp --as <name>), replace it for this project with this one. If your harness must restart or reload to load the server, ask the person for it now, before you go on, and to reopen this same conversation with your harness's resume option, if it has one, so you keep what was said; Otea keeps every item and board draft either way. Approve it if your harness asks, then call any Otea tool. Until then, and whenever MCP is off, the otea command does the same.",
     'Run otea connect --check now (with --as <name>), and again after that call: only it tells whether the server loaded, and the desk warns until it does.',
   ];
@@ -3144,10 +3162,15 @@ const serveStatus: Command = {
 // otea start: the person's first minutes in one command (README, Getting started).
 const start: Command = {
   name: 'start',
-  summary: `For you, not for an agent, in the project's folder: set everything up for a first session in one command, and say what is ready. It creates the project when there is none (otea init), starts this computer's background server and opens the desk signed in (otea serve start; --no-open prints the sign-in link instead, --port picks the port for a first start), offers a first board from a template when the project has none of its own (--template <key> names one, none skips it; asked at a terminal when not given; otherwise your agent designs the boards with you) and prints the text to paste into your agent's chat (otea prompt) with the MCP server it adds to its own config. It looks before it acts: run again, it changes nothing that exists and says what was already there. An agent never runs it: it connects with otea connect and never starts the desk`,
+  summary: `For you, not for an agent, in the project's folder: set everything up for a first session in one command, and say what is ready. It creates the project when there is none (otea init), starts this computer's background server and opens the desk signed in (otea serve start; --no-open prints the sign-in link instead, --port picks the port for a first start), offers a first board from a template when the project has none of its own (--template <key> names one, none skips it; asked at a terminal when not given; otherwise no board is made and your agent designs the boards with you, the report saying how to start from a template instead), in the language you use (the desk's, else this computer's, else English) or the one --lang gives and prints the text to paste into your agent's chat (otea prompt) with the MCP server it adds to its own config. It looks before it acts: run again, it changes nothing that exists and says what was already there. An agent never runs it: it connects with otea connect and never starts the desk`,
   details: TEMPLATE_LIST,
   args: [],
-  options: { template: { placeholder: 'key' }, port: {}, 'no-open': { flag: true } },
+  options: {
+    template: { placeholder: 'key' },
+    lang: { choices: LANGS },
+    port: {},
+    'no-open': { flag: true },
+  },
   execute: async (input) => {
     const { cwd, option, agent, warn } = input;
     if (agent !== undefined) {
@@ -3159,7 +3182,7 @@ const start: Command = {
     const template = option('template');
     const report = await startProject(cwd, {
       template,
-      lang: defaultLang(),
+      lang: (option('lang') as Lang | undefined) ?? defaultLang(),
       choose: async () =>
         (
           await input.ask(
@@ -3207,7 +3230,10 @@ const start: Command = {
         ? `Boards: made ${boards.made.map(({ name }) => `"${name}"`).join(', ')}`
         : boards.all.length > 0
           ? `Boards: already has ${boards.all.map((name) => `"${name}"`).join(', ')}${kept ? `; --template ${template} was not added to them (otea board add <name> --template ${template} adds it)` : ''}`
-          : 'Boards: none yet; your agent designs them with you (otea start --template <key> starts from a template instead)';
+          : // Nothing was asked of a person (no terminal, so no one chose): no board is made for them.
+            // They leave with the way to one: the agent designs it with them, or the command for a
+            // template, with the keys it takes.
+            `Boards: none yet. Your agent designs them with you from the text below, or start from a template now: otea start --template <key> (${TEMPLATE_KEYS}); --lang en|es picks the language of its words`;
     const deskLine = started
       ? `Desk: running in the background at ${url} (pid ${pid}; stop it with otea serve stop)`
       : `Desk: already running at ${url} (pid ${pid})`;
