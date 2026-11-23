@@ -486,7 +486,7 @@ async function runningDesk(): Promise<string | undefined> {
 
 const init: Command = {
   name: 'init',
-  summary: `Create or reuse the project at the repository root: in the Otea home ($OTEA_HOME, default ~/.otea), or with --local in .otea at the root; --join <project> links the repo to a registered project instead (refused when a project in a folder above covers it, unless --here); it makes no board unless --template <key> names one, and only on a project with no boards of its own yet: the boards of that template (${TEMPLATE_KEYS}; a set such as ideas or repos makes all of its boards); you can also pick them later in Studio or with otea board add <name> --template <key>; its boards and its Pedidos board are made in the language you use (the desk's, else this computer's, else English) or the one --lang gives, and keep it; --icon gives the project an icon (without one the UI draws a monogram of its name); --agents-md also adds (or refreshes) a block in AGENTS.md telling agents to run "otea next" and "otea board"`,
+  summary: `Create or reuse the project at the repository root: in the Otea home ($OTEA_HOME, default ~/.otea), or with --local in .otea at the root; --join <project> links the repo to a registered project instead (refused when a project in a folder above covers it, unless --here); it makes no board unless --template <key> names one, and only on a project with no boards of its own yet: the boards of that template (${TEMPLATE_KEYS}; a set such as ideas or repos makes all of its boards); you can also pick them later in Studio or with otea board add <name> --template <key>; its boards and its Pedidos board are made in the language you use (the desk's, else this computer's, else English) and keep it; --icon gives the project an icon (without one the UI draws a monogram of its name); --agents-md also adds (or refreshes) a block in AGENTS.md telling agents to run "otea next" and "otea board"`,
   details: TEMPLATE_LIST,
   args: [],
   options: {
@@ -496,7 +496,6 @@ const init: Command = {
     join: { placeholder: 'project' },
     template: { placeholder: 'key' },
     icon: { placeholder: 'icon' },
-    lang: { choices: LANGS },
   },
   execute: async ({ cwd, flag, option }) => {
     const target = option('join');
@@ -523,7 +522,7 @@ const init: Command = {
       // The repos at the project's folders are added now, before any clone of them is linked.
       if (target === undefined) {
         kept = template !== undefined && template !== NO_BOARDS && hasOwnBoards(project);
-        made = initBoards(project, template, (option('lang') as Lang | undefined) ?? defaultLang());
+        made = initBoards(project, template, defaultLang());
         listRepos(project);
       } else readReposAtFolder(project, root);
     } finally {
