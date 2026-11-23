@@ -173,11 +173,21 @@ describe('a remote added after init, said before the push', () => {
 
     for (const said of [next.out, claim.out]) {
       expect(said).toContain('remote was added');
-      expect(said).toContain(`otea repos add --name ${name}`);
+      expect(said).toContain(`otea repos add --name "${name}"`);
       expect(said).toContain('ask the person');
     }
     // The push is still refused until then: the notice changes nothing.
     expect((await otea('repos', 'list')).out).toContain(`${name}  root:`);
+  });
+
+  it('keeps it in the data a program reads, not only in the text', async () => {
+    git('remote', 'add', 'origin', 'https://github.com/acme/keys.git');
+
+    const claim = JSON.parse((await otea('claim', 'TOD-1', '--json')).out);
+
+    expect(claim.text).toContain('remote was added');
+    expect(claim.text).toContain('otea repos add --name');
+    expect(claim.id).toBe('TOD-1');
   });
 
   it('stops saying it once the repo went by its origin', async () => {
@@ -188,5 +198,52 @@ describe('a remote added after init, said before the push', () => {
     const next = await otea('next');
 
     expect(next.out).not.toContain('remote was added');
+  });
+});
+
+// A repo that had its remote when Otea first saw it is known by it: nothing to say.
+describe('a repo that always had a remote', () => {
+  let repo: ReturnType<typeof tempGitRepo>;
+  let otea: Cli;
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+      cwd: repo.dir,
+      stdio: 'pipe',
+      encoding: 'utf8',
+    });
+
+  beforeEach(async () => {
+    repo = tempGitRepo();
+    otea = cliAt(repo.dir, { OTEA_AGENT: 'quill' });
+    git('commit', '--quiet', '--allow-empty', '-m', 'one');
+    git('remote', 'add', 'origin', 'https://github.com/acme/keys.git');
+    const person = cliAt(repo.dir);
+    expect((await person('init', '--local', '--template', 'none')).code).toBe(0);
+    expect(
+      (await person('board', 'add', 'Tasks', '--template', 'todos', '--lang', 'en')).code,
+    ).toBe(0);
+    declareProfiles(repo.dir, 'quill');
+    const made = await otea(
+      'create',
+      '--collection',
+      'Tasks',
+      '--title',
+      'Water',
+      '--field',
+      'What is needed=water the plants',
+    );
+    expect(made.code).toBe(0);
+  });
+
+  afterEach(() => repo.remove());
+
+  it('is silent on next and claim, in text and in data', async () => {
+    const next = await otea('next');
+    const claim = await otea('claim', 'TOD-1', '--json');
+
+    expect(next.out).not.toContain('remote was added');
+    expect(next.out).not.toContain('repos add');
+    expect(JSON.parse(claim.out).text ?? '').not.toContain('remote was added');
+    expect(claim.out).not.toContain('repos add');
   });
 });

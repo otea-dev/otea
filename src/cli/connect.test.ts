@@ -162,6 +162,8 @@ describe('setup for agents', () => {
         "add this MCP server to your harness's MCP config yourself, for this project only",
       );
       expect(out).toContain('never your user or global config');
+      // The entry names no agent: each session names itself (restored after P9-F3's cut).
+      expect(out).toContain('The entry names no agent: each session names itself');
       expect(out).toMatch(/^ {2}name {5}otea$/m);
       expect(out).toMatch(/^ {2}command {2}node$/m);
       expect(out).toContain(`As JSON: ${JSON.stringify({ otea: entry() })}`);

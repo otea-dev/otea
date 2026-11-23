@@ -26,7 +26,7 @@ otea start
 
 `otea start` makes the project, opens the desk in your browser and prints the text to paste into your agent's chat. [Get started](#from-the-terminal-npm-or-source) says what it does, step by step.
 
-- **`npm i -g` says permission denied?** Install into a folder of your own, with no `sudo`: `npm i -g --prefix ~/.otea-npm @otea/cli`, then put `~/.otea-npm/bin` on your `PATH` ([details](#the-otea-command-from-npm)).
+- **`npm i -g` says permission denied?** Install into a folder of your own, with no `sudo`: `npm i -g --prefix "$HOME/.otea-npm" @otea/cli`, then put that folder's `bin` on your `PATH` on macOS and Linux, or the folder itself on Windows ([details](#the-otea-command-from-npm)).
 - **No Node, or you prefer Otea in its own window?** Install the desktop app instead: [Install](#install) has both ways.
 
 > From the Spanish verb *otear*: to scan from a high vantage point, to watch what is happening and what is coming.
@@ -163,14 +163,14 @@ otea --version
 If `npm i -g` fails with a permission error (EACCES), do not reach for `sudo`: install into a folder of your own and put its `bin` on your `PATH`.
 
 ```sh
-npm i -g --prefix ~/.otea-npm @otea/cli
+npm i -g --prefix "$HOME/.otea-npm" @otea/cli
 export PATH="$HOME/.otea-npm/bin:$PATH"   # add this line to your shell profile too
 otea --version
 ```
 
-On Windows the command lands in the prefix folder itself: add `%USERPROFILE%\.otea-npm` to your `PATH` instead. Update and remove with the same `--prefix` (`npm i -g --prefix ~/.otea-npm @otea/cli`, `npm uninstall -g --prefix ~/.otea-npm @otea/cli`).
+That is for macOS and Linux (and Git Bash). `~` is not expanded everywhere (PowerShell and cmd pass it as it is), so the commands spell the folder with `$HOME`. On Windows the command lands in the prefix folder itself, not in a `bin` subfolder: in PowerShell run `npm i -g --prefix "$HOME\.otea-npm" @otea/cli` (in cmd, `%USERPROFILE%\.otea-npm`) and add that folder to your `PATH`. Update and remove with the same `--prefix` (`npm i -g --prefix "$HOME/.otea-npm" @otea/cli`, `npm uninstall -g --prefix "$HOME/.otea-npm" @otea/cli`).
 
-To update, run `npm i -g @otea/cli` again. To remove it, `npm uninstall -g @otea/cli`. You open the desk with `otea serve` (see [Get started](#from-the-terminal-npm-or-source)).
+To update, run `npm i -g @otea/cli` again. To remove it, `npm uninstall -g @otea/cli`. Then run `otea start` in the folder you want to track: it makes the project, starts the desk and opens it ([Get started](#from-the-terminal-npm-or-source) says what it does).
 
 ### From source
 

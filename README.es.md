@@ -28,7 +28,7 @@ otea start
 
 `otea start` crea el proyecto, abre el escritorio en tu navegador e imprime el texto que le pegas a tu agente (el [paso 2](#2-crear-el-proyecto) lo explica).
 
-- **¿`npm i -g` dice permiso denegado?** Instala en una carpeta tuya, sin `sudo`: `npm i -g --prefix ~/.otea-npm @otea/cli`, y pon `~/.otea-npm/bin` en tu `PATH` ([detalles](#el-comando-otea-desde-npm)).
+- **¿`npm i -g` dice permiso denegado?** Instala en una carpeta tuya, sin `sudo`: `npm i -g --prefix "$HOME/.otea-npm" @otea/cli`, y pon la subcarpeta `bin` de esa carpeta en tu `PATH` en macOS y Linux, o la carpeta misma en Windows ([detalles](#el-comando-otea-desde-npm)).
 - **¿Sin Node, o prefieres Otea en su propia ventana?** Instala la app de escritorio: la sección siguiente tiene las dos formas.
 
 ## 1. Instalar
@@ -113,14 +113,14 @@ otea --version
 Si `npm i -g` falla con un error de permisos (EACCES), no uses `sudo`: instala en una carpeta tuya y pon su `bin` en el `PATH`.
 
 ```sh
-npm i -g --prefix ~/.otea-npm @otea/cli
+npm i -g --prefix "$HOME/.otea-npm" @otea/cli
 export PATH="$HOME/.otea-npm/bin:$PATH"   # agrega también esta línea al perfil de tu shell
 otea --version
 ```
 
-En Windows el comando queda en la propia carpeta del prefijo: agrega `%USERPROFILE%\.otea-npm` al `PATH`. Para actualizar y quitar usa el mismo `--prefix`.
+Eso es para macOS y Linux (y Git Bash). `~` no se expande en todas partes (PowerShell y cmd lo pasan tal cual), por eso los comandos escriben la carpeta con `$HOME`. En Windows el comando queda en la propia carpeta del prefijo, no en una subcarpeta `bin`: en PowerShell corre `npm i -g --prefix "$HOME\.otea-npm" @otea/cli` (en cmd, `%USERPROFILE%\.otea-npm`) y agrega esa carpeta al `PATH`. Para actualizar y quitar usa el mismo `--prefix`.
 
-Para actualizar, corre `npm i -g @otea/cli` otra vez. Para quitarlo, `npm uninstall -g @otea/cli`. Con el comando de npm, el escritorio lo abres con `otea serve` (paso 3).
+Para actualizar, corre `npm i -g @otea/cli` otra vez. Para quitarlo, `npm uninstall -g @otea/cli`. Después corre `otea start` en la carpeta que quieres seguir: crea el proyecto, arranca el escritorio y lo abre (el [paso 2](#2-crear-el-proyecto) lo explica).
 
 ### Desde el código
 

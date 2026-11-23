@@ -793,7 +793,7 @@ function mcpInstructionText(entry: McpEntry): string[] {
     ),
     `As JSON: ${json}`,
     "That JSON is one shape, and a harness may skip a server in another shape without a word: translate it to your harness's schema, or use its own mcp add command, at project scope. Examples: Claude Code: .mcp.json (under mcpServers); OpenCode: opencode.json (under mcp.servers, with type local, command as one array of the command and its args, and env as environment); Codex: .codex/config.toml (a [mcp_servers.<name>] table); Gemini CLI: .gemini/settings.json (under mcpServers). The README has each in full.",
-    "If your harness already has a server named otea that runs anything else (an older Otea, or mcp --as <name>), replace it for this project with this one. If your harness must restart or reload to load the server, ask the person for it now, before you go on, and to reopen this same conversation with your harness's resume option, if it has one, so you keep what was said; Otea keeps every item and board draft either way. Approve it if your harness asks, then call any Otea tool. Until then, and whenever MCP is off, the otea command does the same.",
+    "The entry names no agent: each session names itself (--as; MCP tools: as). If your harness already has a server named otea that runs anything else (an older Otea, or mcp --as <name>), replace it for this project with this one. If your harness must restart or reload to load the server, ask the person for it now, before you go on, and to reopen this same conversation with your harness's resume option, if it has one, so you keep what was said; Otea keeps every item and board draft either way. Approve it if your harness asks, then call any Otea tool. Until then, and whenever MCP is off, the otea command does the same.",
     'Then run otea connect --check (with --as <name>), and again after that call: only it tells whether the server loaded, and the desk warns until it does.',
   ];
 }
@@ -2479,11 +2479,16 @@ const claim: Command = {
       const shared = sharedCheckoutLine(project, input, id);
       const remote = remoteAddedNotice(project, input.cwd);
       const lines = [claimed.text, over, shared, remote].filter((line) => line !== undefined);
+      const text = lines.join('\n');
+      // The notices ride in data.text, as next's do, so they survive --json (a program reads data).
+      const noticed = over || shared || remote ? { text } : {};
       return {
-        data: item.tookOver
-          ? { ...(claimed.data as object), tookOver: item.tookOver }
-          : claimed.data,
-        text: lines.join('\n'),
+        data: {
+          ...(claimed.data as object),
+          ...(item.tookOver ? { tookOver: item.tookOver } : {}),
+          ...noticed,
+        },
+        text,
       };
     });
   },

@@ -76,6 +76,11 @@ function git(cwd: string, ...args: string[]): string | null {
   }
 }
 
+// The origin remote URL of the repo at `path` (one git process); null without one.
+export function remoteUrlAt(path: string): string | null {
+  return git(path, 'config', '--get', 'remote.origin.url');
+}
+
 export function repoFingerprint(path: string): RepoFingerprint {
   const roots = git(path, 'rev-list', '--max-parents=0', 'HEAD');
   return {
