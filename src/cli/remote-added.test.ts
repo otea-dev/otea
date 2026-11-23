@@ -139,9 +139,19 @@ describe('a remote added after init, said before the push', () => {
     git('commit', '--quiet', '--allow-empty', '-m', 'one');
     const person = cliAt(repo.dir);
     expect((await person('init', '--local', '--template', 'none')).code).toBe(0);
-    expect((await person('board', 'add', 'Tasks', '--template', 'todos', '--lang', 'en')).code).toBe(0);
+    expect(
+      (await person('board', 'add', 'Tasks', '--template', 'todos', '--lang', 'en')).code,
+    ).toBe(0);
     declareProfiles(repo.dir, 'quill');
-    const made = await otea('create', '--collection', 'Tasks', '--title', 'Water', '--field', 'What is needed=water the plants');
+    const made = await otea(
+      'create',
+      '--collection',
+      'Tasks',
+      '--title',
+      'Water',
+      '--field',
+      'What is needed=water the plants',
+    );
     expect(made.err).toBe('');
     expect(made.code).toBe(0);
   });
