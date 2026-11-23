@@ -14,37 +14,27 @@
         }
       ],
       "description": "The version of the board format: write 2",
-      "examples": [
-        2
-      ]
+      "examples": [2]
     },
     "name": {
       "type": "string",
       "description": "The name of the board",
-      "examples": [
-        "Bugs"
-      ]
+      "examples": ["Bugs"]
     },
     "item": {
       "type": "string",
       "description": "What one item of the board is called",
-      "examples": [
-        "Bug"
-      ]
+      "examples": ["Bug"]
     },
     "icon": {
       "type": "string",
       "description": "The icon of the board and its items, one of: layers, checkbox, list, stack, inbox, flag, milestone, target, rocket, clipboard, calendar, clock, hourglass, checklist, briefcase, chart, bug, git-branch, git-merge, terminal, code, brackets, database, server, plug, cpu, package, gear, wrench, shield, lock, key, cloud, browser, mobile, test-tube, gauge, image, film, camera, play, music, palette, brush, pen, ruler, shapes, eye, frame, sparkle, pen-nib, layout, type, cube, book, doc, note, chat-bubble, question, lightbulb, megaphone, bookmark, quote, link, mail, diagram, compare, paw, feather, bone, egg, fish, bird, leaf, sprout, tree, mountain, flame, drop, moon, sun, crystal, sword, shieldcrest, potion, map, compass, dice, controller, heart, star, skull, crown, ghost, puzzle, beaker, magnet, bolt, anchor, hook, trophy, gift, tag, pin, globe, home, user, users, robot, cart, coins, building",
-      "examples": [
-        "bug"
-      ]
+      "examples": ["bug"]
     },
     "title": {
       "type": "string",
       "description": "The name of the title field every item has",
-      "examples": [
-        "Title"
-      ]
+      "examples": ["Title"]
     },
     "parts": {
       "type": "object",
@@ -59,23 +49,17 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]*$",
             "description": "The hidden id of the part: its key in parts",
-            "examples": [
-              "fsteps"
-            ]
+            "examples": ["fsteps"]
           },
           "key": {
             "type": "string",
             "description": "The key of the template's field or evidence this one was made from; leave it as it is",
-            "examples": [
-              "high"
-            ]
+            "examples": ["high"]
           },
           "name": {
             "type": "string",
             "description": "What the field or evidence is called",
-            "examples": [
-              "Steps to reproduce"
-            ]
+            "examples": ["Steps to reproduce"]
           },
           "kind": {
             "type": "string",
@@ -100,18 +84,12 @@
               "file"
             ],
             "description": "A field (text, long, check, choice, multi, level, number, date, yesno, url, branch) or evidence (images, video, audio, code, log, diagram, file)",
-            "examples": [
-              "long",
-              "images"
-            ]
+            "examples": ["long", "images"]
           },
           "hint": {
             "type": "string",
             "description": "What goes here: the line agents read",
-            "examples": [
-              "The commands that show the bug",
-              ""
-            ]
+            "examples": ["The commands that show the bug", ""]
           },
           "options": {
             "type": "array",
@@ -122,29 +100,20 @@
                   "type": "string",
                   "pattern": "^[a-z][a-z0-9_]*$",
                   "description": "The hidden id of the choice",
-                  "examples": [
-                    "chigh"
-                  ]
+                  "examples": ["chigh"]
                 },
                 "key": {
                   "type": "string",
                   "description": "The key of the template's choice this one was made from; leave it as it is",
-                  "examples": [
-                    "high"
-                  ]
+                  "examples": ["high"]
                 },
                 "name": {
                   "type": "string",
                   "description": "What the choice reads",
-                  "examples": [
-                    "High"
-                  ]
+                  "examples": ["High"]
                 }
               },
-              "required": [
-                "id",
-                "name"
-              ],
+              "required": ["id", "name"],
               "additionalProperties": false,
               "description": "A choice of the field",
               "examples": [
@@ -168,16 +137,12 @@
           "show": {
             "type": "string",
             "description": "How evidence shows: images as gallery, one or ba; video as strip or player",
-            "examples": [
-              "gallery"
-            ]
+            "examples": ["gallery"]
           },
           "initial": {
             "type": "string",
             "description": "The value a new item starts with: a choice id, a level (low, medium, high, critical), yes or no",
-            "examples": [
-              "chigh"
-            ]
+            "examples": ["chigh"]
           },
           "guard": {
             "type": "object",
@@ -189,46 +154,32 @@
                   "pattern": "^[a-z][a-z0-9_]*$"
                 },
                 "description": "The steps (ids) during which the branch may be pushed",
-                "examples": [
-                  [
-                    "simplement"
-                  ]
-                ]
+                "examples": [["simplement"]]
               },
               "repo": {
                 "type": "string",
                 "pattern": "^[a-z][a-z0-9_]*$",
                 "description": "The field (part id) the repository is read from",
-                "examples": [
-                  "frepo"
-                ]
+                "examples": ["frepo"]
               },
               "base": {
                 "type": "string",
                 "description": "The base branch Otea protects too: agents push or merge into it only to bring in an item that is Done",
-                "examples": [
-                  "main"
-                ]
+                "examples": ["main"]
               },
               "commit": {
                 "type": "string",
                 "pattern": "^[a-z][a-z0-9_]*$",
                 "description": "The field (part id) where the agent writes the short hash of the commit that landed on the base: a handoff checks it is a commit of the base, and on its remote branch when the repo has a remote",
-                "examples": [
-                  "fcommit"
-                ]
+                "examples": ["fcommit"]
               }
             },
-            "required": [
-              "push"
-            ],
+            "required": ["push"],
             "additionalProperties": false,
             "description": "A branch field only: Otea protects the branch",
             "examples": [
               {
-                "push": [
-                  "simplement"
-                ],
+                "push": ["simplement"],
                 "repo": "frepo",
                 "base": "main",
                 "commit": "fcommit"
@@ -238,18 +189,10 @@
           "proof": {
             "type": "boolean",
             "description": "A checklist only (\"pide prueba\"): each ticked point needs a proof in the round (an attached file, a line of an attached log, or a test that passes in an attached report) before the step that hands it is handed off",
-            "examples": [
-              true
-            ]
+            "examples": [true]
           }
         },
-        "required": [
-          "id",
-          "name",
-          "kind",
-          "hint",
-          "options"
-        ],
+        "required": ["id", "name", "kind", "hint", "options"],
         "additionalProperties": false,
         "description": "A field (something to fill) or a piece of evidence (something to show)",
         "examples": [
@@ -284,22 +227,15 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]*$",
             "description": "A field (id) the creation form asks for",
-            "examples": [
-              "fsteps"
-            ]
+            "examples": ["fsteps"]
           },
           "required": {
             "type": "boolean",
             "description": "Whether the form requires it",
-            "examples": [
-              true
-            ]
+            "examples": [true]
           }
         },
-        "required": [
-          "ref",
-          "required"
-        ],
+        "required": ["ref", "required"],
         "additionalProperties": false,
         "description": "A field of the creation form",
         "examples": [
@@ -328,48 +264,29 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]*$",
             "description": "The hidden id of the step",
-            "examples": [
-              "sfix"
-            ]
+            "examples": ["sfix"]
           },
           "key": {
             "type": "string",
             "description": "The key of the template's step this one was made from; leave it as it is",
-            "examples": [
-              "high"
-            ]
+            "examples": ["high"]
           },
           "name": {
             "type": "string",
             "description": "What the step is called",
-            "examples": [
-              "Fix"
-            ]
+            "examples": ["Fix"]
           },
           "doer": {
             "type": "string",
-            "enum": [
-              "you",
-              "any"
-            ],
+            "enum": ["you", "any"],
             "description": "Who does the step: \"you\" (the person) or \"any\" agent",
-            "examples": [
-              "any",
-              "you"
-            ]
+            "examples": ["any", "you"]
           },
           "reviewer": {
             "type": "string",
-            "enum": [
-              "none",
-              "you",
-              "any"
-            ],
+            "enum": ["none", "you", "any"],
             "description": "Who reviews the step: \"none\", \"you\" (the person) or \"any\" agent, never the one that did it in that round",
-            "examples": [
-              "you",
-              "any"
-            ]
+            "examples": ["you", "any"]
           },
           "hand": {
             "type": "array",
@@ -380,21 +297,13 @@
                   "type": "string",
                   "pattern": "^[a-z][a-z0-9_]*$",
                   "description": "The part (id) the step hands off, or title",
-                  "examples": [
-                    "fsteps"
-                  ]
+                  "examples": ["fsteps"]
                 },
                 "req": {
                   "type": "string",
-                  "enum": [
-                    "always",
-                    "when",
-                    "no"
-                  ],
+                  "enum": ["always", "when", "no"],
                   "description": "Whether it is required: always, only when another part has a value, or no",
-                  "examples": [
-                    "always"
-                  ]
+                  "examples": ["always"]
                 },
                 "when": {
                   "type": "object",
@@ -403,22 +312,15 @@
                       "type": "string",
                       "pattern": "^[a-z][a-z0-9_]*$",
                       "description": "The choice, multi, level or yesno part (id) it reads",
-                      "examples": [
-                        "fseverity"
-                      ]
+                      "examples": ["fseverity"]
                     },
                     "value": {
                       "type": "string",
                       "description": "The value that makes it required: a choice id, a level, yes or no",
-                      "examples": [
-                        "high"
-                      ]
+                      "examples": ["high"]
                     }
                   },
-                  "required": [
-                    "part",
-                    "value"
-                  ],
+                  "required": ["part", "value"],
                   "additionalProperties": false,
                   "description": "With req \"when\": which part and value make it required",
                   "examples": [
@@ -431,16 +333,10 @@
                 "fresh": {
                   "type": "boolean",
                   "description": "Evidence only: new in each round, so a send-back empties it",
-                  "examples": [
-                    false
-                  ]
+                  "examples": [false]
                 }
               },
-              "required": [
-                "ref",
-                "req",
-                "fresh"
-              ],
+              "required": ["ref", "req", "fresh"],
               "additionalProperties": false,
               "description": "One thing the step hands off",
               "examples": [
@@ -471,16 +367,12 @@
                   "type": "string",
                   "pattern": "^[a-z][a-z0-9_]*$",
                   "description": "The hidden id of the group",
-                  "examples": [
-                    "gproof"
-                  ]
+                  "examples": ["gproof"]
                 },
                 "name": {
                   "type": "string",
                   "description": "What the group is called",
-                  "examples": [
-                    "Proof"
-                  ]
+                  "examples": ["Proof"]
                 },
                 "parts": {
                   "type": "array",
@@ -489,39 +381,24 @@
                     "pattern": "^[a-z][a-z0-9_]*$"
                   },
                   "description": "The evidence parts (ids) it picks from, all handed by the step",
-                  "examples": [
-                    [
-                      "fshot",
-                      "flog"
-                    ]
-                  ]
+                  "examples": [["fshot", "flog"]]
                 },
                 "min": {
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 9007199254740991,
                   "description": "How many of its parts the handoff needs at least",
-                  "examples": [
-                    1
-                  ]
+                  "examples": [1]
                 }
               },
-              "required": [
-                "id",
-                "name",
-                "parts",
-                "min"
-              ],
+              "required": ["id", "name", "parts", "min"],
               "additionalProperties": false,
               "description": "\"At least N of\" some evidence: the agent attaches what fits",
               "examples": [
                 {
                   "id": "gproof",
                   "name": "Proof",
-                  "parts": [
-                    "fshot",
-                    "flog"
-                  ],
+                  "parts": ["fshot", "flog"],
                   "min": 1
                 }
               ]
@@ -532,10 +409,7 @@
                 {
                   "id": "gproof",
                   "name": "Proof",
-                  "parts": [
-                    "fshot",
-                    "flog"
-                  ],
+                  "parts": ["fshot", "flog"],
                   "min": 1
                 }
               ]
@@ -548,20 +422,13 @@
               "pattern": "^[a-z][a-z0-9_]*$"
             },
             "description": "Ways out besides the next step: a later step (id) or done, or an earlier step to take the item back to",
-            "examples": [
-              [
-                "done"
-              ],
-              []
-            ]
+            "examples": [["done"], []]
           },
           "back": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]*$",
             "description": "Where a send-back lands: same (this step) or an earlier step id",
-            "examples": [
-              "same"
-            ]
+            "examples": ["same"]
           },
           "instructions": {
             "type": "object",
@@ -569,30 +436,20 @@
               "take": {
                 "type": "string",
                 "description": "What an agent reads when it takes the step",
-                "examples": [
-                  "Reproduce it first."
-                ]
+                "examples": ["Reproduce it first."]
               },
               "before": {
                 "type": "string",
                 "description": "What an agent reads before it hands the step off",
-                "examples": [
-                  "Run the tests."
-                ]
+                "examples": ["Run the tests."]
               },
               "review": {
                 "type": "string",
                 "description": "What an agent reviewing the step reads",
-                "examples": [
-                  "Check the test fails first."
-                ]
+                "examples": ["Check the test fails first."]
               }
             },
-            "required": [
-              "take",
-              "before",
-              "review"
-            ],
+            "required": ["take", "before", "review"],
             "additionalProperties": false,
             "description": "The instructions agents read on the step; mention a step or part as @[id], its id, which agents read as its name",
             "examples": [
@@ -619,62 +476,40 @@
             "properties": {
               "req": {
                 "type": "string",
-                "enum": [
-                  "no",
-                  "always"
-                ],
+                "enum": ["no", "always"],
                 "description": "Whether each handoff needs a note",
-                "examples": [
-                  "always"
-                ]
+                "examples": ["always"]
               },
               "hint": {
                 "type": "string",
                 "description": "What goes in the note",
-                "examples": [
-                  "What you ran and what you saw"
-                ]
+                "examples": ["What you ran and what you saw"]
               }
             },
-            "required": [
-              "req",
-              "hint"
-            ],
+            "required": ["req", "hint"],
             "additionalProperties": false
           },
           "waits": {
             "default": [],
             "description": "What the step waits for before it is handed off: its parts closed, its blockers closed",
-            "examples": [
-              [
-                "blockers"
-              ],
-              []
-            ],
+            "examples": [["blockers"], []],
             "type": "array",
             "items": {
               "type": "string",
-              "enum": [
-                "parts",
-                "blockers"
-              ]
+              "enum": ["parts", "blockers"]
             }
           },
           "skipWhenReady": {
             "default": false,
             "type": "boolean",
             "description": "First step nobody reviews only: an item created with all it hands off starts at the next step",
-            "examples": [
-              false
-            ]
+            "examples": [false]
           },
           "doerMayDrop": {
             "default": false,
             "type": "boolean",
             "description": "Whether an agent doing it may drop the item, saying why",
-            "examples": [
-              false
-            ]
+            "examples": [false]
           },
           "lead": {
             "type": "object",
@@ -683,9 +518,7 @@
                 "type": "string",
                 "pattern": "^[a-z][a-z0-9_]*$",
                 "description": "Where it leads instead of the next step: a later step id or done",
-                "examples": [
-                  "done"
-                ]
+                "examples": ["done"]
               },
               "when": {
                 "type": "object",
@@ -694,22 +527,15 @@
                     "type": "string",
                     "pattern": "^[a-z][a-z0-9_]*$",
                     "description": "The choice, multi, level or yesno part (id) it reads",
-                    "examples": [
-                      "fmine"
-                    ]
+                    "examples": ["fmine"]
                   },
                   "value": {
                     "type": "string",
                     "description": "The value that makes it lead there: a choice id, a level, yes or no",
-                    "examples": [
-                      "yes"
-                    ]
+                    "examples": ["yes"]
                   }
                 },
-                "required": [
-                  "part",
-                  "value"
-                ],
+                "required": ["part", "value"],
                 "additionalProperties": false,
                 "description": "Which part and value make it lead there",
                 "examples": [
@@ -720,10 +546,7 @@
                 ]
               }
             },
-            "required": [
-              "to",
-              "when"
-            ],
+            "required": ["to", "when"],
             "additionalProperties": false,
             "description": "While a part holds a value, the way the step takes instead of the next step; the next step is then a way only if ways lists it",
             "examples": [
@@ -737,16 +560,7 @@
             ]
           }
         },
-        "required": [
-          "id",
-          "name",
-          "doer",
-          "reviewer",
-          "hand",
-          "ways",
-          "back",
-          "instructions"
-        ],
+        "required": ["id", "name", "doer", "reviewer", "hand", "ways", "back", "instructions"],
         "additionalProperties": false,
         "description": "A step of the board, in order",
         "examples": []
@@ -761,12 +575,7 @@
         "pattern": "^[a-z][a-z0-9_]*$"
       },
       "description": "Parts (ids) that can be filled at any step",
-      "examples": [
-        [
-          "fbranch"
-        ],
-        []
-      ]
+      "examples": [["fbranch"], []]
     },
     "layout": {
       "type": "object",
@@ -776,12 +585,7 @@
       },
       "additionalProperties": {
         "type": "string",
-        "enum": [
-          "top",
-          "main",
-          "side",
-          "hidden"
-        ]
+        "enum": ["top", "main", "side", "hidden"]
       },
       "description": "Where each part (or rounds, or parts) shows on the item page: top, main, side, hidden",
       "examples": [
@@ -798,26 +602,17 @@
         "pattern": "^[a-z][a-z0-9_]*$"
       },
       "description": "The parts (ids) the list row shows, in order",
-      "examples": [
-        [
-          "fseverity"
-        ],
-        []
-      ]
+      "examples": [["fseverity"], []]
     },
     "about": {
       "type": "string",
       "description": "About this board: what it is for",
-      "examples": [
-        "Bugs found in the app, until fixed."
-      ]
+      "examples": ["Bugs found in the app, until fixed."]
     },
     "idle": {
       "type": "string",
       "description": "What an agent does when the board has nothing for it",
-      "examples": [
-        "Look for new bugs."
-      ]
+      "examples": ["Look for new bugs."]
     },
     "cap": {
       "type": "object",
@@ -825,22 +620,15 @@
         "on": {
           "type": "boolean",
           "description": "Whether agents add items only while few wait for the person",
-          "examples": [
-            false
-          ]
+          "examples": [false]
         },
         "n": {
           "type": "number",
           "description": "How many may wait for the person",
-          "examples": [
-            3
-          ]
+          "examples": [3]
         }
       },
-      "required": [
-        "on",
-        "n"
-      ],
+      "required": ["on", "n"],
       "additionalProperties": false,
       "description": "The cap on the items agents add",
       "examples": [
@@ -856,26 +644,17 @@
         "type": "string"
       },
       "description": "Titles of the sample items previews draw",
-      "examples": [
-        [
-          "Login fails on Safari"
-        ],
-        []
-      ]
+      "examples": [["Login fails on Safari"], []]
     },
     "template": {
       "type": "string",
       "description": "The template it was copied from, for the record",
-      "examples": [
-        "bugs"
-      ]
+      "examples": ["bugs"]
     },
     "lang": {
       "type": "string",
       "description": "The language the board was made in (en or es); leave it as it is",
-      "examples": [
-        "en"
-      ]
+      "examples": ["en"]
     },
     "snapshot": {
       "type": "object",
@@ -918,22 +697,15 @@
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
           "description": "The board (hidden id) its items divide into, or same",
-          "examples": [
-            "same"
-          ]
+          "examples": ["same"]
         },
         "always": {
           "type": "boolean",
           "description": "Whether a part is never created alone",
-          "examples": [
-            false
-          ]
+          "examples": [false]
         }
       },
-      "required": [
-        "board",
-        "always"
-      ],
+      "required": ["board", "always"],
       "additionalProperties": false,
       "description": "\"Se divide en\": the board each item divides into",
       "examples": [
@@ -950,11 +722,7 @@
         "pattern": "^[a-z][a-z0-9_]*$"
       },
       "description": "The boards (hidden ids) a template made with this one",
-      "examples": [
-        [
-          "bbugs"
-        ]
-      ]
+      "examples": [["bbugs"]]
     },
     "analysis": {
       "type": "object",
@@ -963,41 +731,31 @@
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
           "description": "The field (part id) that says how much work an item is",
-          "examples": [
-            "feffort"
-          ]
+          "examples": ["feffort"]
         },
         "risk": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
           "description": "The field (part id) that says how risky an item is to do",
-          "examples": [
-            "frisk"
-          ]
+          "examples": ["frisk"]
         },
         "impact": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
           "description": "The field (part id) that says how much an item matters",
-          "examples": [
-            "fseverity"
-          ]
+          "examples": ["fseverity"]
         },
         "area": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
           "description": "The field (part id) that says where an item belongs",
-          "examples": [
-            "farea"
-          ]
+          "examples": ["farea"]
         },
         "due": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
           "description": "The date field (part id) an item is due by",
-          "examples": [
-            "fdue"
-          ]
+          "examples": ["fdue"]
         }
       },
       "additionalProperties": false,
@@ -1026,14 +784,9 @@
       "properties": {
         "by": {
           "type": "string",
-          "enum": [
-            "page",
-            "anyone"
-          ],
+          "enum": ["page", "anyone"],
           "description": "Who may drop an item: only from its page, or anyone (an agent too, asked to)",
-          "examples": [
-            "anyone"
-          ]
+          "examples": ["anyone"]
         },
         "motives": {
           "type": "array",
@@ -1044,29 +797,20 @@
                 "type": "string",
                 "pattern": "^[a-z][a-z0-9_]*$",
                 "description": "The hidden id of the motive",
-                "examples": [
-                  "wont_fix"
-                ]
+                "examples": ["wont_fix"]
               },
               "key": {
                 "type": "string",
                 "description": "The key of the template's motive this one was made from; leave it as it is",
-                "examples": [
-                  "high"
-                ]
+                "examples": ["high"]
               },
               "name": {
                 "type": "string",
                 "description": "What the motive reads",
-                "examples": [
-                  "Won't fix"
-                ]
+                "examples": ["Won't fix"]
               }
             },
-            "required": [
-              "id",
-              "name"
-            ],
+            "required": ["id", "name"],
             "additionalProperties": false,
             "description": "A motive a drop names",
             "examples": [
@@ -1088,10 +832,7 @@
           ]
         }
       },
-      "required": [
-        "by",
-        "motives"
-      ],
+      "required": ["by", "motives"],
       "additionalProperties": false
     },
     "list": {
@@ -1108,27 +849,18 @@
       "properties": {
         "as": {
           "type": "string",
-          "enum": [
-            "list",
-            "table"
-          ],
+          "enum": ["list", "table"],
           "description": "How the published list shows its items",
-          "examples": [
-            "list"
-          ]
+          "examples": ["list"]
         },
         "group": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
           "description": "What it groups by: a choice, level or yesno part (id), step or motive",
-          "examples": [
-            "step"
-          ]
+          "examples": ["step"]
         }
       },
-      "required": [
-        "as"
-      ],
+      "required": ["as"],
       "additionalProperties": false
     }
   },
