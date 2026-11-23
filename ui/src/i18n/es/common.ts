@@ -62,13 +62,28 @@ export const common = {
   'ago.now': 'ahora mismo',
   'ago.time': 'hace {time}',
   'lease.left': 'quedan {time}',
-  'lease.expired': 'vencida',
+  'lease.expired': 'sin señal',
   'lease.heldBy': 'en manos de {holder}',
   'lease.heldUntil': 'en manos de {holder} hasta {time}',
   'lease.heldExpired': 'en manos de {holder}; su reserva venció ({time})',
   'listen.none': 'nadie está escuchando',
   'listen.setAside': 'apartado por {agent}',
   'listen.lead': 'Nadie está escuchando.',
+  // Un agente conectado que no espera en otea wait (acaba de entregar): se dice con calma.
+  'listen.connectedQueue': {
+    one: 'en cola: {agent} está conectado',
+    other: 'en cola: {count} agentes conectados',
+  },
+  'listen.connected': {
+    one: '{agent} está conectado; lo verá cuando vuelva a esperar.',
+    other: '{count} agentes están conectados; lo verán cuando vuelvan a esperar.',
+  },
+  // Las palabras de un agente: las del servidor (src/core/agent-status.ts), y ninguna otra.
+  'agent.status.working': 'trabajando',
+  'agent.status.listening': 'escuchando',
+  'agent.status.connected': 'conectado',
+  'agent.status.silent': 'sin señal',
+  'agent.status.away': 'ausente',
   'listen.noAgents': 'ningún agente conectado',
   'listen.noAgentsLead': 'Ningún agente conectado.',
   'listen.noAgentsNotice':
@@ -122,7 +137,7 @@ export const common = {
   'when.hoursMinutes': '{hours} h {minutes} min',
   'when.hours': '{hours} h',
   'when.minutes': '{minutes} min',
-  'when.expired': 'vencida',
+  'when.expired': 'sin señal',
   'when.now': 'ahora',
   'when.yesterday': 'ayer',
   'when.days': { one: '{count} día', other: '{count} días' },

@@ -57,7 +57,7 @@ export const toca = {
   'toca.sub.thenAgent': 'then an agent takes it',
   'toca.sub.thenClose': 'then it closes',
   'toca.sub.does': '{agent} is on it',
-  'toca.sub.silent': '{agent} has gone quiet',
+  'toca.sub.silent': '{agent} has no signal',
   'toca.sub.waitsFor': 'waiting for {agent}',
   'toca.sub.waitsAgent': 'waiting for an agent',
   'toca.sub.waitsKids': 'waiting for its children',
@@ -65,7 +65,7 @@ export const toca = {
   'toca.sub.didIt': 'done by {agent}',
   'toca.sub.closedBy': 'closed by {agent}',
   'toca.sub.closedByYou': 'closed by you',
-  'toca.quiet': '{agent} quiet · {time}',
+  'toca.quiet': '{agent} no signal · {time}',
   'toca.replied': '{agent} answered',
   'toca.round': 'round {n}',
 

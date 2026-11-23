@@ -2,22 +2,22 @@ import { isClosed, isLandStep, positionOf } from '../../src/core/board/engine.ts
 import type { BoardDefinition } from '../../src/core/board/model.ts';
 import { activeLease } from './active-lease.ts';
 import { t } from './i18n/i18n.ts';
-import { type Agent, isConnected, statusOf } from './presence.ts';
+import { type Agent, hearsDesk, isConnected, statusOf } from './presence.ts';
 import type { Item, ItemEvent } from './types.ts';
 
 // Whether the desk is heard (PLAN5 G3): only an agent waiting in otea wait wakes for what the person
 // does here. One idle in its chat, even with its MCP server open, hears nothing until it is told to
 // go on, so an approval or an answer would sit there with the item reading as on its way.
 
-// An agent that called Otea this recently is at work: it reads the item again when it next asks
-// Otea. The server's listening window: within it, it counts the agent connected too.
+// How long a holder gets to pick up an answer before the desk says it went quiet on it: the
+// server's listening window.
 const AT_WORK_MS = 150_000;
 
-// Whether any agent waits now. Before presence loads, or from a server that does not say, it is
-// taken as yes: the desk never warns of a silence it cannot tell.
+// Whether any agent waits now (the server's status listening). Before presence loads, or from a
+// server that does not say, it is taken as yes: the desk never warns of a silence it cannot tell.
 export function anyoneWaits(agents: readonly Agent[] | null | undefined): boolean {
   if (!agents) return true;
-  return agents.some((a) => a.waiting !== false);
+  return agents.some(hearsDesk);
 }
 
 // Whether a move the person can make here lands the item on an agent: only then does it matter
@@ -30,10 +30,9 @@ export function handsToAgent(
 }
 
 // The agents at work now (P7-R2-9, P7-R2-12), as the server says (status working): connected, and
-// holding an item they work on (not one that only waits for their question to be answered), or
-// having called Otea lately without handing off, between two items too. While one is, what the
-// person hands to an agent reaches it when it waits again, and an item nobody hears waits its turn
-// in a queue: the desk says so calmly, not as an alarm.
+// holding an item they work on (not one that only waits for their question to be answered). While
+// one is, what the person hands to an agent reaches it when it waits again, and an item nobody
+// hears waits its turn in a queue: the desk says so calmly, not as an alarm.
 export function workingAgents(
   agents: readonly Agent[] | null | undefined,
   items: readonly Pick<Item, 'id' | 'asks'>[],
@@ -44,14 +43,20 @@ export function workingAgents(
 
 // Whether one agent is at work: the server's status, the one definition the pill, the menu and the
 // queue note share (it holds an item it works on, not one that waits for its own question to be
-// answered; or it called Otea lately and did not just hand its work off). `items` and `now` stay
-// for the callers; the desk works out nothing of its own.
+// answered). `items` and `now` stay for the callers; the desk works out nothing of its own.
 export function isWorking(
   a: Agent,
   _items?: readonly Pick<Item, 'id' | 'asks'>[],
   _now?: number,
 ): boolean {
   return statusOf(a) === 'working';
+}
+
+// The agents the server says are connected but not waiting (status connected): one that just handed
+// off, or sits idle in its chat with its MCP server open. They hear nothing of the desk until they
+// wait again, which is no fault: the desk says so calmly (P5-F12, P2-F4).
+export function connectedAgents(agents: readonly Agent[] | null | undefined): string[] {
+  return (agents ?? []).filter((a) => statusOf(a) === 'connected').map((a) => a.name);
 }
 
 // The agent that holds the item's live lease while it is no longer connected (P7-R3-10): its
@@ -80,7 +85,7 @@ export function silentHolder(
 ): { agent: string; since: string } | null {
   const lease = activeLease(item.lease, now);
   const holder = lease ? agents?.find((a) => a.name === lease.holder) : undefined;
-  if (!holder || holder.waiting === true) return null;
+  if (!holder || hearsDesk(holder)) return null;
   const asked = new Set(
     events
       .filter((e) => e.type === 'question_asked' && e.actor.name === holder.name)
@@ -97,12 +102,14 @@ export function silentHolder(
 }
 
 // What the desk says beside a move that hands the item to an agent (P7-R2-9): nothing while an
-// agent waits (it hears it at once); while none does, that the agents at work will see it when
-// they wait again (calm), or, with none at work, that nobody is listening (the alarm).
+// agent waits (it hears it at once); while none does, that the agents at work, or connected, will
+// see it when they wait again (calm); with none there at all, that none is connected (calm too);
+// and only when the agents left gave no signal, that nobody is listening (the alarm).
 export type Hearing =
   | { kind: 'unheard' }
   | { kind: 'nobody' }
-  | { kind: 'working'; agents: string[] };
+  | { kind: 'working'; agents: string[] }
+  | { kind: 'connected'; agents: string[] };
 
 // Whether no agent is here at all (none connected, none silent on a lease): an empty room, which
 // the desk says calmly, never as a silence to fix. Before presence loads it is not.
@@ -118,16 +125,24 @@ export function hearing(
   if (anyoneWaits(agents)) return null;
   const working = workingAgents(agents, items, now);
   if (working.length > 0) return { kind: 'working', agents: working };
+  const connected = connectedAgents(agents);
+  if (connected.length > 0) return { kind: 'connected', agents: connected };
   return noAgents(agents) ? { kind: 'nobody' } : { kind: 'unheard' };
 }
 
-// What the desk says of an item nobody hears: «nadie está escuchando» (a warning), or, while an
-// agent is at work on another item, that it waits in the queue for it (calm); with no agent
-// connected at all, that none is (calm).
+// What the desk says of an item nobody hears: «nadie está escuchando» (a warning, only when the
+// agents there gave no signal), or, while an agent is at work on another item, or connected, that
+// it waits in the queue for it (calm); with no agent connected at all, that none is (calm).
 export function unheardWords(
   busy: readonly string[],
   nobody = false,
+  connected: readonly string[] = [],
 ): { text: string; calm: boolean } {
+  if (busy.length === 0 && connected.length > 0)
+    return {
+      text: t('listen.connectedQueue', { count: connected.length, agent: connected[0] ?? '' }),
+      calm: true,
+    };
   if (busy.length === 0 && nobody) return { text: t('listen.noAgents'), calm: true };
   if (busy.length === 0) return { text: t('listen.none'), calm: false };
   return { text: t('listen.busy', { count: busy.length, agent: busy[0] ?? '' }), calm: true };
@@ -141,7 +156,12 @@ export function unheardLead(
   agents: readonly Agent[] | null | undefined,
   id: string,
 ): string {
-  if (busy.length === 0) return t(noAgents(agents) ? 'listen.noAgentsLead' : 'listen.lead');
+  if (busy.length === 0) {
+    const connected = connectedAgents(agents);
+    if (connected.length > 0)
+      return t('listen.connected', { count: connected.length, agent: connected[0] ?? '' });
+    return t(noAgents(agents) ? 'listen.noAgentsLead' : 'listen.lead');
+  }
   const elsewhere = busy.every((name) =>
     agents?.find((a) => a.name === name)?.holding.some((held) => held !== id),
   );
@@ -164,7 +184,7 @@ export function unheard(
   const lease = activeLease(item.lease, now);
   if (!lease) return true;
   const holder = agents?.find((a) => a.name === lease.holder);
-  return !holder || !isConnected(holder) || now - (Date.parse(holder.lastSeen) || 0) > AT_WORK_MS;
+  return !holder || statusOf(holder) !== 'working';
 }
 
 // The items waiting behind `item` to land: on a board's land step (one agent lands at a time on a

@@ -58,13 +58,28 @@ export const common = {
   'ago.now': 'just now',
   'ago.time': '{time} ago',
   'lease.left': '{time} left',
-  'lease.expired': 'expired',
+  'lease.expired': 'no signal',
   'lease.heldBy': 'held by {holder}',
   'lease.heldUntil': 'held by {holder} until {time}',
   'lease.heldExpired': 'held by {holder}, its lease expired at {time}',
   'listen.none': 'nobody is listening',
   'listen.setAside': 'set aside by {agent}',
   'listen.lead': 'Nobody is listening.',
+  // A connected agent that is not in otea wait (it just handed off): said calmly.
+  'listen.connectedQueue': {
+    one: 'queued: {agent} is connected',
+    other: 'queued: {count} agents are connected',
+  },
+  'listen.connected': {
+    one: '{agent} is connected; it will see it when it waits again.',
+    other: '{count} agents are connected; they will see it when they wait again.',
+  },
+  // The words for an agent: the server's (src/core/agent-status.ts), and no other.
+  'agent.status.working': 'working',
+  'agent.status.listening': 'listening',
+  'agent.status.connected': 'connected',
+  'agent.status.silent': 'no signal',
+  'agent.status.away': 'away',
   'listen.noAgents': 'no agent is connected',
   'listen.noAgentsLead': 'No agent is connected.',
   'listen.noAgentsNotice':
@@ -115,7 +130,7 @@ export const common = {
   'when.hoursMinutes': '{hours} h {minutes} min',
   'when.hours': '{hours} h',
   'when.minutes': '{minutes} min',
-  'when.expired': 'expired',
+  'when.expired': 'no signal',
   'when.now': 'now',
   'when.yesterday': 'yesterday',
   'when.days': { one: '{count} day', other: '{count} days' },

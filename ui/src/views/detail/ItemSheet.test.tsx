@@ -180,7 +180,16 @@ describe('the item sheet', () => {
   // P7-R2-9: every review read «Nadie está escuchando» in red, even where Aprobar closes the item
   // and only Devolver, not chosen, hands it to an agent; and while the agent plainly worked.
   describe('beside a move that hands the item to an agent', () => {
-    const lone = { name: 'Mender', harness: null, holding: [], lastSeen: ago(10), live: true };
+    // An agent with no signal: it holds nothing now and nothing says it is connected, so nobody
+    // listens. (One that is connected but not waiting is calm: see the next test.)
+    const lone = {
+      name: 'Mender',
+      harness: null,
+      holding: [],
+      lastSeen: ago(10),
+      live: false,
+      status: 'silent',
+    };
     const onward: ItemView = {
       ...item,
       transitions: [
@@ -199,23 +208,39 @@ describe('the item sheet', () => {
       expect(silent).toContain('data-unheard');
       expect(silent).toContain('<b>Nobody is listening.</b>');
       expect(silent).toContain('<code>otea wait --turn agent --unclaimed</code>');
-      expect(render(onward, withAgents([{ ...lone, waiting: true }]))).not.toContain(
-        'data-unheard',
-      );
+      const listens = { ...lone, live: true, waiting: true, status: 'listening' };
+      expect(render(onward, withAgents([listens]))).not.toContain('data-unheard');
+    });
+
+    // P5-F12, P2-F4: the agent handed off and is not in otea wait. The pill says «1 conectado»; the
+    // item said «Nadie está escuchando» in red, as if something failed.
+    it('says calmly that a connected agent will see it when it waits again, never the alarm', () => {
+      setLanguage('es');
+      const connected = { ...lone, live: true, waiting: false, status: 'connected' };
+      const html = render(onward, withAgents([connected]));
+      expect(html).toContain('data-unheard="calm"');
+      expect(html).toContain('Mender está conectado; lo verá cuando vuelva a esperar.');
+      expect(html).not.toContain('Nadie está escuchando');
+      expect(html).not.toContain('data-unheard=""');
     });
 
     it('says calmly that the agent at work will see it when it waits again', () => {
       setLanguage('es');
-      const busy = { ...lone, waiting: false, holding: ['ERR-300'] };
+      const busy = {
+        ...lone,
+        live: true,
+        waiting: false,
+        holding: ['ERR-300'],
+        status: 'working',
+      };
       const html = render(onward, withAgents([busy]));
       expect(html).toContain('data-unheard="calm"');
       expect(html).toContain('Mender está trabajando; lo verá cuando vuelva a esperar.');
       expect(html).not.toContain('Nadie está escuchando');
-      // kiln holds nothing, and called Otea a minute ago: at work between two items (P7-R2-9).
-      const two = [
-        busy,
-        { ...busy, name: 'kiln', lastSeen: ago(1), actedAt: ago(1), holding: [] },
-      ].map((each) => ({ ...each, status: 'working' }));
+      // The server says each is at work: the desk names exactly those.
+      const two = [busy, { ...busy, name: 'kiln', lastSeen: ago(1), actedAt: ago(1) }].map(
+        (each) => ({ ...each, status: 'working' }),
+      );
       expect(render(onward, withAgents(two))).toContain(
         '2 agentes están trabajando; lo verán cuando vuelvan a esperar.',
       );
@@ -261,7 +286,14 @@ describe('the item sheet', () => {
   it('says in the header that nobody is listening on an item that waits for an agent', () => {
     setLanguage('es');
     const queued: ItemView = { ...item, state: 'fixing', turn: 'agent', events: [] };
-    const lone = { name: 'Mender', harness: null, holding: [], lastSeen: ago(30), live: true };
+    const lone = {
+      name: 'Mender',
+      harness: null,
+      holding: [],
+      lastSeen: ago(30),
+      live: false,
+      status: 'silent',
+    };
     const silent = render(queued, { ...app, agents: [{ ...lone, waiting: false }] } as App);
     expect(silent).toContain('>Espera a un agente. Nadie está escuchando.</span></p>');
   });
@@ -283,8 +315,20 @@ describe('the item sheet', () => {
     expect(html).toContain('data-unheard="calm"');
     expect(html).toContain('claude-haiku está trabajando; lo verá cuando vuelva a esperar.');
     expect(html).not.toContain('data-unheard=""');
-    const idle = { ...haiku, lastSeen: ago(0.5), actedAt: ago(10), listening: true };
-    expect(render(queued, { ...app, agents: [idle] } as App)).toContain(
+    // Connected but idle in its chat (no call, no wait): calm too, in the status the server says.
+    const idle = {
+      ...haiku,
+      lastSeen: ago(0.5),
+      actedAt: ago(10),
+      listening: true,
+      status: 'connected',
+    };
+    const idleHtml = render(queued, { ...app, agents: [idle] } as App);
+    expect(idleHtml).toContain('claude-haiku está conectado; lo verá cuando vuelva a esperar.');
+    expect(idleHtml).not.toContain('Nadie está escuchando');
+    // Only an agent with no signal leaves it as the alarm.
+    const gone = { ...haiku, lastSeen: ago(30), live: false, status: 'silent' };
+    expect(render(queued, { ...app, agents: [gone] } as App)).toContain(
       '<b>Nadie está escuchando.</b>',
     );
   });
@@ -380,7 +424,10 @@ describe('the item sheet', () => {
       setAside: { by: 'claude-haiku', at: ago(10) },
     };
     const lone = { name: 'claude-haiku', harness: null, holding: [], lastSeen: ago(30) };
-    const silent = { ...app, agents: [{ ...lone, live: true, waiting: false }] } as App;
+    const silent = {
+      ...app,
+      agents: [{ ...lone, live: false, waiting: false, status: 'silent' }],
+    } as App;
     const html = render(aside, silent);
     expect(html).toContain('<b>claude-haiku</b> lo dejó para más adelante.');
     expect(html).not.toContain('Espera a un agente');

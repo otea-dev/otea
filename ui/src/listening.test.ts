@@ -313,7 +313,12 @@ describe('unheardLead', () => {
     expect(unheardLead(['claude-a'], [free], 'TASK-1')).toBe(
       'claude-a is at work and will see it when it waits again.',
     );
-    expect(unheardLead([], [free], 'TASK-1')).toBe('Nobody is listening.');
+    // Connected but not waiting is no silence to fix (P5-F12); only no signal is.
+    expect(unheardLead([], [free], 'TASK-1')).toBe(
+      'claude-a is connected; it will see it when it waits again.',
+    );
+    const silent = agent('claude-a', { live: false, holding: ['TASK-2'], status: 'silent' });
+    expect(unheardLead([], [silent], 'TASK-1')).toBe('Nobody is listening.');
   });
 });
 

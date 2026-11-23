@@ -28,13 +28,11 @@ export const shell = {
   'shell.pill.waiting': { one: '{count} escuchando', other: '{count} escuchando' },
   'shell.pill.connected': { one: '{count} conectado', other: '{count} conectados' },
   'shell.pill.silent': { one: '{count} sin señal', other: '{count} sin señal' },
-  'shell.pill.quiet': { one: '{count} callado', other: '{count} callados' },
   'shell.pill.noProfile': { one: '{count} sin perfil', other: '{count} sin perfil' },
   'shell.pill.of': 'de {count}',
   'shell.row.open': '{agent}: abrir su ficha',
   'shell.row.work': 'trabaja en',
-  'shell.row.quiet': 'callado desde {time} ·',
-  'shell.row.quietRan': 'callado desde {time} · su reserva venció',
+  'shell.row.quiet': 'sin señal desde {time} ·',
   'shell.row.wait': 'espera tu respuesta ·',
   'shell.row.idle': 'escuchando · libre desde {time}',
   'shell.row.connected': 'conectado · no escucha ahora: no espera trabajo nuevo',
@@ -46,7 +44,7 @@ export const shell = {
   'shell.flag.changed': 'cambió {time}',
   'shell.flag.noMcp': 'MCP sin conectar',
   'shell.flag.noMcpTip':
-    'Pidió conectarse por MCP (otea connect), pero su harness nunca cargó el servidor de Otea: lo rechazó al pedir aprobarlo, o nunca se agregó. Sigue trabajando con el comando otea.',
+    'Pidió conectarse por MCP (otea connect), pero su harness nunca cargó el servidor de Otea: lo rechazó al pedir aprobarlo, o nunca se agregó. Trabaja con el comando otea, que es una vía válida: no hace falta arreglar nada si cumple.',
   'shell.flag.mcpUnused': 'conectado por CLI, MCP sin usar',
   'shell.flag.mcpUnusedTip':
     'Su harness cargó el servidor MCP de Otea, pero este agente trabaja con el comando otea. Funciona igual: no hace falta arreglar nada.',

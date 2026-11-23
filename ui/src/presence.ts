@@ -1,4 +1,5 @@
 import { AGENT_STATUSES, type AgentStatus } from '../../src/core/agent-status.ts';
+import { t } from './i18n/i18n.ts';
 import type { ItemEvent } from './types.ts';
 
 // An agent the server has seen in this project: its name (the actor of its claims, leases and
@@ -82,6 +83,18 @@ export function statusOf(a: Pick<Agent, 'status' | 'live' | 'holding' | 'waiting
   if (!a.live) return 'away';
   if (a.holding.length > 0) return 'working';
   return a.waiting === true ? 'listening' : 'connected';
+}
+
+// The word for what the agent is doing now, in the language on screen: the server's status through
+// agent.status.*, the one set of words (working, listening, connected, silent, away).
+export function statusWord(a: Pick<Agent, 'status' | 'live' | 'holding' | 'waiting'>): string {
+  return t(`agent.status.${statusOf(a)}`);
+}
+
+// Whether the agent hears what the person does on the desk: it waits in otea wait (status
+// listening). A server that sends no status leaves the flag; one that says nothing of it, as yes.
+export function hearsDesk(a: Pick<Agent, 'status' | 'live' | 'holding' | 'waiting'>): boolean {
+  return a.status !== undefined ? a.status === 'listening' : a.waiting !== false;
 }
 
 // Connected: working, listening or connected. One silent on a live lease is not (it is in the menu,

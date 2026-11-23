@@ -385,7 +385,9 @@ describe('the agents menu', () => {
         onPerformance: () => undefined,
       }),
     );
-    expect(html).toContain('<span class="verb">conectado · no escucha: no está en otea wait</span>');
+    expect(html).toContain(
+      '<span class="verb">conectado · no escucha: no está en otea wait</span>',
+    );
     expect(html).not.toContain('verb warn-t');
   });
 
