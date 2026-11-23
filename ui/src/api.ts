@@ -35,6 +35,8 @@ import type {
 } from './types.ts';
 import { type AgentDetail, parseAgentDetail } from './views/agent/agent-sheet.ts';
 
+const SESSION_PATH = '/api/session';
+
 async function get(path: string, signal: AbortSignal): Promise<Response> {
   // Every read says whether the PC answered it (the offline line, sync-state.ts).
   const response = await fetch(apiUrl(path), {
@@ -44,7 +46,10 @@ async function get(path: string, signal: AbortSignal): Promise<Response> {
     if (!signal.aborted) noteRead({ kind: 'failed' });
     throw error;
   });
-  noteRead(readOf(response.headers));
+  const read = readOf(response.headers);
+  // The session's own read is the PC's answer to anyone: it says it is there, not that this
+  // browser is signed in.
+  noteRead(read.kind === 'fresh' && path === SESSION_PATH ? { kind: 'fresh', open: true } : read);
   // A device on the LAN whose token was revoked (or never paired) goes back to the pairing screen.
   if (response.status === 401) {
     const body: unknown = await response
@@ -53,8 +58,13 @@ async function get(path: string, signal: AbortSignal): Promise<Response> {
       .catch(() => undefined);
     const code = (body as { error?: { code?: unknown } } | undefined)?.error?.code;
     if (code === 'unpaired') window.location.assign('/pair');
-    // This computer's browser without the sign-in cookie: the server reads to no one else.
-    if (code === 'unauthorized') throw new Error(t('error.readSignIn'));
+    // This computer's browser without the sign-in cookie, or whose sign-in ran out: the server
+    // reads to no one else. The app says so, with the way back in (SignedOut), instead of showing
+    // an empty project (P8-F4).
+    if (code === 'unauthorized') {
+      noteRead({ kind: 'refused' });
+      throw new Error(t('error.readSignIn'));
+    }
   }
   if (!response.ok && response.status !== 404) {
     throw new Error(t('error.getFailed', { path, status: response.status }));
@@ -111,7 +121,7 @@ export function evidenceFileUrl(id: number): string {
 }
 
 export async function fetchSession(signal: AbortSignal): Promise<Session> {
-  return (await get('/api/session', signal)).json();
+  return (await get(SESSION_PATH, signal)).json();
 }
 
 export async function fetchCollections(signal: AbortSignal): Promise<CollectionView[]> {
