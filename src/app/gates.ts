@@ -536,8 +536,9 @@ function strayRefusal(
   return `${gate} refused: ${base} would take ${count} that no approved item holds on its branch or records as its own: ${commitsShown(commits)}. ${names} ${verb} ${base}: it takes only the branches of approved items, as they were pushed, and the commits an approved or Done item records by its id. If an approved item made it, record it on that item: while it is landed, in the field its step asks for (otea update <id> --field "<field>=${example}"); once it is Done, with otea merged <id> --commit ${example}. If no approved item made it, push nothing of it: ask the person, otea ask <id> "<question>".`;
 }
 
-// An id of a commit as an item records it in a field: 7 to 40 hex digits, a word of its own.
-const COMMIT_ID = /\b[0-9a-f]{7,40}\b/gi;
+// An id of a commit as an item records it in a field: 7 to 64 hex digits (a SHA-256 repo's ids are
+// 64), a word of its own.
+const COMMIT_ID = /\b[0-9a-f]{7,64}\b/gi;
 
 function commitIds(value: unknown): string[] {
   return typeof value === 'string'

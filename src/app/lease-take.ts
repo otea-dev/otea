@@ -85,6 +85,11 @@ export function assertMayWriteItem(ctx: Context, item: ItemRecord, actor: Actor,
       `The person freed ${item.id} from you at ${timeText(last.at)}; ${again}`,
     );
   }
+  // A lease another agent held ran out, but its session runs: the item is still its own, as for a
+  // claim (P1-R3-6); a write on it would be a write over that agent.
+  if (item.lease && sessionRuns(db, item.lease.holder, () => at)) {
+    throw stillWorking(item.id, item.lease);
+  }
   // Never claimed: the wait the claim keeps for an item that is not its turn to land is the
   // write's too. A claim the landing queue refused was got round by updating and handing off
   // anyway (P1-F1). An item of no board (a preset's) is queued by nothing.

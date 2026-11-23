@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { instantiate, requireTemplate } from '../core/board/templates.ts';
-import { updateItemState } from '../store/queries.ts';
+import { appendEvent, updateItemState } from '../store/queries.ts';
 import { createItem } from './items.ts';
 import { claimItem } from './leases.ts';
 import { nextFor } from './next.ts';
+import { endProcess, waitBeat } from './presence.ts';
 import { setOrder } from './priority.ts';
 import { memoryContext, publishAs } from './testing.ts';
 
@@ -64,5 +65,76 @@ describe('working straight on main, one agent at a time', () => {
     expect(() => claimItem(ctx, { id: behind, actor: agent('quill') }, now)).toThrow(
       `${top} goes first on main (order 1), then ${behind}`,
     );
+  });
+
+  // A lease that ran out while its holder's session runs is still its holder's: it may be at work
+  // on a long step with no otea call, and the next agent would commit on main under it.
+  it('still counts, as on main, an item whose lease ran out while its holder session runs', () => {
+    const { ctx, doing } = board();
+    const first = doing('first');
+    const second = doing('second');
+    const T0 = '2026-01-01T00:00:00.000Z';
+    const T20 = '2026-01-01T00:20:00.000Z';
+    const listens = (time: string) =>
+      waitBeat(
+        ctx.db,
+        { agent: 'claude-b', channel: 'cli', waiter: process.pid },
+        () => time,
+      ).run();
+    listens(T0);
+    claimItem(ctx, { id: first, actor: agent('claude-b') }, () => T0);
+    listens(T20);
+
+    expect(() => claimItem(ctx, { id: second, actor: agent('quill') }, () => T20)).toThrow(
+      `${second} not claimed: claude-b works on main with ${first} now`,
+    );
+    // Once that session ended nobody works on it: the next agent takes it over, first in line.
+    endProcess(ctx.db, process.pid);
+    expect(claimItem(ctx, { id: first, actor: agent('quill') }, () => T20).lease?.holder).toBe(
+      'quill',
+    );
+  });
+
+  // Main stays taken until what is committed there has landed: an item in review, or approved and
+  // waiting for its push, still holds it; one that made no commit holds nothing.
+  it('keeps main taken while an item waits for its review or its push, until it landed', () => {
+    const { ctx, doing } = board();
+    const first = doing('first');
+    const second = doing('second');
+    updateItemState(ctx.db, first, 'doit__review', now());
+
+    const held = `${second} not claimed: ${first} is committed on main and waits for its review and its push`;
+    expect(() => claimItem(ctx, { id: second, actor: agent('quill') }, now)).toThrow(held);
+    const idle = nextFor(ctx, 'quill', {}, now);
+    expect(idle).toMatchObject({ item: null, idle: true });
+    expect(idle.text).toContain(`${second} waits to work on main: ${first} is committed there`);
+
+    // Approved: it lands in the Subir step, which an agent does, and main stays taken until done.
+    updateItemState(ctx.db, first, 'land', now());
+    expect(() => claimItem(ctx, { id: second, actor: agent('quill') }, now)).toThrow(
+      new RegExp(`${second} not claimed: .*${first}`),
+    );
+    // Landed: the next change goes ahead.
+    updateItemState(ctx.db, first, 'done', now());
+    expect(claimItem(ctx, { id: second, actor: agent('quill') }, now).lease?.holder).toBe('quill');
+  });
+
+  it('holds nothing for an item whose handoff made no commit', () => {
+    const { ctx, doing } = board();
+    const first = doing('first');
+    const second = doing('second');
+    updateItemState(ctx.db, first, 'doit__review', now());
+    appendEvent(ctx.db, {
+      itemId: first,
+      type: 'transitioned',
+      actor: agent('claude-b'),
+      at: now(),
+      data: {
+        to: 'doit__review',
+        tip: { branch: 'main', commit: 'a'.repeat(40), tree: 'b'.repeat(40), unchanged: true },
+      },
+    });
+
+    expect(claimItem(ctx, { id: second, actor: agent('quill') }, now).lease?.holder).toBe('quill');
   });
 });

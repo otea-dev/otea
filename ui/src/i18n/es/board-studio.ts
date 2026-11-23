@@ -45,6 +45,8 @@ export const boardStudio = {
     'Cada ítem de {board} se divide en un tablero que ya no existe. Elige otro en Sobre el tablero.',
   'bs.problem.guard_no_push': '«{part}» está protegida pero no se puede subir en ningún paso.',
   'bs.problem.guard_base': 'La rama base que protege «{part}» no es un nombre de rama.',
+  'bs.problem.guard_commit':
+    'El campo de commit que comprueba «{part}» no es un campo de texto que use este tablero.',
   'bs.problem.initial_invalid': '{part} empieza en un valor que ya no tiene. Elige otro.',
   'bs.problem.mention_raw':
     'Las instrucciones de {step} nombran algo con @ y llaves: escribe @ y elígelo, así los agentes leen su nombre.',

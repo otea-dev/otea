@@ -8,6 +8,7 @@ import { attachEvidence, detachEvidence } from './evidence.ts';
 import { createItem, updateItem } from './items.ts';
 import { claimItem } from './leases.ts';
 import { handoffItem } from './next.ts';
+import { setOrder } from './priority.ts';
 import { memoryContext, projectOf, publishAs } from './testing.ts';
 
 const you = { kind: 'human' as const, name: 'fede' };
@@ -18,7 +19,7 @@ const now = () => new Date(Date.UTC(2026, 10, 19, 9, 0, tick++)).toISOString();
 // P1-F1: two items waiting to land in main, the second one's claim refused ("claude-b lands CAM-1
 // now"); the agent went on with update and handoff, which only looked at who else held the item,
 // and landed it anyway. Every write on an item is the holder's: no claim, no write.
-describe('a write on an item needs the claim', () => {
+describe('a write on an item waits its turn as the claim does', () => {
   function two() {
     const ctx = memoryContext();
     const def = instantiate(requireTemplate('changes'), 'es', {}, undefined, { keep: true });
@@ -65,19 +66,46 @@ describe('a write on an item needs the claim', () => {
     });
   });
 
-  it('still lets an agent write an item it could claim now', () => {
-    const { ctx, first } = two();
-    // claude-b holds it: the same holder writes on, the queue is not asked again.
+  // Decided: an agent that holds no lease writes what it could claim (the item first in line), as
+  // the flows built on next and offers do; what is behind another in the queue it may not.
+  it('lets a lease-less agent write the item first in line, and not the one behind it', () => {
+    const ctx = memoryContext();
+    const def = instantiate(requireTemplate('changes'), 'es', {}, undefined, { keep: true });
+    publishAs(ctx, def, 'bcam', now);
+    const approved = (title: string) => {
+      const { id } = createItem(
+        ctx,
+        {
+          collection: def.name,
+          title,
+          fields: { want: 'x', branch: `cambio/${title}` },
+          actor: you,
+        },
+        now,
+      );
+      updateItemState(ctx.db, id, 'land', now());
+      return id;
+    };
+    const top = approved('top');
+    const behind = approved('behind');
+    setOrder(ctx, { collection: def.name, ids: [top, behind], actor: you }, now);
+    const quill = agent('quill');
+
     expect(
-      updateItem(ctx, { id: first, fields: { commit: 'abc1234' }, actor: agent('claude-b') }, now)
-        .fields,
+      updateItem(ctx, { id: top, fields: { commit: 'abc1234' }, actor: quill }, now).fields,
     ).toMatchObject({ commit: 'abc1234' });
+    expect(() =>
+      updateItem(ctx, { id: behind, fields: { commit: 'abc1234' }, actor: quill }, now),
+    ).toThrow(`${behind} not claimed: ${top} lands in main first (order 1), then ${behind}`);
   });
 
-  it('lets the person write what no agent holds', () => {
-    const { ctx, second } = two();
+  it('never binds the person, whoever holds the item', () => {
+    const { ctx, first } = two();
     expect(
-      updateItem(ctx, { id: second, fields: { commit: 'abc1234' }, actor: you }, now).fields,
+      updateItem(ctx, { id: first, fields: { commit: 'abc1234' }, actor: you }, now).fields,
     ).toMatchObject({ commit: 'abc1234' });
+    expect(() =>
+      updateItem(ctx, { id: first, fields: { commit: 'abc1234' }, actor: agent('quill') }, now),
+    ).toThrow(/claude-b/);
   });
 });

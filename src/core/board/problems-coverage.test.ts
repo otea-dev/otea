@@ -152,6 +152,24 @@ describe('problemsOf, the later settings', () => {
     }
   });
 
+  // P8-F1: guard.commit names the field a handoff checks as a landed commit; naming a field the
+  // board does not have (or does not use) would leave the check silently off.
+  it('blocks a protected branch whose commit field is not a text field the board uses', () => {
+    const def = tareasDeRepo();
+    def.parts.fbranch = {
+      ...def.parts.fbranch!,
+      guard: { push: ['simpl'], base: 'main', commit: 'fgone' },
+    };
+    expect(found(def)).toEqual([
+      {
+        level: 'error',
+        code: 'guard_commit',
+        params: { part: 'Rama' },
+        at: { kind: 'form' },
+      },
+    ]);
+  });
+
   it('blocks a start value that is not one of the field values', () => {
     const def = errores();
     def.parts.fcat = { ...def.parts.fcat!, initial: 'cgone' };

@@ -169,6 +169,8 @@ export function problemText(problem: Problem): string {
       return t('bs.problem.guard_no_push', { part: str(p.part) as string });
     case 'guard_base':
       return t('bs.problem.guard_base', { part: str(p.part) as string });
+    case 'guard_commit':
+      return t('bs.problem.guard_commit', { part: str(p.part) as string });
     case 'initial_invalid':
       return t('bs.problem.initial_invalid', { part: str(p.part) as string });
     case 'mention_raw':

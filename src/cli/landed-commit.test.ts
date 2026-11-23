@@ -78,5 +78,82 @@ describe('the commit a board says it landed', () => {
       git(origin, 'update-ref', 'refs/heads/main', git(dir, 'rev-parse', 'HEAD~1'));
       expect(refusal(pushed)).toContain('is in your local main but not on origin/main');
     });
+
+    // The remote cannot be asked: fail closed, saying so, never «push it first».
+    it('fails closed, saying to try again, when the remote cannot be reached', () => {
+      const pushed = commit('a.txt');
+      git(dir, 'push', '-q', 'origin', 'main');
+      git(dir, 'remote', 'set-url', 'origin', join(root, 'gone.git'));
+      const said = refusal(pushed);
+      expect(said).toContain('could not reach origin');
+      expect(said).toContain('hand it off again in a moment');
+      expect(said).not.toMatch(/push it first/i);
+    });
+
+    // A value may name several commits: each must be pushed, and a hex-looking word that is no
+    // commit of this checkout is no hash.
+    it('holds every commit a value names, and ignores a word that is no commit', () => {
+      const first = commit('a.txt');
+      git(dir, 'push', '-q', 'origin', 'main');
+      const second = commit('b.txt');
+      expect(refusal(`${first} and ${second}`)).toContain(`commit ${second} is in your local main`);
+      git(dir, 'push', '-q', 'origin', 'main');
+      expect(refusal(`${first} and ${second}`)).toBeUndefined();
+      expect(refusal(`landed ${second} (decaded)`)).toBeUndefined();
+      expect(refusal('decaded')).toMatch(/no commit decaded in this checkout/);
+    });
+
+    // The commit written must hold what the person approved, not just be some pushed commit:
+    // git rev-parse origin/main before the push is a real, pushed, older commit.
+    it('refuses an older commit of main for the work that was approved', () => {
+      const old = git(dir, 'rev-parse', '--short', 'origin/main');
+      const work = commit('a.txt');
+      const approved = { commit: git(dir, 'rev-parse', 'HEAD') };
+      // Before any push: the old hash is on origin/main, yet it is not the approved work.
+      const early = landedCommitRefusal(dir, 'Commit pushed', old, 'main', approved);
+      expect(early).toContain('does not hold the work the person approved');
+      expect(early).toContain('older commit of main');
+      expect(landedCommitRefusal(dir, 'Commit pushed', work, 'main', approved)).toContain(
+        'is in your local main but not on origin/main',
+      );
+      git(dir, 'push', '-q', 'origin', 'main');
+      expect(landedCommitRefusal(dir, 'Commit pushed', old, 'main', approved)).toContain(
+        'does not hold the work the person approved',
+      );
+      expect(landedCommitRefusal(dir, 'Commit pushed', work, 'main', approved)).toBeUndefined();
+      // A commit after it holds it too; so does one with the same changes (a rebase or squash).
+      const later = commit('b.txt');
+      git(dir, 'push', '-q', 'origin', 'main');
+      expect(landedCommitRefusal(dir, 'Commit pushed', later, 'main', approved)).toBeUndefined();
+      expect(
+        landedCommitRefusal(dir, 'Commit pushed', old, 'main', { ...approved, unchanged: true }),
+      ).toBeUndefined();
+    });
+  });
+
+  // A SHA-256 repository writes 64-digit ids.
+  it('takes a 64-digit id of a SHA-256 repository', () => {
+    const sha256 = join(root, 'sha256');
+    try {
+      execFileSync('git', ['init', '--quiet', '-b', 'main', '--object-format=sha256', sha256], {
+        stdio: 'ignore',
+      });
+    } catch {
+      return;
+    }
+    execFileSync(
+      'git',
+      ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--allow-empty', '-qm', 'x'],
+      {
+        cwd: sha256,
+        stdio: 'ignore',
+      },
+    );
+    const full = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: sha256,
+      encoding: 'utf8',
+    }).trim();
+    expect(full).toHaveLength(64);
+    expect(landedCommitRefusal(sha256, 'Commit pushed', full, 'main')).toBeUndefined();
   });
 });

@@ -176,8 +176,16 @@ import { watch } from '../app/watch.ts';
 import { agentGuideFor, TOPICS_REMINDER, TOPICS_RULE } from '../core/agent-guide.ts';
 import { agentPrompt, isPromptKind, PROMPT_KINDS, type PromptKind } from '../core/agent-prompts.ts';
 import { isClosed, isLandStep, positionOf, waysOf } from '../core/board/engine.ts';
-import { DONE, guardedBranch, isEvidence, stepById, workedBase } from '../core/board/model.ts';
-import { DROPPED_NAME } from '../core/board/next.ts';
+import {
+  type BoardDefinition,
+  DONE,
+  guardedBranch,
+  isEvidence,
+  stepById,
+  stepIndex,
+  workedBase,
+} from '../core/board/model.ts';
+import { DROPPED_NAME, wayByName } from '../core/board/next.ts';
 import { attachedPart, fieldsByName, partByName, stateName } from '../core/board/reading.ts';
 import type { Lang } from '../core/board/template-words.ts';
 import { isSetKey, LANGS, LISTED_KEYS, TEMPLATE_SETS, TEMPLATES } from '../core/board/templates.ts';
@@ -1701,22 +1709,40 @@ function boardMove(
 // where the repo has a remote, be on the remote's branch of it after a fetch (P8-F1, P9-F5). The
 // field took «banana», and the hash of a push the hook had refused, and the item went Done.
 function refuseUnlandedCommit(project: Project, cwd: string, move: BoardMoveInput): void {
-  if (move.actor.kind !== 'agent' || move.way !== undefined) return;
+  if (move.actor.kind !== 'agent') return;
   const item = getItem(project, move.id);
   const board = liveBoardOf(project, item.collection);
   const position = positionOf(item.state);
   if (!board || isClosed(position) || position.phase !== 'doing') return;
+  if (!movesOn(board.def, position.step, move.way)) return;
   const guard = guardedBranch(board.def);
   const ref = guard?.guard.commit;
   const base = guard?.guard.base;
   const part = ref === undefined ? undefined : board.def.parts[ref];
-  if (!part || base === undefined) return;
+  if (!guard || !part || base === undefined) return;
   const hand = stepById(board.def, position.step)?.hand.find((each) => each.ref === part.id);
   const value = item.fields[part.id];
   // A value still missing is the engine's refusal, in its words.
   if (!hand || hand.req === 'no' || typeof value !== 'string' || value.trim() === '') return;
-  const refused = landedCommitRefusal(cwd, part.name, value, base);
+  const branch = String(item.fields[guard.id] ?? '').trim();
+  const tip = branch === '' ? undefined : approvedTipOf(project, item.id, branch);
+  const approved = tip && {
+    commit: tip.commit,
+    ...(tip.unchanged ? { unchanged: true as const } : {}),
+  };
+  const refused = landedCommitRefusal(cwd, part.name, value, base, approved);
   if (refused) throw new OteaError('missing_fields', `${item.id} not handed off: ${refused}`);
+}
+
+// Whether a handoff of the step along `way` (none: the default one) takes the item on, to a later
+// step or to Done, not back to an earlier one for another round. What the handoff of a branch
+// checks (the branch has commits, the commit that landed is real) is checked for the forward moves,
+// `--way Done` among them, and left alone for a way back (a rebase that conflicts goes back to
+// Hacerlo with its work as it is). A way the step does not have is the engine's refusal.
+function movesOn(def: BoardDefinition, stepId: string, way: string | undefined): boolean {
+  if (way === undefined) return true;
+  const target = wayByName(def, stepId, way);
+  return target === undefined || target === DONE || stepIndex(def, target) > stepIndex(def, stepId);
 }
 
 // A step that hands a branch hands the work on it: an agent's handoff of one with no commits over
@@ -1725,11 +1751,12 @@ function refuseUnlandedCommit(project: Project, cwd: string, move: BoardMoveInpu
 // itself, on a board that works straight on it, is handed off with no commit as no code change
 // (P2S-R3-3, handedBranch).
 function refuseEmptyBranch(project: Project, cwd: string, move: BoardMoveInput): void {
-  if (move.actor.kind !== 'agent' || move.way !== undefined) return;
+  if (move.actor.kind !== 'agent') return;
   const item = getItem(project, move.id);
   const board = liveBoardOf(project, item.collection);
   const position = positionOf(item.state);
   if (!board || isClosed(position) || position.phase !== 'doing') return;
+  if (!movesOn(board.def, position.step, move.way)) return;
   const step = stepById(board.def, position.step);
   for (const hand of step?.hand ?? []) {
     const part = board.def.parts[hand.ref];
@@ -1775,7 +1802,8 @@ function handedBranch(
   const branch = String(item.fields[guard.id] ?? '').trim();
   if (branch === '') return {};
   const base = branch === guard.guard.base;
-  const checked = move.actor.kind === 'agent' && move.way === undefined && !base;
+  const forward = movesOn(board.def, position.step, move.way);
+  const checked = move.actor.kind === 'agent' && forward && !base;
   const state = checked ? pushState(cwd, branch) : undefined;
   const frozen = `once handed off, ${guard.name} is frozen while it is reviewed`;
   if (state?.kind === 'missing') {
@@ -1846,7 +1874,7 @@ function handedBranch(
     base &&
     hands &&
     move.actor.kind === 'agent' &&
-    move.way === undefined &&
+    forward &&
     pushState(cwd, branch)?.kind === 'pushed';
   const said = unchanged
     ? `${item.id} goes to review with no commit: ${branch} holds nothing the remote lacks, so the person reviews no code change and the push gate does not wait on it.`
@@ -1918,8 +1946,9 @@ const handoffCommand: Command = {
     let said: string | undefined;
     const moved = boardMove(input, (project, move) => {
       refuseEmptyBranch(project, input.cwd, move);
-      refuseUnlandedCommit(project, input.cwd, move);
       const handed = handedBranch(project, input.cwd, move);
+      // After the branch's own checks, which say first that it was never pushed.
+      refuseUnlandedCommit(project, input.cwd, move);
       warning = handed.warning;
       said = handed.said;
       return handoffItem(project, { ...move, ...(handed.tip ? { tip: handed.tip } : {}) });
@@ -2371,14 +2400,17 @@ function sharedCheckoutLine(project: Project, input: Input, id?: string): string
     );
   }
   // On a board that works straight on its base, the work is on main with no branch, and Otea lets
-  // one agent at a time take it (land-order.ts): a worktree of its own would only move the work off
-  // the base the person reviews, so the notice must not send the agent to one (P1-F2).
+  // one change at a time on it, held until it has landed (land-order.ts): a worktree of its own
+  // would only move the work off the base the person reviews, so the notice must not send the agent
+  // to one (P1-F2). It says only what the rule makes true: no other item of the boards that work on
+  // this base is on it. Agents with other work (another board, another repo) may still be in this
+  // checkout, so it says to keep to the files of the change.
   const board =
     id === undefined ? undefined : liveBoardOf(project, getItem(project, id).collection);
   const base = board && workedBase(board.def);
   if (base !== undefined && others.length > 0) {
     lines.push(
-      `${others.join(', ')} also holds work in this project, but this board works straight on ${base} with one agent at a time, so nobody else is changing ${base} while you hold ${id}: work here, on ${base}, with no branch and no worktree.`,
+      `${others.join(', ')} also holds work in this project, but this board works straight on ${base}, one change at a time until it has landed, so no other item of it is on ${base} while you hold ${id}: work here, on ${base}, with no branch and no worktree, and touch only the files of your change.`,
     );
   } else if (others.length > 0) {
     lines.push(

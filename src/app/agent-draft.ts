@@ -226,6 +226,7 @@ export function problemWords(problem: Problem): string {
     split_unknown: `${board.trim() || 'the board'} divides into a board that does not exist`,
     guard_no_push: `the branch${part} is protected but no step lets it be pushed`,
     guard_base: `the base branch the branch${part} protects too is not a branch name`,
+    guard_commit: `the commit field the branch${part} is checked against is not a text field of the board`,
     initial_invalid: `the field${part} starts with a value it does not have`,
     mention_raw: `step${step} mentions something as @{…}: write it @[id], the id of the step or part`,
     mention_unknown: `step${step} mentions an @[id] the board does not have`,

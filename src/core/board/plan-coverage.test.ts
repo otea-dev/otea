@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { BoardDefinition, Part, Step } from './model.ts';
+import type { BoardDefinition, Guard, Part, Step } from './model.ts';
 import { changePlan, itemEffects, itemMoves } from './plan.ts';
 import { cambios, errores, tareasDeRepo } from './testing.ts';
 
@@ -54,6 +54,18 @@ describe('changePlan, the later settings', () => {
       { kind: 'drop_by', by: 'page' },
       { kind: 'list', as: 'table', group: 'Categoría' },
     ]);
+  });
+
+  // P8-F1: naming the field a handoff checks as the landed commit changes what agents may do, so
+  // it is a change of the guard to publish, not nothing.
+  it('says a change of the commit field a guard checks', () => {
+    const live = errores();
+    const live2 = errores();
+    const branch = live2.parts.fbranch as Part;
+    live2.parts.fbranch = { ...branch, guard: { ...(branch.guard as Guard), commit: 'fcat' } };
+    expect(changePlan(live, live2, { boardName: () => undefined })).toContainEqual(
+      expect.objectContaining({ kind: 'guard', part: 'fbranch' }),
+    );
   });
 
   it('names the board a split leads to, and says when a setting goes away', () => {
