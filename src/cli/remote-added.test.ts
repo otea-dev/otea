@@ -154,7 +154,7 @@ describe('a remote added after init, said before the push', () => {
     expect(next.out).not.toContain('repos add');
   });
 
-  it('tells next and claim which command to run, after the person says it is that repo', async () => {
+  it('tells next and claim which command to run, and that the person says first', async () => {
     git('remote', 'add', 'origin', 'https://github.com/acme/keys.git');
     const name = (await otea('repos', 'list')).out.trim().split(/\s+/)[0] ?? '';
 
@@ -162,7 +162,7 @@ describe('a remote added after init, said before the push', () => {
     const claim = await otea('claim', 'TOD-1');
 
     for (const said of [next.out, claim.out]) {
-      expect(said).toContain('a remote was added');
+      expect(said).toContain('remote was added');
       expect(said).toContain(`otea repos add --name ${name}`);
       expect(said).toContain('ask the person');
     }
@@ -177,6 +177,6 @@ describe('a remote added after init, said before the push', () => {
 
     const next = await otea('next');
 
-    expect(next.out).not.toContain('a remote was added');
+    expect(next.out).not.toContain('remote was added');
   });
 });
