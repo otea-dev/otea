@@ -282,6 +282,19 @@ describe('mcp server', () => {
       expect(draft).toContain('otea handoff <id> --way');
     });
 
+    // A tool call has no stdin to pipe the board on: file "-" says to give it as definition.
+    it('answers file "-" on a board draft by pointing to definition, not to a pipe', async () => {
+      const made = await text('board_draft', { new: 'Ideas', why: 'try', template: 'changes' });
+      const request = made.match(/\b[A-Z]+-\d+\b/)?.[0] ?? '';
+
+      const reply = await call('board_draft', { id: request, file: '-' }, agent);
+
+      expect(reply.isError).toBe(true);
+      const said = reply.content[0]?.text ?? '';
+      expect(said).toContain('definition');
+      expect(said).not.toMatch(/pipe|here-document|board_draft \{ file/);
+    });
+
     it('gives the events one a line, each with its id first', async () => {
       const events = await text('events', { item: 'TASKS-1' });
 
