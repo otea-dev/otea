@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { basename, dirname, relative, resolve, sep } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import type { BroughtCommit, Landing, MergeTake, Tip } from '../app/gates.ts';
-import { excludeFromGit } from '../app/project.ts';
+import { excludeFromGit, gitDirsByWalking } from '../app/project.ts';
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, {
@@ -20,9 +21,27 @@ const SCRATCH_IDENTITY = {
   GIT_COMMITTER_EMAIL: 'otea@localhost',
 };
 
+// The branch the HEAD file of the checkout at cwd names (also before the first commit), read
+// without asking git: undefined when it cannot be told that way (a detached HEAD, git's own
+// variables set, a repo that keeps its refs in a reftable), and git is asked.
+function branchByReading(cwd: string): string | undefined {
+  const dirs = gitDirsByWalking(cwd, process.env);
+  if (!dirs || existsSync(join(dirs.common, 'reftable'))) return undefined;
+  try {
+    const head = /^ref: refs\/heads\/(\S.*?)\s*$/.exec(
+      readFileSync(join(dirs.gitDir, 'HEAD'), 'utf8'),
+    );
+    return head?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
 // The branch checked out in the repo at cwd, even before its first commit; throws outside a repo
 // or on a detached HEAD.
 export function currentBranch(cwd: string): string {
+  const read = branchByReading(cwd);
+  if (read !== undefined) return read;
   try {
     return git(cwd, 'symbolic-ref', '--short', 'HEAD');
   } catch {
@@ -33,6 +52,8 @@ export function currentBranch(cwd: string): string {
 // The branch checked out in the repo at cwd; undefined outside a repo or on a detached HEAD (a
 // rebase under way), where git names none.
 export function checkedOutBranch(cwd: string): string | undefined {
+  const read = branchByReading(cwd);
+  if (read !== undefined) return read;
   try {
     return git(cwd, 'symbolic-ref', '--short', '--quiet', 'HEAD') || undefined;
   } catch {
@@ -507,6 +528,8 @@ export function remoteOf(cwd: string, branch: string): string {
 // Whether cwd is in a repo's main checkout, not one of its linked worktrees (git worktree add);
 // false outside a repo.
 export function inMainCheckout(cwd: string): boolean {
+  const dirs = gitDirsByWalking(cwd, process.env);
+  if (dirs) return dirs.gitDir === dirs.common;
   try {
     const dir = resolve(cwd, git(cwd, 'rev-parse', '--git-dir'));
     const common = resolve(cwd, git(cwd, 'rev-parse', '--git-common-dir'));

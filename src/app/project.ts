@@ -74,38 +74,61 @@ const GIT_DISCOVERY_ENV = [
   'GIT_DISCOVERY_ACROSS_FILESYSTEM',
 ];
 
-// The common git dir of the checkout at cwd, found by walking up to its .git, as git does: a .git
-// folder is the common dir; a .git file (`gitdir: <path>`) of a linked worktree points at a dir whose
-// `commondir` file names it, and of a submodule at the dir itself. Undefined whenever this cannot be
-// sure (git's own variables set, a .git that does not read as one, no .git above cwd): git is asked.
-export function commonDirByWalking(cwd: string, env: NodeJS.ProcessEnv): string | undefined {
+export type GitDirs = {
+  // The git dir of the checkout itself (a linked worktree has its own, under the main one's).
+  gitDir: string;
+  // The one all the checkouts of the repo share.
+  common: string;
+  // Whether git names the common dir by its plain path (the .git at the top of the checkout it ran
+  // in), not by its real path.
+  plain: boolean;
+};
+
+// The git dirs of the checkout at cwd, found by walking up to its .git, as git does: a .git folder
+// is both; a .git file (`gitdir: <path>`) of a linked worktree points at the checkout's own dir,
+// whose `commondir` file names the common one, and of a submodule at the dir that is both.
+// Undefined whenever this cannot be sure (git's own variables set, a .git that does not read as
+// one, no .git above cwd): git is asked.
+export function gitDirsByWalking(cwd: string, env: NodeJS.ProcessEnv): GitDirs | undefined {
   if (GIT_DISCOVERY_ENV.some((name) => env[name] !== undefined)) return undefined;
   const start = resolve(cwd);
   for (let dir = start; ; dir = dirname(dir)) {
     const dotGit = join(dir, '.git');
     try {
       const kind = statSync(dotGit);
+      let gitDir: string;
       let common: string;
       if (kind.isDirectory()) {
+        gitDir = dotGit;
         common = dotGit;
       } else if (kind.isFile()) {
         const pointer = /^gitdir:\s*(.+?)\s*$/m.exec(readFileSync(dotGit, 'utf8'));
         if (!pointer?.[1]) return undefined;
-        const gitDir = resolve(dir, pointer[1]);
+        gitDir = resolve(dir, pointer[1]);
         const named = join(gitDir, 'commondir');
         common = existsSync(named) ? resolve(gitDir, readFileSync(named, 'utf8').trim()) : gitDir;
       } else {
         return undefined;
       }
       if (!existsSync(join(common, 'HEAD'))) return undefined;
-      // git answers the real path of a dir it reached through a link, and the plain `.git` at the
-      // top of the checkout it ran in.
-      const plain = (kind.isDirectory() && dir === start) || process.platform === 'win32';
-      return plain ? common : realpathSync(common);
+      return { gitDir, common, plain: kind.isDirectory() && dir === start };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return undefined;
     }
     if (dirname(dir) === dir) return undefined;
+  }
+}
+
+// What `git rev-parse --git-common-dir` answers from cwd, without asking git when it can be told:
+// git gives the real path of a dir it reached through a link.
+export function commonDirByWalking(cwd: string, env: NodeJS.ProcessEnv): string | undefined {
+  const dirs = gitDirsByWalking(cwd, env);
+  if (!dirs) return undefined;
+  if (dirs.plain || process.platform === 'win32') return dirs.common;
+  try {
+    return realpathSync(dirs.common);
+  } catch {
+    return undefined;
   }
 }
 
