@@ -63,15 +63,23 @@ export function checkedOutBranch(cwd: string): string | undefined {
 
 // Whether some checkout of the repository at cwd, the main one or a linked worktree, has `branch`
 // checked out: what an MCP server can tell of where an agent works, since it only knows the
-// directory its session started in. Undefined when git cannot say.
+// directory its session started in. A worktree git marks prunable, or whose folder is gone, is not
+// a checkout anyone works in. Undefined when git cannot say.
 export function branchCheckedOutAnywhere(cwd: string, branch: string): boolean | undefined {
   try {
-    const listed = execFileSync('git', ['worktree', 'list', '--porcelain'], {
+    // -z: entries end in NUL and a worktree's block in an empty one, so a path is read as it is.
+    const listed = execFileSync('git', ['worktree', 'list', '--porcelain', '-z'], {
       cwd,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     });
-    return listed.split(/\r?\n/).some((line) => line.trim() === `branch refs/heads/${branch}`);
+    return listed.split('\0\0').some((block) => {
+      const lines = block.split('\0');
+      const path = lines.find((line) => line.startsWith('worktree '))?.slice('worktree '.length);
+      if (path === undefined || !existsSync(path)) return false;
+      if (lines.some((line) => line === 'prunable' || line.startsWith('prunable '))) return false;
+      return lines.includes(`branch refs/heads/${branch}`);
+    });
   } catch {
     return undefined;
   }
