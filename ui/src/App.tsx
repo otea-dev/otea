@@ -15,6 +15,7 @@ import { ModelPerformance } from './components/ModelPerformance.tsx';
 import { CatalogOverview, ModuleIndex, ModulePanel } from './components/ModuleCatalog.tsx';
 import { ProjectSettings } from './components/ProjectSettings.tsx';
 import { ProjectsInbox } from './components/ProjectsInbox.tsx';
+import { SignedOutGate } from './components/SignedOut.tsx';
 import { Triage } from './components/Triage.tsx';
 import { useAttention, useRoute } from './hooks.ts';
 import { t, useLanguage } from './i18n/i18n.ts';
@@ -30,6 +31,7 @@ import { OfflineBar } from './offline/OfflineBar.tsx';
 import { CaptureSheet } from './phone/CaptureSheet.tsx';
 import { DeskOnly, deskOnlyOf } from './phone/DeskOnly.tsx';
 import { NavSheet } from './phone/NavSheet.tsx';
+import { SearchSheet } from './phone/SearchSheet.tsx';
 import { TabBar } from './phone/TabBar.tsx';
 import type { Route } from './selection.ts';
 import { PreferencesView } from './shell/PreferencesView.tsx';
@@ -174,6 +176,7 @@ function Shell() {
       <InstallBanner />
       <NavSheet />
       <CaptureSheet />
+      <SearchSheet />
       <LanguageNote />
       <ToastHost />
       <Tooltip />
@@ -189,7 +192,9 @@ export function App() {
   useRoute();
   return (
     <AppProvider>
-      <Shell />
+      <SignedOutGate>
+        <Shell />
+      </SignedOutGate>
     </AppProvider>
   );
 }

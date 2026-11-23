@@ -101,6 +101,8 @@ export const IC = {
   sun: '<circle cx="8" cy="8" r="2.6"/><path d="M8 1.8v1.4M8 12.8v1.4M1.8 8h1.4M12.8 8h1.4M3.6 3.6l1 1M11.4 11.4l1 1M3.6 12.4l1-1M11.4 4.6l1-1"/>',
   moon: '<path d="M12.6 9.6A5 5 0 0 1 6.4 3.4a5 5 0 1 0 6.2 6.2z"/>',
   x: '<path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>',
+  // the phone's search: a lens and its handle
+  search: '<circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2l3.3 3.3"/>',
   // the phone capture's photo: the system camera (mock screen 3)
   camera:
     '<rect x="2" y="4.7" width="12" height="8.7" rx="1.7"/><circle cx="8" cy="9" r="2.3"/><path d="M5.7 4.7l1-1.7h2.6l1 1.7"/>',

@@ -13,6 +13,7 @@ import { Pop } from '../kit/pop/Pop.tsx';
 import { lookOf } from '../lanes/looks.ts';
 import { NodeGlyph } from '../lanes/NodeGlyph.tsx';
 import { useSync } from '../offline/sync-state.ts';
+import { closeSearch, openSearch, useSearchOpen } from '../phone/search-open.ts';
 import { monogramOf } from '../place-icons.ts';
 import {
   type AgentRow,
@@ -611,6 +612,26 @@ function AgentsPill() {
   );
 }
 
+// The phone's search: a round button in the pills' own skin, opening the search sheet.
+function SearchButton() {
+  const app = useApp();
+  const open = useSearchOpen().open;
+  if (!app.phone) return null;
+  return (
+    <button
+      type="button"
+      className="sbtn"
+      data-search=""
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-label={t('phone.search')}
+      onClick={() => (open ? closeSearch() : openSearch())}
+    >
+      <Icon name="search" />
+    </button>
+  );
+}
+
 export function Topbar() {
   const app = useApp();
   const yours = tocaCount(app.all, { now: app.now }) > 0;
@@ -625,6 +646,7 @@ export function Topbar() {
         <Brand yours={yours} working={working} />
       </div>
       <div className="tb-end">
+        <SearchButton />
         <AgentsPill />
       </div>
     </header>
