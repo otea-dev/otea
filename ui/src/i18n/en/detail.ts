@@ -753,10 +753,11 @@ export const detail = {
   },
   'bi.branch.diffOffMore': '{count} more',
   'bi.branch.diffFiles':
-    'The attached diff does not match what lands. The diff {diff}; the work handed off changes {landed}. Approving approves what was handed off, not the diff.',
+    'The attached diff does not match what lands. The diff {diff}; the work handed off {landed}. Approving approves what was handed off, not the diff.',
   'bi.branch.diffFilesNames': 'names {files}',
   'bi.branch.diffFilesNone': 'names no file',
-  'bi.branch.diffFilesNothing': 'no file',
+  'bi.branch.diffFilesChanges': 'changes {files}',
+  'bi.branch.diffFilesChangesNone': 'changes no file',
   'bi.branch.moved':
     'The branch changed on the remote after the handoff: it is now at {now}. Approving approves only what was handed off, {handed}.',
   'bi.request.board': 'Board {name}',

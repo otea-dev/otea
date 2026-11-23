@@ -58,3 +58,19 @@ describe('diffFilesText', () => {
     expect(diffFilesText(off)).toContain('changes a, b, c, d, and 2 more.');
   });
 });
+
+// An empty commit and an invented diff list no file on either side: the warning still says so.
+describe('diffFilesText of work that changes no file', () => {
+  afterEach(() => setLanguage('en'));
+
+  it('says both lists are empty, in both languages', () => {
+    const off = { diff: [], landed: [] };
+    expect(diffFilesText(off)).toBe(
+      'The attached diff does not match what lands. The diff names no file; the work handed off changes no file. Approving approves what was handed off, not the diff.',
+    );
+    setLanguage('es');
+    expect(diffFilesText(off)).toBe(
+      'El diff adjunto no coincide con lo que aterriza. El diff no nombra ningún archivo; lo entregado no cambia ningún archivo. Aprobar aprueba lo entregado, no el diff.',
+    );
+  });
+});
