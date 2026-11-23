@@ -55,7 +55,10 @@ const LEVEL_WORDS: Readonly<Record<string, (typeof LEVELS)[number]>> = {
 
 function oneChoice(part: Part, given: string): string {
   const wanted = fold(given);
-  const found = part.options.find(({ id, name }) => id === given || fold(name) === wanted);
+  // By name, by id or by the key a template gave it (Esfuerzo=s), whichever the reader typed.
+  const found =
+    part.options.find(({ id, name }) => id === given || fold(name) === wanted) ??
+    part.options.find(({ key }) => key !== undefined && fold(key) === wanted);
   if (!found)
     throw new OteaError(
       'invalid_fields',
