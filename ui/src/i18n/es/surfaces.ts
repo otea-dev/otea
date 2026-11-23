@@ -182,12 +182,6 @@ export const surfaces = {
   'projects.agents.title': 'Agentes',
   'projects.agents.sub': 'en todos los proyectos',
   'projects.agents.holding': { one: 'con {count} ítem', other: 'con {count} ítems' },
-  // The server's status for an agent (core/agent-status.ts), said in the words of the agents menu.
-  'projects.agent.working': 'trabajando',
-  'projects.agent.listening': 'escuchando',
-  'projects.agent.connected': 'conectado',
-  'projects.agent.silent': 'sin señal',
-  'projects.agent.away': 'ausente',
   'projects.withAgents': {
     one: 'No se listan aquí: {count} ítem con agentes, en {projects}.',
     other: 'No se listan aquí: {count} ítems con agentes, en {projects}.',

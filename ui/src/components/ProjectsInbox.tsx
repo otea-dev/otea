@@ -263,9 +263,7 @@ export function AcrossAgents({ projects }: { projects: readonly ProjectOverview[
           <li key={`${agent.project.id}:${agent.name}`} data-status={agent.status}>
             <AgentMark name={agent.name} decorative />
             <b>{agent.name}</b>
-            <span className="st">
-              {t(`projects.agent.${agent.status}` as 'projects.agent.working')}
-            </span>
+            <span className="st">{t(`agent.status.${agent.status}`)}</span>
             <a href={projectHref(agent.project)}>{agent.project.name}</a>
             {agent.holding > 0 ? (
               <span className="ct">{t('projects.agents.holding', { count: agent.holding })}</span>
