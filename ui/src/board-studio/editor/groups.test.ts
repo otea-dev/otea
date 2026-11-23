@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { compileBoard } from '../../../../src/core/board/compile.ts';
 import { handoffCheck } from '../../../../src/core/board/engine.ts';
+import { groupFresh } from '../../../../src/core/board/model.ts';
 import { problemsOf } from '../../../../src/core/board/problems.ts';
 import { parseDefinition } from '../../../../src/core/board/schema.ts';
 import { creatures } from '../../../../src/core/board/testing.ts';
 import {
   addGroup,
   groupable,
-  groupFresh,
   removeGroup,
   removePart,
   renameGroup,
@@ -138,6 +138,59 @@ describe('a group of evidence built in Studio', () => {
     toggleGroupPart(def, 'sanimate', id, 'elog');
     expect(fresh('elog')).toBe(true);
     expect(problemsOf(def, {})).toEqual([]);
+  });
+
+  // A part belongs to at most one group, so its way of counting is one; another group's parts are
+  // never touched by a group that is added or turned.
+  it('keeps a part in one group, and leaves another group’s parts as they are', () => {
+    const { def, animar } = board();
+    def.parts.efoto = { id: 'efoto', name: 'Foto', kind: 'images', hint: '', options: [] };
+    animar.hand.splice(3, 0, { ref: 'efoto', req: 'no', fresh: false });
+    const hand = (ref: string) => animar.hand.find((entry) => entry.ref === ref);
+
+    const first = addGroup(def, 'sanimate', 'Prueba') ?? '';
+    // The first group takes what is free; toggled off, a part leaves it carried over.
+    toggleGroupPart(def, 'sanimate', first, 'efoto');
+    toggleGroupPart(def, 'sanimate', first, 'elog');
+    setGroupFresh(def, 'sanimate', first, false);
+    expect(animar.groups?.[0]?.parts).toEqual(['eanim', 'eshot']);
+    // A deliberate «carries over» on a part outside any group stays: only a member is new.
+    setRequirement(def, 'sanimate', 'efoto', 'no', false);
+
+    const second = addGroup(def, 'sanimate', 'Otra') ?? '';
+    const [one, two] = animar.groups ?? [];
+    expect(one?.parts).toEqual(['eanim', 'eshot']);
+    expect(two?.parts).toEqual(['elog', 'efoto']);
+    // Only the new group's parts became new; the first group's kept its way.
+    expect([hand('eanim')?.fresh, hand('eshot')?.fresh]).toEqual([false, false]);
+    expect([hand('efoto')?.fresh, hand('elog')?.fresh]).toEqual([true, true]);
+
+    // Turning one group moves nobody else's part, and a part of another group cannot join.
+    setGroupFresh(def, 'sanimate', second, false);
+    expect([hand('eanim')?.fresh, hand('eshot')?.fresh]).toEqual([false, false]);
+    setGroupFresh(def, 'sanimate', first, true);
+    expect([hand('efoto')?.fresh, hand('elog')?.fresh]).toEqual([false, false]);
+    expect(groupable(def, animar, first)).toEqual(['eanim', 'eshot']);
+    toggleGroupPart(def, 'sanimate', first, 'efoto');
+    expect(animar.groups?.[0]?.parts).toEqual(['eanim', 'eshot']);
+    // Nothing is free for a third group.
+    expect(addGroup(def, 'sanimate', 'Tercera')).toBeUndefined();
+    expect(problemsOf(def, {})).toEqual([]);
+  });
+
+  it('refuses a board whose groups share a part', () => {
+    const { def, animar } = board();
+    animar.groups = [
+      { id: 'g1', name: 'Una', parts: ['eanim', 'eshot'], min: 1 },
+      { id: 'g2', name: 'Otra', parts: ['eshot', 'elog'], min: 1 },
+    ];
+    const problems = problemsOf(def, {});
+    expect(problems.map(({ code }) => code)).toEqual(['group_overlap']);
+    expect(problems[0]).toMatchObject({
+      level: 'error',
+      params: { group: 'Otra', other: 'Una', part: 'Captura' },
+    });
+    expect(() => compileBoard('boverlap', 1, def)).toThrowError(/another group of the step/);
   });
 
   it('asks the handoff for a new file from a member made new each round', () => {

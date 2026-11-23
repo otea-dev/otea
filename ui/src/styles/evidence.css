@@ -1179,6 +1179,9 @@
   font: 400 12px / 1.35 var(--sans);
   color: var(--ink-3);
 }
+.ev-reader-notice.warn {
+  color: var(--warn);
+}
 
 /* The desk reader (review mock, desk): the round's files on the left, the one picked on the right. */
 .dialog.rd-dialog {

@@ -863,7 +863,8 @@ export type EvidenceGaps = {
     min: number;
     have: number;
     parts: string[];
-    fresh?: true;
+    // The parts that count only this round's files (GroupState.fresh).
+    fresh?: string[];
   }[];
   optional: string[];
 };
@@ -907,7 +908,7 @@ export function evidenceGaps(
             min: state.min,
             have: state.have,
             parts: state.parts,
-            ...(state.fresh ? { fresh: true as const } : {}),
+            ...(state.fresh ? { fresh: state.fresh } : {}),
           },
         ]
       : [],

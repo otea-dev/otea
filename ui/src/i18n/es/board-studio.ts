@@ -22,6 +22,8 @@ export const boardStudio = {
     'El grupo «{group}» de {step} pide {min} de {of}. Necesita al menos una, y no más de las que tiene.',
   'bs.problem.group_duplicate':
     '«{part}» está dos veces en el grupo «{group}» de {step}. Quita una.',
+  'bs.problem.group_overlap':
+    '«{part}» está en los grupos «{other}» y «{group}» de {step}. Una parte pertenece a un solo grupo: sácala de uno.',
   'bs.problem.group_member':
     '«{part}» en el grupo «{group}» de {step} no es una evidencia opcional de ese paso. Sácala del grupo.',
   'bs.problem.way_invalid':

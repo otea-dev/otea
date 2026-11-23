@@ -239,12 +239,8 @@ export const detail = {
   'evidence.required': 'obligatorio',
   'evidence.gap.required': '{name}: obligatorio, todavía sin adjuntar',
   'evidence.gap.group': {
-    one: '{name}: al menos {min} de {list} ({count} adjuntado)',
-    other: '{name}: al menos {min} de {list} ({count} adjuntados)',
-  },
-  'evidence.gap.groupFresh': {
-    one: '{name}: al menos {min} de {list}, de esta ronda ({count} adjuntado)',
-    other: '{name}: al menos {min} de {list}, de esta ronda ({count} adjuntados)',
+    one: '{name}: al menos {min} de {list}{fresh} ({count} adjuntado)',
+    other: '{name}: al menos {min} de {list}{fresh} ({count} adjuntados)',
   },
   'evidence.gap.optional': '+ {list} (opcionales, sin cargar)',
   'evidence.files': '{label}: archivos',

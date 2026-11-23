@@ -35,6 +35,7 @@ import { choiceLines, type ItemChoice } from './choices.ts';
 import {
   type BoardDefinition,
   DONE,
+  freshMembers,
   type Group,
   guardedBranch,
   type Hand,
@@ -561,20 +562,21 @@ function whenWords(def: BoardDefinition, when: NonNullable<Hand['when']>): strin
   return `${read?.name ?? '…'} is ${value}`;
 }
 
-// Whether every part of a group is new in each round: a send-back then empties the whole group.
-function freshGroup(group: Group, step: Step): boolean {
-  return (
-    group.parts.length > 0 &&
-    group.parts.every((ref) => step.hand.find((hand) => hand.ref === ref)?.fresh === true)
-  );
+// What a group says of the files its counting discards: "each new this round" when it discards the
+// older files of every part, "new this round: A, B" of some, nothing when it keeps them all.
+// `fresh`: the names of the parts that count only this round's files (GroupState.fresh).
+function freshWords(fresh: readonly string[] | undefined, parts: readonly string[]): string {
+  if (!fresh || fresh.length === 0) return '';
+  return fresh.length === parts.length
+    ? ', each new this round'
+    : `, new this round: ${fresh.join(', ')}`;
 }
 
-// "at least 1 of Screenshot, GIF, Video, Log": what a group asks of the handoff; "each new this
-// round" when a send-back empties it.
+// "at least 1 of Screenshot, GIF, Video, Log": what a group asks of the handoff.
 function groupWords(group: Group, def: BoardDefinition, step: Step): string {
-  const names = group.parts.map((ref) => partOf(def, ref)?.name ?? ref);
-  const fresh = freshGroup(group, step) ? ', each new this round' : '';
-  return `at least ${group.min} of ${names.join(', ')}${fresh}`;
+  const name = (ref: string) => partOf(def, ref)?.name ?? ref;
+  const names = group.parts.map(name);
+  return `at least ${group.min} of ${names.join(', ')}${freshWords(freshMembers(step, group).map(name), names)}`;
 }
 
 // What "new this round" means, said once, to the one who hands off again after a send-back: the
@@ -989,7 +991,7 @@ function lackingText(id: string, missing: readonly Missing[]): string {
     const what = parts.map(({ name, reason, fresh, points, group }) => {
       const said =
         reason === 'group' && group
-          ? `at least ${group.min} of ${group.parts.join(', ')}${group.fresh ? ', each new this round' : ''}; ${group.have} attached`
+          ? `at least ${group.min} of ${group.parts.join(', ')}${freshWords(group.fresh, group.parts)}; ${group.have} attached`
           : reason === 'missing' && fresh
             ? 'new this round'
             : reason === 'unproved' && points?.length
@@ -1004,10 +1006,11 @@ function lackingText(id: string, missing: readonly Missing[]): string {
         ? `Call handoff again${flag}.`
         : `Attach or fill them with otea attach ${id} / otea update ${id}, then call handoff again${flag}.`;
     const prove = parts.some(({ reason }) => reason === 'unproved') ? [proveText(id)] : [];
-    // A part with only earlier files, or a group new in each round, says what attaching it again
-    // means (P7-F8).
+    // A part with only earlier files, or a group that counts only this round's files, says what
+    // attaching it again means (P7-F8).
     const again = parts.some(
-      ({ reason, group }) => reason === 'not_new' || (reason === 'group' && group?.fresh),
+      ({ reason, group }) =>
+        reason === 'not_new' || (reason === 'group' && group?.fresh !== undefined),
     )
       ? [FRESH_RULE]
       : [];

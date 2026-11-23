@@ -272,7 +272,9 @@ export function compileBoard(id: string, version: number, def: BoardDefinition):
           ? 'it asks for more than it has'
           : fault.code === 'group_duplicate'
             ? `it names "${part}" twice`
-            : 'it has no name';
+            : fault.code === 'group_overlap'
+              ? `"${part}" is in another group of the step too`
+              : 'it has no name';
     throw new OteaError(
       'invalid_board',
       `Board ${def.name} does not compile: the group "${group}" of step "${step.name}" is wrong: ${why}`,

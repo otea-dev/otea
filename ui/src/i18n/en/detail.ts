@@ -240,12 +240,8 @@ export const detail = {
   'evidence.required': 'required',
   'evidence.gap.required': '{name}: required, not attached yet',
   'evidence.gap.group': {
-    one: '{name}: at least {min} of {list} ({count} attached)',
-    other: '{name}: at least {min} of {list} ({count} attached)',
-  },
-  'evidence.gap.groupFresh': {
-    one: '{name}: at least {min} of {list}, new this round ({count} attached)',
-    other: '{name}: at least {min} of {list}, new this round ({count} attached)',
+    one: '{name}: at least {min} of {list}{fresh} ({count} attached)',
+    other: '{name}: at least {min} of {list}{fresh} ({count} attached)',
   },
   'evidence.gap.optional': '+ {list} (optional, not provided)',
   'evidence.files': '{label}: files',

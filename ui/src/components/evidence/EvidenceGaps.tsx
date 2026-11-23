@@ -1,3 +1,4 @@
+import { freshWords } from '../../fresh-words.ts';
 import { listOr, t } from '../../i18n/i18n.ts';
 import type { EvidenceGaps as Gaps } from '../../views/detail/board-item.ts';
 
@@ -17,11 +18,12 @@ export function EvidenceGaps({ gaps, required = false }: { gaps: Gaps; required?
       ))}
       {gaps.groups.map((group) => (
         <p key={group.id} className="ev-gap miss" data-group={group.id}>
-          {t(group.fresh ? 'evidence.gap.groupFresh' : 'evidence.gap.group', {
+          {t('evidence.gap.group', {
             name: group.name,
             min: group.min,
             count: group.have,
             list: listOr(group.parts),
+            fresh: freshWords(group.fresh, group.parts),
           })}
         </p>
       ))}

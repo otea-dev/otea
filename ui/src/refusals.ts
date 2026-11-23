@@ -1,5 +1,6 @@
 import type { Linked, Missing } from '../../src/core/board/engine.ts';
 import type { RefusalDetails } from '../../src/core/refusal.ts';
+import { freshWords } from './fresh-words.ts';
 import { language, listOf, listOr, t } from './i18n/i18n.ts';
 
 // A refusal from the server in the language on screen, worded from its code and details. The
@@ -49,9 +50,10 @@ function handoffWhy(missing: readonly Missing[]): string {
     const what = parts.map(({ name, reason, fresh, points, group }) => {
       const said =
         reason === 'group' && group
-          ? t(group.fresh ? 'refusal.why.groupFresh' : 'refusal.why.group', {
+          ? t('refusal.why.group', {
               min: group.min,
               list: listOr(group.parts),
+              fresh: freshWords(group.fresh, group.parts),
               count: group.have,
             })
           : reason === 'missing' && fresh

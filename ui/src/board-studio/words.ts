@@ -126,6 +126,13 @@ export function problemText(problem: Problem): string {
         step: str(p.step) as string,
         part: str(p.part) as string,
       });
+    case 'group_overlap':
+      return t('bs.problem.group_overlap', {
+        group: str(p.group) as string,
+        other: str(p.other) as string,
+        step: str(p.step) as string,
+        part: str(p.part) as string,
+      });
     case 'group_member':
       return t('bs.problem.group_member', {
         group: str(p.group) as string,

@@ -135,23 +135,37 @@ describe('the review of a delivery with mixed evidence', () => {
   // P5-F6: «(1 adjuntados)». The count agrees with what it counts, and a group new in each round
   // says so.
   it('agrees the count of a short group in Spanish, and says when it is new each round', () => {
-    const original = animar.groups;
+    // The fixture is shared: what is changed here is put back as it was, value by value.
+    const originalGroups = animar.groups;
+    const originalHand = animar.hand.map((hand) => ({ ...hand }));
     animar.groups = [{ id: 'gproof', name: 'Prueba', parts: ['eanim', 'eshot', 'elog'], min: 2 }];
     try {
       setLanguage('es');
       const one = evidenceMarkup(item([file(1, 'efile', 'informe.txt'), file(2, 'elog', 's.log')]));
-      expect(one).toContain('Prueba: al menos 2 de Animación, Captura o Salida (1 adjuntado)');
+      expect(one).toContain('(1 adjuntado)');
       const none = evidenceMarkup(item([file(1, 'efile', 'informe.txt')]));
       expect(none).toContain('(0 adjuntados)');
+
+      // Some parts new each round: the line says which, since counting discards only their older
+      // files; all of them, that every part is.
       setLanguage('en');
-      for (const hand of animar.hand) if (hand.ref !== 'efile') hand.fresh = true;
-      const fresh = evidenceMarkup(item([file(1, 'efile', 'informe.txt')]));
-      expect(fresh).toContain(
-        'at least 2 of Animación, Captura, or Salida, new this round (0 attached)',
+      const hand = (ref: string) => animar.hand.find((entry) => entry.ref === ref);
+      const some = hand('eshot');
+      if (some) some.fresh = true;
+      expect(evidenceMarkup(item([file(1, 'efile', 'informe.txt')]))).toContain(
+        'at least 2 of Animación, Captura, or Salida, new this round: Captura (0 attached)',
+      );
+      for (const ref of ['eanim', 'eshot', 'elog']) {
+        const part = hand(ref);
+        if (part) part.fresh = true;
+      }
+      expect(evidenceMarkup(item([file(1, 'efile', 'informe.txt')]))).toContain(
+        'at least 2 of Animación, Captura, or Salida, each new this round (0 attached)',
       );
     } finally {
-      if (original) animar.groups = original;
-      for (const hand of animar.hand) hand.fresh = false;
+      if (originalGroups) animar.groups = originalGroups;
+      else delete animar.groups;
+      animar.hand = originalHand;
     }
   });
 

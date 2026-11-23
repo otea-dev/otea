@@ -38,6 +38,8 @@ describe('an "at least N of" group', () => {
           have: 0,
           parts: ['Animación', 'Captura', 'Salida'],
           held: [],
+          // The recording is new each round: the group says so for it alone.
+          fresh: ['Animación'],
         },
       },
     ]);

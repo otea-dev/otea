@@ -4,6 +4,7 @@ import {
   DONE,
   DROPPED,
   defaultWay,
+  freshMembers,
   type Group,
   guardedBranch,
   type Hand,
@@ -207,14 +208,14 @@ export type HandoffCheck = { ok: boolean; missing: Missing[] };
 
 // Where a group stands: it needs `min` of its parts (their names, in the step's order); `have`
 // are the ones with a file (`held`, by name), counting only files with bytes and, for a part new
-// in each round, from this round. `fresh`: every part of the group is new in each round, so a
-// send-back empties the whole group; it is left out when some part carries over.
+// in each round, from this round. `fresh`: the parts (by name) that count only files of this round,
+// so a send-back empties them; all of `parts` for a group new in each round, left out when none is.
 export type GroupState = {
   min: number;
   have: number;
   parts: string[];
   held: string[];
-  fresh?: true;
+  fresh?: string[];
 };
 
 // The ref a group answers to in what a handoff lacks.
@@ -274,9 +275,8 @@ export function groupStates(
     const files = new Map(parts.map(({ ref }) => [ref, countedFiles(step, facts, ref)]));
     const held = new Set(matchedParts(files));
     const holding = parts.filter(({ ref }) => held.has(ref));
-    const fresh =
-      parts.length > 0 &&
-      parts.every(({ ref }) => step.hand.find((hand) => hand.ref === ref)?.fresh === true);
+    const fresh = new Set(freshMembers(step, group));
+    const newOnes = parts.filter(({ ref }) => fresh.has(ref));
     return {
       group,
       state: {
@@ -284,7 +284,7 @@ export function groupStates(
         have: holding.length,
         parts: parts.map(({ name }) => name),
         held: holding.map(({ name }) => name),
-        ...(fresh ? { fresh: true as const } : {}),
+        ...(newOnes.length > 0 ? { fresh: newOnes.map(({ name }) => name) } : {}),
       },
     };
   });

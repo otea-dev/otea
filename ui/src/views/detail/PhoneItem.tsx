@@ -38,6 +38,7 @@ import type { Evidence, ItemView, TypeView } from '../../types.ts';
 import { evidenceWords } from '../toca/phone.ts';
 import { Acts, type ActsMode } from './Acts.tsx';
 import { evidenceGaps, type EvidenceGaps as Gaps } from './board-item.ts';
+import { cautionKeyOf, useCaution } from './caution.ts';
 import type { Facts } from './facts.ts';
 import { resumedToastOf, toastOf } from './frame.ts';
 import { type MoveChoice, type MovePlan, moveSaysOf, otherMoves } from './moves.ts';
@@ -239,9 +240,17 @@ function Files({
     ? {
         seen: decide.seen,
         notice: decide.notice,
+        warn: decide.warn,
         back: decide.back ? { ...decide.back, onClick: after(decide.back.onClick) } : undefined,
+        // A move held for a second press leaves the reader open, its line shown in it.
         approve: decide.approve
-          ? { ...decide.approve, onClick: after(decide.approve.onClick) }
+          ? {
+              ...decide.approve,
+              onClick: () => {
+                if (decide.approve?.hold?.()) return;
+                after(decide.approve?.onClick ?? (() => undefined))();
+              },
+            }
           : undefined,
       }
     : undefined;
@@ -728,9 +737,11 @@ export function PhoneItem(p: PhoneItemProps) {
   const leave = notesDock(p.mode, app.session.canWrite) ? p.notes?.leave : undefined;
   const docked = (dock && (primary || sendback || picking)) || !!leave;
   const [asking, setAsking] = useState<Asking | null>(null);
-  const [refused, setRefused] = useState('');
-  // The move a caution was said for (Aprobar with a group short): pressed again, it goes through.
-  const [warned, setWarned] = useState<string | null>(null);
+  const [refusal, setRefused] = useState('');
+  // Aprobar with a group short is asked once, here and in the reader (useCaution); its line shows
+  // where a refusal does.
+  const careful = useCaution(cautionKeyOf(item), p.caution);
+  const refused = refusal || careful.line;
   const [text, setText] = useState('');
   const backBtn = useRef<HTMLButtonElement>(null);
   const primaryBtn = useRef<HTMLButtonElement>(null);
@@ -799,16 +810,8 @@ export function PhoneItem(p: PhoneItemProps) {
       setRefused(no);
       return;
     }
-    const careful = warned === c.move.to ? null : p.caution?.(c);
-    if (careful) {
-      setWarned(c.move.to);
-      setRefused(careful);
-      return;
-    }
-    if (warned) {
-      setWarned(null);
-      setRefused('');
-    }
+    // Held for a second press: its line stands in `careful.line`.
+    if (careful.press(c)) return;
     if (c.move.reasonRequired || c.kind === 'sendback') ask(c);
     else make(c);
   };
@@ -819,7 +822,14 @@ export function PhoneItem(p: PhoneItemProps) {
           seen: newest.evidence.filter((e) => seen.has(e.id)).length,
           notice: p.notes?.review?.says,
           back: sendback ? { label: sendback.label, onClick: () => choose(sendback) } : undefined,
-          approve: primary ? { label: primary.label, onClick: () => choose(primary) } : undefined,
+          approve: primary
+            ? {
+                label: primary.label,
+                onClick: () => choose(primary),
+                hold: () => careful.press(primary) !== null,
+              }
+            : undefined,
+          warn: careful.line || undefined,
         }
       : undefined;
   // A send-back with your review's comments goes with them: words of its own are optional (P4-7).

@@ -19,15 +19,17 @@ const now = () => new Date(Date.UTC(2026, 10, 17, 9, 0, tick++)).toISOString();
 // a send-back returns it to Concepto for a second round. `fresh` says whether the group is new in
 // each round (P5-F2: a returned round was handed off with nothing new, as the first round's files
 // still filled the group).
-function setup(fresh: boolean, grouped = true) {
+function setup(way: boolean | 'swamp', grouped = true) {
   const root = mkdtempSync(join(tmpdir(), 'otea-rounds-'));
   const def = creatures();
   const concept = def.steps[0];
   if (!concept) throw new Error('no step');
+  // `swamp`: only the swamp reference is new each round, the concept art carries over.
+  const fresh = way === true;
   if (grouped) {
     concept.hand = [
       { ref: 'eart', req: 'no', fresh },
-      { ref: 'eswamp', req: 'no', fresh },
+      { ref: 'eswamp', req: 'no', fresh: fresh || way === 'swamp' },
     ];
     concept.groups = [{ id: 'gshots', name: 'Pruebas', parts: ['eart', 'eswamp'], min: 1 }];
   } else {
@@ -79,7 +81,7 @@ describe('a returned round and the evidence new in each round', () => {
       const missing = boardBlockOf(project, requireItem(project.db, id))?.missing ?? [];
       expect(missing.find(({ ref }) => ref === 'group:gshots')).toMatchObject({
         reason: 'group',
-        group: { have: 0, fresh: true },
+        group: { have: 0, fresh: ['Arte conceptual', 'Barro'] },
       });
       attach('eswamp');
       expect(hand).not.toThrow();
@@ -126,6 +128,31 @@ describe('a returned round and the evidence new in each round', () => {
       );
       attach('eart', 'the same bytes');
       expect(hand).not.toThrow();
+    });
+  });
+
+  // Counting discards the older files of the parts new each round only: the group says which, and
+  // what carries over still counts.
+  describe('a group where only one part is new each round', () => {
+    beforeEach(() => {
+      ({ root, project, id } = setup('swamp'));
+    });
+
+    it('says which part is new, counts the one that carries over, and asks the new one again', () => {
+      returned();
+      // The concept art of the first round still counts, so the group is met: nothing to attach.
+      expect(readNext()).toContain('at least 1 of Arte conceptual, Barro, new this round: Barro');
+      expect(hand).not.toThrow();
+    });
+
+    it('is not met by an older file of the part that is new each round', () => {
+      attach('eswamp');
+      hand();
+      sendBackItem(project, { id, actor: you, channel: 'ui', reason: 'Otra vez' }, now);
+      claimItem(project, { id, actor: quill }, now);
+      expect(() => hand()).toThrowError(
+        /missing Pruebas \(at least 1 of Arte conceptual, Barro, new this round: Barro; 0 attached\)/,
+      );
     });
   });
 
