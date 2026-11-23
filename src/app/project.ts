@@ -79,8 +79,9 @@ export type GitDirs = {
   gitDir: string;
   // The one all the checkouts of the repo share.
   common: string;
-  // Whether git names the common dir by its plain path (the .git at the top of the checkout it ran
-  // in), not by its real path.
+  // Whether git names the common dir by a path from where it ran (the .git folder above it, which
+  // the caller resolves against its own cwd, links and all), not by its real path (a .git file's
+  // dirs, which git gives in full).
   plain: boolean;
 };
 
@@ -111,7 +112,7 @@ export function gitDirsByWalking(cwd: string, env: NodeJS.ProcessEnv): GitDirs |
         return undefined;
       }
       if (!existsSync(join(common, 'HEAD'))) return undefined;
-      return { gitDir, common, plain: kind.isDirectory() && dir === start };
+      return { gitDir, common, plain: kind.isDirectory() };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return undefined;
     }
