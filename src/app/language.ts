@@ -47,7 +47,10 @@ export function storedLanguageAt(env: Env = process.env): Lang | undefined {
 // C and POSIX, with or without an encoding, say nothing), else the one the runtime reads from the
 // system.
 export function systemLanguage(env: Env = process.env, locale = system.locale): Lang {
-  const set = [env.LC_ALL, env.LC_MESSAGES, env.LANG].find(
+  // Git Bash (MSYS) sets LANG to en_US.UTF-8 on every Windows computer whatever its language, so
+  // there it says nothing: the system's own locale does (LC_ALL and LC_MESSAGES are a person's).
+  const lang = env.MSYSTEM ? undefined : env.LANG;
+  const set = [env.LC_ALL, env.LC_MESSAGES, lang].find(
     (value) => value && !/^(C|POSIX)(\.|$)/.test(value),
   );
   return /^es(?![a-z])/i.test(set ?? locale()) ? 'es' : 'en';
