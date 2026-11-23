@@ -81,7 +81,7 @@ export function askQuestion(ctx: Context, input: AskInput, now = systemClock): A
   return transaction(ctx.db, () => {
     const item = requireWritableItem(ctx.db, id);
     const at = now();
-    assertMayWriteItem(ctx.db, item, input.actor, at);
+    assertMayWriteItem(ctx, item, input.actor, at);
     const { board, step } = doing(ctx, item);
     const on = itemOnBoard(ctx, item, board.def);
     if (on.asking)

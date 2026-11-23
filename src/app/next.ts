@@ -1671,7 +1671,7 @@ export function handoffItem(
     const amended = amendHandoff(ctx, item, board, input, at);
     if (amended) return amended;
     const lease = activeLease(item.lease, at);
-    assertMayWriteItem(ctx.db, item, input.actor, at);
+    assertMayWriteItem(ctx, item, input.actor, at);
     // An agent that holds no lease on it never hands off an item left for or just offered to
     // another agent; whether the step is an agent's at all, the handoff itself answers.
     if (input.actor.kind === 'agent' && !lease) assertMayHandOff(ctx, item, input.actor.name, at);
@@ -1837,7 +1837,7 @@ export function dropItem(ctx: Context, input: DropInput, now = systemClock): Boa
     const board = requireBoard(ctx, item);
     const at = now();
     if (input.actor.kind === 'agent' && input.via !== 'relay')
-      assertMayWriteItem(ctx.db, item, input.actor, at);
+      assertMayWriteItem(ctx, item, input.actor, at);
     const to = dropTarget(board, item, input);
     const moved = land(ctx, item, board, to, input, at);
     return { item: moved, text: droppedText(board.def, item.id, to) };
@@ -2164,6 +2164,21 @@ function assertMayHandOff(ctx: Context, item: ItemRecord, agent: string, at: str
       `${item.id} was just offered to another agent; hand off only what is yours (otea next)`,
     );
   }
+}
+
+// The part of the claim's refusal a write must keep (P1-F1): an agent that never claimed an item
+// that waits its turn to land (or, on a board that works straight on its base, its turn to work
+// on it) did not get round that wait by writing and handing off without the claim.
+export function assertNotBehindInQueue(
+  ctx: Context,
+  item: ItemRecord,
+  agent: string,
+  at: string,
+): void {
+  const position = positionOf(item.state);
+  if (isClosed(position) || position.phase !== 'doing') return;
+  const first = landTurnFor(ctx, item, agent, at);
+  if (first) throw new OteaError('not_claimable', landsFirstText(item.id, first));
 }
 
 export function assertMayClaim(

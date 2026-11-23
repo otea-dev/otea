@@ -361,7 +361,7 @@ export function updateItem(ctx: Context, input: UpdateItemInput, now = systemClo
     const preset = presetOf(ctx, getCollection(db, item.collection));
     const type: ItemType = typeOf(preset, item.type);
     const at = now();
-    assertMayWriteItem(db, item, input.actor, at);
+    assertMayWriteItem(ctx, item, input.actor, at);
     if (turnOf(type.workflow, item.state) === 'none') {
       throw new OteaError(
         'item_closed',
@@ -474,7 +474,7 @@ export function moveItem(ctx: Context, input: MoveItemInput, now = systemClock):
     const to = boardState(ctx, item.collection, input.to);
     const at = now();
     const lease = activeLease(item.lease, at);
-    assertMayWriteItem(db, item, actor, at);
+    assertMayWriteItem(ctx, item, actor, at);
     // On a board, the step engine says first, in the board's words, why a move is not this actor's.
     const note = assertMoveHandsOff(ctx, item, to, actor, {
       ...(reason === undefined ? {} : { reason }),

@@ -183,7 +183,7 @@ export function tickPoint(project: Project, input: TickInput, now = systemClock)
   const { def } = board;
   const { part, point } = pointOf(def, input.point, input.part);
   const at = now();
-  assertMayWriteItem(project.db, item, input.actor, at);
+  assertMayWriteItem(project, item, input.actor, at);
   const position = positionOf(item.state);
   if (isClosed(position))
     throw new OteaError('item_closed', `${item.id} is closed and takes no proof`, {

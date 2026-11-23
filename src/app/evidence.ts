@@ -200,7 +200,7 @@ export function placeFile(
     );
   }
   const type = typeOfItem(project, item);
-  assertMayWriteItem(project.db, item, actor, at);
+  assertMayWriteItem(project, item, actor, at);
   if (turnOf(type.workflow, item.state) === 'none') {
     throw new OteaError(
       'item_closed',
@@ -390,7 +390,7 @@ export function detachEvidence(
   return transaction(project.db, () => {
     const item = requireWritableItem(project.db, input.id);
     const at = now();
-    assertMayWriteItem(project.db, item, input.actor, at);
+    assertMayWriteItem(project, item, input.actor, at);
     const entry = selectEvidence(project.db, item.id).find(({ id }) => id === input.evidence);
     if (!entry) {
       throw new OteaError('not_found', `${item.id} has no attached file #${input.evidence}`);

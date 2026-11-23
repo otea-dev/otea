@@ -351,7 +351,7 @@ export function replyNote(ctx: Context, input: ReplyNoteInput, now = systemClock
         'invalid_transition',
         `Note ${input.note} on ${item.id} is already answered`,
       );
-    assertMayWriteItem(ctx.db, item, input.actor, at);
+    assertMayWriteItem(ctx, item, input.actor, at);
     const text = input.text.trim();
     if (text === '')
       refuse('reason_required', id, 'empty', `Not answered: say your answer to note ${input.note}`);
