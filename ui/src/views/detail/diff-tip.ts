@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
+import type { DiffFilesOff } from '../../../../src/server/diff-files.ts';
 import type { DiffOffTip } from '../../../../src/server/diff-tip.ts';
-import { fetchDiffOffTip } from '../../api.ts';
+import { fetchDiffFiles, fetchDiffOffTip } from '../../api.ts';
 import { listOf, t } from '../../i18n/i18n.ts';
 
 // The attached diff of an item in review does not come from the tip handed off on its branch
 // (P1-R3-1): the PC compares them (src/server/diff-tip.ts) and the page says so under the branch,
 // before the person approves. Approving keeps the tip, not the diff.
 
-export type { DiffOffTip };
+export type { DiffFilesOff, DiffOffTip };
 
 // At most this many files are named; the rest are counted.
 const NAMED = 3;
@@ -34,6 +35,46 @@ export function useDiffOffTip(item: string, asking: boolean, at: string): DiffOf
     if (!asking) return;
     const abort = new AbortController();
     fetchDiffOffTip(item, abort.signal).then(
+      (heard) => setOff({ item, off: heard }),
+      () => undefined,
+    );
+    return () => abort.abort();
+  }, [item, asking, at]);
+  return asking && off.item === item ? off.off : null;
+}
+
+// The files the attached diff names are not those the work handed off changes (P1-F2): the PC
+// compares the two lists (src/server/diff-files.ts) and the page names both before the person
+// approves; approving is still theirs.
+const LISTED = 4;
+
+function filesList(files: readonly string[], empty: 'bi.branch.diffFilesNothing'): string {
+  if (files.length === 0) return t(empty);
+  const more = files.length - LISTED;
+  const named = files.slice(0, LISTED);
+  return listOf(more > 0 ? [...named, t('bi.branch.diffOffMore', { count: more })] : named);
+}
+
+export function diffFilesText(off: DiffFilesOff): string {
+  const diff =
+    off.diff.length === 0
+      ? t('bi.branch.diffFilesNone')
+      : t('bi.branch.diffFilesNames', { files: filesList(off.diff, 'bi.branch.diffFilesNothing') });
+  return t('bi.branch.diffFiles', {
+    diff,
+    landed: filesList(off.landed, 'bi.branch.diffFilesNothing'),
+  });
+}
+
+// Whether the attached diff names other files than the work handed off changes, while `asking`;
+// null otherwise, and while the PC has not answered.
+export function useDiffFiles(item: string, asking: boolean, at: string): DiffFilesOff | null {
+  const [off, setOff] = useState<{ item: string; off: DiffFilesOff | null }>({ item, off: null });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a change to the item asks again
+  useEffect(() => {
+    if (!asking) return;
+    const abort = new AbortController();
+    fetchDiffFiles(item, abort.signal).then(
       (heard) => setOff({ item, off: heard }),
       () => undefined,
     );
