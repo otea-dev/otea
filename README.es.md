@@ -26,7 +26,10 @@ npm i -g @otea/cli   # necesita Node.js 22.18 o posterior
 otea start
 ```
 
-`otea start` crea el proyecto, abre el escritorio en tu navegador e imprime el texto que le pegas a tu agente (el [paso 2](#2-crear-el-proyecto) lo explica). ¿Sin Node, o prefieres Otea en su propia ventana? Instala la app de escritorio: la sección siguiente tiene las dos formas.
+`otea start` crea el proyecto, abre el escritorio en tu navegador e imprime el texto que le pegas a tu agente (el [paso 2](#2-crear-el-proyecto) lo explica).
+
+- **¿`npm i -g` dice permiso denegado?** Instala en una carpeta tuya, sin `sudo`: `npm i -g --prefix ~/.otea-npm @otea/cli`, y pon `~/.otea-npm/bin` en tu `PATH` ([detalles](#el-comando-otea-desde-npm)).
+- **¿Sin Node, o prefieres Otea en su propia ventana?** Instala la app de escritorio: la sección siguiente tiene las dos formas.
 
 ## 1. Instalar
 
@@ -38,7 +41,8 @@ Hay dos formas de instalar Otea: la **app de escritorio** o el **comando `otea` 
 - **macOS:** la app de escritorio, si quieres Otea en su propia ventana y con avisos. Todavía no se actualiza sola: cada versión nueva la descargas tú. Si ya usas Node, npm sirve igual.
 - **Linux:** la app de escritorio en `.deb` si usas Debian o Ubuntu. En otras distribuciones, el AppImage, o npm si quieres `otea` en tu terminal.
 
-### Qué te da cada una
+<details>
+<summary><strong>Qué te da cada una</strong> (una tabla, si quieres comparar)</summary>
 
 | | App de escritorio | npm (`npm i -g @otea/cli`) |
 | --- | --- | --- |
@@ -51,6 +55,8 @@ Hay dos formas de instalar Otea: la **app de escritorio** o el **comando `otea` 
 | Necesita Node.js | ❌ Trae el suyo | ✅ Node.js 22.18 o posterior |
 
 Todo lo demás funciona igual de las dos formas: los tableros, el teléfono (emparejarlo y recibir avisos en él) y los agentes por la terminal o por MCP. Ninguna de las dos arranca sola al iniciar sesión.
+
+</details>
 
 ### La app de escritorio
 
@@ -103,6 +109,16 @@ Necesitas [Node.js](https://nodejs.org/) 22.18 o posterior (se recomienda Node 2
 npm i -g @otea/cli
 otea --version
 ```
+
+Si `npm i -g` falla con un error de permisos (EACCES), no uses `sudo`: instala en una carpeta tuya y pon su `bin` en el `PATH`.
+
+```sh
+npm i -g --prefix ~/.otea-npm @otea/cli
+export PATH="$HOME/.otea-npm/bin:$PATH"   # agrega también esta línea al perfil de tu shell
+otea --version
+```
+
+En Windows el comando queda en la propia carpeta del prefijo: agrega `%USERPROFILE%\.otea-npm` al `PATH`. Para actualizar y quitar usa el mismo `--prefix`.
 
 Para actualizar, corre `npm i -g @otea/cli` otra vez. Para quitarlo, `npm uninstall -g @otea/cli`. Con el comando de npm, el escritorio lo abres con `otea serve` (paso 3).
 
