@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openProject } from '../app/project.ts';
 import { repoNameAt, UnknownRepo } from '../app/repos.ts';
-import { type Cli, cliAt, tempGitRepo } from './testing.ts';
+import { type Cli, cliAt, declareProfiles, tempGitRepo } from './testing.ts';
 
 // A repo is known by its origin URL, or by its root commit while it has no origin. A remote added
 // after `otea init` changes what the repo is known by. Its root commit is shared by every fork, so
@@ -118,5 +118,65 @@ describe('a remote added after init', () => {
     } finally {
       copy.remove();
     }
+  });
+});
+
+// The agent hears of it before the push is refused: next and claim say it, with the one command and
+// that the person's word comes first (persona P3, round 6).
+describe('a remote added after init, said before the push', () => {
+  let repo: ReturnType<typeof tempGitRepo>;
+  let otea: Cli;
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+      cwd: repo.dir,
+      stdio: 'pipe',
+      encoding: 'utf8',
+    });
+
+  beforeEach(async () => {
+    repo = tempGitRepo();
+    otea = cliAt(repo.dir, { OTEA_AGENT: 'quill' });
+    git('commit', '--quiet', '--allow-empty', '-m', 'one');
+    const person = cliAt(repo.dir);
+    expect((await person('init', '--local', '--template', 'none')).code).toBe(0);
+    expect((await person('board', 'add', 'Tasks', '--template', 'todos', '--lang', 'en')).code).toBe(0);
+    declareProfiles(repo.dir, 'quill');
+    const made = await otea('create', '--collection', 'Tasks', '--title', 'Water', '--field', 'What is needed=water the plants');
+    expect(made.err).toBe('');
+    expect(made.code).toBe(0);
+  });
+
+  afterEach(() => repo.remove());
+
+  it('says nothing while the repo has no remote or was never changed', async () => {
+    const next = await otea('next');
+
+    expect(next.out).not.toContain('repos add');
+  });
+
+  it('tells next and claim which command to run, after the person says it is that repo', async () => {
+    git('remote', 'add', 'origin', 'https://github.com/acme/keys.git');
+    const name = (await otea('repos', 'list')).out.trim().split(/\s+/)[0] ?? '';
+
+    const next = await otea('next');
+    const claim = await otea('claim', 'TOD-1');
+
+    for (const said of [next.out, claim.out]) {
+      expect(said).toContain('a remote was added');
+      expect(said).toContain(`otea repos add --name ${name}`);
+      expect(said).toContain('ask the person');
+    }
+    // The push is still refused until then: the notice changes nothing.
+    expect((await otea('repos', 'list')).out).toContain(`${name}  root:`);
+  });
+
+  it('stops saying it once the repo went by its origin', async () => {
+    git('remote', 'add', 'origin', 'https://github.com/acme/keys.git');
+    const name = (await otea('repos', 'list')).out.trim().split(/\s+/)[0] ?? '';
+    expect((await otea('repos', 'add', '--name', name)).code).toBe(0);
+
+    const next = await otea('next');
+
+    expect(next.out).not.toContain('a remote was added');
   });
 });
