@@ -588,8 +588,20 @@ describe('wait', () => {
         .setEncoding('utf8')
         .once('data', (line: string) => resolve(Number(line.trim()))),
     );
+    const listening = () => {
+      const project = openProject(repo.dir);
+      try {
+        return listAgents(project.db).some(({ name, listening }) => name === 'claude' && listening);
+      } finally {
+        project.db.close();
+      }
+    };
     try {
-      await delay(1500);
+      // The wait is heard as listening only once it has noted who started it (watchOwner reads
+      // its parent first). A fixed delay is not that: on a loaded runner the wait is still starting
+      // when the parent ends, and it then watches the system's own process (pid 1 on macOS and
+      // Linux), which never ends, so it never stops.
+      await until(listening, 30_000);
       parent.kill();
       await until(() => existsSync(log) && readFileSync(log, 'utf8').includes('Stopped'), 20_000);
       const said = readFileSync(log, 'utf8');
