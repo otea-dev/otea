@@ -42,8 +42,8 @@ export type SameRound = { commit: string; round: number };
 
 // Whether `tip`, handed off from the step `from`, holds the files the previous handoff from that
 // step held: same branch, same tree, whatever commits (an empty one) came between. Handoffs from
-// another step are never compared (a landing step hands the tree it was given). `before` counts
-// only the first handoffs; none: all.
+// another step are never compared (a landing step hands the tree it was given, not a new one), so
+// only a later round of the same step is. `before` counts only the first handoffs; none: all.
 function sameAsEarlier(
   ctx: Context,
   id: string,
