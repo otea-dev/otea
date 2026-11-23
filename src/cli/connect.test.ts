@@ -191,6 +191,25 @@ describe('setup for agents', () => {
       );
     });
 
+    // P9-F3: the same thing said three times in a long output, and a PATH warning that alarmed.
+    it('says each thing once, in a short output, and the PATH difference as a note, not a warning', async () => {
+      const bin = join(repo.dir, 'bin');
+      mkdirSync(bin);
+      const decoy = join(bin, process.platform === 'win32' ? 'otea.cmd' : 'otea');
+      writeFileSync(decoy, '#!/bin/sh\n');
+      chmodSync(decoy, 0o755);
+
+      const { out } = await cliAt(repo.dir, { PATH: bin })('connect');
+
+      expect(out.match(/writes no harness config/g)?.length ?? 0).toBeLessThanOrEqual(1);
+      expect(out.match(/for this project only/g)?.length ?? 0).toBe(1);
+      expect(out).not.toMatch(/warning/i);
+      expect(out.split('PATH').length - 1).toBe(1);
+      expect(out.length).toBeLessThan(2600);
+      // What is required comes last, and is one line.
+      expect(out.trimEnd().split('\n').at(-1)).toMatch(/^Then run otea connect --check/);
+    });
+
     it('prints the server and what it did with AGENTS.md with --json', async () => {
       expect(await json('connect')).toEqual({
         agentsMd: { path: join(repo.dir, 'AGENTS.md'), action: 'created' },
