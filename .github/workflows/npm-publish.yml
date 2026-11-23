@@ -104,6 +104,10 @@ jobs:
             exit 1
           fi
           "$RUNNER_TEMP/prefix/bin/otea" --help > /dev/null
+          # The bundle must find its presets, schemas and UI on disk: init, a board from a preset,
+          # the MCP server over stdio and the desk server's command, from a clean install.
+          cd "$GITHUB_WORKSPACE"
+          node scripts/try-package.mjs "$RUNNER_TEMP/pack"
 
       - name: Stage (dry run)
         if: steps.mode.outputs.release != 'true'

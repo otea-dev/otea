@@ -6,6 +6,7 @@ import {
   mkdirSync,
   readFileSync,
   realpathSync,
+  type Stats,
   statSync,
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -88,36 +89,62 @@ export type GitDirs = {
 // The git dirs of the checkout at cwd, found by walking up to its .git, as git does: a .git folder
 // is both; a .git file (`gitdir: <path>`) of a linked worktree points at the checkout's own dir,
 // whose `commondir` file names the common one, and of a submodule at the dir that is both.
-// Undefined whenever this cannot be sure (git's own variables set, a .git that does not read as
-// one, no .git above cwd): git is asked.
+// Undefined whenever this cannot be sure, and git is asked: git's own variables set; a .git that
+// does not read as one (no HEAD, objects/ and refs/); a level that is itself a git dir (a bare
+// repo, or a folder inside .git); a climb that crosses a file system (git stops there); a repo
+// another user owns (git's safe.directory decides); no .git above cwd. What these answers feed
+// (the gates) fails toward git, never toward a guess.
 export function gitDirsByWalking(cwd: string, env: NodeJS.ProcessEnv): GitDirs | undefined {
   if (GIT_DISCOVERY_ENV.some((name) => env[name] !== undefined)) return undefined;
+  const me = process.getuid?.();
+  const owned = (path: string) => me === undefined || statSync(path).uid === me;
   const start = resolve(cwd);
   for (let dir = start; ; dir = dirname(dir)) {
     const dotGit = join(dir, '.git');
     try {
-      const kind = statSync(dotGit);
-      let gitDir: string;
-      let common: string;
-      if (kind.isDirectory()) {
-        gitDir = dotGit;
-        common = dotGit;
-      } else if (kind.isFile()) {
-        const pointer = /^gitdir:\s*(.+?)\s*$/m.exec(readFileSync(dotGit, 'utf8'));
-        if (!pointer?.[1]) return undefined;
-        gitDir = resolve(dir, pointer[1]);
-        const named = join(gitDir, 'commondir');
-        common = existsSync(named) ? resolve(gitDir, readFileSync(named, 'utf8').trim()) : gitDir;
-      } else {
-        return undefined;
+      const here = statSync(dir);
+      let kind: Stats | undefined;
+      try {
+        kind = statSync(dotGit);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return undefined;
       }
-      if (!existsSync(join(common, 'HEAD'))) return undefined;
-      return { gitDir, common, plain: kind.isDirectory() };
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return undefined;
+      if (kind) {
+        let gitDir: string;
+        let common: string;
+        if (kind.isDirectory()) {
+          gitDir = dotGit;
+          common = dotGit;
+        } else if (kind.isFile()) {
+          const pointer = /^gitdir:\s*(.+?)\s*$/m.exec(readFileSync(dotGit, 'utf8'));
+          if (!pointer?.[1]) return undefined;
+          gitDir = resolve(dir, pointer[1]);
+          const named = join(gitDir, 'commondir');
+          common = existsSync(named) ? resolve(gitDir, readFileSync(named, 'utf8').trim()) : gitDir;
+        } else {
+          return undefined;
+        }
+        if (!isGitDir(common) || !existsSync(join(gitDir, 'HEAD'))) return undefined;
+        if (!owned(dir) || !owned(common)) return undefined;
+        return { gitDir, common, plain: kind.isDirectory() };
+      }
+      // No .git here: but this level may itself be a git dir, which git takes as it is.
+      if (isGitDir(dir)) return undefined;
+      const parent = dirname(dir);
+      if (parent === dir || statSync(parent).dev !== here.dev) return undefined;
+    } catch {
+      return undefined;
     }
-    if (dirname(dir) === dir) return undefined;
   }
+}
+
+// What a git dir holds, and nothing else does by chance.
+function isGitDir(dir: string): boolean {
+  return (
+    existsSync(join(dir, 'HEAD')) &&
+    existsSync(join(dir, 'objects')) &&
+    existsSync(join(dir, 'refs'))
+  );
 }
 
 // What `git rev-parse --git-common-dir` answers from cwd, without asking git when it can be told:

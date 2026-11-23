@@ -38,6 +38,14 @@ jobs:
           "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
       - run: npm ci
       - run: npm run check
+      # What npm would publish, installed into an empty folder and tried: the bundle must find its
+      # presets, schemas and UI on disk and run init, the MCP server and the desk server's command.
+      - name: Try the packed package
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/pack"
+          npm pack --pack-destination "$RUNNER_TEMP/pack"
+          node scripts/try-package.mjs "$RUNNER_TEMP/pack"
 
   # package.json engines says node >=22.18, so the oldest supported Node runs on every pull request
   # too. Ubuntu only, to keep the cost low. Not a required check.
@@ -53,6 +61,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - name: Try the packed package
+        run: |
+          mkdir -p "$RUNNER_TEMP/pack"
+          npm pack --pack-destination "$RUNNER_TEMP/pack"
+          node scripts/try-package.mjs "$RUNNER_TEMP/pack"
 
   # The desktop app is its own package. Here its types are checked and its bundle built: the
   # Electron binary is not downloaded, and its pure parts already run in the check job's tests. The

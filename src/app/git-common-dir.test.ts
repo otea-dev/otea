@@ -95,10 +95,34 @@ describe('gitCommonDir without asking git', () => {
     mkdirSync(join(fake, '.git'));
     expect(commonDirByWalking(fake, {})).toBeUndefined();
     expect(gitCommonDir(fake)).toBe(askGitOrUndefined(fake));
+    // A .git with a HEAD but no objects/ or refs/ is no repo either.
+    const hollow = tempDir();
+    mkdirSync(join(hollow, '.git'));
+    writeFileSync(join(hollow, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+    expect(commonDirByWalking(hollow, {})).toBeUndefined();
+    mkdirSync(join(hollow, '.git', 'objects'));
+    expect(commonDirByWalking(hollow, {})).toBeUndefined();
+    mkdirSync(join(hollow, '.git', 'refs'));
+    expect(commonDirByWalking(hollow, {})).toBe(join(hollow, '.git'));
     // A .git file that points at nothing.
     const broken = tempDir();
     writeFileSync(join(broken, '.git'), 'gitdir: ./nowhere\n');
     expect(commonDirByWalking(broken, {})).toBeUndefined();
+  });
+
+  it('leaves a bare repo inside a checkout to git, which takes it as its own repo', () => {
+    const { repo } = repoWithWorktree();
+    const bare = join(repo, 'mirror.git');
+    git(repo, 'init', '--quiet', '--bare', bare);
+    mkdirSync(join(bare, 'refs', 'deeper'), { recursive: true });
+    for (const cwd of [bare, join(bare, 'refs', 'deeper')]) {
+      expect(commonDirByWalking(cwd, {})).toBeUndefined();
+      expect(gitCommonDir(cwd)).toBe(askGit(cwd));
+    }
+    // And the folder inside a .git of its own.
+    const hooks = join(repo, '.git', 'hooks');
+    expect(commonDirByWalking(hooks, {})).toBeUndefined();
+    expect(gitCommonDir(hooks)).toBe(askGitOrUndefined(hooks));
   });
 
   it('is undefined outside a repo', () => {
