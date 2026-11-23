@@ -1,4 +1,4 @@
-import type { Command } from '../cli/command.ts';
+import type { Command, OptionSpec } from '../cli/command.ts';
 import { AGENT_COMMANDS, toolName } from './commands.ts';
 
 // A token of a command line: a quoted value, or a run up to a space or the punctuation that ends a
@@ -8,6 +8,17 @@ const TOKEN = /^(?:"[^"]*"|[^\s,;)`]+?)(?=[\s,;)`]|[.:](?:\s|$)|$)/;
 // The arguments that name an item, and what can stand for one in a text.
 const ITEM_ARGS = new Set(['id', 'ids...']);
 const ITEM_VALUE = /^(?:"[^"]*"|<[^>]+>|[A-Z][A-Z0-9]*-\d+)$/;
+
+function isJson(text: string): boolean {
+  const first = text.trimStart()[0];
+  if (first !== '{' && first !== '[') return false;
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const quoted = (value: string) =>
   value.startsWith('"') ? value : JSON.stringify(value.replace(/\.$/, ''));
@@ -31,6 +42,14 @@ function call(
   let at = start + name.length;
   const args = command.args.map((arg) => arg.replace(/\?$/, ''));
   const pairs: string[] = [];
+  // A repeated option (--field a --field b) is one argument holding an array, as the tool asks.
+  const many = new Map<string, { at: number; values: string[] }>();
+  const list = (key: string, value: string) => {
+    const entry = many.get(key) ?? { at: pairs.push(''), values: [] };
+    many.set(key, entry);
+    entry.values.push(value);
+    pairs[entry.at - 1] = `${key}: [${entry.values.join(', ')}]`;
+  };
   for (;;) {
     const rest = text.slice(at);
     const space = rest.match(/^ +/)?.[0] ?? '';
@@ -55,7 +74,8 @@ function call(
         continue;
       }
       at += gap.length + value.length;
-      pairs.push(`${key}: ${quoted(value)}`);
+      if (spec.multiple) list(key, quoted(value));
+      else pairs.push(`${key}: ${quoted(value)}`);
       continue;
     }
     const arg = args[0];
@@ -71,10 +91,36 @@ function call(
   return { said: pairs.length > 0 ? `${tool} { ${pairs.join(', ')} }` : tool, end: at };
 }
 
+// Whether the words before `at` are another tool's command line (`git push --force-with-lease`):
+// its flags are its own, whatever Otea names an option the same.
+function foreignCommand(text: string, at: number): boolean {
+  let start = at;
+  while (
+    start > 0 &&
+    !/[\n`(;]/.test(text[start - 1] ?? '') &&
+    !/[.:]\s/.test(text.slice(start - 2, start))
+  ) {
+    start -= 1;
+  }
+  return /(?:^|[\s"'])(?:git|gh|npm|npx|node|pnpm|yarn)\s[^`()\n]*$/.test(text.slice(start, at));
+}
+
 // What Otea tells an agent, in the words of the MCP tools it calls: `otea wait --turn agent`
 // reads `wait { turn: "agent" }`, an option on its own (`--reason`) reads `{ reason }`. A command
-// the server does not serve is left as the person would run it.
+// the server does not serve, and the flags of another tool's command (git's), are left as they are.
+// A JSON text is data, not prose: it stays as it is.
 export function mcpWords(text: string, commands: readonly Command[]): string {
+  if (isJson(text)) return text;
+  const options = new Map<string, OptionSpec>([['as', {}]]);
+  for (const command of commands) {
+    for (const [name, spec] of Object.entries(command.options)) {
+      options.set(name, {
+        ...options.get(name),
+        ...spec,
+        multiple: spec.multiple === true || options.get(name)?.multiple === true,
+      });
+    }
+  }
   let out = '';
   let at = 0;
   while (at < text.length) {
@@ -95,9 +141,17 @@ export function mcpWords(text: string, commands: readonly Command[]): string {
     }
     // A placeholder after it (`--as <name>`) is the value: `{ as: <name> }`.
     const option = text.slice(at).match(/^--([a-z][a-z0-9-]*)(?: ("[^"]*"|<[^>\s]+>))?/);
-    if (option && (at === 0 || /[\s(`"']/.test(text[at - 1] ?? ''))) {
+    const known = option?.[1] === undefined ? undefined : options.get(option[1]);
+    if (
+      option &&
+      known &&
+      (at === 0 || /[\s(`"']/.test(text[at - 1] ?? '')) &&
+      !foreignCommand(text, at)
+    ) {
       const key = (option[1] ?? '').replaceAll('-', '_');
-      out += option[2] === undefined ? `{ ${key} }` : `{ ${key}: ${option[2]} }`;
+      const value =
+        option[2] === undefined || known.multiple !== true ? option[2] : `[${option[2]}]`;
+      out += value === undefined ? `{ ${key} }` : `{ ${key}: ${value} }`;
       at += option[0].length;
       continue;
     }
