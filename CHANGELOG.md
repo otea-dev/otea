@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.5.0](https://github.com/otea-dev/otea/compare/v0.4.0...v0.5.0) (2026-11-23)
+
+
+### Features
+
+* **cli:** say in the event timeline where each of the person's moves came from ([b754c41](https://github.com/otea-dev/otea/commit/b754c41ce6e8d76f863506e99adc834e995b05ee))
+* **history:** record whether a human move came from the desk, the phone or a direct API call ([4dc6864](https://github.com/otea-dev/otea/commit/4dc68644b8d87c423a704a03c2217b8eff7d14ae))
+* **history:** say in the item history where each of the person's moves came from ([dc8e836](https://github.com/otea-dev/otea/commit/dc8e836f35716b06d6d19632d1f8e1e09eacf88f))
+* **review:** warn when the attached diff names other files than the work handed off changes ([a6b88d2](https://github.com/otea-dev/otea/commit/a6b88d29a28b2a9af86b40d032f898510fdbe82b))
+* **settings:** show which Otea runs, with a copyable report for bugs ([42fbe7e](https://github.com/otea-dev/otea/commit/42fbe7eb078940a18f3363b1a856d3c0923b6ee9))
+* **ui:** show the diff and landed file lists in review, on the desk and the phone ([03c89e5](https://github.com/otea-dev/otea/commit/03c89e5b5369fa654b3699ae0f850673a14cb2d8))
+
+
+### Bug fixes
+
+* **board:** make any move into a land step the person's alone, a send-back included ([1c4433b](https://github.com/otea-dev/otea/commit/1c4433b5dfcd5eb87eb7ff7e008e0778ed27b173))
+* **boards:** read a level in next in the board's language, and take a choice by its key ([3136175](https://github.com/otea-dev/otea/commit/31361754b207827e1ef880d4970d0c6dbd6efb40))
+* **boards:** read a yes-or-no value in the board's language ([07f6c68](https://github.com/otea-dev/otea/commit/07f6c68a31767913c2d87bb1876330a4a9b991ee))
+* **cli:** review round on the round-7 CLI fixes ([37834e5](https://github.com/otea-dev/otea/commit/37834e5fcfc39a0846670a95b5518e634f727536))
+* **cli:** round-7 CLI findings (wait, connect, open, relay, main queue, owner) ([08d0011](https://github.com/otea-dev/otea/commit/08d001154e2c14cc4648ed85fa439a2d3f686111))
+* **handoff:** ignore prunable worktrees and worktrees whose folder is gone over MCP ([99d09d8](https://github.com/otea-dev/otea/commit/99d09d8681af238ddc68de15357ca9a22bac50f0))
+* **handoff:** judge only the commits that change files, whatever the diff config says ([01600d3](https://github.com/otea-dev/otea/commit/01600d38b07ce4930bef2c2beb3adea52e25bd90))
+* **handoff:** refuse a landed commit that changes no files ([37607ab](https://github.com/otea-dev/otea/commit/37607abc96402881104a5b01e582a4a470d0e4a6))
+* **handoff:** refuse over MCP a branch no checkout of the repository has checked out ([56a87b4](https://github.com/otea-dev/otea/commit/56a87b40d100da5cce57d1a04ac79cb01eaad1f0))
+* **items:** keep a later step's field as it is while the item waits in review ([cbc2c61](https://github.com/otea-dev/otea/commit/cbc2c61d4027693cd7f22295eab8deea925c4ee8))
+* **items:** let anytime fields and unchanged values through the review lock, and use langOf in next ([1254547](https://github.com/otea-dev/otea/commit/12545471f0fe2674748ea70e738920f8e8b40559))
+* **language:** harden the project language and make the desk's agent prompt follow it ([5d51a45](https://github.com/otea-dev/otea/commit/5d51a455722011d83edfd72418dca9c5612e19b5))
+* **language:** keep the language of otea start, prompt and boards with the project, not the desk ([2870b5f](https://github.com/otea-dev/otea/commit/2870b5fa1467557009fb92125b0f87681ca56f08))
+* **offline:** never answer /api/version from the service worker's cache ([6639711](https://github.com/otea-dev/otea/commit/6639711f64e6e65f45fff1c6c0bb5f71b9a1e65c))
+* **review:** warn when the work changes no file, and read paths as git writes them ([e3761fb](https://github.com/otea-dev/otea/commit/e3761fba4c8e679ffddaddd975fa52448312285e))
+* **serve:** never tell anyone to stop a server that is not the background one ([5603319](https://github.com/otea-dev/otea/commit/5603319f69885a980bef4d6b0bfad7172cd01499))
+* **serve:** say when the background server is not the installed Otea ([9f028c6](https://github.com/otea-dev/otea/commit/9f028c6eae72fccce4affb23876b5ceb58c33151))
+
 ## [0.4.0](https://github.com/otea-dev/otea/compare/v0.3.0...v0.4.0) (2026-11-23)
 
 
