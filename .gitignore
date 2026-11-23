@@ -3,6 +3,8 @@ node_modules/
 
 # Build output
 dist/
+# The bundle src/cli/startup.test.ts builds to count the files it loads
+.bundle-check/
 out/
 release/
 # The CLI the desktop app carries, laid out by desktop/scripts/stage-cli.mjs
