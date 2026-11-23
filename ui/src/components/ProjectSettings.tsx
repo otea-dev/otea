@@ -447,12 +447,12 @@ export function SettingsBody({
         <div className="pj-you">
           <h3 className="pj-subhead">{t('topics.settings.label')}</h3>
           {you}
-          <p className="pj-hint">
-            {t('settings.prefsText')}{' '}
-            <Button size="sm" variant="quiet" onClick={onPreferences}>
+          <p className="pj-hint">{t('settings.prefsText')}</p>
+          <div className="pj-add pj-you-go">
+            <Button size="sm" onClick={onPreferences}>
               {t('settings.prefsGo')}
             </Button>
-          </p>
+          </div>
         </div>
       </Section>
       <Section
@@ -541,9 +541,7 @@ function Advanced({
           {tx('settings.localOne', { command: code('otea migrate --to common') })}
         </p>
       )}
-      <h3 className="pj-subhead">
-        {t('settings.repos')} · {t('settings.repoCount', { count: repos.length })}
-      </h3>
+      <h3 className="pj-subhead">{t('settings.repoCount', { count: repos.length })}</h3>
       {repos.length > 0 ? (
         <Repos repos={repos} />
       ) : (

@@ -21,7 +21,6 @@
 .inbox-agents {
   padding-left: 72px;
   margin: 8px 0 56px;
-  max-width: 720px;
 }
 .inbox-agents h2 {
   font: 450 21px / 1.15 var(--serif);
@@ -215,8 +214,8 @@
 .pj-sec-body > .pj-subhead:first-child {
   margin-top: 0;
 }
-.pj-you .pj-hint .btn {
-  margin-left: 4px;
+.pj-you .pj-you-go {
+  margin-top: 12px;
 }
 /* What «Detalles técnicos» opens in Configuración: its blocks keep to the section's measure. */
 .pj-adv {
