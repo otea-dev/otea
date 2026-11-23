@@ -254,8 +254,8 @@ import {
 } from './format.ts';
 import { prState } from './gh.ts';
 import {
-  branchesBrought,
   branchCheckedOutAnywhere,
+  branchesBrought,
   checkedOutBranch,
   checkoutRoot,
   commitsOver,
