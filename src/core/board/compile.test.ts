@@ -101,12 +101,14 @@ describe('compileBoard', () => {
     });
     const labels = preset.types[0]?.labels;
     expect(labels?.es?.states.sconcept__review).toBe('Concepto');
-    expect(labels?.en?.states.done).toBe('Done');
     expect(labels?.es?.states.dropped).toBe('Descartado');
+    // This board is in Spanish: a desk on an English screen reads it in Spanish too.
+    expect(labels?.en?.states.sconcept__review).toBe('Concepto');
+    expect(labels?.en?.states.done).toBe('Hecho');
     expect(labels?.es?.values?.fbiome).toEqual({ cswamp: 'Pantano', cwood: 'Bosque' });
   });
 
-  it('names a level field’s values in both languages (the Tabla groups by them)', () => {
+  it('names a level field’s values in the board’s language, on every screen (the Tabla groups by them)', () => {
     const def = creatures();
     const level = { id: 'fsev', name: 'Severidad', kind: 'level' as const, hint: '', options: [] };
     const preset = compileBoard('bcria', 1, {
@@ -121,7 +123,7 @@ describe('compileBoard', () => {
       high: 'alta',
       critical: 'crítica',
     });
-    expect(labels?.en?.values?.fsev?.critical).toBe('critical');
+    expect(labels?.en?.values?.fsev).toEqual(labels?.es?.values?.fsev);
   });
 
   it('names a checklist’s and a multi choice’s options, so the item page reads names, not ids', () => {

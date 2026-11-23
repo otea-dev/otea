@@ -25,7 +25,7 @@ import {
 } from './model.ts';
 import { groupFaults } from './problems.ts';
 import { stateName } from './reading.ts';
-import { defaultZone, LANGS, type Lang } from './templates.ts';
+import { boardLang, defaultZone, LANGS, type Lang } from './templates.ts';
 
 // A published board version compiled into the preset the rest of Otea already reads (items, moves,
 // leases, lanes, the item page): one type, `item`; a workflow state per step phase (stateOf); a
@@ -403,50 +403,48 @@ export function compileBoard(id: string, version: number, def: BoardDefinition):
     ],
   };
 
-  const labels = Object.fromEntries(
-    LANGS.map((lang) => [
-      lang,
-      {
-        name: def.name,
-        types: { [BOARD_TYPE]: def.item },
-        states: {
-          ...Object.fromEntries(phases.map((phase) => [phase.state, phase.label(lang)])),
-          [DONE]: WORDS[lang].done,
-          [DROPPED]: WORDS[lang].dropped,
-          // A discard with a motive reads as its motive (Duplicado).
-          ...Object.fromEntries(
-            def.drop.motives.map(({ id: motive, name }) => [
-              stateOf({ closed: DROPPED, motive }),
-              name,
-            ]),
-          ),
-        },
-        fields: Object.fromEntries(
-          Object.entries(fields).map(([key, field]) => [key, field.label]),
-        ),
-        values: Object.fromEntries(
-          ordered
-            // A checklist and a multi choice hold their options' ids too (a JSON list).
-            .filter(
-              (part) =>
-                fields[part.id]?.module === 'enum' ||
-                part.kind === 'level' ||
-                part.kind === 'check' ||
-                part.kind === 'multi',
-            )
-            .filter((part) => fields[part.id] !== undefined)
-            .map((part) => [
-              part.id,
-              part.kind === 'yesno'
-                ? { yes: WORDS[lang].yes, no: WORDS[lang].no }
-                : part.kind === 'level'
-                  ? Object.fromEntries(LEVELS.map((level) => [level, WORDS[lang][level] ?? level]))
-                  : Object.fromEntries(part.options.map((choice) => [choice.id, choice.name])),
-            ]),
-        ),
-      },
-    ]),
-  );
+  // The words the desk shows for the board's states, fields and values. A board speaks one
+  // language, the one it was made in, which is the agent's (`otea next`, `otea board`): the desk
+  // picks the labels of its screen's language, so each language holds the board's own, and the
+  // desk's chrome is the only thing the screen's language changes.
+  const wordsIn = (lang: Lang) => ({
+    name: def.name,
+    types: { [BOARD_TYPE]: def.item },
+    states: {
+      ...Object.fromEntries(phases.map((phase) => [phase.state, phase.label(lang)])),
+      [DONE]: WORDS[lang].done,
+      [DROPPED]: WORDS[lang].dropped,
+      // A discard with a motive reads as its motive (Duplicado).
+      ...Object.fromEntries(
+        def.drop.motives.map(({ id: motive, name }) => [
+          stateOf({ closed: DROPPED, motive }),
+          name,
+        ]),
+      ),
+    },
+    fields: Object.fromEntries(Object.entries(fields).map(([key, field]) => [key, field.label])),
+    values: Object.fromEntries(
+      ordered
+        // A checklist and a multi choice hold their options' ids too (a JSON list).
+        .filter(
+          (part) =>
+            fields[part.id]?.module === 'enum' ||
+            part.kind === 'level' ||
+            part.kind === 'check' ||
+            part.kind === 'multi',
+        )
+        .filter((part) => fields[part.id] !== undefined)
+        .map((part) => [
+          part.id,
+          part.kind === 'yesno'
+            ? { yes: WORDS[lang].yes, no: WORDS[lang].no }
+            : part.kind === 'level'
+              ? Object.fromEntries(LEVELS.map((level) => [level, WORDS[lang][level] ?? level]))
+              : Object.fromEntries(part.options.map((choice) => [choice.id, choice.name])),
+        ]),
+    ),
+  });
+  const labels = Object.fromEntries(LANGS.map((screen) => [screen, wordsIn(boardLang(def))]));
 
   const raw = {
     preset: id,

@@ -90,7 +90,7 @@ describe('a board read by desks in two languages', () => {
       const presets = (await response.json()) as {
         types: { labels?: Record<string, { states: Record<string, string> }> }[];
       }[];
-      // The board's own preset is the one with a step "Fix".
+      // The board's own preset is the one with a step "Triage" (the official ones have none).
       return presets
         .flatMap(({ types }) => types)
         .flatMap(({ labels: byLang }) =>
@@ -99,7 +99,7 @@ describe('a board read by desks in two languages', () => {
             states: Object.values(words.states),
           })),
         )
-        .filter(({ states }) => states.some((state) => state.startsWith('Fix')));
+        .filter(({ states }) => states.includes('Triage'));
     };
 
     for (const screen of ['es', 'en']) {

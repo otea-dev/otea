@@ -10,7 +10,7 @@ import type { RoundSame } from '../../src/server/round-same.ts';
 import type { FeedEvent } from './activity.ts';
 import { apiUrl } from './base.ts';
 import type { WrittenBrief } from './brief.ts';
-import { type Language, languageHeader, t } from './i18n/i18n.ts';
+import { type Language, t } from './i18n/i18n.ts';
 import type { NotifyView } from './notify/offer.ts';
 import { noteRead, readOf } from './offline/sync-state.ts';
 import { type Agent, parseAgents } from './presence.ts';
@@ -45,7 +45,7 @@ async function get(path: string, signal: AbortSignal): Promise<Response> {
   // Every read says whether the PC answered it (the offline line, sync-state.ts).
   const response = await fetch(apiUrl(path), {
     signal,
-    headers: { accept: 'application/json', ...languageHeader() },
+    headers: { accept: 'application/json' },
   }).catch((error: unknown) => {
     if (!signal.aborted) noteRead({ kind: 'failed' });
     throw error;
@@ -186,11 +186,10 @@ async function post<T>(
     // Every write says it comes from the page (core/surface.ts), so the history can tell it from a
     // direct call made with the same session.
     headers: form
-      ? { accept: 'application/json', ...languageHeader(), [SURFACE_HEADER]: '1', ...extra }
+      ? { accept: 'application/json', [SURFACE_HEADER]: '1', ...extra }
       : {
           accept: 'application/json',
           'content-type': 'application/json',
-          ...languageHeader(),
           [SURFACE_HEADER]: '1',
           ...extra,
         },

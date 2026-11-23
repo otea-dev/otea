@@ -86,7 +86,8 @@ export const shell = {
   'prefs.english': 'English',
   'prefs.spanish': 'Español',
   'prefs.onlyInterface': 'Only the interface is translated.',
-  'prefs.translated': '{only} Item content, their fields and what agents write stay as they are.',
+  'prefs.translated':
+    '{only} Each board keeps the language it was made in, as do the items and what agents write.',
   'prefs.phone': 'Phone, in Settings…',
   'prefs.server': 'server',
   'prefs.all': 'All preferences…',
@@ -110,7 +111,7 @@ export const shell = {
   'languageNote.label': 'Language',
   'languageNote.heading': 'Otea is in English, as your browser asks ({tag}).',
   'languageNote.body':
-    'Only the interface is translated. Item content, their fields and what agents write stay exactly as written.',
+    'Only the interface is translated. Each board keeps the language it was made in (its steps, fields and choices), as do the items and what agents write.',
   'languageNote.where': 'Change it any time in Preferences, below.',
   'languageNote.wherePanel': 'Change it any time in Preferences, at the foot of the panel.',
   'languageNote.ok': 'Got it',

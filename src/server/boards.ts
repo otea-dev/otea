@@ -56,10 +56,6 @@ const DraftBody = z.strictObject({
   definition: z.unknown(),
   baseVersion: z.number().int().positive().nullable(),
   draftStamp: z.string().nullable().optional(),
-  // The language the editor read the draft in: the words it sends are in it. Required: without it
-  // the server could only guess, and a guess that is the desk's language today strips the snapshot
-  // of a board whose desk switched language since.
-  readIn: z.enum(['en', 'es']),
 });
 
 const PublishBody = z.strictObject({
@@ -251,12 +247,11 @@ export function boardsApi(project: Project, feed: ChangeFeed, auth: Session): Ho
         const input = await body(
           c,
           DraftBody,
-          '{"definition": board, "baseVersion": number | null, "readIn": "en" | "es", "draftStamp"?: string | null}',
+          '{"definition": board, "baseVersion": number | null, "draftStamp"?: string | null}',
         );
         const saved = saveDraft(project, id(c), {
           definition: input.definition,
           baseVersion: input.baseVersion,
-          readIn: input.readIn,
           ...(input.draftStamp === undefined ? {} : { draftStamp: input.draftStamp }),
         });
         feed.notify();

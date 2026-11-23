@@ -59,14 +59,14 @@ describe('GET /api/agent-prompt', () => {
   // The pasted prompt is for the agent: each board and step as `otea next` shows it, in the
   // language the board was made in, whatever the desk's. Only the list beside it, for the person,
   // follows the desk (the board snapshot).
-  it('keeps the prompt in each board’s own language and lists its steps in the desk’s', async () => {
+  it('keeps the prompt and the list beside it in each board’s own language, whatever the desk’s', async () => {
     initBoards(project, 'todos', 'en');
 
     const { body } = await get('?lang=es');
 
     expect(body.prompt).toContain('- To-dos: Do it');
     expect(body.prompt).not.toContain('Hacerlo');
-    expect(body.boards).toEqual([{ name: 'To-dos', steps: ['Hacerlo'] }]);
+    expect(body.boards).toEqual([{ name: 'To-dos', steps: ['Do it'] }]);
     expect((await get('?lang=en')).body.boards).toEqual([{ name: 'To-dos', steps: ['Do it'] }]);
   });
 
