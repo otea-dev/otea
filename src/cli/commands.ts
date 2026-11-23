@@ -3200,6 +3200,9 @@ type ServeOptions = {
   // Started by otea serve start: nobody reads this process's output and nobody is there to watch a
   // network listener, so it neither opens the local network at start nor issues a pairing code.
   unattended: boolean;
+  // Started by the desktop app, which owns this server: otea serve stop leaves it alone, and no
+  // command tells anyone to stop it.
+  desktop: boolean;
   tailscale: TailscaleCli;
   probe: Probe;
   warn: Input['warn'];
@@ -3255,7 +3258,7 @@ async function serveUntil(
   cwd: string,
   options: ServeOptions,
 ): Promise<Served> {
-  const { port, lan, unattended, tailscale, probe, warn, gitHook } = options;
+  const { port, lan, unattended, desktop, tailscale, probe, warn, gitHook } = options;
   const here = projectHere(cwd);
   const home = oteaHome();
   // One server per Otea home: a second otea serve points at the one running.
@@ -3298,7 +3301,13 @@ async function serveUntil(
     }
     writeServeFile(
       home,
-      { port: listening.port, pid: process.pid, links: true, version: OTEA_VERSION },
+      {
+        port: listening.port,
+        pid: process.pid,
+        links: true,
+        version: OTEA_VERSION,
+        owner: unattended ? 'daemon' : desktop ? 'desktop' : 'foreground',
+      },
       unattended && port !== 0,
     );
     const sync = setInterval(() => server.sync(), SYNC_EVERY_MS);
@@ -3487,11 +3496,22 @@ const serveStart: Command = {
 const serveStop: Command = {
   name: 'serve stop',
   summary:
-    "Stop this computer's otea serve, however it was started, by its process id. Stops nothing when none runs (the record of one that ended is cleaned up)",
+    "Stop this computer's otea serve, however it was started, by its process id. Stops nothing when none runs (the record of one that ended is cleaned up). The Otea desktop app's own server is refused unless --force: it would close under the app's window",
   args: [],
-  options: {},
-  execute: async () => {
-    const result = await stopServer(oteaHome(), OTEA.args.at(-1) ?? '');
+  options: { force: { flag: true } },
+  execute: async ({ flag }) => {
+    const home = oteaHome();
+    if (!flag('force')) {
+      const held = await inspectServer(home);
+      const info = readServeFile(home);
+      if ((held.kind === 'running' || held.kind === 'unresponsive') && info?.owner === 'desktop') {
+        throw new OteaError(
+          'forbidden',
+          `The server running here (pid ${info.pid}) belongs to the Otea desktop app: stopping it would close it under the app's window. Quit the app instead, or end it anyway with otea serve stop --force`,
+        );
+      }
+    }
+    const result = await stopServer(home, OTEA.args.at(-1) ?? '');
     if (!result) return { data: { stopped: false }, text: 'No otea serve is running' };
     if ('stale' in result) {
       return {
@@ -3666,9 +3686,14 @@ const serve: Command = {
     // What otea serve start runs it with: no sign-in link or pairing code in its output (it goes
     // to a log), and the local network stays closed unless a person opens it.
     daemon: { flag: true },
+    // What the desktop app runs it with, to say whose server it is (--served-by desktop).
+    'served-by': { choices: ['desktop'] },
   },
   execute: async (input) => {
     const { cwd, option, flag, signal, warn, tailscale, probe, home } = input;
+    if (flag('daemon') && option('served-by') !== undefined) {
+      throw new UsageError('--daemon and --served-by cannot be used together');
+    }
     // A server whose starter is gone (an agent's session that ran it in the background ended)
     // stops, as it would with the terminal that ran it, and says why; --no-owner keeps it.
     const owner = flag('no-owner') ? undefined : watchOwner(signal);
@@ -3683,6 +3708,7 @@ const serve: Command = {
       port: portFrom(option('port')),
       lan: flag('lan'),
       unattended: flag('daemon'),
+      desktop: option('served-by') === 'desktop',
       tailscale,
       probe,
       warn,

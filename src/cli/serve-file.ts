@@ -13,20 +13,36 @@ const ServeInfo = z.object({
   // The Otea version that runs the server. A server started by 0.4.0 or earlier says nothing, and
   // is taken as older than any that does.
   version: z.string().optional(),
+  // Who started the server, which decides how it is restarted: `daemon` (otea serve start), `desktop`
+  // (the desktop app, which owns its window's server) or `foreground` (an otea serve in a terminal).
+  // 0.4.0 and earlier say nothing; a value this Otea does not know is read as nothing too.
+  owner: z.enum(['daemon', 'desktop', 'foreground']).optional().catch(undefined),
 });
 
 export type ServeInfo = z.infer<typeof ServeInfo>;
+export type ServeOwner = NonNullable<ServeInfo['owner']>;
 
 // A server keeps running its old code after the package under it is upgraded. What to tell a person
 // when the server they reach is not the installed version (or says nothing of its own); nothing
-// when it is. Never a restart of its own: ending the server is the person's to do.
+// when it is. Never a restart of its own, and never `otea serve stop` for a server that is not the
+// background one: that would end the desktop app's server under its window, or a terminal's.
 export function serverVersionNote(
   info: ServeInfo | undefined,
   installed: string,
 ): string | undefined {
   if (!info || info.version === installed) return undefined;
   const runs = info.version ? `Otea ${info.version}` : 'an older Otea (it recorded no version)';
-  return `The server running here (pid ${info.pid}) is ${runs}, and ${installed} is installed: to use the installed one, run otea serve stop, then otea serve start`;
+  const app = 'update the app, or quit it and open it again';
+  const restart = 'run otea serve stop, then otea serve start';
+  const what = {
+    daemon: `to use the installed one, ${restart}`,
+    desktop: `it is the Otea desktop app's, so ${app}`,
+    foreground:
+      'it is an otea serve running in a terminal, so stop it there (Ctrl+C) and run otea serve again',
+    // 0.4.0 wrote no owner: the desktop app's server looks like any other.
+    unknown: `if the Otea desktop app started it, ${app}; if otea serve start did, ${restart}`,
+  }[info.owner ?? 'unknown'];
+  return `The server running here (pid ${info.pid}) is ${runs}, and ${installed} is installed: ${what}`;
 }
 
 // The port the background server of this home last ran on, by the port it was asked for. serve.json

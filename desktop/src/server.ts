@@ -157,7 +157,9 @@ export function startServe(
   cwd: string,
   port?: number,
 ): Promise<{ url: string; child: ChildProcess; attached: boolean }> {
-  const args = [...cli.args, 'serve', '--no-open', '--json'];
+  // `--served-by desktop` records the app as the owner of this server: otea serve stop refuses it,
+  // and no notice tells anyone to stop it.
+  const args = [...cli.args, 'serve', '--no-open', '--json', '--served-by', 'desktop'];
   if (port !== undefined) args.push('--port', String(port));
   const child = spawn(cli.command, args, {
     cwd,
