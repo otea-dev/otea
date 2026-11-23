@@ -9,8 +9,9 @@ import {
   requireSet,
   requireTemplate,
   TEMPLATE_SETS,
+  TEMPLATES,
 } from './templates.ts';
-import { errores } from './testing.ts';
+import { errores, step } from './testing.ts';
 
 const moves = (def = errores()) =>
   compileBoard('berr', 1, def).workflow.transitions.map(
@@ -109,29 +110,60 @@ describe('compileBoard, the template sets', () => {
   // P1-F1: an agent could relay an invented approval into the land step. What lands on main or
   // closes the item is the person's, on the desk or the phone, in every shipped board; send-backs
   // and drops stay `human`, so chat can still make them.
+  // The land steps of a board, and every move the person makes that chat can relay (`human`) whose
+  // target is one of them or Hecho.
+  const relayableLandings = (def: BoardDefinition) => {
+    const landing = new Set(
+      def.steps
+        .filter(({ id }) => isLandStep(def, id))
+        .map(({ id }) => stateOf({ step: id, phase: 'doing' })),
+    );
+    const { transitions } = compileBoard('bset', 1, def).workflow;
+    const relayable = transitions
+      .filter(({ by, to }) => by === 'human' && (landing.has(to) || to === DONE))
+      .map(({ from, to }) => `${from}>${to}`);
+    return { lands: landing.size, relayable };
+  };
+
   it('makes the approval into a land step or Hecho human-ui in every board, never a send-back', () => {
     let lands = 0;
-    for (const set of TEMPLATE_SETS) {
-      for (const lang of ['en', 'es'] as const) {
-        const ids = set.boards.map((_, index) => ({ id: `b${index}` }));
-        for (const def of instantiateSet(set, lang, ids)) {
-          const landing = new Set(
-            def.steps
-              .filter(({ id }) => isLandStep(def, id))
-              .map(({ id }) => stateOf({ step: id, phase: 'doing' })),
-          );
-          lands += landing.size;
-          const { transitions } = compileBoard('bset', 1, def).workflow;
-          const relayable = transitions.filter(({ by }) => by === 'human');
-          const where = `${set.key} ${def.name}`;
-          for (const { to } of relayable) {
-            expect(landing.has(to), `${where}: ${to} is a land step`).toBe(false);
-            expect(to, `${where}: ${to} is Hecho`).not.toBe(DONE);
-          }
-        }
+    for (const lang of ['en', 'es'] as const) {
+      const boards = [
+        // Every template of the catalogue, the retired ones and the coverage ones too.
+        ...TEMPLATES.map((template) => ({
+          where: `${template.key} ${lang}`,
+          def: instantiate(template, lang, {}, sequenceIds()),
+        })),
+        ...TEMPLATE_SETS.flatMap((set) => {
+          const ids = set.boards.map((_, index) => ({ id: `b${index}` }));
+          return instantiateSet(set, lang, ids).map((def) => ({
+            where: `${set.key} ${def.name} ${lang}`,
+            def,
+          }));
+        }),
+      ];
+      for (const { where, def } of boards) {
+        const found = relayableLandings(def);
+        lands += found.lands;
+        expect(found.relayable, `${where}: a relayable move into a land step or Hecho`).toEqual([]);
       }
     }
     expect(lands).toBeGreaterThan(0);
+  });
+
+  // A later step whose review sends back INTO the land step: a send-back is relayable, and it put
+  // the item in the land step with no approval of the person's, which an agent then landed.
+  it('makes a send-back from a later step into the land step human-ui on a custom board', () => {
+    const def = instantiate(requireTemplate('changes'), 'en', {}, sequenceIds());
+    const land = def.steps.find((each) => each.name === 'Land');
+    if (!land) throw new Error('no Land');
+    land.ways = [DONE];
+    def.steps.push(step('sverify', 'Verify', { doer: 'any', reviewer: 'you', back: land.id }));
+    expect(isLandStep(def, land.id)).toBe(true);
+    const doing = stateOf({ step: land.id, phase: 'doing' });
+    const all = moves(def);
+    expect(all).toContain(`${stateOf({ step: 'sverify', phase: 'review' })}>${doing}:human-ui!`);
+    expect(relayableLandings(def).relayable).toEqual([]);
   });
 
   it('keeps a send-back from the person’s review relayable, and its approval into the land step human-ui', () => {
