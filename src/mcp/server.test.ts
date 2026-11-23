@@ -419,7 +419,7 @@ describe('mcp server', () => {
       const worded = await call('reply', { id: 'TASKS-1', answer: 'Hecho', note: 'the reason' });
       expect(worded.content[0]?.text).toContain('A send-back reason is not a note');
 
-      const events = await data('events', { id: 'TASKS-1', since: 0 });
+      const events = await data('events', { item: 'TASKS-1', since: 0 });
       expect(Array.isArray(events)).toBe(true);
     });
 
@@ -647,7 +647,9 @@ describe('mcp server', () => {
 
         // `as` is required in the tool's schema where a call needs a name: the client refuses it.
         expect(reply.isError).toBe(true);
-        expect(reply.content[0]?.text).toMatch(/\bas\b/);
+        // The schema's own issue, on the path `as`, and the command never ran: nothing was claimed.
+        expect(reply.content[0]?.text).toMatch(/Invalid arguments for tool claim: as: /);
+        expect((await json('show', 'TASKS-1')).lease).toBeFalsy();
         expect((await call('claim', { id: 'TASKS-1', as: 'scout' }, bare)).isError).toBeFalsy();
       } finally {
         await bare.close();
@@ -670,7 +672,7 @@ describe('mcp server', () => {
         expect(shown.isError, shown.content[0]?.text).toBeFalsy();
         const unnamed = await call('topic_add', { question: 'q' }, bare);
         expect(unnamed.isError).toBe(true);
-        expect(unnamed.content[0]?.text).toMatch(/\bas\b/);
+        expect(unnamed.content[0]?.text).toMatch(/Invalid arguments for tool topic_add: as: /);
         const project = openProject(repo.dir);
         try {
           expect(listAgents(project.db).map(({ name }) => name)).toEqual(['claude']);

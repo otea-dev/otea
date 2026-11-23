@@ -16,14 +16,26 @@ const LINK_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const fileOf = (home: string, link: string) =>
   join(home, SIGNIN_DIR, createHash('sha256').update(link).digest('hex'));
 
-// Links that ended, or that nobody redeemed for a day, are cleared as a new one is issued.
+// A link another process is writing right now (the file exists a moment before its end time is in
+// it) is no ended link: an empty or unparsable file that young is left alone.
+const WRITING_MS = 5_000;
+
+// Links that ended are cleared as a new one is issued.
 function sweep(home: string, now: number): void {
   const dir = join(home, SIGNIN_DIR);
-  for (const name of readdirSync(dir)) {
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
     const path = join(dir, name);
     try {
       const endsAt = Number(readFileSync(path, 'utf8'));
-      if (!(endsAt > now) || statSync(path).mtimeMs < now - 24 * 60 * 60 * 1000) {
+      if (Number.isFinite(endsAt) && endsAt > 0) {
+        if (endsAt <= now) rmSync(path, { force: true });
+      } else if (Date.now() - statSync(path).mtimeMs >= WRITING_MS) {
         rmSync(path, { force: true });
       }
     } catch {

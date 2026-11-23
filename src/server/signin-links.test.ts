@@ -1,4 +1,5 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -59,12 +60,58 @@ describe('single-use sign-in links', () => {
     expect(readFileSync(join(home, SIGNIN_DIR, names[0] ?? ''), 'utf8')).not.toContain(link);
   });
 
-  it('is used up by the first of two that redeem it together', () => {
+  // Real processes, released together: the files of two redeems race, and one wins.
+  it('is used up by exactly one of several processes that redeem it at the same moment', async () => {
     const link = issueSignInLink(home);
+    const go = join(home, 'go');
+    const script = [
+      "const fs = require('node:fs');",
+      'const [module, home, link, go] = process.argv.slice(1);',
+      'const until = Date.now() + 20000;',
+      'while (!fs.existsSync(go) && Date.now() < until) {}',
+      'import(module).then((m) => console.log(m.redeemSignInLink(home, link)));',
+    ].join(' ');
+    const children = Array.from({ length: 6 }, () => {
+      const child = spawn(
+        process.execPath,
+        [
+          '--disable-warning=ExperimentalWarning',
+          '-e',
+          script,
+          new URL('./signin-links.ts', import.meta.url).href,
+          home,
+          link,
+          go,
+        ],
+        { stdio: ['ignore', 'pipe', 'inherit'] },
+      );
+      let out = '';
+      child.stdout.on('data', (chunk) => {
+        out += String(chunk);
+      });
+      return new Promise<string>((resolve) => child.on('close', () => resolve(out.trim())));
+    });
+    // Every child is up and spinning; then they go.
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    writeFileSync(go, '');
 
-    const results = [redeemSignInLink(home, link), redeemSignInLink(home, link)];
+    const results = await Promise.all(children);
 
-    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(results.filter((result) => result === 'true')).toHaveLength(1);
+    expect(results.filter((result) => result === 'false')).toHaveLength(5);
+  }, 60_000);
+
+  it('does not clear a link another process is still writing, and survives a missing folder', () => {
+    // issuing the first link finds no folder yet, and no error comes of sweeping it.
+    expect(() => issueSignInLink(home)).not.toThrow();
+    const folder = join(home, SIGNIN_DIR);
+    writeFileSync(join(folder, 'writing'), '');
+    issueSignInLink(home);
+    expect(readdirSync(folder)).toContain('writing');
+    const old = new Date(Date.now() - 60_000);
+    utimesSync(join(folder, 'writing'), old, old);
+    issueSignInLink(home);
+    expect(readdirSync(folder)).not.toContain('writing');
   });
 
   describe('as GET /auth takes it', () => {

@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -7,11 +8,22 @@ import { processAlive } from '../app/presence.ts';
 import { ensureUiToken } from '../server/token.ts';
 import { SERVE_LOG } from './daemon.ts';
 import { readServeFile, SERVE_FILE } from './serve-file.ts';
-import { spawnCli, type TempRepo, tempGitRepo, until } from './testing.ts';
+import { spawnCli, startCli, type TempRepo, tempGitRepo, until } from './testing.ts';
 
 const MAIN = fileURLToPath(new URL('./main.ts', import.meta.url));
 
 const home = () => process.env.OTEA_HOME ?? '';
+
+// A port nothing listens on now.
+const freePort = () =>
+  new Promise<number>((resolve, reject) => {
+    const probe = createServer();
+    probe.on('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address() as { port: number };
+      probe.close(() => resolve(port));
+    });
+  });
 
 // A process that accepts connections and never answers, with `words` after its script on its
 // command line (where a real server has its entry point and subcommand).
@@ -49,6 +61,7 @@ describe('serve start, status and stop', () => {
   afterEach(async () => {
     await stopWhatRuns(repo.dir);
     rmSync(join(home(), SERVE_FILE), { force: true });
+    rmSync(join(home(), 'serve-port'), { force: true });
     repo.remove();
   });
 
@@ -151,19 +164,59 @@ describe('serve start, status and stop', () => {
 
   // P6-F4: a restart without --port came back on 4400, and the bookmarks of the port before died.
   it('starts again on the port it last ran on, and says so', async () => {
-    const first = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
-    expect(first.code).toBe(0);
+    const port = await freePort();
+    const first = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', String(port));
+    expect(first.code, first.err).toBe(0);
     const before = readServeFile(home());
     if (!before) throw new Error('serve start left no serve.json');
+    expect(before.port).toBe(port);
     expect((await spawnCli(repo.dir, 'serve', 'stop')).code).toBe(0);
     await until(() => !processAlive(before.pid), 15_000);
 
     const again = await spawnCli(repo.dir, 'serve', 'start', '--no-open');
 
     expect(again.code, again.err).toBe(0);
-    expect(readServeFile(home())?.port).toBe(before.port);
-    expect(again.out).toContain(`It uses port ${before.port}, where it last ran`);
+    expect(readServeFile(home())?.port).toBe(port);
+    expect(again.out).toContain(`It uses port ${port}, where it last ran`);
   }, 90_000);
+
+  // Only the background server's own choice is kept: a port the system picked (--port 0) or a
+  // foreground otea serve is a one-off.
+  it('remembers no port for --port 0, and none for a foreground serve', async () => {
+    const first = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
+    expect(first.code).toBe(0);
+    expect(existsSync(join(home(), 'serve-port'))).toBe(false);
+    await stopWhatRuns(repo.dir);
+
+    const foreground = startCli(repo.dir, 'serve', '--no-open', '--port', String(await freePort()));
+    try {
+      await until(() => readServeFile(home()) !== undefined, 30_000);
+      expect(existsSync(join(home(), 'serve-port'))).toBe(false);
+    } finally {
+      await foreground.stop();
+    }
+  }, 90_000);
+
+  // The server an older Otea started cannot redeem a single-use link: no link is printed for it,
+  // never one that would be refused.
+  it('prints no link for a server that cannot redeem one, and says how to get one', async () => {
+    const first = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
+    expect(first.code).toBe(0);
+    const running = readServeFile(home());
+    if (!running) throw new Error('serve start left no serve.json');
+    // As an older Otea wrote it: no word of single-use links.
+    writeFileSync(
+      join(home(), SERVE_FILE),
+      JSON.stringify({ port: running.port, pid: running.pid }),
+    );
+
+    const again = await spawnCli(repo.dir, 'serve', 'start', '--no-open');
+
+    expect(again.code, again.err).toBe(0);
+    expect(again.out).not.toContain('/auth?token=');
+    expect(again.out).toContain('older Otea');
+    expect(again.out).toContain('otea serve stop');
+  }, 60_000);
 
   // P6-F5: --port 4917 against a server on 4916 was ignored without a word.
   it('says --port was ignored when the server already runs on another port', async () => {

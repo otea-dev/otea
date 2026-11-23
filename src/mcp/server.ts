@@ -10,7 +10,7 @@ import { OteaError } from '../core/errors.ts';
 import { type Actor, agentActor, assertAgentName, PERSON_READER } from '../core/item.ts';
 import { parseWaitTimeout } from '../core/lease.ts';
 import { AGENT_COMMANDS, NAMELESS_READS, READ_ONLY, toolName } from './commands.ts';
-import { inputSchema, optionValues } from './schema.ts';
+import { inputSchema, optionValues, unknownParameters } from './schema.ts';
 import { mcpWords } from './words.ts';
 
 export { AGENT_COMMANDS, CLI_ONLY_COMMANDS, toolName } from './commands.ts';
@@ -205,6 +205,12 @@ async function callCommand(
   let input: Input | undefined;
   const done = context.calling?.(command.name);
   try {
+    const unknown = unknownParameters(command, OMITTED_OPTIONS[command.name] ?? [], values);
+    if (unknown.length > 0) {
+      throw new UsageError(
+        `${toolName(command.name)} takes no ${unknown.map((key) => `{ ${key} }`).join(', ')}: see its input schema (an option with a hyphen is named with an underscore, such as all_projects)`,
+      );
+    }
     const named = optionValues(command, values);
     const given = command.name === 'wait' ? waitValues(named) : named;
     input = inputFor(command, given, context, signal, records, harness, seen);

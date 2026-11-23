@@ -22,8 +22,8 @@ Everything is under the Otea home: `$OTEA_HOME`, which defaults to `~/.otea` (on
 | The sign-in key | `<home>/ui-token` | 32 random bytes, base64url. Created on the first `otea serve` and reused. |
 | The server's Web Push keys | `<home>/push-keys.json` | Used to send notifications to paired phones. |
 | Where the server runs | `<home>/serve.json` | The port and the process id, nothing secret. |
-| The port it last ran on | `<home>/serve-port` | Kept after the server stops, so `otea serve start` comes back on it. Nothing secret. |
-| Single-use sign-in links | `<home>/signin-links/` | What `serve --no-open`, `serve start --no-open` and `start --no-open` print instead of the key: one file per link, named by the hash of its token, holding when it ends (10 minutes). Removed when used, or when the next one is made after it ended. A transcript that keeps a printed link holds nothing that signs in after one use. |
+| The port it last ran on | `<home>/serve-port` | Written by the background server (`otea serve start`, not for `--port 0`), kept after it stops, so the next start comes back on it. Nothing secret. |
+| Single-use sign-in links | `<home>/signin-links/` | What `serve --no-open`, `serve start --no-open` and `start --no-open` print instead of the key: one file per link, named by the hash of its token, holding when it ends (10 minutes). Removed when used; the ones that ended go when the next link is made. A transcript that keeps a printed link holds nothing that signs in after one use or after 10 minutes. Redeeming a link sets the browser's session cookie, which carries the key itself (the same cookie `otea open` sets), so the link limits what a transcript leaks, not what a signed-in browser holds. |
 | What the background server prints | `<home>/serve.log` | Written by `otea serve start`. It holds no sign-in link, and is emptied at the next start once it passes 256 KB. |
 | The desktop app's preferences and recent projects | Electron's user data folder for `Otea` | `settings.json`, `recent-projects.json` and cached icons. |
 

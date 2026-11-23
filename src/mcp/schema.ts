@@ -91,11 +91,31 @@ export function inputSchema(
   for (const arg of command.args) {
     const optional = arg.endsWith('?');
     const key = optional ? arg.slice(0, -1) : arg;
-    const text = z.string().describe(ARG_HELP[key] ?? key);
+    const help = ARG_HELP[key];
+    const text = help ? z.string().describe(help) : z.string();
     shape[key] = optional ? text.optional() : text;
   }
   for (const [name, spec] of Object.entries(command.options)) {
     if (!omitted.includes(name)) shape[schemaKey(name)] = optionSchema(name, spec);
   }
-  return z.object(shape);
+  // Loose, not strict: a strict schema says additionalProperties:false in every tool, which every
+  // agent pays for in its context. A key the tool does not take is refused by the call instead
+  // (unknownParameters), never dropped silently.
+  return z.looseObject(shape);
+}
+
+// The keys a call gave that the tool does not take. An option keeps taking the name it had before
+// the hyphens became underscores (`all-projects`), so a client written for it still works.
+export function unknownParameters(
+  command: Pick<Command, 'args' | 'options'>,
+  omitted: readonly string[],
+  values: Record<string, unknown>,
+): string[] {
+  const known = new Set(['as', ...command.args.map((arg) => arg.replace(/\?$/, ''))]);
+  for (const name of Object.keys(command.options)) {
+    if (omitted.includes(name)) continue;
+    known.add(name);
+    known.add(schemaKey(name));
+  }
+  return Object.keys(values).filter((key) => !known.has(key));
 }
