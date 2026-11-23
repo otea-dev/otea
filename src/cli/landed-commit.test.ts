@@ -155,6 +155,29 @@ describe('the commit a board says it landed', () => {
       expect(landedCommitRefusal(dir, 'Commit pushed', after, 'main', approved)).toBeUndefined();
     });
 
+    // P1-F2: git commit --allow-empty gave the persona a new hash of main of its own: it passed
+    // every check, and the item went Done with no change landed.
+    it('refuses a commit that changes no files, though it is new, pushed and builds on the approved work', () => {
+      commit('a.txt');
+      const approved = { commit: git(dir, 'rev-parse', 'HEAD') };
+      git(dir, 'commit', '-q', '--allow-empty', '-m', 'nothing');
+      const empty = git(dir, 'rev-parse', '--short', 'HEAD');
+      git(dir, 'push', '-q', 'origin', 'main');
+      const said = landedCommitRefusal(dir, 'Commit pushed', empty, 'main', approved);
+      expect(said).toContain(`commit ${empty} changes no files`);
+      expect(said).toContain('--allow-empty');
+      expect(landedCommitRefusal(dir, 'Commit pushed', empty, 'main')).toContain(
+        'changes no files',
+      );
+      // One that changes a file is fine, and so is the empty one named beside it.
+      const real = commit('b.txt');
+      git(dir, 'push', '-q', 'origin', 'main');
+      expect(landedCommitRefusal(dir, 'Commit pushed', real, 'main', approved)).toBeUndefined();
+      expect(
+        landedCommitRefusal(dir, 'Commit pushed', `${real} after ${empty}`, 'main', approved),
+      ).toBeUndefined();
+    });
+
     // The remote has no main (deleted there) though this checkout still has the old origin/main
     // from its last fetch: that is no proof, the commit is not pushed.
     it('refuses when the remote has no base branch, whatever the stale ref says', () => {
@@ -290,14 +313,13 @@ describe('the commit a board says it landed', () => {
     execFileSync('git', ['init', '--quiet', '-b', 'main', '--object-format=sha256', sha256], {
       stdio: 'ignore',
     });
-    execFileSync(
-      'git',
-      ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--allow-empty', '-qm', 'x'],
-      {
-        cwd: sha256,
-        stdio: 'ignore',
-      },
-    );
+    // The id's format is under test, not an empty commit: it changes a file.
+    writeFileSync(join(sha256, 'x.txt'), 'x');
+    execFileSync('git', ['add', 'x.txt'], { cwd: sha256, stdio: 'ignore' });
+    execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'x'], {
+      cwd: sha256,
+      stdio: 'ignore',
+    });
     const full = execFileSync('git', ['rev-parse', 'HEAD'], {
       cwd: sha256,
       encoding: 'utf8',
