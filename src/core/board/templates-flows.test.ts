@@ -84,6 +84,7 @@ describe('the Implementación board', () => {
     expect(partNamed(tasks, 'Rama')?.guard).toEqual({
       push: [stepNamed(tasks, 'Hacer')?.id, land?.id],
       base: 'main',
+      commit: partNamed(tasks, 'Commit en main')?.id,
     });
     expect(handOf(tasks, 'Hacer', 'Rama')).toMatchObject({ req: 'always' });
     expect(handOf(tasks, 'Integrar', 'Commit en main')).toMatchObject({ req: 'always' });
@@ -220,6 +221,7 @@ describe('the Cambios template', () => {
     expect(partNamed(def, 'Rama')?.guard).toEqual({
       push: [stepNamed(def, 'Hacerlo')?.id, land?.id],
       base: 'main',
+      commit: partNamed(def, 'Commit en main')?.id,
     });
   });
 

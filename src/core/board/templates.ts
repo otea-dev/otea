@@ -49,7 +49,7 @@ export type TemplatePart = {
   optionKeys?: readonly string[];
   show?: string;
   initial?: string;
-  guard?: { push: readonly string[]; repo?: string; base?: string };
+  guard?: { push: readonly string[]; repo?: string; base?: string; commit?: string };
 };
 
 // A conditional requirement: the part (by key) and the value that makes it required, read as
@@ -529,6 +529,7 @@ function build(
         push: part.guard.push.map(ref),
         ...(part.guard.repo === undefined ? {} : { repo: ref(part.guard.repo) }),
         ...(part.guard.base === undefined ? {} : { base: part.guard.base }),
+        ...(part.guard.commit === undefined ? {} : { commit: ref(part.guard.commit) }),
       };
   }
   // A text with the board names filled and `@{key}` turned into `@[id]`.

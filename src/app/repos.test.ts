@@ -107,6 +107,32 @@ describe('repos', () => {
     expect(listRepos(project, ENV)).toEqual([]);
   });
 
+  // P10-F1, P3-F3: a remote added after the repo was registered by its first commit blocks its
+  // first push until the person says it is the same repo. The refusal says what happened and the
+  // one command; a repo named like its project must not read "repo knows repo".
+  it('explains, in a push after a remote was added, what happened and the one command', () => {
+    const same = repo('same');
+    commit(same);
+    listRepos(project, ENV);
+    git(same, 'remote', 'add', 'origin', 'https://github.com/acme/same');
+
+    const said = () => {
+      try {
+        repoNameAt(project, same, ENV);
+      } catch (error) {
+        return (error as Error).message;
+      }
+      return '';
+    };
+    const message = said();
+    expect(message).toContain('a remote was added after Otea first saw it');
+    expect(message).toContain(`run once in ${same}: otea repos add --name same`);
+    expect(message).toContain('then push again');
+    expect(message).not.toMatch(/knows .* only by/);
+    expect(() => addRepo(project, same, 'same', ENV)).not.toThrow();
+    expect(repoNameAt(project, same, ENV)).toBe('same');
+  });
+
   it('adds a repo under its folder name or a name given, renames it, and forgets it', () => {
     listRepos(project, ENV);
     const other = repo('other', 'https://github.com/acme/other');

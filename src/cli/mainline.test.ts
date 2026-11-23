@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { approveItem, liveBoardOf } from '../app/next.ts';
@@ -27,8 +28,8 @@ describe('the Code on main board', () => {
   };
   const pushMain = () => otea('check', '--gate', 'push', '--branch', 'main');
 
-  // An item of Código, its Rama main, being done in Hacerlo.
-  const doing = async (title: string) => {
+  // An item of Código, its Rama main, being done in Hacerlo (or in `step`).
+  const doing = async (title: string, step = 'Hacerlo') => {
     const created = await otea(
       'create',
       '--collection',
@@ -44,8 +45,8 @@ describe('the Code on main board', () => {
     const made: string = JSON.parse(created.out).id;
     const project = openProject(repo.dir);
     try {
-      const doit = liveBoardOf(project, 'Código')?.def.steps.find(({ name }) => name === 'Hacerlo');
-      if (!doit) throw new Error('no Hacerlo');
+      const doit = liveBoardOf(project, 'Código')?.def.steps.find(({ name }) => name === step);
+      if (!doit) throw new Error(`no ${step}`);
       updateItemState(
         project.db,
         made,
@@ -173,5 +174,78 @@ describe('the Code on main board', () => {
     expect((await otea('handoff', id, '--note', 'regar')).code).toBe(0);
     approve(id);
     expect(await pushMain()).toMatchObject({ code: 0 });
+  });
+
+  // P8-F1, P9-F5: the Subir step took «banana» as Commit subido, and the hash of a push the hook
+  // had refused, and the item went Done with nothing on the remote. It takes a commit of main,
+  // and where the repo has a remote, one that is on it.
+  it('closes Subir only with a commit of main, on the remote when the repo has one', async () => {
+    const landing = await doing('Regar', 'Subir');
+    expect((await otea('claim', landing)).code).toBe(0);
+    const put = (value: string) => otea('update', landing, '--field', `Commit subido=${value}`);
+    const handoff = () => otea('handoff', landing);
+
+    // No remote: main is where it ends, and a hash of it is the proof.
+    expect((await put('banana')).code).toBe(0);
+    const text = await handoff();
+    expect(text.code).not.toBe(0);
+    expect(text.err).toContain(`${landing} not handed off: Commit subido says "banana"`);
+    expect((await put('deadbeef')).code).toBe(0);
+    expect((await handoff()).err).toContain('no commit deadbeef in this checkout');
+
+    // With a remote, a commit of the local main that was never pushed is not landed.
+    const origin = mkdtempSync(join(tmpdir(), 'otea-origin-'));
+    execFileSync('git', ['init', '--quiet', '--bare', origin], { stdio: 'ignore' });
+    git('remote', 'add', 'origin', origin);
+    change('bot.py', 'print(5)\n');
+    const local = git('rev-parse', '--short', 'HEAD');
+    expect((await put(local)).code).toBe(0);
+    const unpushed = await handoff();
+    expect(unpushed.code).not.toBe(0);
+    expect(unpushed.err).toContain(`commit ${local} is in your local main but not on origin/main`);
+    expect(unpushed.err).toContain('git push origin main');
+
+    git('push', '-q', 'origin', 'main');
+    const closed = await handoff();
+    expect(closed.code, closed.err).toBe(0);
+    expect(closed.out).toContain(`${landing} is Done`);
+    rmSync(origin, { recursive: true, force: true, maxRetries: 10 });
+  });
+
+  // P1-F2: the board says to work on main with no branch, and the notice said to make a worktree
+  // of its own: three agents committing in one checkout broke the index and one handed off
+  // another's commit. The board takes one agent at a time on main, and the notice agrees.
+  it('takes one agent at a time on main, and tells the agent so instead of sending it to a worktree', async () => {
+    declareProfiles(repo.dir, 'lu', 'mo');
+    const mo = cliAt(repo.dir, { OTEA_AGENT: 'mo' });
+    const other = await doing('Riego doble');
+    expect((await mo('claim', id)).code).toBe(0);
+
+    const refused = await otea('claim', other);
+    expect(refused.code).not.toBe(0);
+    expect(refused.err).toContain(
+      `${other} not claimed: mo works on main with ${id} now, and ${other} waits for it: this board works straight on main, so one agent at a time`,
+    );
+
+    // Another agent holds work on some other board: the notice does not send this one to a worktree.
+    await mo('release', id);
+    const person = cliAt(repo.dir);
+    expect((await person('board', 'add', 'Tareas', '--template', 'todos')).code).toBe(0);
+    const todo = await otea(
+      'create',
+      '--collection',
+      'Tareas',
+      '--title',
+      'Regar',
+      '--field',
+      'Qué hace falta=regar',
+      '--json',
+    );
+    expect(todo.code, todo.err).toBe(0);
+    expect((await mo('claim', JSON.parse(todo.out).id)).code, todo.err).toBe(0);
+    const claimed = await otea('claim', id);
+    expect(claimed.code, claimed.err).toBe(0);
+    expect(claimed.out).toContain('no branch and no worktree');
+    expect(claimed.out).not.toContain('git worktree add');
   });
 });

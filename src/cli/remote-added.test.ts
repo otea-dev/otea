@@ -57,9 +57,13 @@ describe('a remote added after init', () => {
     const refused = await gate();
 
     expect(refused.code).toBe(19);
+    // P10-F1, P3-F3: what happened, and the one command, with no "repo knows repo" when the
+    // folder and the project share a name.
+    expect(refused.err).toContain('a remote was added after Otea first saw it');
     expect(refused.err).toContain(
-      `If this is ${name}, run in ${repo.dir}: otea repos add --name ${name}`,
+      `If it is, run once in ${repo.dir}: otea repos add --name ${name}, then push again`,
     );
+    expect(refused.err).not.toMatch(/knows .* only by its first commit/);
     expect(() => nameAt(repo.dir)).toThrow(UnknownRepo);
   });
 
