@@ -35,7 +35,7 @@ export const shell = {
   'shell.row.quietRan': 'quiet since {time} · its lease ran out',
   'shell.row.wait': 'waits for your answer ·',
   'shell.row.idle': 'listening · free since {time}',
-  'shell.row.connected': 'connected · not listening: not in otea wait',
+  'shell.row.connected': 'connected · not listening now: not waiting for new work',
   'shell.row.silent': 'no signal on',
   'shell.row.noProfile': 'takes no step until it declares model and effort',
   'shell.flag.noProfile': 'no profile',
@@ -57,8 +57,9 @@ export const shell = {
   'shell.performance': 'See performance',
   'shell.performanceLine': 'how many handoffs come back, per model',
   'shell.connectedRule':
-    'connected: its Otea MCP server is open, or it used Otea in the last two and a half minutes; a lease alone does not count. It listens only while otea wait runs',
-  'shell.selfDeclared': 'each agent declares its own profile: Otea keeps it, never checks it.',
+    'connected: it has Otea open, or it used Otea in the last two and a half minutes; holding an item is not enough. It listens only while it waits for new work',
+  'shell.selfDeclared':
+    'each agent says its own model and effort: Otea notes them, never checks them.',
 
   // Preferences: what belongs to this browser
   'prefs.title': 'Preferences',

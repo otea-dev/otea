@@ -37,7 +37,7 @@ export const shell = {
   'shell.row.quietRan': 'callado desde {time} · su reserva venció',
   'shell.row.wait': 'espera tu respuesta ·',
   'shell.row.idle': 'escuchando · libre desde {time}',
-  'shell.row.connected': 'conectado · no escucha: no está en otea wait',
+  'shell.row.connected': 'conectado · no escucha ahora: no espera trabajo nuevo',
   'shell.row.silent': 'sin señal en',
   'shell.row.noProfile': 'no toma pasos hasta declarar modelo y esfuerzo',
   'shell.flag.noProfile': 'sin perfil',
@@ -59,8 +59,9 @@ export const shell = {
   'shell.performance': 'Ver rendimiento',
   'shell.performanceLine': 'cuántas entregas vuelven, por modelo',
   'shell.connectedRule':
-    'conectado: su servidor MCP de Otea está abierto o usó Otea en los últimos dos minutos y medio; una reserva sola no cuenta. Escucha solo mientras otea wait corre',
-  'shell.selfDeclared': 'el perfil lo declara cada agente: Otea lo guarda, no lo comprueba.',
+    'conectado: tiene Otea abierto o lo usó en los últimos dos minutos y medio; tener un ítem en mano no basta. Escucha solo mientras espera trabajo nuevo',
+  'shell.selfDeclared':
+    'cada agente dice su modelo y su esfuerzo: Otea los anota, no los comprueba.',
 
   // Preferencias: lo que es de este navegador
   'prefs.title': 'Preferencias',

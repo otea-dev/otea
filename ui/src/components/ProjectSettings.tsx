@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import {
   addProjectPath,
   fetchProjectSettings,
@@ -13,6 +13,7 @@ import { Button, Icon } from '../kit/index.ts';
 import { sizeLabel } from '../projects.ts';
 import type { RepoSettings, ProjectSettings as Settings } from '../types.ts';
 import { TopicsSetting } from '../views/topics/TopicsSetting.tsx';
+import { TechDetails } from './AgentPrompt.tsx';
 import { CopyGlyph } from './CopyCommand.tsx';
 import { PageSection as Section } from './PageSection.tsx';
 import { PhoneTransport } from './PhoneTransport.tsx';
@@ -63,7 +64,7 @@ export function Repos({ repos }: { repos: RepoSettings[] }) {
         <span className="pj-repo-items">{t('settings.items')}</span>
       </div>
       {repos.map((repo) => (
-        <div key={repo.folder} className="pj-repo">
+        <div key={`${repo.folder}:${repo.name}`} className="pj-repo">
           <span className="pj-repo-name">
             <TypeIcon name="git-branch" size={14} />
             <span>{repo.name}</span>
@@ -210,23 +211,8 @@ function PathCard({ path, settings, canWrite, last, onChanged }: PathCardProps) 
           </div>
         </div>
       ) : path.missing ? (
-        <>
-          <p className="pj-missing-text">{t('settings.missingText')}</p>
-          <div className="pj-repo pj-repo-dim">
-            <span className="pj-repo-name">
-              <TypeIcon name="git-branch" size={14} />
-              <span>{path.path.split(/[\\/]/).pop()}</span>
-            </span>
-            <span />
-            <span className="t-cap">{t('settings.notChecked')}</span>
-            <span />
-          </div>
-        </>
-      ) : path.repos.length > 0 ? (
-        <Repos repos={path.repos} />
-      ) : (
-        <p className="pj-missing-text">{t('settings.noRepos')}</p>
-      )}
+        <p className="pj-missing-text">{t('settings.missingText')}</p>
+      ) : null}
     </div>
   );
 }
@@ -239,7 +225,6 @@ function AddPath({ settings, onChanged }: { settings: Settings; onChanged: () =>
     setPath('');
     onChanged();
   });
-  const command = <code className="pj-code">{`otea projects add . --to ${settings.name}`}</code>;
   if (!open) {
     return (
       <div className="pj-add">
@@ -247,7 +232,6 @@ function AddPath({ settings, onChanged }: { settings: Settings; onChanged: () =>
           <Icon name="plus" />
           {t('settings.add')}
         </Button>
-        <span className="t-cap">{tx('settings.orInside', { command })}</span>
       </div>
     );
   }
@@ -279,7 +263,6 @@ function AddPath({ settings, onChanged }: { settings: Settings; onChanged: () =>
         <Button variant="quiet" onClick={() => setOpen(false)}>
           {t('common.cancel')}
         </Button>
-        <span className="t-cap">{tx('settings.orInside', { command })}</span>
       </div>
     </form>
   );
@@ -312,6 +295,12 @@ function Storage({ settings }: { settings: Settings }) {
   const { database, evidence } = settings;
   return (
     <dl className="pj-storage">
+      <dt>{t('settings.storage')}</dt>
+      <dd>
+        <span className="t-small">
+          {settings.storage === 'common' ? t('settings.storageCommon') : t('settings.storageLocal')}
+        </span>
+      </dd>
       <dt>{t('settings.database')}</dt>
       <dd>
         <span className="pj-mono">{database.path}</span>
@@ -402,8 +391,6 @@ export function ProjectSettings({ version, connection, canWrite }: ProjectSettin
     );
   }
   const value = settings.value;
-  const repos = value.paths.reduce((sum, path) => sum + path.repos.length, 0);
-  const pathsSub = `${t('settings.pathCount', { count: value.paths.length })} · ${t('settings.repoCount', { count: repos })}`;
   return (
     <div className="page pj-settings">
       <header className="head" data-enter="head">
@@ -414,73 +401,155 @@ export function ProjectSettings({ version, connection, canWrite }: ProjectSettin
         <p className="dek">{t('settings.dek', { name: value.name })}</p>
       </header>
       {signIn}
-      <div className="pj-body" data-enter="fade">
-        <Section name={t('settings.name')}>
-          <div className="pj-name">
-            <span className="pj-name-icon">
-              {value.paths[0]?.kind === 'folder' ? (
-                <FolderGlyph />
-              ) : (
-                <TypeIcon name="git-branch" size={16} />
-              )}
-            </span>
-            <span className="pj-name-value">{value.name}</span>
-          </div>
-          <p className="pj-hint">
-            {tx('settings.nameHint', {
-              join: <code className="pj-code">--join</code>,
-              to: <code className="pj-code">--to</code>,
-              id: <code className="pj-code">{value.id}</code>,
-            })}
-          </p>
-        </Section>
-        <Section name={t('settings.paths')} sub={pathsSub}>
-          <div className="pj-paths">
-            {value.paths.map((path) => (
-              <PathCard
-                key={path.path}
-                path={path}
-                settings={value}
-                canWrite={canWrite}
-                last={value.paths.length === 1}
-                onChanged={changed}
-              />
-            ))}
-            {value.registered ? (
-              canWrite ? (
-                <AddPath settings={value} onChanged={changed} />
-              ) : null
-            ) : (
-              <p className="pj-hint">
-                {tx('settings.localOne', {
-                  command: <code className="pj-code">otea migrate --to common</code>,
-                })}
-              </p>
-            )}
-          </div>
-        </Section>
-        <Section
-          name={t('phone.transport.section')}
-          sub={t('phone.transport.sub')}
-          id={settingsSectionId('phone')}
-        >
+      <SettingsBody
+        value={value}
+        canWrite={canWrite}
+        onChanged={changed}
+        onPreferences={() => app.go({ view: 'preferences' })}
+        you={<TopicsSetting canWrite={canWrite} />}
+        phone={
           <PhoneTransport
             canWrite={canWrite}
             onPair={() => app.go({ view: 'lan', over: 'settings' })}
           />
-        </Section>
-        <Section name={t('topics.settings.label')} id={settingsSectionId('topics')}>
-          <TopicsSetting canWrite={canWrite} />
-        </Section>
-        <Section
-          name={t('settings.storage')}
-          sub={
-            value.storage === 'common' ? t('settings.storageCommon') : t('settings.storageLocal')
-          }
-        >
-          <Storage settings={value} />
-        </Section>
-      </div>
+        }
+      />
+    </div>
+  );
+}
+
+// The sections of Configuración, in the order a person looks for them: what is theirs (Tú), the
+// project (name and folders), the phone, and the technical rest behind «Avanzado». `you` and
+// `phone` are the live panels that read the server themselves.
+export function SettingsBody({
+  value,
+  canWrite,
+  onChanged,
+  onPreferences,
+  you,
+  phone,
+}: {
+  value: Settings;
+  canWrite: boolean;
+  onChanged: () => void;
+  onPreferences: () => void;
+  you: ReactNode;
+  phone: ReactNode;
+}) {
+  const repos = value.paths.flatMap((path) => path.repos);
+  return (
+    <div className="pj-body" data-enter="fade">
+      <Section
+        name={t('settings.sec.you')}
+        sub={t('settings.sec.youSub')}
+        id={settingsSectionId('topics')}
+      >
+        <div className="pj-you">
+          <h3 className="pj-subhead">{t('topics.settings.label')}</h3>
+          {you}
+          <p className="pj-hint">
+            {t('settings.prefsText')}{' '}
+            <Button size="sm" variant="quiet" onClick={onPreferences}>
+              {t('settings.prefsGo')}
+            </Button>
+          </p>
+        </div>
+      </Section>
+      <Section
+        name={t('settings.sec.project')}
+        sub={t('settings.pathCount', { count: value.paths.length })}
+      >
+        <div className="pj-name">
+          <span className="pj-name-icon">
+            {value.paths[0]?.kind === 'folder' ? (
+              <FolderGlyph />
+            ) : (
+              <TypeIcon name="git-branch" size={16} />
+            )}
+          </span>
+          <span className="pj-name-value">{value.name}</span>
+        </div>
+        <p className="pj-hint">{t('settings.nameText')}</p>
+        <h3 className="pj-subhead">{t('settings.folders')}</h3>
+        <div className="pj-paths">
+          {value.paths.map((path) => (
+            <PathCard
+              key={path.path}
+              path={path}
+              settings={value}
+              canWrite={canWrite}
+              last={value.paths.length === 1}
+              onChanged={onChanged}
+            />
+          ))}
+          {value.registered ? (
+            canWrite ? (
+              <AddPath settings={value} onChanged={onChanged} />
+            ) : null
+          ) : (
+            <p className="pj-hint">{t('settings.localOneText')}</p>
+          )}
+        </div>
+      </Section>
+      <Section
+        name={t('phone.transport.section')}
+        sub={t('phone.transport.sub')}
+        id={settingsSectionId('phone')}
+      >
+        {phone}
+      </Section>
+      <Section name={t('settings.sec.advanced')} sub={t('settings.sec.advancedSub')}>
+        <TechDetails>
+          <Advanced settings={value} repos={repos} canWrite={canWrite} />
+        </TechDetails>
+      </Section>
+    </div>
+  );
+}
+
+// What «Detalles técnicos» holds: the names the terminal takes, the repos and how strictly pushes
+// are checked, the commands that do from a repo what the page does, and where the data lives.
+function Advanced({
+  settings,
+  repos,
+  canWrite,
+}: {
+  settings: Settings;
+  repos: RepoSettings[];
+  canWrite: boolean;
+}) {
+  const code = (text: string) => <code className="pj-code">{text}</code>;
+  return (
+    <div className="pj-adv">
+      <p className="pj-hint">
+        {tx('settings.nameHint', {
+          join: code('--join'),
+          to: code('--to'),
+          id: code(settings.id),
+        })}
+      </p>
+      {settings.registered ? (
+        canWrite ? (
+          <p className="pj-hint">
+            {tx('settings.orInside', {
+              command: code(`otea projects add . --to ${settings.name}`),
+            })}
+          </p>
+        ) : null
+      ) : (
+        <p className="pj-hint">
+          {tx('settings.localOne', { command: code('otea migrate --to common') })}
+        </p>
+      )}
+      <h3 className="pj-subhead">
+        {t('settings.repos')} · {t('settings.repoCount', { count: repos.length })}
+      </h3>
+      {repos.length > 0 ? (
+        <Repos repos={repos} />
+      ) : (
+        <p className="pj-hint">{t('settings.noRepos')}</p>
+      )}
+      <Storage settings={settings} />
     </div>
   );
 }

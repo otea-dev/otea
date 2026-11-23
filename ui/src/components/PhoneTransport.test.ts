@@ -113,7 +113,8 @@ describe('Configuración · Teléfono: how you reach Otea', () => {
     expect(html).toContain('Only on this computer');
     expect(html).toContain('From your phone, at home');
     expect(html).toContain('From anywhere, with Tailscale');
-    expect(html).toContain('no HTTPS on the local network');
+    expect(html).toContain('the local network is not a secure connection');
+    expect(html).not.toContain('tailnet');
   });
 
   it('marks Tailscale in use when it carries the phone', () => {
