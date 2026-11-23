@@ -27,6 +27,7 @@ const LIVE_ONLY = [
   '/api/lan',
   '/api/phone',
   '/api/notify',
+  '/api/version',
 ];
 
 export function swRoute(

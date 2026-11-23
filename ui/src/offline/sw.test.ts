@@ -76,6 +76,8 @@ describe('swRoute', () => {
     '/api/lan',
     '/api/phone',
     '/api/notify',
+    // Which Otea the server runs: a kept answer would call a page stale when the PC is only off.
+    '/api/version',
   ])('leaves %s to the network', (path) => {
     expect(route(path)).toBe('network');
     // An evidence file opened in a tab is a page load, yet never the app.
