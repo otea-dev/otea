@@ -105,3 +105,39 @@ describe('a later step’s field in review', () => {
     expect((await otea('update', 'CAM-1', '--field', 'Impacto=alta')).code).toBe(0);
   });
 });
+
+// A yes-or-no field reads back in the board's language too (sí, not yes), and takes either.
+describe('a yes-or-no value in the board language', () => {
+  let repo: TempRepo;
+  let otea: Cli;
+
+  beforeEach(async () => {
+    repo = tempGitRepo();
+    const person = cliAt(repo.dir);
+    otea = cliAt(repo.dir, { OTEA_AGENT: 'claude' });
+    await person('init', '--local');
+    await person('board', 'add', 'Pendientes', '--template', 'todos');
+    await otea('profile', '--model', 'unknown', '--effort', 'unknown', '--harness', 'test');
+  }, 60_000);
+
+  afterEach(() => repo.remove());
+
+  it.each(['yes', 'sí', 'si'])('reads %s back as sí', async (given) => {
+    const made = await otea(
+      'create',
+      '--collection',
+      'Pendientes',
+      '--title',
+      'A',
+      '--field',
+      'Qué hace falta=x',
+      '--field',
+      `Lo hago yo=${given}`,
+    );
+    expect(made.code).toBe(0);
+
+    const shown = (await otea('show', 'PEN-1')).out;
+    expect(shown).toContain('Lo hago yo: sí');
+    expect(shown).not.toContain('Lo hago yo: yes');
+  });
+});
