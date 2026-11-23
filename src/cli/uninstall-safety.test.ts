@@ -655,7 +655,7 @@ describe('uninstall writes nothing it was not asked to', () => {
     const result = await interrupted('uninstall', '--only', 'machine', '--purge-data');
 
     expect(result.code).toBe(130);
-    expect(result.err).toContain('Nothing was deleted');
+    expect(result.err).toContain('nothing was deleted');
     expect(existsSync(home)).toBe(true);
   });
 });

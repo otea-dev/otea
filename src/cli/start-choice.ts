@@ -50,10 +50,13 @@ export function choiceFrom(answer: string | undefined, fallback: Pick): string {
   return said;
 }
 
-// Ctrl+C at the question: the command stops before it makes anything.
-export function cancelled(error: unknown): CommandFailure | undefined {
+// Ctrl+C at a question: the command stops before it changes anything, and says so.
+export function cancelled(
+  error: unknown,
+  message = 'Cancelled: nothing was made',
+): CommandFailure | undefined {
   return error instanceof Error && error.name === 'AbortError'
-    ? new CommandFailure('interrupted', 'Cancelled: nothing was made')
+    ? new CommandFailure('interrupted', message)
     : undefined;
 }
 
