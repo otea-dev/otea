@@ -46,6 +46,23 @@ describe('the commit a board says it landed', () => {
       const aside = commit('b.txt');
       expect(refusal(aside)).toMatch(new RegExp(`commit ${aside} is not in main`));
     });
+
+    // A config of the person's that hides submodule changes (diff.ignoreSubmodules) made a commit
+    // that only moves a submodule look empty: what is asked of git must not depend on it.
+    it('takes a commit that only moves a submodule, whatever the diff config says', () => {
+      commit('a.txt');
+      git(dir, 'config', 'diff.ignoreSubmodules', 'all');
+      git(
+        dir,
+        'update-index',
+        '--add',
+        '--cacheinfo',
+        `160000,${git(dir, 'rev-parse', 'HEAD')},vendor/lib`,
+      );
+      git(dir, 'commit', '-q', '-m', 'bump the submodule');
+      const bumped = git(dir, 'rev-parse', '--short', 'HEAD');
+      expect(refusal(bumped)).toBeUndefined();
+    });
   });
 
   describe('in a repo with a remote', () => {
@@ -208,6 +225,22 @@ describe('the commit a board says it landed', () => {
       // With nobody holding it it is fine, and so is another commit of main.
       expect(ask(first, { landed: [] })).toBeUndefined();
       expect(ask(commit('b.txt'), { landed })).toBeUndefined();
+    });
+
+    // An empty commit of its own is no work: beside the real commit another item landed, it must
+    // not stand for the item's own commit (round-7 review of P1-F2).
+    it('does not take an empty commit beside a commit another item landed', () => {
+      git(dir, 'commit', '-q', '--allow-empty', '-m', 'nothing');
+      const empty = git(dir, 'rev-parse', '--short', 'HEAD');
+      const theirs = commit('a.txt');
+      const landed = [{ id: 'MN-3', value: theirs }];
+      expect(ask(`${empty} ${theirs}`, { landed })).toContain(
+        `commit ${theirs} is already the commit MN-3 landed with`,
+      );
+      expect(ask(`${theirs} ${empty}`, { landed })).toContain('is already the commit MN-3');
+      // With its own real commit named too, the empty one is only context.
+      const mine = commit('b.txt');
+      expect(ask(`${empty} ${mine}`, { landed })).toBeUndefined();
     });
 
     // The base as it stood when the item was first claimed holds nothing of the item's work.
