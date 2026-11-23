@@ -2,6 +2,7 @@ import type { Channel } from '../core/authority.ts';
 import { OteaError } from '../core/errors.ts';
 import type { Actor } from '../core/item.ts';
 import type { RefusalDetails } from '../core/refusal.ts';
+import type { Surface } from '../core/surface.ts';
 import { transaction } from '../store/database.ts';
 import { appendEvent, selectEvents, updateItemState } from '../store/queries.ts';
 import { typeOfItem } from './collections.ts';
@@ -24,7 +25,14 @@ export const UNDO_WINDOW_MS = 30_000;
 
 type Why = Extract<RefusalDetails, { kind: 'undo' }>['why'];
 
-export type UndoMoveInput = { id: string; from: string; actor: Actor; channel: Channel };
+export type UndoMoveInput = {
+  id: string;
+  from: string;
+  actor: Actor;
+  channel: Channel;
+  // Where the person's request came from (core/surface.ts).
+  surface?: Surface;
+};
 
 export function undoMove(ctx: Context, input: UndoMoveInput, now: Clock = systemClock): Item {
   const { db } = ctx;
@@ -62,6 +70,7 @@ export function undoMove(ctx: Context, input: UndoMoveInput, now: Clock = system
         ...stateNames(workflow, { from: item.state, to: input.from }),
         undoes: last.id,
         channel: input.channel,
+        ...(input.surface === undefined ? {} : { surface: input.surface }),
       },
     });
     return present({ ...item, state: input.from, updatedAt: at }, workflow, at);

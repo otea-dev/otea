@@ -9,10 +9,18 @@ import {
   MAX_EVIDENCE_BYTES,
   MAX_EVIDENCE_MB,
 } from '../core/evidence.ts';
+import { SURFACE_HEADER, type Surface } from '../core/surface.ts';
 import { RejectedRequest } from './errors.ts';
 import { clientOf, type Session } from './session.ts';
 
 export const HUMAN_IN_UI: Performer = { actor: { kind: 'human', name: 'human' }, channel: 'ui' };
+
+// Where a request of the person's came from (core/surface.ts): the phone's page, the desk's page,
+// or a direct call with the person's session, which carries no page header.
+export function surfaceOf(c: Context): Surface {
+  if (c.req.header(SURFACE_HEADER) === undefined) return 'api';
+  return clientOf(c).kind === 'device' ? 'phone' : 'desk';
+}
 
 // `choice`: on a board item that carries options, the one the person picks with this approval.
 const MoveBody = z.object({

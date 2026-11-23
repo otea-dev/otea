@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addCollection } from '../app/collections.ts';
 import { listDevices } from '../app/devices.ts';
-import { createItem } from '../app/items.ts';
+import { createItem, getItem } from '../app/items.ts';
 import { choosePhoneTransport, phoneSettings } from '../app/phone.ts';
 import type { Project } from '../app/project.ts';
 import { type FakeTailscale, fakeTailscale, TAILNET_HOST } from '../app/tailscale-testing.ts';
+import { SURFACE_HEADER } from '../core/surface.ts';
 import { formatCode } from './lan.ts';
 import type { PairingView } from './pairing.ts';
 import { createServer, type OteaServer } from './server.ts';
@@ -24,6 +25,7 @@ type Call = {
   forwardedFor?: string;
   cookie?: string | undefined;
   origin?: string;
+  headers?: Record<string, string>;
 };
 
 describe('phone transports on the server', () => {
@@ -44,7 +46,7 @@ describe('phone transports on the server', () => {
       cookie,
       origin,
     } = call;
-    const headers: Record<string, string> = { host };
+    const headers: Record<string, string> = { host, ...call.headers };
     if (forwardedFor !== '') headers['x-forwarded-for'] = forwardedFor;
     if (cookie !== undefined) headers.cookie = cookie;
     if (body !== undefined) {
@@ -152,6 +154,21 @@ describe('phone transports on the server', () => {
         cookie,
       });
       expect(choose.status).toBe(403);
+    });
+
+    // P1-S1: the record of a move says it came from the phone, not the desk, when the paired phone's
+    // page made it; its own call with no page header is a direct one.
+    it('records a move of the paired phone as made from the phone', async () => {
+      const { cookie } = await pairOverTailscale();
+      const move = (headers: Record<string, string>) =>
+        viaTailscale('/p/memory-aaaaaa/api/items/TASKS-1/move', {
+          method: 'POST',
+          body: { to: 'discarded', reason: 'not needed' },
+          cookie,
+          headers,
+        });
+      expect((await move({ [SURFACE_HEADER]: '1' })).status).toBe(200);
+      expect(getItem(project, 'TASKS-1').events.at(-1)?.data.surface).toBe('phone');
     });
 
     it('never takes what tailscale serve forwards for this computer’s own browser', async () => {
