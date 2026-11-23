@@ -8,6 +8,7 @@ What Otea keeps on your computer, what it listens on, what it sends out, what it
 - That server listens on `127.0.0.1` only, unless you open the local network for a phone. Even on `127.0.0.1` it answers only a browser that signed in with the key in `ui-token`, or a paired device.
 - Otea has no account, no cloud service and no telemetry. The few things that leave the computer are listed in [What leaves the machine](#what-leaves-the-machine).
 - Otea writes into a repository only when you ask it to: [What Otea writes in your repositories](#what-otea-writes-in-your-repositories).
+- Otea's rules (who reviews, what only you approve on the desk, what lands on main) hold against an agent's mistakes and overreach through `otea` and its MCP server. They do not stop an agent that sets out to act as you: one that runs as your user account with a shell can read the Otea home, sign a browser in with a sign-in link Otea prints under `--no-open`, or edit the database directly. Keep those links to yourself. If you need a hard boundary, run the agent in a sandbox or under another account without access to the Otea home.
 
 ## Where data lives
 
