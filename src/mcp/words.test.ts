@@ -51,6 +51,41 @@ describe('mcpWords', () => {
     );
   });
 
+  // P8-F1: the agent runs git's commands as they are; only Otea's own options become arguments.
+  it('never rewrites the flags of another tool', () => {
+    for (const text of [
+      'push Branch first (git push --force-with-lease origin <branch>), then main',
+      'Write the short hash (git rev-parse --short main).',
+      'push it yourself this once with git push --force-with-lease --no-verify, which skips the check',
+      'open one and merge it with gh pr merge --squash --delete-branch',
+    ])
+      expect(words(text)).toBe(text);
+    // Beside an Otea command, the Otea flag still reads as its argument.
+    expect(words('push it (git push --force-with-lease origin x), then otea next --claim.')).toBe(
+      'push it (git push --force-with-lease origin x), then next { claim: true }.',
+    );
+  });
+
+  // P8-F3: a repeated option is one array argument, as the tool's schema asks.
+  it('names a repeated option as an array, one value or several', () => {
+    expect(words('Fill it with otea update CAM-1 --field "Branch=<branch>".')).toBe(
+      'Fill it with update { id: "CAM-1", field: ["Branch=<branch>"] }.',
+    );
+    expect(words('otea update CAM-1 --field "Effort=Small" --field "Impact=low"')).toBe(
+      'update { id: "CAM-1", field: ["Effort=Small", "Impact=low"] }',
+    );
+    expect(words('set it with --field "Effort=Small"')).toBe(
+      'set it with { field: ["Effort=Small"] }',
+    );
+  });
+
+  // P8-F2: a JSON text is data to hand back as it is, never prose to rewrite.
+  it('leaves a JSON text as it is', () => {
+    const json = JSON.stringify({ step: 'run otea handoff <id> --way "Do it" --reason "why"' });
+    expect(words(json)).toBe(json);
+    expect(words(`${json}\n`)).toBe(`${json}\n`);
+  });
+
   it('leaves a command the server does not serve as the person would run it', () => {
     expect(words('Ask the person to run otea init --agents-md.')).toBe(
       'Ask the person to run otea init --agents-md.',
