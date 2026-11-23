@@ -4,7 +4,7 @@ import { openNewBoard } from '../board-studio/home/studio-dialogs.ts';
 import { t } from '../i18n/i18n.ts';
 import { Button } from '../kit/Button.tsx';
 import { Icon, type IconName } from '../kit/Icon.tsx';
-import { dismissNextStep, hasFinishedItem, nextStepDismissed } from '../next-step.ts';
+import { dismissNextStep, firstFinishedRecently, nextStepDismissed } from '../next-step.ts';
 
 type Move = { key: 'pair' | 'board' | 'agent'; icon: IconName; run: () => void };
 
@@ -16,7 +16,7 @@ export function NextStep() {
   const project = app.project?.id;
   const [gone, setGone] = useState(() => project === undefined || nextStepDismissed(project));
   const [leaving, setLeaving] = useState(false);
-  if (gone || !hasFinishedItem(app.all)) return null;
+  if (gone || !firstFinishedRecently(app.all, app.now)) return null;
 
   const put = () => {
     if (project !== undefined) dismissNextStep(project);

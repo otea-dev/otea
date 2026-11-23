@@ -3,7 +3,7 @@ import { isListedKey, type Lang } from '../core/board/templates.ts';
 import { OteaError } from '../core/errors.ts';
 import { promptFacts, promptKindOf } from './agent-prompts.ts';
 import { listBoardSummaries } from './boards.ts';
-import { hasOwnBoards, type InitBoard, initBoards, NO_BOARDS } from './init-boards.ts';
+import { type InitBoard, initBoards, NO_BOARDS } from './init-boards.ts';
 import {
   initProject,
   openProject,
@@ -37,32 +37,39 @@ export type StartOptions = {
   // A template key (or `none`), as init --template takes it.
   template?: string | undefined;
   lang: Lang;
-  // Asked once, only when nothing was named and the project has no board of its own yet: the key
-  // the person picks, or nothing to leave the boards to the agent.
+  // Asked once, only when nothing was named and the project is new: the key the person picks, or
+  // nothing to leave the boards to the agent. A project that exists is never asked again, so a
+  // second run does not nag the person who left the boards to their agent.
   choose?: () => Promise<string | undefined>;
 };
 
+// A typo fails before anything is made.
+function assertTemplate(key: string | undefined): void {
+  if (key !== undefined && key !== NO_BOARDS && !isListedKey(key)) {
+    throw new OteaError('not_found', `There is no template ${key}`);
+  }
+}
+
 export async function startProject(cwd: string, options: StartOptions): Promise<StartReport> {
   const { template, lang } = options;
-  // A typo fails before anything is made.
-  if (template !== undefined && template !== NO_BOARDS && !isListedKey(template)) {
-    throw new OteaError('not_found', `There is no template ${template}`);
-  }
-  let created = false;
-  let project: Project;
+  assertTemplate(template);
+  let project: Project | undefined;
   try {
     project = openProject(cwd);
   } catch (error) {
     if (!(error instanceof OteaError) || error.details?.kind !== 'no_project') throw error;
+  }
+  const created = project === undefined;
+  let picked = template;
+  if (project === undefined) {
+    // What the person types is checked before the project is made, so a typo leaves nothing behind.
+    if (picked === undefined) picked = (await options.choose?.()) || undefined;
+    assertTemplate(picked);
     project = initProject(cwd);
-    created = true;
   }
   try {
     if (created) listRepos(project);
-    let picked = template;
-    if (picked === undefined && !hasOwnBoards(project)) picked = await options.choose?.();
-    const picks = picked === undefined || picked === '' ? undefined : picked;
-    const made = initBoards(project, picks, lang);
+    const made = initBoards(project, picked, lang);
     const moment = promptKindOf(project);
     const { root, dataDir, storage } = project;
     return {

@@ -205,9 +205,11 @@ Then [give your agent the text](#give-your-agent-the-text).
    Boards: none yet; your agent designs them with you (otea start --template <key> starts from a template instead)
    Desk: running in the background at http://127.0.0.1:4400/p/tienda-web-yafrhx/ (pid 4120; stop it with otea serve stop)
 
-   Next: paste this into your agent's chat (otea prompt prints it again):
+   Next, paste this into your agent's chat (otea prompt prints it again):
      Set up Otea in this project and design with me how we will work. ...
    ```
+
+   With `--no-open` the sign-in link comes in a block of its own above the agent's text: it is yours alone, so it never travels with what you paste. It asks about a first board only when it makes the project, and only at a terminal.
 
    Run it again any time: it looks before it acts, changes nothing that exists and says what was already there. It is for you: an agent never runs it (it connects with `otea connect` and never starts the desk). It writes nothing into the repo, and the project starts with no boards unless you pick one (your agent's `otea connect` adds one block to `AGENTS.md`: see [What Otea writes in your repo](#what-otea-writes-in-your-repo)).
 

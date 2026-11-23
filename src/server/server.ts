@@ -530,13 +530,16 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         const lang =
           asked === 'es' || asked === 'en' ? asked : resolveLang(storedLanguage(machine), env);
         const moment = kind ?? promptKindOf(project);
-        // The boards are named in the language the prompt is written in (their snapshot's words).
-        const facts = inLanguage(lang, () => promptFacts(project, moment));
+        // The pasted prompt names each board and step as the agent reads them (`otea next`, `otea
+        // board`: each in the language it was made in), whatever the desk's language; the list
+        // beside it is for the person, in the desk's.
+        const facts = inLanguage(undefined, () => promptFacts(project, moment));
+        const shown = inLanguage(lang, () => promptFacts(project, moment));
         const first = 'first' in facts && facts.first === true ? { first: true } : {};
         return c.json({
           kind: moment,
           prompt: agentPrompt(moment, lang, facts),
-          ...connectFacts(moment, facts),
+          ...connectFacts(shown),
           ...first,
         });
       })

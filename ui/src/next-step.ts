@@ -30,7 +30,16 @@ export function dismissNextStep(project: string): void {
   }
 }
 
-// The first item to reach the last step of its board (a closed state that closes it as done).
-export function hasFinishedItem(items: readonly Item[]): boolean {
-  return items.some((item) => item.closes === 'done');
+const WEEK_MS = 7 * 24 * 3_600_000;
+
+// The card is for the project's first finished item, soon after it: the earliest item that
+// reached the last step of its board (a closed state that closes it as done) did so within the
+// last week. A project that finished its first item long ago (every project, on the release that
+// brought this card) never gets it, and a second finished item is not a first.
+export function firstFinishedRecently(items: readonly Item[], now: number): boolean {
+  const done = items
+    .filter((item) => item.closes === 'done')
+    .map((item) => Date.parse(item.enteredAt ?? item.updatedAt))
+    .filter((at) => !Number.isNaN(at));
+  return done.length > 0 && Math.min(...done) >= now - WEEK_MS;
 }

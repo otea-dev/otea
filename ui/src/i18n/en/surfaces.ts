@@ -268,7 +268,7 @@ export const surfaces = {
   'connect.ledeJoin':
     'To add one more agent, paste this into its chat. It will work alongside the others, without taking what they already have in hand.',
   'connect.whereCode':
-    'Each agent works on its own copy of your code, so it never steps on yours or on another’s.',
+    'Each agent works on its own copy of the project, so it never steps on yours or on another’s.',
   'connect.whereFiles':
     'Each agent works on the files in this folder, leaving alone the ones another is changing.',
   'connect.boards': 'It will do these steps:',

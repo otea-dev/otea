@@ -3178,7 +3178,18 @@ const start: Command = {
       warn,
     });
     const { url, signInUrl } = pages(state.url, state.token, here);
-    const signIn = await signInLines(input, signInUrl);
+    // Opening a browser prints nothing. With --no-open the link is yours alone, in a block of its
+    // own above the text for the agent, so the two are never copied together: it holds this
+    // computer's Otea key.
+    const noOpen = input.flag('no-open');
+    if (!noOpen) await signInLines(input, signInUrl);
+    const signIn = noOpen
+      ? [
+          '',
+          "Sign-in link, for you only (it holds this computer's Otea key: never paste it to your agent):",
+          `  ${signInUrl}`,
+        ]
+      : [];
     const { entry } = mcpEntryFor(input, report.project.id);
     const mcp = { name: MCP_SERVER, ...entry };
     const { project, created, boards, prompt } = report;
@@ -3206,7 +3217,7 @@ const start: Command = {
       deskLine,
       ...signIn,
       '',
-      "Next: paste this into your agent's chat (otea prompt prints it again):",
+      "Next, paste this into your agent's chat (otea prompt prints it again):",
       ...prompt.split('\n').map((line) => `  ${line}`),
       '',
       `Your agent adds Otea's MCP server to its own config when it connects (the text above tells it; otea connect prints the details): ${JSON.stringify({ [MCP_SERVER]: entry })}`,

@@ -1,15 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { en } from '../i18n/en.ts';
 import { es } from '../i18n/es.ts';
-import { ledeKey, PLAIN_CONNECT_KEYS, whereKey } from './connect-words.ts';
+import { ledeKey, whereKey } from './connect-words.ts';
 
 // P4 (a person who does not program) found «Conectar un agente» full of worktree, MCP and harness.
-// What a person reads there is the plain register: its keys name no tool, command or file an agent
-// works with, in either language. What the agent needs is reachable behind «Detalles técnicos».
+// What a person reads there is the plain register: every message under connect.* and next.* (and
+// the first-contact words of the empty project and of Te toca), but connect.tech.*, which is the
+// agent's. The set is read from the catalogs by prefix, so a key added later is held to it too.
 const JARGON =
-  /\b(mcp|harness|worktree|agents\.md|cli|terminal|branch|rama|commit|repositorio|repository|prompt)\b|--|`/i;
+  /\b(mcp|harness|worktree|agents\.md|cli|api|git|checkout|lease|terminal|branch|rama|commit|repositorio|repository|prompt)\b|--|`/i;
+
+const PLAIN_PREFIXES = ['connect.', 'next.', 'emptyProject.', 'toca.noAgents.'];
+const TECH_PREFIX = 'connect.tech.';
 
 const said = (catalog: Record<string, unknown>, key: string) => JSON.stringify(catalog[key]);
+const plainKeys = (catalog: Record<string, unknown>) =>
+  Object.keys(catalog).filter(
+    (key) =>
+      PLAIN_PREFIXES.some((prefix) => key.startsWith(prefix)) && !key.startsWith(TECH_PREFIX),
+  );
 
 describe('the plain register of first contact', () => {
   for (const [language, catalog] of [
@@ -17,7 +26,10 @@ describe('the plain register of first contact', () => {
     ['Spanish', es],
   ] as const) {
     it(`names no tool or command to the person, in ${language}`, () => {
-      const jargon = PLAIN_CONNECT_KEYS.filter((key) =>
+      const keys = plainKeys(catalog as Record<string, unknown>);
+      // The set is the catalogs' own: it holds the dialog's and the card's words.
+      expect(keys).toEqual(expect.arrayContaining(['connect.ledeJoin', 'next.title']));
+      const jargon = keys.filter((key) =>
         JARGON.test(said(catalog as Record<string, unknown>, key)),
       );
       expect(jargon).toEqual([]);
