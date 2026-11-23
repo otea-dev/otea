@@ -31,8 +31,9 @@ function stillWorking(id: string, lease: Lease): OteaError {
   );
 }
 
-// The tips (full commit ids) of the base an item's board protects as the claiming checkout has them
-// now, which a claim records with its event; the CLI knows the checkout, the app does not.
+// The tips (full commit ids) of the base an item's board protects as the claiming checkout has them,
+// which a claim records with its event. The claimer reads them from git BEFORE the claim's
+// transaction opens and hands over only this lookup, so no git runs inside it.
 export type BaseTips = (item: ItemRecord) => string[];
 
 // Takes the lease on an item for the actor, inside the caller's transaction, once the caller has
@@ -61,11 +62,12 @@ export function takeItem(
   if (!held || ended) {
     const previous = item.lease && item.lease.holder !== actor.name ? item.lease.holder : null;
     // Where the base stood when the item was taken (P1-F3): what it held is not this item's work.
-    const tips = baseTipsOf?.(item) ?? [];
+    // Always written by a claim that has a checkout, even as [], so the first claim of an item is
+    // told from one that recorded nothing.
     const data = {
       ...lease,
       ...(previous ? { previous, ...(ended ? { cause: 'ended' } : {}) } : {}),
-      ...(tips.length > 0 ? { baseTips: tips } : {}),
+      ...(baseTipsOf ? { baseTips: baseTipsOf(item) } : {}),
     };
     appendEvent(db, { itemId: item.id, type: 'claimed', actor, at, data });
   }
