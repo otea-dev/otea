@@ -4,17 +4,26 @@ import { z } from 'zod';
 
 export const SERVE_FILE = 'serve.json';
 
-const ServeInfo = z.object({ port: z.number().int(), pid: z.number().int() });
+// `links`: the server redeems the single-use sign-in links a command prints (signin-links.ts); one
+// started by an older Otea does not say so, and no such link is printed for it.
+const ServeInfo = z.object({
+  port: z.number().int(),
+  pid: z.number().int(),
+  links: z.boolean().optional(),
+});
 
 export type ServeInfo = z.infer<typeof ServeInfo>;
 
-// The port this home's server last ran on. serve.json goes with the server; this stays, so the next
-// `otea serve start` comes back on the same port (bookmarks and a sign-in cookie are per port).
+// The port the background server of this home last ran on, by the port it was asked for. serve.json
+// goes with the server; this stays, so the next `otea serve start` comes back on the same port
+// (bookmarks and a sign-in cookie are per port).
 export const LAST_PORT_FILE = 'serve-port';
 
-export function writeServeFile(dir: string, info: ServeInfo): void {
+// `remember`: only the background server (otea serve start) keeps its port for the next start; a
+// foreground otea serve, or a port the system picked (--port 0), is a one-off.
+export function writeServeFile(dir: string, info: ServeInfo, remember = false): void {
   writeFileSync(join(dir, SERVE_FILE), `${JSON.stringify(info)}\n`);
-  writeFileSync(join(dir, LAST_PORT_FILE), `${info.port}\n`);
+  if (remember) writeFileSync(join(dir, LAST_PORT_FILE), `${info.port}\n`);
 }
 
 export function readLastPort(dir: string): number | undefined {

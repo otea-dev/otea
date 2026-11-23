@@ -1,5 +1,13 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -150,7 +158,7 @@ describe('hook', () => {
 
     // P10-F2: a hook that is exactly one an older Otea wrote is brought up to date by the first
     // command that sees it, so the warning does not come back on every push.
-    it('rewrites a hook that is exactly an older Otea’s, once, keeping the command it runs', async () => {
+    it('rewrites a hook that is exactly an older Otea’s, once, to what hook install --git writes', async () => {
       const person = cliAt(repo.dir);
       expect((await person('init', '--template', 'none')).code).toBe(0);
       repo.write('.git/hooks/pre-push', OLD_HOOK);
@@ -165,9 +173,16 @@ describe('hook', () => {
         '# otea-hook: pre-push',
         '# otea-hook-version: 3',
       ]);
-      expect(hook).toContain('      otea check --gate push --branch "$branch" --repo --commits');
       // Its own, current hook: Otea still takes it out, and says nothing more of it.
       expect(isOteaOwnHook(hook)).toBe(true);
+      // Exactly what install writes, the lines for an Otea that is gone included: installing now
+      // changes nothing. No temp file is left beside it.
+      expect((await otea('hook', 'install', '--git')).code).toBe(0);
+      expect(read('.git/hooks/pre-push')).toBe(hook);
+      expect(hook).toContain('if ! {');
+      expect(
+        readdirSync(join(repo.dir, '.git', 'hooks')).filter((name) => name.includes('.otea-')),
+      ).toEqual([]);
       const second = await otea('check', '--gate', 'push', '--branch', 'feature', '--repo');
       expect(second.err).not.toContain('older Otea');
       expect((await otea('connect', '--check')).out).not.toContain('older Otea');

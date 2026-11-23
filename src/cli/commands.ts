@@ -808,8 +808,8 @@ const HARNESS_PERMISSIONS =
 // An outdated pre-push hook that is exactly one an Otea wrote is updated by whichever command sees
 // it first, so the warning does not come back on every command and push (P10-F2): the rule is the
 // one hook remove follows, a file that is exactly Otea's and nothing else.
-function refreshedHookLine(cwd: string): string | undefined {
-  const path = refreshOutdatedGitHook(cwd);
+function refreshedHookLine({ cwd, home }: Pick<Input, 'cwd' | 'home'>): string | undefined {
+  const path = refreshOutdatedGitHook(cwd, withHome(OTEA, home));
   return path === undefined
     ? undefined
     : `Updated ${path}, a pre-push hook an older Otea wrote, to this version: a push now stops when Otea cannot check it (otea hook remove --git takes it out)`;
@@ -881,7 +881,7 @@ const connect: Command = {
     if (name !== undefined) assertAgentName(name);
     if (flag('check')) {
       const checked = withProject(cwd, (project) => mcpCheck(project, name));
-      const refreshed = refreshedHookLine(cwd);
+      const refreshed = refreshedHookLine(input);
       const withRefresh =
         refreshed === undefined
           ? checked
@@ -3112,7 +3112,11 @@ async function serveUntil(
         warn(`Could not open Otea to the local network: ${(error as Error).message}`);
       });
     }
-    writeServeFile(home, { port: listening.port, pid: process.pid });
+    writeServeFile(
+      home,
+      { port: listening.port, pid: process.pid, links: true },
+      unattended && port !== 0,
+    );
     const sync = setInterval(() => server.sync(), SYNC_EVERY_MS);
     sync.unref();
     const stop = () => {
@@ -3178,11 +3182,20 @@ function ownerGoneText(started: number): string {
 // The sign-in link for a person to open by hand, which a transcript or a log may keep: the page's
 // own link with a single-use token in place of the long-lived key (P3-F5). It works once, for ten
 // minutes; the server it signs in to redeems it from the Otea home.
-function singleUseSignIn(signInUrl: string): string {
-  const link = issueSignInLink(oteaHome());
+// A server started by an older Otea (its serve.json says nothing of single-use links) cannot redeem
+// one: no link is printed, never one that would be refused, and the person is told how to get one.
+function singleUseSignIn(signInUrl: string): { url: string } | { note: string } {
+  const home = oteaHome();
+  const running = readServeFile(home);
+  if (running && !running.links) {
+    return {
+      note: `No sign-in link is printed: the Otea server running here (pid ${running.pid}) is from an older Otea and cannot take single-use links. Run otea serve stop, then start it again; otea open signs a browser in meanwhile`,
+    };
+  }
+  const link = issueSignInLink(home);
   const url = new URL(signInUrl);
   url.searchParams.set('token', link);
-  return url.toString();
+  return { url: url.toString() };
 }
 
 const SINGLE_USE_NOTE = `works once, within ${SIGNIN_LINK_LIFETIME_MS / 60_000} minutes; run the command again for another`;
@@ -3195,7 +3208,8 @@ async function signInLines(
   signInUrl: string,
 ): Promise<string[]> {
   if (flag('no-open')) {
-    return [`Sign a browser in at ${singleUseSignIn(signInUrl)} (${SINGLE_USE_NOTE})`];
+    const link = singleUseSignIn(signInUrl);
+    return ['note' in link ? link.note : `Sign a browser in at ${link.url} (${SINGLE_USE_NOTE})`];
   }
   await openUrl(signInUrl).catch((error: unknown) => {
     const reason = error instanceof Error ? error.message : String(error);
@@ -3378,13 +3392,16 @@ const start: Command = {
     // computer's Otea key.
     const noOpen = input.flag('no-open');
     if (!noOpen) await signInLines(input, signInUrl);
-    const signIn = noOpen
-      ? [
-          '',
-          `Sign-in link, for you only (${SINGLE_USE_NOTE}; never paste it to your agent):`,
-          `  ${singleUseSignIn(signInUrl)}`,
-        ]
-      : [];
+    const link = noOpen ? singleUseSignIn(signInUrl) : undefined;
+    const signIn = !link
+      ? []
+      : 'note' in link
+        ? ['', link.note]
+        : [
+            '',
+            `Sign-in link, for you only (${SINGLE_USE_NOTE}; never paste it to your agent):`,
+            `  ${link.url}`,
+          ];
     const { entry } = mcpEntryFor(input, report.project.id);
     const mcp = { name: MCP_SERVER, ...entry };
     const { project, created, boards, prompt } = report;
@@ -3885,7 +3902,7 @@ const check: Command = {
     const gate = input.required('gate');
     // The hook runs this check on every push: an outdated one that is exactly Otea's is brought up
     // to date here, once (P10-F2); one with edits or lines of the person's is said on every push.
-    const refreshed = refreshedHookLine(input.cwd);
+    const refreshed = refreshedHookLine(input);
     if (refreshed !== undefined) input.warn(refreshed);
     const outdated = outdatedGitHookLine(input.cwd);
     if (outdated !== undefined) input.warn(outdated);

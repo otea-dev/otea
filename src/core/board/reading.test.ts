@@ -44,8 +44,19 @@ describe('reading a board item by names', () => {
     expect(evidenceByName(def, 'Animac')).toBe('eanim');
     expect(evidenceByName(def, 'cambios')).toBe('ecode');
     // Two parts begin with an a: no guess between them.
-    expect(() => evidenceByName(def, 'a')).toThrowError(/has no evidence "a"/);
+    expect(() => evidenceByName(def, 'a')).toThrowError(/"a" is ambiguous/);
     expect(() => evidenceByName(def, '')).toThrowError(/has no evidence ""/);
+  });
+
+  it('refuses a key that is one part’s kind and the start of another part’s name', () => {
+    const odd = creatures();
+    const code = odd.parts.ecode;
+    if (!code) throw new Error('no ecode part');
+    code.name = 'Images of the code';
+
+    expect(() => evidenceByName(odd, 'images')).toThrowError(/"images" is ambiguous, it fits/);
+    // Its full name still names it.
+    expect(evidenceByName(odd, 'Images of the code')).toBe('ecode');
   });
 
   it('says a review in the board’s language and reads it in either language', () => {

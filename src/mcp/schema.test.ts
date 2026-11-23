@@ -76,8 +76,26 @@ describe('mcp tool schemas', () => {
       content: { text: string }[];
     };
 
+    // The schema's own issue, on the path `as`: nothing of the command ran.
     expect(reply.isError).toBe(true);
-    expect(reply.content[0]?.text).toMatch(/\bas\b/);
+    expect(reply.content[0]?.text).toMatch(/Invalid arguments for tool claim: as: /);
+  });
+
+  // P8-F5: a client written for `all-projects` must hear it is now `all_projects`, or keep working.
+  it('keeps taking an option under its old hyphenated name, and refuses a key it does not know', async () => {
+    const old = (await bare.callTool({
+      name: 'topic_list',
+      arguments: { 'all-projects': true },
+    })) as { isError?: boolean };
+    expect(old.isError).toBeFalsy();
+
+    const unknown = (await bare.callTool({
+      name: 'topic_list',
+      arguments: { all_project: true },
+    })) as { isError?: boolean; content: { text: string }[] };
+    expect(unknown.isError).toBe(true);
+    expect(unknown.content[0]?.text).toContain('topic_list takes no { all_project }');
+    expect(unknown.content[0]?.text).toContain('all_projects');
   });
 
   it('types and describes the wait timeout, and takes a number of seconds', async () => {

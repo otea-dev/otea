@@ -178,7 +178,11 @@ describe('serve', () => {
     const { out } = await otea('serve', '--port', '0');
     const port = Number(new URL(URL_LINE.exec(out)?.[1] ?? '').port);
 
-    expect(JSON.parse(readFileSync(serveFile(), 'utf8'))).toEqual({ port, pid: process.pid });
+    expect(JSON.parse(readFileSync(serveFile(), 'utf8'))).toEqual({
+      port,
+      pid: process.pid,
+      links: true,
+    });
     expect(existsSync(join(repo.dir, '.otea', 'serve.json'))).toBe(false);
 
     interrupt.abort();

@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import {
   chmodSync,
   existsSync,
@@ -33,8 +34,9 @@ const MARK = '# otea-hook: pre-push';
 
 // The version of the hook Otea writes now, on the line after MARK. A hook with MARK and another
 // version (or none: the ones before #495, which let a push through when Otea could not check it)
-// is outdated: Otea says so, and rewrites it only on otea hook install --git. Bump it whenever the
-// hook's lines change what a push does.
+// is outdated: Otea says so. One that is exactly what an Otea wrote is rewritten by otea check or
+// otea connect --check (refreshOutdatedGitHook), any other only by otea hook install --git. Bump
+// it whenever the hook's lines change what a push does.
 const VERSION = '# otea-hook-version: 3';
 
 // How a hook runs this Otea, as `otea connect` does for the MCP server.
@@ -122,24 +124,33 @@ function ownCommand(content: string): { found: string; gone: string[] } | undefi
   return candidates.some((candidate) => flat(candidate) === given) ? { found, gone } : undefined;
 }
 
-// Rewrites a pre-push hook an older Otea wrote to the current version, keeping the command it runs,
-// and says its path; nothing when the hook is current, or is not exactly one an Otea wrote (a line
-// of the person's, or an edit, keeps it as it is: they update it with otea hook install --git).
-// The file is replaced whole by a rename, so a push that is running it reads the old one to its
-// end; where the system will not rename over it (an open file on Windows) it stays as it was.
-export function refreshOutdatedGitHook(cwd: string): string | undefined {
-  if (gitHookKind(cwd) !== 'outdated') return undefined;
-  const path = gitHookFile(cwd);
-  const next = `${path}.otea-new`;
+// Replaces a hook file whole: written to a file of its own (exclusive, so two runs never write the
+// same one), then renamed over it, so a push that is running the old hook reads it to its end.
+function replaceHook(path: string, content: string): void {
+  const next = `${path}.otea-${process.pid}-${randomBytes(4).toString('hex')}`;
   try {
-    const own = ownCommand(readFileSync(path, 'utf8'));
-    if (own === undefined) return undefined;
-    writeFileSync(next, modernHook(own.found, VERSION, own.gone), { mode: 0o755 });
+    writeFileSync(next, content, { flag: 'wx', mode: 0o755 });
     chmodSync(next, 0o755);
     renameSync(next, path);
+  } catch (error) {
+    rmSync(next, { force: true });
+    throw error;
+  }
+}
+
+// Rewrites a pre-push hook an older Otea wrote to what otea hook install --git writes now for this
+// Otea (the same content, the lines for an Otea that is gone included), and says its path; nothing
+// when the hook is current, or is not exactly one an Otea wrote (a line of the person's, or an edit,
+// keeps it as it is: they update it with otea hook install --git). Where the system will not
+// rename over the file (an open file on Windows) it stays as it was.
+export function refreshOutdatedGitHook(cwd: string, otea: Launcher): string | undefined {
+  if (gitHookKind(cwd) !== 'outdated') return undefined;
+  const path = gitHookFile(cwd);
+  try {
+    if (!isOteaOwnHook(readFileSync(path, 'utf8'))) return undefined;
+    replaceHook(path, preHook(otea));
     return path;
   } catch {
-    rmSync(next, { force: true });
     return undefined;
   }
 }

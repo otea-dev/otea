@@ -171,8 +171,16 @@ export function evidenceByName(def: BoardDefinition, key: string): string {
   const byKind = evidence.filter((candidate) => fold(candidate.kind) === wanted);
   const byStart =
     wanted === '' ? [] : evidence.filter((candidate) => fold(candidate.name).startsWith(wanted));
-  const only = [byKind, byStart].find((found) => found.length === 1)?.[0];
-  if (only) return only.id;
+  // Read together: a kind and a name start that point at different parts are no guess to make.
+  const matching = [...new Map([...byKind, ...byStart].map((part) => [part.id, part])).values()];
+  const [only, ...others] = matching;
+  if (only && others.length === 0) return only.id;
+  if (only) {
+    throw new OteaError(
+      'evidence_not_accepted',
+      `${def.name}: "${key}" is ambiguous, it fits ${namesOf(matching)}; name one of them in full`,
+    );
+  }
   throw new OteaError(
     'evidence_not_accepted',
     `${def.name} has no evidence "${key}"; its evidence is ${namesOf(evidence)}`,
