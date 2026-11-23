@@ -6,7 +6,7 @@ import type { Context } from './context.ts';
 import { createItem, getItem } from './items.ts';
 import { claimItem } from './leases.ts';
 import { LIVE_WINDOW_MS, seeAgent, waitBeat } from './presence.ts';
-import { declareProfile, requireProfile } from './profile.ts';
+import { declareProfile, presetProfile, requireProfile } from './profile.ts';
 import { memoryContext } from './testing.ts';
 
 const ana: Actor = { kind: 'human', name: 'ana' };
@@ -81,6 +81,15 @@ describe('agent profile', () => {
         { agent: 'claude', channel: 'mcp', harness: CLAUDE_CODE, newSession: true },
         at(T30),
       );
+
+      expect(findProfile(ctx.db, 'claude')?.profile.harness).toBe('gemini-cli');
+    });
+
+    // The agent declares before its client was ever heard: the first sighting must not replace it.
+    it('keeps the harness the agent declares before the MCP client is first heard', () => {
+      expect(declare({ ...OPUS, harness: 'gemini-cli' }, 'mcp').profile.harness).toBe('gemini-cli');
+
+      seeAgent(ctx.db, { agent: 'claude', channel: 'mcp', harness: CLAUDE_CODE }, at(T1));
 
       expect(findProfile(ctx.db, 'claude')?.profile.harness).toBe('gemini-cli');
     });
@@ -166,8 +175,9 @@ describe('agent profile', () => {
       expect(findProfile(ctx.db, 'claude')?.confirmed).toBe(true);
     });
 
-    it('follow the MCP client when it names another harness', () => {
-      declare(OPUS, 'mcp');
+    it('follows the MCP client when the profile names no harness but the command line', () => {
+      presetProfile(ctx.db, { agent: 'claude', ...OPUS }, at(T0));
+      expect(findProfile(ctx.db, 'claude')?.profile.harness).toBe('cli');
       seeAgent(ctx.db, { agent: 'claude', channel: 'mcp', harness: { name: 'codex' } }, at(T1));
 
       expect(findProfile(ctx.db, 'claude')?.profile.harness).toBe('codex');

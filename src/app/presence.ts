@@ -157,7 +157,7 @@ export function seeAgent(db: DatabaseSync, sighting: Sighting, now: Clock = syst
   if (sighting.newSession || (sighting.channel === 'cli' && away)) {
     unconfirmProfile(db, sighting.agent);
   }
-  followClient(db, sighting, at, known?.harness ?? undefined);
+  followClient(db, sighting, at);
   const next = harnessAfter(known, sighting);
   const fresh = known && Date.parse(at) - Date.parse(known.lastSeen) < SEEN_PRECISION_MS;
   const same =
@@ -544,18 +544,15 @@ export function mcpLoaded(
   if (session !== undefined) beatProcess(db, session, () => at);
 }
 
-// A profile's harness is the MCP client's until the agent names its own: when the client names
-// another one than the last sighting heard, the profile follows. A client already heard under that
-// name changes nothing, so the harness an agent declared over it stays (P8-F3).
-function followClient(
-  db: DatabaseSync,
-  { agent, channel, harness }: Sighting,
-  at: string,
-  heardAs?: string,
-): void {
-  if (channel !== 'mcp' || !harness || heardAs === harness.name) return;
+// A profile's harness is the MCP client's until a harness is declared: a profile preset for the
+// command line (`cli`, otea connect without --harness) follows the client once it names itself. A
+// declared harness stays, whether the agent declared it before or after the client was first heard
+// (P8-F3).
+function followClient(db: DatabaseSync, { agent, channel, harness }: Sighting, at: string): void {
+  if (channel !== 'mcp' || !harness) return;
   const declared = findProfile(db, agent);
-  if (!declared || declared.profile.harness === harness.name) return;
+  if (!declared || declared.profile.harness !== CLI_HARNESS.name) return;
+  if (declared.profile.harness === harness.name) return;
   const profile = { ...declared.profile, harness: harness.name };
   saveProfile(db, agent, profile, { at, channel, confirmed: declared.confirmed });
 }

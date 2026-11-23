@@ -3701,6 +3701,14 @@ const open: Command = {
       throw notRunning(`The Otea server on port ${port} is another Otea home's (OTEA_HOME)`);
     // The link is the person's to open by hand, single-use and never the key, as serve --no-open's.
     if (flag('no-open')) {
+      // A server an older Otea started cannot redeem one: nothing to print, so it is no success.
+      const running = readServeFile(home);
+      if (running && !running.links) {
+        throw new CommandFailure(
+          'not_running',
+          `No sign-in link: the Otea server running here (pid ${running.pid}) is from an older Otea and cannot take single-use links. Run otea serve stop, then otea serve start, and run otea open --no-open again`,
+        );
+      }
       return { data: { url }, text: (await signInLines({ flag, openUrl, warn }, link)).join('\n') };
     }
     await openUrl(link).catch((error: unknown) => {

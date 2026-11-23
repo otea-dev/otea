@@ -77,12 +77,63 @@ describe('open', () => {
     expect(redeemed.headers.get('set-cookie')).toContain('otea_session_');
   });
 
-  it('still says to run serve with --no-open when no server answers', async () => {
+  // The link signs one browser in: used once, it signs no other in, and a second one still works.
+  it('prints links that each sign in once', async () => {
+    await serve();
+    const link = (text: string) => /at (\S+) \(/.exec(text)?.[1] ?? '';
+    const first = link((await otea('open', '--no-open')).out);
+    const second = link((await otea('open', '--no-open')).out);
+
+    const used = await fetch(first, { redirect: 'manual' });
+    const again = await fetch(first, { redirect: 'manual' });
+    const other = await fetch(second, { redirect: 'manual' });
+
+    expect(used.headers.get('set-cookie')).toContain('otea_session_');
+    expect(again.headers.get('set-cookie')).toBeNull();
+    expect(again.status).not.toBe(302);
+    expect(other.headers.get('set-cookie')).toContain('otea_session_');
+  });
+
+  it('prints no link and no key with --no-open --json', async () => {
+    const { page } = await serve();
+
+    const { code, out, err } = await otea('open', '--no-open', '--json');
+
+    expect(code).toBe(0);
+    expect(JSON.parse(out)).toEqual({ url: page });
+    expect(out + err).not.toContain('token=');
+    expect(out + err).not.toContain('/auth');
+    expect(out + err).not.toContain(token());
+    expect(opened).toEqual([]);
+  });
+
+  it('says to run serve with --no-open when no server answers', async () => {
     const { port } = await serve();
     interrupt.abort();
     await vi.waitFor(() =>
       expect(otea('open', '--no-open', '--port', port)).resolves.toMatchObject({ code: 11 }),
     );
+
+    const { err } = await otea('open', '--no-open', '--port', port);
+
+    expect(err).toContain(`No Otea server answers on port ${port}; run "otea serve start"`);
+  });
+
+  // A server an older Otea started cannot redeem a single-use link: no link, and no success.
+  it('fails with --no-open for a server that cannot redeem a single-use link', async () => {
+    const { port } = await serve();
+    const running = JSON.parse(readFileSync(serveFile(), 'utf8'));
+    writeFileSync(serveFile(), JSON.stringify({ port: running.port, pid: running.pid }));
+
+    const { code, out, err } = await otea('open', '--no-open', '--port', port);
+
+    expect(code).toBe(11);
+    expect(out).toBe('');
+    expect(err).toContain('is from an older Otea and cannot take single-use links');
+    expect(err).toContain('otea serve stop, then otea serve start');
+    expect(err).not.toContain('signs a browser in meanwhile');
+    expect(err).not.toContain(token());
+    expect(opened).toEqual([]);
   });
 
   it('prints the url with --json', async () => {
