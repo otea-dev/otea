@@ -1,6 +1,7 @@
 import { isClosed, isLandStep, positionOf } from '../core/board/engine.ts';
 import { guardedBranch, stepById, workedBase } from '../core/board/model.ts';
 import { activeLease } from '../core/lease.ts';
+import { timeText } from '../core/time.ts';
 import { type ItemRecord, selectItems, selectStateEntries } from '../store/queries.ts';
 import type { Context } from './context.ts';
 import { type LiveBoard, leftFor, liveBoardOf, liveBoards } from './next.ts';
@@ -84,9 +85,10 @@ function placeText(priority: Priority | undefined, work: boolean): string {
 
 // What lands before the item: `holder` lands `first` now, or `first` lands next (its `place` in
 // the person's order says why). `work`: the item does its work on the base, not lands in it;
-// `review`: `first` is committed on the base and waits for its review or its push.
+// `review`: `first` is committed on the base and waits for its review or its push. `until`: when the
+// holder's lease runs out, if it holds one now (its calls extend it).
 export type LandsFirst = { first: string; base: string; work?: true } & (
-  | { holder: string }
+  | { holder: string; until?: string }
   | { place: string }
   | { review: true }
 );
@@ -137,6 +139,7 @@ export function landsFirst(
             first: other.id,
             base: own.base,
             holder,
+            ...(lease ? { until: lease.expiresAt } : {}),
             ...(own.work ? { work: true as const } : {}),
           },
         ];
@@ -185,24 +188,31 @@ export function landsFirst(
   };
 }
 
-// Why a claim of the item is refused while another lands first, in one line.
+// The holder's lease, so the agent knows until when the base is taken at the latest: its calls
+// extend it, and the item moving on frees the base sooner (P1-S4).
+const leaseUntil = (first: LandsFirst) =>
+  'until' in first && first.until ? ` (its lease runs until ${timeText(first.until)})` : '';
+
+// Why a claim of the item is refused while another lands first, in one line. It names the item that
+// holds the base, and says what the agent can take meanwhile: anything that is not on that base.
 export function landsFirstText(id: string, first: LandsFirst): string {
   const { base } = first;
   if (first.work) {
+    const meanwhile = `Items that do not work on ${base} can be taken now: otea next.`;
     if ('review' in first) {
-      return `${id} not claimed: ${first.first} is committed on ${base} and waits for its review and its push, and ${id} waits for it: this board works straight on ${base}, so one change at a time until it has landed, or the next one's commits would ride along in that push. Take other work meanwhile: otea next.`;
+      return `${id} not claimed: ${first.first} is committed on ${base} and waits for its review and its push, and ${id} waits for it: this board works straight on ${base}, so one change at a time until it has landed, or the next one's commits would ride along in that push. ${meanwhile}`;
     }
     const ahead =
       'holder' in first
-        ? `${first.holder} works on ${base} with ${first.first} now, and ${id} waits for it`
+        ? `${first.holder} works on ${base} with ${first.first} now${leaseUntil(first)}, and ${id} waits for it`
         : `${first.first} goes first on ${base} (${first.place}), then ${id}`;
-    return `${id} not claimed: ${ahead}: this board works straight on ${base}, so one agent at a time, in the person's order, or two would change the same files. Take other work meanwhile: otea next.`;
+    return `${id} not claimed: ${ahead}: this board works straight on ${base}, so one agent at a time, in the person's order, or two would change the same files. ${meanwhile}`;
   }
   const ahead =
     'holder' in first
-      ? `${first.holder} lands ${first.first} in ${base} now; ${id} lands after it`
+      ? `${first.holder} lands ${first.first} in ${base} now${leaseUntil(first)}; ${id} lands after it`
       : `${first.first} lands in ${base} first (${'place' in first ? first.place : ''}), then ${id}`;
-  return `${id} not claimed: ${ahead}: one agent lands at a time on ${base}, in the person's order, so no landing conflicts with another under way. Take other work meanwhile: otea next.`;
+  return `${id} not claimed: ${ahead}: one agent lands at a time on ${base}, in the person's order, so no landing conflicts with another under way. Items that do not land in ${base} can be taken now: otea next.`;
 }
 
 // What next says, with nothing to offer, of the items that wait for their turn to land.

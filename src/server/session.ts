@@ -29,7 +29,7 @@ export function clientOf(c: Context): Client {
 const BAD_LINK = `<!doctype html>
 <meta charset="utf-8">
 <title>Otea</title>
-<p>This sign-in link is not valid for this Otea server. Run <code>otea open</code> in a project folder to open the UI with a fresh link.</p>
+<p>This sign-in link is not valid for this Otea server. Run <code>otea open</code> in a project folder to open the UI with a fresh link, or <code>otea open --no-open</code> to print one to open by hand.</p>
 `;
 
 export type Session = {

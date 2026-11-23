@@ -87,6 +87,8 @@ export function SignedOut({ onRetry }: SignedOutProps) {
           <p>{t('signedOut.how')}</p>
           <CopyCommand command="otea open" />
           <p className="so-then">{t('signedOut.then')}</p>
+          <p className="so-then">{t('signedOut.noBrowser')}</p>
+          <CopyCommand command="otea open --no-open" />
           <p className="so-then">{t('signedOut.app')}</p>
         </div>
         <div className="pair-bar">

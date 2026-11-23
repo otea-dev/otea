@@ -383,11 +383,41 @@ describe('setup for agents', () => {
       expect(next.err).not.toContain('not confirmed in this session');
     });
 
-    it('requires the profile of an agent named that never declared one', async () => {
-      const { code, err } = await otea('connect', '--as', 'claude-b');
+    // P8-F3: --model and --effort were required, though a harness may not tell the agent either; the
+    // agent says unknown then, as otea profile lets it.
+    it('declares unknown for the model and effort an agent named does not give', async () => {
+      const agent = cliAt(repo.dir, { OTEA_AGENT: 'p8-oc' });
 
-      expect(code).toBe(2);
-      expect(err).toContain('--model <id> --effort <level>');
+      const { code, err } = await agent('connect', '--as', 'p8-oc', '--harness', 'opencode');
+
+      expect(code).toBe(0);
+      expect(err).toBe('');
+      expect(JSON.parse((await agent('profile', '--json')).out)).toMatchObject({
+        profile: { harness: 'opencode', model: 'unknown', effort: 'unknown' },
+        confirmed: false,
+      });
+    });
+
+    it('keeps the model and effort an agent declared when connect names neither', async () => {
+      const agent = cliAt(repo.dir, { OTEA_AGENT: 'pc' });
+      await agent('profile', ...PROFILE, '--harness', 'opencode');
+
+      expect((await agent('connect', '--as', 'pc')).code).toBe(0);
+
+      expect(JSON.parse((await agent('profile', '--json')).out)).toMatchObject({
+        profile: { model: 'claude-opus-5-5', effort: 'high', harness: 'opencode' },
+        confirmed: true,
+      });
+    });
+
+    it('says unknown for the one of the two it is not given', async () => {
+      const { code } = await otea('connect', '--as', 'claude-b', '--model', 'gpt-5');
+
+      expect(code).toBe(0);
+      const profile = JSON.parse(
+        (await cliAt(repo.dir, { OTEA_AGENT: 'claude-b' })('profile', '--json')).out,
+      );
+      expect(profile.profile).toMatchObject({ model: 'gpt-5', effort: 'unknown' });
     });
 
     it('says, with --check, that nobody reached Otea over MCP yet', async () => {

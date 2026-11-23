@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { ownerGone, processAlive } from '../app/presence.ts';
+import { STARTED_BY } from './started-by.ts';
 
 export type ProcessRow = { pid: number; parent: number; name: string; path?: string };
 
@@ -132,7 +133,7 @@ export type ProcessTable = { rows: ProcessRow[]; complete: boolean };
 // without MSYS's table, a parent Windows names may be a shell's fork that ended.
 export async function listProcesses(
   signal: AbortSignal,
-  start: number = process.ppid,
+  start: number = STARTED_BY,
 ): Promise<ProcessTable | undefined> {
   if (process.platform !== 'win32') {
     const out = await run('ps', ['-A', '-o', 'pid=,ppid=,comm='], signal);
@@ -179,7 +180,9 @@ export function watchOwner(
     everyMs?: number;
   } = {},
 ): OwnerWatch {
-  const start = process.ppid;
+  // The parent the process started under, not the one it has when this runs: a shell that ended
+  // while the command loaded has left the system's own process in its place.
+  const start = STARTED_BY;
   const controller = new AbortController();
   const listing = new AbortController();
   let chain = [start];

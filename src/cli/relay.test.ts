@@ -143,6 +143,24 @@ describe('relay', () => {
     expect(err).toContain('make it with "otea move"');
   });
 
+  // P8-F5: 'Cannot move from "Hacerlo" to "Hacerlo"' said nothing of why: a send-back is relayed
+  // only while the person reviews the step, and this one is still the agent's.
+  it.each(['todo', 'done'])(
+    'says why an item still in its agent’s hands is not relayed to %s, and what to do',
+    async (to) => {
+      const { code, err } = await otea('relay', 'TASKS-2', to, '--quote', 'Send it back');
+
+      expect(code).toBe(4);
+      expect(err).not.toContain('Cannot move');
+      expect(err).toContain('Not relayed: TASKS-2 is not in review, it is at Hacerlo');
+      expect(err).toContain(
+        'a send-back or an approval is relayed only while the person reviews it',
+      );
+      expect(err).toContain('otea handoff TASKS-2');
+      expect(err).toContain('a relay can only move it to Dropped now');
+    },
+  );
+
   it('fails as usual for an invalid transition or an unknown item', async () => {
     expect((await otea('relay', 'TASKS-2', 'done', '--quote', 'Done')).code).toBe(4);
     expect((await otea('relay', 'TASKS-9', 'dropped', '--quote', 'x', '--reason', 'x')).code).toBe(

@@ -54,6 +54,37 @@ describe('open', () => {
     expect(out + err).not.toContain(token());
   });
 
+  // P8-F4: the signed-out page sends to otea open, which could only open a browser: headless and
+  // remote work had no way to a fresh link.
+  it('prints a fresh single-use sign-in link with --no-open, opening no browser, never the key', async () => {
+    const { origin, id } = await serve();
+
+    const first = await otea('open', '--no-open');
+    const second = await otea('open', '--no-open');
+
+    expect(first.code).toBe(0);
+    expect(first.out).toMatch(
+      new RegExp(
+        `^Sign a browser in at (${origin}/auth\\?token=[A-Za-z0-9_-]{43}&next=${encodeURIComponent(`/p/${id}/`)}) \\(works once, within 10 minutes; run the command again for another\\)\\n$`,
+      ),
+    );
+    expect(opened).toEqual([]);
+    expect(first.out + first.err).not.toContain(token());
+    const link = (text: string) => /at (\S+) \(/.exec(text)?.[1];
+    expect(link(second.out)).not.toBe(link(first.out));
+    const redeemed = await fetch(link(first.out) ?? '', { redirect: 'manual' });
+    expect(redeemed.status).toBe(302);
+    expect(redeemed.headers.get('set-cookie')).toContain('otea_session_');
+  });
+
+  it('still says to run serve with --no-open when no server answers', async () => {
+    const { port } = await serve();
+    interrupt.abort();
+    await vi.waitFor(() =>
+      expect(otea('open', '--no-open', '--port', port)).resolves.toMatchObject({ code: 11 }),
+    );
+  });
+
   it('prints the url with --json', async () => {
     const { page } = await serve();
 

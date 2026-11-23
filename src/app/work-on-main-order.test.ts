@@ -41,8 +41,11 @@ describe('working straight on main, one agent at a time', () => {
     claimItem(ctx, { id: first, actor: agent('claude-b') }, now);
     setOrder(ctx, { collection: def.name, ids: [first, second], actor: you }, now);
 
+    // P1-S4: which item holds main and until when, and that what does not work there goes on.
     expect(() => claimItem(ctx, { id: second, actor: agent('quill') }, now)).toThrow(
-      `${second} not claimed: claude-b works on main with ${first} now, and ${second} waits for it: this board works straight on main, so one agent at a time, in the person's order, or two would change the same files. Take other work meanwhile: otea next.`,
+      new RegExp(
+        `^${second} not claimed: claude-b works on main with ${first} now \\(its lease runs until \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} UTC\\), and ${second} waits for it: this board works straight on main, so one agent at a time, in the person's order, or two would change the same files\\. Items that do not work on main can be taken now: otea next\\.$`,
+      ),
     );
     const idle = nextFor(ctx, 'quill', {}, now);
     expect(idle).toMatchObject({ item: null, idle: true });

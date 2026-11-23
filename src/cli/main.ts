@@ -1,3 +1,4 @@
+import './started-by.ts';
 import { OTEA_VERSION } from './version.ts';
 
 // The entry of the otea command. The version is answered here, before the commands load: they are

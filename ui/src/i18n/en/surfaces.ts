@@ -167,6 +167,8 @@ export const surfaces = {
   'signedOut.state': 'signed out',
   'signedOut.how': 'To get back in, run this in the project’s folder:',
   'signedOut.then': 'It opens a new link, signed in. Then come back here and try again.',
+  'signedOut.noBrowser':
+    'No browser to open there (a remote or headless session)? This prints a link to open by hand instead, once and for ten minutes:',
   'signedOut.app': 'In the desktop app, close it and open it again.',
   'signedOut.retry': 'Try again',
   'signedOut.trying': 'Trying…',

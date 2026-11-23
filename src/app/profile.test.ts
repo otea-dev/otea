@@ -65,8 +65,24 @@ describe('agent profile', () => {
       });
     });
 
-    it('takes the harness from the MCP client, whatever the agent says', () => {
-      expect(declare({ ...OPUS, harness: 'other' }, 'mcp').profile.harness).toBe('claude-code');
+    it('takes the harness from the MCP client when the agent names none', () => {
+      expect(declare(OPUS, 'mcp').profile.harness).toBe('claude-code');
+    });
+
+    // P8-F3: the client's name pinned every agent behind one client to the same harness, whatever
+    // each said it ran in.
+    it('keeps the harness the agent declares over the MCP client, on later sightings too', () => {
+      seeAgent(ctx.db, { agent: 'claude', channel: 'mcp', harness: CLAUDE_CODE }, at(T0));
+
+      expect(declare({ ...OPUS, harness: 'gemini-cli' }, 'mcp').profile.harness).toBe('gemini-cli');
+      seeAgent(ctx.db, { agent: 'claude', channel: 'mcp', harness: CLAUDE_CODE }, at(T1));
+      seeAgent(
+        ctx.db,
+        { agent: 'claude', channel: 'mcp', harness: CLAUDE_CODE, newSession: true },
+        at(T30),
+      );
+
+      expect(findProfile(ctx.db, 'claude')?.profile.harness).toBe('gemini-cli');
     });
 
     it('keeps the harness it knows when the agent declares again', () => {
