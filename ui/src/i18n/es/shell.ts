@@ -89,7 +89,7 @@ export const shell = {
   'prefs.spanish': 'Español',
   'prefs.onlyInterface': 'Solo se traduce la interfaz.',
   'prefs.translated':
-    '{only} El contenido de los ítems, sus campos y lo que escriben los agentes se quedan como están.',
+    '{only} Cada tablero conserva el idioma en que se hizo, igual que los ítems y lo que escriben los agentes.',
   'prefs.phone': 'Teléfono, en Configuración…',
   'prefs.server': 'servidor',
   'prefs.all': 'Todas las preferencias…',
@@ -113,7 +113,7 @@ export const shell = {
   'languageNote.label': 'Idioma',
   'languageNote.heading': 'Otea está en español, como pide tu navegador ({tag}).',
   'languageNote.body':
-    'Solo se traduce la interfaz. El contenido de los ítems, sus campos y lo que escriben los agentes se quedan tal como están.',
+    'Solo se traduce la interfaz. Cada tablero conserva el idioma en que se hizo (sus pasos, campos y opciones), igual que los ítems y lo que escriben los agentes.',
   'languageNote.where': 'Puedes cambiarlo cuando quieras en Preferencias, aquí abajo.',
   'languageNote.wherePanel': 'Puedes cambiarlo cuando quieras en Preferencias, al pie del panel.',
   'languageNote.ok': 'Entendido',

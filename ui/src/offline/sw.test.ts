@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { LANGUAGE_HEADER } from '../../../src/core/board/template-words.ts';
 import { FROM_CACHE, PROJECT, SAVED_AT, swRoute } from './sw-routes.ts';
 import {
   type CacheLike,
@@ -121,23 +120,6 @@ describe('networkFirst', () => {
     expect(await response.json()).toEqual([{ id: 'A-1' }]);
     expect(response.headers.get(FROM_CACHE)).toBeNull();
     expect(map.get(ITEMS)?.headers.get(SAVED_AT)).toBe('1700000000000');
-  });
-
-  // A board reads in the language the desk asked in: the offline copy of a read is the one made for
-  // that language, never another's.
-  it('keeps one answer per language the desk asked in', async () => {
-    const { cache } = memoryCache();
-    const ask = (lang: string, net: () => Promise<Response>) =>
-      networkFirst(new Request(ITEMS, { headers: { [LANGUAGE_HEADER]: lang } }), {
-        net,
-        cache,
-        now: () => 0,
-      });
-    await ask('es', async () => json([{ step: 'Arreglar' }]));
-    await ask('en', async () => json([{ step: 'Fix' }]));
-
-    expect(await (await ask('es', down)).json()).toEqual([{ step: 'Arreglar' }]);
-    expect(await (await ask('en', down)).json()).toEqual([{ step: 'Fix' }]);
   });
 
   // TS-11: Tailscale serve answers 502 while nothing listens behind it: Otea is closed on the PC,

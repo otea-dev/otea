@@ -36,7 +36,6 @@ function draft(id: string, def: BoardDefinition, published: boolean): ReadyDraft
     canRedo: false,
     depth: { undo: 0, redo: 0 },
     selection: { kind: 'about' },
-    readIn: 'en',
     select: noop,
     reveal: noop,
     revealed: 0,

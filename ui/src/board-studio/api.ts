@@ -12,7 +12,6 @@ import type { BoardDefinition, Target } from '../../../src/core/board/model.ts';
 import type { Problem } from '../../../src/core/board/problems.ts';
 import type { Lang, TemplateView } from '../../../src/core/board/templates.ts';
 import { apiUrl } from '../base.ts';
-import { type Language, languageHeader } from '../i18n/i18n.ts';
 import { serverMessage, unreachable } from '../remote.ts';
 
 // The board Studio's client for /api/boards and /api/templates (src/server/boards.ts). Every
@@ -53,7 +52,6 @@ async function call<T>(method: string, path: string, given?: unknown, signal?: A
     method,
     headers: {
       accept: 'application/json',
-      ...languageHeader(),
       ...(payload === undefined ? {} : { 'content-type': 'application/json' }),
     },
     ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
@@ -117,13 +115,9 @@ export function saveDraft(
   definition: BoardDefinition,
   baseVersion: number | null,
   draftStamp: string | null | undefined,
-  readIn: Language,
 ): Promise<{ record: BoardRecord; problems: Problem[] }> {
   const stamp = draftStamp === undefined ? {} : { draftStamp };
-  // `readIn`: the language `definition` was read in, which its words are in. The server needs it
-  // (a draft without it is a 400): a language switched since must never make it take the words it
-  // holds for the person's edits.
-  return call('PUT', `${board(id)}/draft`, { definition, baseVersion, ...stamp, readIn });
+  return call('PUT', `${board(id)}/draft`, { definition, baseVersion, ...stamp });
 }
 
 export function discardDraft(id: string): Promise<{ deleted: boolean }> {

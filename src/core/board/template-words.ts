@@ -4,10 +4,6 @@ export type Lang = 'en' | 'es';
 
 export const LANGS: readonly Lang[] = ['en', 'es'];
 
-// The header the desk sends on every request with the language on its screen: more than one desk
-// (a phone beside the computer) may be open in different languages.
-export const LANGUAGE_HEADER = 'x-otea-lang';
-
 export type Words = Readonly<Record<Lang, string>>;
 
 export const w = (en: string, es: string): Words => ({ en, es });

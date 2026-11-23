@@ -22,7 +22,7 @@ import {
   showItem,
   updateItem,
 } from '../app/items.ts';
-import { isLang, rememberLanguage, resolveLang, storedLanguage } from '../app/language.ts';
+import { rememberLanguage, storedLanguage } from '../app/language.ts';
 import type { Launcher } from '../app/launcher.ts';
 import { memoryMachine } from '../app/machine.ts';
 import { boardRoundOf, liveBoards, rowFactsOf } from '../app/next.ts';
@@ -48,7 +48,6 @@ import { estimatesOfItems, pinItems, priorityOf, setOrder } from '../app/priorit
 import { type Env, type Project, projectView } from '../app/project.ts';
 import { projectLanguage } from '../app/project-language.ts';
 import { answerQuestion } from '../app/questions.ts';
-import { inLanguage } from '../app/reading-lang.ts';
 import { linkItems, unlinkItems } from '../app/relations.ts';
 import { reassignItem, restartItem, resumeItem, undoRelease } from '../app/restart.ts';
 import { setAsideOf } from '../app/set-aside.ts';
@@ -78,7 +77,7 @@ import { mergedOutside } from '../cli/merged-outside.ts';
 import { OTEA_VERSION } from '../cli/version.ts';
 import { agentPrompt, connectFacts, isPromptKind, PROMPT_KINDS } from '../core/agent-prompts.ts';
 import { PERIOD_HINT, parsePeriod } from '../core/board/performance.ts';
-import { LANGS, LANGUAGE_HEADER, type Lang } from '../core/board/template-words.ts';
+import { LANGS, type Lang } from '../core/board/template-words.ts';
 import { OteaError } from '../core/errors.ts';
 import { MAX_EVIDENCE_MB } from '../core/evidence.ts';
 import { TURNS, type Turn } from '../core/workflow.ts';
@@ -483,17 +482,11 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
     new Hono<OteaEnv>()
       // A board published from another process (the CLI, another server) joins the catalog before
       // anything reads items; it costs one query when nothing was published.
-      .use(async (c, next) => {
-        // The desk reads every board in the language on its screen (it says so in x-otea-lang), else
-        // the one it last told the server, else each board in the language it was made in.
-        const said = c.req.header(LANGUAGE_HEADER);
-        const lang = isLang(said) ? said : storedLanguage(machine);
-        // An answer depends on the language asked: a cache keeps one per language.
-        c.header('Vary', LANGUAGE_HEADER, { append: true });
-        await inLanguage(lang, async () => {
-          syncBoardPresets(project);
-          await next();
-        });
+      .use(async (_c, next) => {
+        // A board's own words are read in the language it was made in, which is the agent's, on every
+        // screen: the screen's language is for the desk's chrome, not for a board's content.
+        syncBoardPresets(project);
+        await next();
       })
       .route('/', machineApi(doors))
       .get('/project', (c) => c.json(projectView(project)))
@@ -533,24 +526,19 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       // What to paste into an agent's chat (Conectar un agente, the empty project): the first contact,
       // one more agent joining, or one more board; without a kind, the project's moment.
       .get('/agent-prompt', (c) => {
-        const { kind, lang: asked } = c.req.query();
+        const { kind } = c.req.query();
         if (kind !== undefined && !isPromptKind(kind))
           throw new InvalidQuery(`kind must be one of ${PROMPT_KINDS.join(', ')}`);
-        // `lang` is the desk's screen: it words the list beside the prompt. The prompt itself is in
-        // the project's language, as otea prompt writes it.
-        const lang =
-          asked === 'es' || asked === 'en' ? asked : resolveLang(storedLanguage(machine), env);
         const moment = kind ?? promptKindOf(project);
-        // The pasted prompt names each board and step as the agent reads them (`otea next`, `otea
-        // board`: each in the language it was made in), whatever the desk's language; the list
-        // beside it is for the person, in the desk's.
-        const facts = inLanguage(undefined, () => promptFacts(project, moment));
-        const shown = inLanguage(lang, () => promptFacts(project, moment));
+        // The pasted prompt and the list beside it name each board and step as the agent reads them
+        // (`otea next`, `otea board`: each in the language it was made in), whatever the desk's
+        // language. The prompt itself is in the project's language, as otea prompt writes it.
+        const facts = promptFacts(project, moment);
         const first = 'first' in facts && facts.first === true ? { first: true } : {};
         return c.json({
           kind: moment,
           prompt: agentPrompt(moment, projectLanguage(project, env), facts),
-          ...connectFacts(shown),
+          ...connectFacts(facts),
           ...first,
         });
       })

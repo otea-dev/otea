@@ -514,11 +514,11 @@ function SingleDiscardDialog({
         const back: Promise<unknown> = deleted
           ? createBoard({ name: kept.name, item: kept.item, lang: language() }).then(
               async (record: BoardRecord) => {
-                await saveDraft(record.id, kept, null, undefined, draft.readIn);
+                await saveDraft(record.id, kept, null, undefined);
                 window.location.hash = `#/studio/board/${encodeURIComponent(record.id)}`;
               },
             )
-          : saveDraft(id, kept, base, undefined, draft.readIn).then(() => draft.reload());
+          : saveDraft(id, kept, base, undefined).then(() => draft.reload());
         back
           .then(() => plainToast(tx('bs.preview.discard.undone', { name: <b>{kept.name}</b> })))
           .catch((e: unknown) => plainToast(failedText(message(e))));

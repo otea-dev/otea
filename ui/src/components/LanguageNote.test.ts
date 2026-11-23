@@ -15,7 +15,7 @@ describe('the first-run language note', () => {
 
     expect(html).toContain('Otea está en español, como pide tu navegador (<code>es-AR</code>).');
     expect(html).toContain('Solo se traduce la interfaz.');
-    expect(html).toContain('lo que escriben los agentes se quedan tal como están');
+    expect(html).toContain('Cada tablero conserva el idioma en que se hizo');
     expect(html).toContain('>Entendido</button>');
     expect(html).toContain('aria-label="Idioma"');
   });

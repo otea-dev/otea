@@ -38,7 +38,9 @@ describe('the Preferences pop', () => {
   it('says what the motion choice does and that only the interface is translated', () => {
     const html = body();
     expect(html).toContain('Sigue al sistema: ahora <b>completo</b>.');
-    expect(html).toContain('<b>Solo se traduce la interfaz.</b> El contenido de los ítems');
+    expect(html).toContain(
+      '<b>Solo se traduce la interfaz.</b> Cada tablero conserva el idioma en que se hizo',
+    );
   });
 
   it('stays small: the rest is on the page, one entry away', () => {
