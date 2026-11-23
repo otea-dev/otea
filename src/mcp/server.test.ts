@@ -265,6 +265,23 @@ describe('mcp server', () => {
       expect(board).toBe(mcpWords(await cliText('board', 'tasks'), COMMANDS));
     });
 
+    // P8-F1, P8-F2: the draft is data the agent edits and hands back, so it is valid JSON, and its
+    // step text keeps git's flags as they are.
+    it('gives a board draft as the JSON it is, and git commands whole', async () => {
+      const made = await text('board_draft', {
+        new: 'Cambios',
+        why: 'Small changes',
+        template: 'changes',
+      });
+      const request = made.match(/\b[A-Z]+-\d+\b/)?.[0] ?? '';
+      const draft = await text('board_draft', { id: request });
+
+      const parsed = JSON.parse(draft);
+      expect(parsed.name).toBe('Cambios');
+      expect(draft).toContain('git push --force-with-lease origin <branch>');
+      expect(draft).toContain('otea handoff <id> --way');
+    });
+
     it('gives the events one a line, each with its id first', async () => {
       const events = await text('events', { item: 'TASKS-1' });
 
