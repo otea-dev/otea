@@ -195,11 +195,15 @@ describe('otea start', () => {
     expect(started.code).toBe(0);
     // A choice in one line, by what the person does: the two templates a first session is likely to
     // want (a simple dev has no way to know which to pick), each a real key, or the agent's design.
-    const boards = started.out.split('\n').find((line) => line.startsWith('Boards:')) ?? '';
-    expect(boards).toContain('none yet');
-    expect(boards).toContain('otea start --template changes (code');
-    expect(boards).toContain('--template todos (anything that is not code');
-    expect(boards).toContain('your agent designs them with you');
+    // P2-F8: one line per template, each the exact command and what the board is for, so a dev
+    // with a code repo knows which to run without opening the help.
+    const lines = started.out.split('\n');
+    const at = lines.findIndex((line) => line.startsWith('Boards:'));
+    expect(lines[at]).toContain('none yet');
+    const hint = lines.slice(at, at + 5).join('\n');
+    expect(hint).toMatch(/otea start --template changes\s+code: .*branch/);
+    expect(hint).toMatch(/otea start --template todos\s+anything that is not code/);
+    expect(hint).toContain('your agent designs the boards with you');
     expect(isListedKey('changes') && isListedKey('todos')).toBe(true);
 
     const init = await person(repo.dir, 'init');
@@ -300,14 +304,14 @@ describe('otea start', () => {
     const asked: string[] = [];
     const answer = async (question: string) => {
       asked.push(question);
-      return '';
+      return 'none';
     };
     const terminal = () => cliAt(repo.dir, {}, undefined, undefined, answer);
 
-    const first = await terminal()('start', '--no-open', '--port', '0', '--json');
+    const first = await terminal()('start', '--no-open', '--port', '0');
     expect(first.code).toBe(0);
     expect(asked).toHaveLength(1);
-    expect(json(first).boards.all).toEqual([]);
+    expect(first.out).toContain('Boards: none yet');
 
     const second = await terminal()('start', '--no-open', '--json');
     expect(second.code).toBe(0);
@@ -319,6 +323,118 @@ describe('otea start', () => {
     expect(piped.code).toBe(0);
     expect(json(piped).boards.all).toEqual([]);
   }, 120_000);
+
+  // P2-F8: at a terminal the person sees a short numbered choice of the boards that fit, with the
+  // default marked, and nothing is made until they choose. Enter takes the default they just saw.
+  describe('the first board, chosen at a terminal', () => {
+    const typing = (...answers: string[]) => {
+      const asked: string[] = [];
+      const ask = async (question: string) => {
+        asked.push(question);
+        return answers[asked.length - 1] ?? '';
+      };
+      return { asked, cli: (cwd = repo.dir) => cliAt(cwd, {}, undefined, undefined, ask) };
+    };
+    const made = (result: Result) => json(result).boards.all;
+
+    it('shows the choices with one plain line each and the default marked, then makes the picked board', async () => {
+      const { asked, cli } = typing('2');
+
+      const started = await cli()('start', '--no-open', '--port', '0', '--json');
+
+      expect(started.code).toBe(0);
+      expect(asked).toHaveLength(1);
+      const question = asked[0] ?? '';
+      expect(question).toMatch(/1\) changes\s+code: /);
+      expect(question).toMatch(/2\) todos\s+anything that is not code/);
+      expect(question).toMatch(/3\) agent\s+no board now: your agent designs/);
+      expect(question).toMatch(/none/);
+      // A code repo: the default is the code board, said before the person answers.
+      expect(question).toMatch(/1\) changes.*\(default\)/);
+      expect(made(started)).toEqual(['To-dos']);
+    }, 120_000);
+
+    it('takes the default on Enter, only after it was shown: changes in a git repo, to-dos elsewhere', async () => {
+      const inRepo = typing('');
+      const started = await inRepo.cli()('start', '--no-open', '--port', '0', '--json');
+      expect(started.code).toBe(0);
+      expect(inRepo.asked[0]).toContain('(default)');
+      expect(made(started)).toEqual(['Changes']);
+
+      const folder = realpathSync.native(mkdtempSync(join(tmpdir(), 'otea-folder-')));
+      folders.push(folder);
+      const outside = typing('');
+      const plain = await outside.cli(folder)('start', '--no-open', '--json');
+      expect(plain.code).toBe(0);
+      expect(outside.asked[0]).toMatch(/2\) todos.*\(default\)/);
+      expect(made(plain)).toEqual(['To-dos']);
+    }, 120_000);
+
+    it.each(['none', 'None', '3', 'agent'])(
+      'makes no board on %s',
+      async (answer) => {
+        const { cli } = typing(answer);
+
+        const started = await cli()('start', '--no-open', '--port', '0', '--json');
+
+        expect(started.code).toBe(0);
+        expect(json(started).project.created).toBe(true);
+        expect(made(started)).toEqual([]);
+      },
+      120_000,
+    );
+
+    it('leaves nothing behind on Ctrl+C: no project, no board, no desk', async () => {
+      const interrupted = cliAt(repo.dir, {}, undefined, undefined, async () => {
+        throw new DOMException('The operation was aborted', 'AbortError');
+      });
+
+      const result = await interrupted('start', '--no-open', '--port', '0');
+
+      expect(result.code).toBe(130);
+      expect(result.err).toContain('nothing was made');
+      expect((await cliAt(repo.dir)('projects', 'current')).code).not.toBe(0);
+      expect(readServeFile(home())).toBeUndefined();
+    });
+
+    // A script, a pipe or an agent never waits on a question.
+    it.each([
+      ['--json', ['--json']],
+      ['--yes', ['--yes']],
+      ['--template', ['--template', 'todos']],
+    ])(
+      'never asks with %s',
+      async (_name, extra) => {
+        const { asked, cli } = typing('1');
+
+        const started = await cli()('start', '--no-open', '--port', '0', '--json', ...extra);
+
+        expect(started.code).toBe(0);
+        expect(asked).toEqual([]);
+        expect(made(started)).toEqual(extra.includes('--template') ? ['To-dos'] : []);
+      },
+      120_000,
+    );
+
+    it('never asks an agent, which is refused before anything', async () => {
+      const asked: string[] = [];
+      const agent = cliAt(
+        repo.dir,
+        { OTEA_AGENT: 'claude' },
+        undefined,
+        undefined,
+        async (question) => {
+          asked.push(question);
+          return '1';
+        },
+      );
+
+      const refused = await agent('start', '--no-open');
+
+      expect(refused.code).not.toBe(0);
+      expect(asked).toEqual([]);
+    });
+  });
 
   // The sign-in link holds this computer's key: it must not travel with the agent's text.
   it('prints the sign-in link in a block of its own, apart from the text for the agent', async () => {
