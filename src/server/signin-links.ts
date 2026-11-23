@@ -12,6 +12,7 @@ export const SIGNIN_DIR = 'signin-links';
 export const SIGNIN_LINK_LIFETIME_MS = 10 * 60 * 1000;
 
 const LINK_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const USED_SUFFIX = '.used';
 
 const fileOf = (home: string, link: string) =>
   join(home, SIGNIN_DIR, createHash('sha256').update(link).digest('hex'));
@@ -53,16 +54,26 @@ export function issueSignInLink(home: string, now = Date.now()): string {
 }
 
 // Whether `given` is a link that was issued, has not ended and was not used: it is used up by this.
-// Two requests with the same link race on removing its file, and only the one that removes it wins.
+// Using it up is creating a file beside the link's own that must not exist yet (the 'wx' flag): the
+// file system lets exactly one caller create it, whatever the others read or remove meanwhile. Reading
+// the link's file and then removing it, or renaming it, is no such thing: on Windows several
+// processes can hold the same file open, and each one's remove or rename then goes through. The
+// winner removes the link's file; the mark stays (and holds when the link ends, so it is swept with
+// it) in case that removing fails.
 export function redeemSignInLink(home: string, given: string, now = Date.now()): boolean {
   if (!LINK_PATTERN.test(given)) return false;
   const path = fileOf(home, given);
   let endsAt: number;
   try {
     endsAt = Number(readFileSync(path, 'utf8'));
-    rmSync(path);
   } catch {
     return false;
   }
+  try {
+    writeFileSync(`${path}${USED_SUFFIX}`, `${endsAt}\n`, { flag: 'wx', mode: 0o600 });
+  } catch {
+    return false;
+  }
+  rmSync(path, { force: true });
   return endsAt > now;
 }
