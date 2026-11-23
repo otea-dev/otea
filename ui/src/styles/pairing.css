@@ -213,6 +213,43 @@
   }
 }
 
+/* ---- the session ran out (SignedOut): the pairing screen's page, with the way back in ---- */
+.signed-out .pair-body {
+  flex: none;
+}
+.so-how {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  margin-top: 22px;
+}
+.so-how p {
+  margin: 0;
+  font: 400 14.5px / 1.5 var(--sans);
+  color: var(--ink);
+}
+.so-how .so-then {
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+/* On a wide screen the page stands in the middle, its button after the words, not at the foot. */
+@media (min-width: 48rem) {
+  .signed-out {
+    justify-content: center;
+    padding-block: 48px;
+  }
+  .signed-out .pair-bar {
+    position: static;
+    margin: 18px 0 0;
+    padding: 0;
+    background: none;
+    align-items: flex-start;
+  }
+  .signed-out .pair-bar .btn {
+    min-width: 200px;
+  }
+}
+
 /* ---- Emparejar un teléfono (#/lan): a dialog over Te toca (mock:736-742) ---- */
 .dialog code.inl {
   display: inline;

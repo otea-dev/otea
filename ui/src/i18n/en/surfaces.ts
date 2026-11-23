@@ -159,6 +159,19 @@ export const surfaces = {
   'pair.error.too_many_attempts': 'Too many tries. Wait a minute, then try again.',
   'pair.error.invalid_name': 'Give this phone a name of up to 60 characters.',
   'pair.error.other': 'Pairing failed: {message}',
+  // The session ran out: what this browser says instead of an empty project (SignedOut)
+  'signedOut.title': 'You are signed out',
+  'signedOut.text':
+    'This browser’s sign-in to Otea is no longer valid, so it cannot read your items. Nothing is lost: your work is still where Otea runs.',
+  'signedOut.browser': 'this browser',
+  'signedOut.state': 'signed out',
+  'signedOut.how': 'To get back in, run this in the project’s folder:',
+  'signedOut.then': 'It opens a new link, signed in. Then come back here and try again.',
+  'signedOut.app': 'In the desktop app, close it and open it again.',
+  'signedOut.phone':
+    'A phone that was paired is paired again from the computer, in Settings › Phone.',
+  'signedOut.retry': 'Try again',
+  'signedOut.trying': 'Trying…',
   'projects.label': 'projects',
   'projects.aria': 'Projects',
   'projects.waiting': 'Waiting for you',

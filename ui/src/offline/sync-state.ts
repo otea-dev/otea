@@ -12,15 +12,27 @@ export type SyncState = {
   // The PC answered through its door (Tailscale serve, 502) with nothing behind it: Otea itself
   // is closed there, rather than the PC out of reach.
   closed?: true;
+  // The PC answers, and refuses every read: this browser's sign-in ran out (P8-F4). Not offline:
+  // the app says so and shows the way back in, never an empty project.
+  signedOut?: true;
 };
 
 export type Read =
-  | { kind: 'fresh' }
+  // `open`: the answer of a call the PC gives anyone (the session's), which says nothing of the
+  // sign-in.
+  | { kind: 'fresh'; open?: true }
   | { kind: 'cached'; savedAt: number | null; closed?: true }
+  | { kind: 'refused' }
   | { kind: 'failed' };
 
 export function afterRead(state: SyncState, read: Read, now: number): SyncState {
-  if (read.kind === 'fresh') return { offline: false, syncedAt: now };
+  if (read.kind === 'refused') return { offline: false, syncedAt: state.syncedAt, signedOut: true };
+  if (read.kind === 'fresh') {
+    const kept = read.open === true && state.signedOut === true;
+    return kept
+      ? { offline: false, syncedAt: now, signedOut: true }
+      : { offline: false, syncedAt: now };
+  }
   const saved = read.kind === 'cached' ? read.savedAt : null;
   const syncedAt =
     saved === null ? state.syncedAt : Math.max(saved, state.syncedAt ?? Number.NEGATIVE_INFINITY);
@@ -43,7 +55,8 @@ function set(next: SyncState) {
   const same =
     next.offline === state.offline &&
     next.syncedAt === state.syncedAt &&
-    next.closed === state.closed;
+    next.closed === state.closed &&
+    next.signedOut === state.signedOut;
   if (same) return;
   state = next;
   for (const fn of [...listeners]) fn();

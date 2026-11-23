@@ -165,6 +165,19 @@ export const surfaces = {
   'pair.error.too_many_attempts': 'Demasiados intentos. Espera un minuto y vuelve a intentarlo.',
   'pair.error.invalid_name': 'Ponle a este teléfono un nombre de hasta 60 caracteres.',
   'pair.error.other': 'No se pudo emparejar: {message}',
+  // La sesión caducó: lo que dice este navegador en vez de un proyecto vacío (SignedOut)
+  'signedOut.title': 'Tu sesión caducó',
+  'signedOut.text':
+    'Este navegador ya no tiene la sesión iniciada en Otea, así que no puede leer tus ítems. No se perdió nada: tu trabajo sigue donde corre Otea.',
+  'signedOut.browser': 'este navegador',
+  'signedOut.state': 'sin sesión',
+  'signedOut.how': 'Para volver a entrar, ejecuta esto en la carpeta del proyecto:',
+  'signedOut.then': 'Abre un enlace nuevo, con la sesión iniciada. Luego vuelve aquí y reintenta.',
+  'signedOut.app': 'En la app de escritorio, ciérrala y ábrela de nuevo.',
+  'signedOut.phone':
+    'Un teléfono que estaba emparejado se empareja de nuevo desde el equipo, en Configuración › Teléfono.',
+  'signedOut.retry': 'Volver a intentar',
+  'signedOut.trying': 'Intentando…',
   'projects.label': 'proyectos',
   'projects.aria': 'Proyectos',
   'projects.waiting': 'Te esperan',
