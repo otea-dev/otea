@@ -179,6 +179,15 @@ export const surfaces = {
     one: 'Y {count} tema respondido más',
     other: 'Y {count} temas respondidos más',
   },
+  'projects.agents.title': 'Agentes',
+  'projects.agents.sub': 'en todos los proyectos',
+  'projects.agents.holding': { one: 'con {count} ítem', other: 'con {count} ítems' },
+  // The server's status for an agent (core/agent-status.ts), said in the words of the agents menu.
+  'projects.agent.working': 'trabajando',
+  'projects.agent.listening': 'escuchando',
+  'projects.agent.connected': 'conectado',
+  'projects.agent.silent': 'sin señal',
+  'projects.agent.away': 'ausente',
   'projects.withAgents': {
     one: 'No se listan aquí: {count} ítem con agentes, en {projects}.',
     other: 'No se listan aquí: {count} ítems con agentes, en {projects}.',
@@ -472,6 +481,11 @@ export const surfaces = {
   'perf.period.all': 'Todo',
   'perf.board': 'Tablero',
   'perf.allBoards': 'Todos los tableros',
+  'perf.scope': 'Alcance',
+  'perf.scope.project': 'Este proyecto',
+  'perf.scope.all': 'Todos los proyectos',
+  'perf.dekAll':
+    'Cómo rinde cada modelo en todos tus proyectos juntos: cuántas de sus entregas vuelven, cuántas rondas lleva terminar un paso y cuánto tarda en entregar.',
   'perf.reading.one': 'Con {model}, {back}.',
   'perf.reading.two': 'Con {model}, {back}; con {other}, {otherBack}.',
   'perf.reading.oneIn': '1 de cada {n} entregas vuelve',

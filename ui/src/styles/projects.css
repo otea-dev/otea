@@ -17,6 +17,76 @@
   color: var(--ink-3);
   max-width: 64ch;
 }
+/* The agents of every project, under the lanes: one quiet line each, the project they work in a link. */
+.inbox-agents {
+  padding-left: 72px;
+  margin: 8px 0 56px;
+  max-width: 720px;
+}
+.inbox-agents h2 {
+  font: 450 21px / 1.15 var(--serif);
+  font-variation-settings: "opsz" 24;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.inbox-agents .margin-label {
+  display: block;
+  margin: 4px 0 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  font: 400 11.5px / 1.45 var(--mono);
+}
+.inbox-agents ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+.inbox-agents li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-height: 44px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+  font: 400 15px / 1.35 var(--sans);
+  color: var(--ink-2);
+}
+.inbox-agents li b {
+  font-weight: 560;
+  color: var(--ink);
+}
+.inbox-agents .st {
+  font: 400 12px / 1 var(--mono);
+  color: var(--ink-3);
+}
+.inbox-agents li[data-status="working"] .st {
+  color: var(--you-ink);
+}
+.inbox-agents li[data-status="silent"] .st {
+  color: var(--warn);
+}
+.inbox-agents a {
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 3px;
+  transition: color 160ms var(--ease);
+}
+.inbox-agents a:hover {
+  color: var(--ink);
+}
+.inbox-agents .ct {
+  margin-left: auto;
+  font: 400 italic 14px / 1 var(--serif);
+  color: var(--ink-3);
+}
+@media (max-width: 720px) {
+  .inbox-agents {
+    padding-left: 0;
+  }
+}
 .row.inert {
   cursor: default;
 }

@@ -173,6 +173,15 @@ export const surfaces = {
     one: 'And {count} more answered topic',
     other: 'And {count} more answered topics',
   },
+  'projects.agents.title': 'Agents',
+  'projects.agents.sub': 'across every project',
+  'projects.agents.holding': { one: 'with {count} item', other: 'with {count} items' },
+  // The server's status for an agent (core/agent-status.ts), said in the words of the agents menu.
+  'projects.agent.working': 'working',
+  'projects.agent.listening': 'listening',
+  'projects.agent.connected': 'connected',
+  'projects.agent.silent': 'no signal',
+  'projects.agent.away': 'away',
   'projects.withAgents': {
     one: 'Not listed here: {count} item with agents, in {projects}.',
     other: 'Not listed here: {count} items with agents, in {projects}.',
@@ -468,6 +477,11 @@ export const surfaces = {
   'perf.period.all': 'All',
   'perf.board': 'Board',
   'perf.allBoards': 'All boards',
+  'perf.scope': 'Scope',
+  'perf.scope.project': 'This project',
+  'perf.scope.all': 'All projects',
+  'perf.dekAll':
+    'How each model performs across all your projects together: how many of its handoffs come back, how many rounds a step takes to finish and how long it takes to hand off.',
   'perf.reading.one': 'With {model}, {back}.',
   'perf.reading.two': 'With {model}, {back}; with {other}, {otherBack}.',
   'perf.reading.oneIn': '1 in {n} handoffs comes back',

@@ -5,11 +5,12 @@ import { onPublishedBoard } from '../board-studio/home/boards-store.ts';
 import { agentOf, askingAgent, type TocaSection, tocaSection } from '../derive/toca.ts';
 import { whenText } from '../derive/when.ts';
 import { listOf, t, tx } from '../i18n/i18n.ts';
+import { AgentMark } from '../kit/Marks.tsx';
 import { LaneHead } from '../lanes/LaneHead.tsx';
 import { type LaneBlock, LaneList } from '../lanes/LaneList.tsx';
 import { lookOf } from '../lanes/looks.ts';
 import { keptStateWord, stateWord } from '../preset-words.ts';
-import { inboxOf, itemHref, whereOf } from '../projects.ts';
+import { agentsAcross, inboxOf, itemHref, projectHref, whereOf } from '../projects.ts';
 import { topicsHash } from '../selection.ts';
 import { capped } from '../topics.ts';
 import type { AnsweredTopic, Item, ProjectOverview } from '../types.ts';
@@ -248,6 +249,34 @@ export function elsewhereBlocks(project: ProjectOverview): LaneBlock[] {
   return blocks;
 }
 
+// The agents of every project, under the lanes (P6-F3): who works where, so nobody opens each
+// project to know. Each says the server's word for it (status), and its project opens on click.
+export function AcrossAgents({ projects }: { projects: readonly ProjectOverview[] }) {
+  const agents = agentsAcross(projects);
+  if (agents.length === 0) return null;
+  return (
+    <section className="inbox-agents" data-leaf="" aria-labelledby="inbox-agents-h">
+      <h2 id="inbox-agents-h">{t('projects.agents.title')}</h2>
+      <span className="margin-label">{t('projects.agents.sub')}</span>
+      <ul>
+        {agents.map((agent) => (
+          <li key={`${agent.project.id}:${agent.name}`} data-status={agent.status}>
+            <AgentMark name={agent.name} decorative />
+            <b>{agent.name}</b>
+            <span className="st">
+              {t(`projects.agent.${agent.status}` as 'projects.agent.working')}
+            </span>
+            <a href={projectHref(agent.project)}>{agent.project.name}</a>
+            {agent.holding > 0 ? (
+              <span className="ct">{t('projects.agents.holding', { count: agent.holding })}</span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function ProjectsInbox() {
   const app = useApp();
   const name = app.project?.name ?? '';
@@ -311,6 +340,7 @@ export function ProjectsInbox() {
               : null}
           </p>
         ) : null}
+        <AcrossAgents projects={projects} />
       </section>
       <aside className="agents" data-leaf="" />
     </div>

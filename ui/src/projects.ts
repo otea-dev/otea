@@ -1,6 +1,41 @@
+import type { AgentStatus } from '../../src/core/agent-status.ts';
 import { projectPage } from './base.ts';
 import { hashFor } from './selection.ts';
 import type { ProjectOverview, WaitingItem } from './types.ts';
+
+// An agent in one of the projects, with the server's status for it there (core/agent-status.ts).
+export type AcrossAgent = {
+  name: string;
+  status: AgentStatus;
+  holding: number;
+  project: Pick<ProjectOverview, 'id' | 'name' | 'current'>;
+};
+
+// What needs a look first: no signal, then at work, then waiting, then merely connected.
+const ATTENTION: readonly AgentStatus[] = ['silent', 'working', 'listening', 'connected', 'away'];
+
+// The agents of every readable project, the ones that need a look first. The same agent working in
+// two projects is two rows: each is its own session of work. Away ones are never listed.
+export function agentsAcross(projects: readonly ProjectOverview[]): AcrossAgent[] {
+  return projects
+    .filter((project) => project.unavailable === undefined)
+    .flatMap((project) =>
+      (project.agents ?? [])
+        .filter((agent) => agent.status !== 'away')
+        .map((agent) => ({
+          name: agent.name,
+          status: agent.status,
+          holding: agent.holding,
+          project: { id: project.id, name: project.name, current: project.current },
+        })),
+    )
+    .sort(
+      (a, b) =>
+        ATTENTION.indexOf(a.status) - ATTENTION.indexOf(b.status) ||
+        a.project.name.localeCompare(b.project.name) ||
+        a.name.localeCompare(b.name),
+    );
+}
 
 // What the projects inbox shows: the projects with something waiting for you, in the registry's
 // order, and what stays out of it (items with agents, projects with nothing open).
@@ -48,7 +83,7 @@ export function itemHref(project: ProjectOverview, item: WaitingItem): string {
   return projectPage(project.id, hashFor(item.id));
 }
 
-export function projectHref(project: ProjectOverview): string {
+export function projectHref(project: Pick<ProjectOverview, 'id' | 'current'>): string {
   if (project.current) return '#/';
   return projectPage(project.id);
 }
