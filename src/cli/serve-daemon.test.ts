@@ -93,6 +93,27 @@ describe('serve start, status and stop', () => {
     expect(after.code).toBe(11);
   }, 60_000);
 
+  // The desktop app's server shares serve.json: otea serve stop must not close it under the window.
+  it("refuses to stop the desktop app's server unless --force, and records a daemon as one", async () => {
+    const started = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
+    expect(started.code).toBe(0);
+    const info = readServeFile(home());
+    if (!info) throw new Error('serve start left no serve.json');
+    expect(info.owner).toBe('daemon');
+    writeFileSync(join(home(), SERVE_FILE), JSON.stringify({ ...info, owner: 'desktop' }));
+
+    const refused = await spawnCli(repo.dir, 'serve', 'stop');
+
+    expect(refused.code).toBe(7);
+    expect(refused.err).toContain('belongs to the Otea desktop app');
+    expect(processAlive(info.pid)).toBe(true);
+
+    const forced = await spawnCli(repo.dir, 'serve', 'stop', '--force');
+
+    expect(forced.out).toBe(`Stopped otea serve (pid ${info.pid}, port ${info.port})\n`);
+    expect(processAlive(info.pid)).toBe(false);
+  }, 60_000);
+
   // A harness reads a command's output through a pipe until the pipe closes. A server that held it
   // open (Windows lets a child inherit every handle of its parent) kept that read, and the agent's
   // call with it, running for as long as the server did.

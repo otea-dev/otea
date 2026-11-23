@@ -79,7 +79,9 @@ describe('a server started by another version of Otea', () => {
 
     expect(code).toBe(0);
     const [running, notice, rest] = out.split('\n');
-    expect(running).toMatch(/^otea serve is running at http:\/\/127\.0\.0\.1:\d+ \(pid \d+, port \d+\)$/);
+    expect(running).toMatch(
+      /^otea serve is running at http:\/\/127\.0\.0\.1:\d+ \(pid \d+, port \d+\)$/,
+    );
     expect(notice).toBe(
       `The server running here (pid ${process.pid}) is an older Otea (it recorded no version), and ${OTEA_VERSION} is installed: if the Otea desktop app started it, ${APP}; if otea serve start did, ${STOP_START}`,
     );
@@ -98,7 +100,9 @@ describe('a server started by another version of Otea', () => {
 
         expect(code).toBe(0);
         expect(out).toContain(said);
-        expect(out).toContain(`${OTEA_VERSION} is installed: to use the installed one, ${STOP_START}`);
+        expect(out).toContain(
+          `${OTEA_VERSION} is installed: to use the installed one, ${STOP_START}`,
+        );
       });
 
       it('serve status --json says a restart is needed', async () => {
@@ -179,28 +183,31 @@ describe('a server started by another version of Otea', () => {
         ['serve start', ['serve', 'start', '--no-open']],
         ['start', ['start', '--template', 'none', '--no-open']],
         ['open --no-open', ['open', '--no-open']],
-      ])('%s says to stop that otea serve and run it again, never otea serve stop', async (_c, args) => {
-        await serveAs(version, 'foreground');
+      ])(
+        '%s says to stop that otea serve and run it again, never otea serve stop',
+        async (_c, args) => {
+          await serveAs(version, 'foreground');
 
-        const { code, out } = await run(...args);
+          const { code, out } = await run(...args);
 
-        expect(code).toBe(0);
-        expect(out).toContain(said);
-        expect(out).toContain(
-          `${OTEA_VERSION} is installed: it is an otea serve running in a terminal, so stop it there (Ctrl+C) and run otea serve again`,
-        );
-        expect(out).not.toContain('serve stop');
-      });
+          expect(code).toBe(0);
+          expect(out).toContain(said);
+          expect(out).toContain(
+            `${OTEA_VERSION} is installed: it is an otea serve running in a terminal, so stop it there (Ctrl+C) and run otea serve again`,
+          );
+          expect(out).not.toContain('serve stop');
+        },
+      );
     });
   });
 
-  it('serve stop refuses the desktop app\'s server without --force, and leaves it running', async () => {
+  it("serve stop refuses the desktop app's server without --force, and leaves it running", async () => {
     await serveAs(OTEA_VERSION, 'desktop');
 
     const { code, err } = await run('serve', 'stop');
 
     expect(code).toBe(7);
-    expect(err).toContain("belongs to the Otea desktop app");
+    expect(err).toContain('belongs to the Otea desktop app');
     expect(err).toContain('--force');
     expect(recorded()).toMatchObject({ pid: process.pid });
   });
