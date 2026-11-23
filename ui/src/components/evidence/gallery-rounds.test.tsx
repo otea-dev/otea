@@ -121,18 +121,37 @@ describe('the desk gallery when a round attached the same file again', () => {
 
   it('says so beside Comparar, and in the compare itself', () => {
     setLanguage('es');
-    const el = draw([first, same(logo2, 'aa')], new Map([[2, 1], [4, 2]]));
+    const el = draw(
+      [first, same(logo2, 'aa')],
+      new Map([
+        [2, 1],
+        [4, 2],
+      ]),
+    );
     expect(el.textContent).toContain('Igual que la ronda 1: el archivo no cambió');
     act(() => button(el, 'Comparar con la ronda 1')?.click());
-    expect(el.querySelector('.ev-compare')?.textContent).toContain('no cambió');
+    expect(el.querySelector('.ev-compare')).not.toBeNull();
+    expect(el.textContent).toContain('Igual que la ronda 1: el archivo no cambió');
   });
 
   it('says nothing when the bytes changed, or when no hash is known', () => {
     setLanguage('es');
-    const changed = draw([first, same(logo2, 'bb')], new Map([[2, 1], [4, 2]]));
+    const changed = draw(
+      [first, same(logo2, 'bb')],
+      new Map([
+        [2, 1],
+        [4, 2],
+      ]),
+    );
     expect(changed.textContent).not.toContain('no cambió');
     act(() => root?.unmount());
-    const unknown = draw([same(logo1, ''), same(logo2, '')], new Map([[2, 1], [4, 2]]));
+    const unknown = draw(
+      [same(logo1, ''), same(logo2, '')],
+      new Map([
+        [2, 1],
+        [4, 2],
+      ]),
+    );
     expect(unknown.textContent).not.toContain('no cambió');
   });
 });

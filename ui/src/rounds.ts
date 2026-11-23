@@ -230,6 +230,13 @@ export function namePairs(
   return [...pairs, ...older.filter((e) => !used.has(e)).map((before) => ({ before }))];
 }
 
+// Whether a round holds the very bytes of the file it is compared with (P5-F1): an agent may meet a
+// part new each round by attaching the same file again, so the review says nothing changed. A file
+// with no known hash is never called the same.
+export function sameBytes(before: Evidence | undefined, after: Evidence | undefined): boolean {
+  return !!before && !!after && before.sha256 !== '' && before.sha256 === after.sha256;
+}
+
 // The two files of a module Comparar rondas shows for rounds A and B: the newest of B's with its
 // pair by name in A (namePairs); with no pair, the newest of each, as a module with one file a
 // round has.

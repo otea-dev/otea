@@ -10,7 +10,7 @@ import { comparePair, nudgeSplit, splitAt, stepIndex } from '../../evidence.ts';
 import { useFileUrl } from '../../evidence-files.ts';
 import { t } from '../../i18n/i18n.ts';
 import { Button, Icon } from '../../kit/index.ts';
-import { earlierRoundPair } from '../../rounds.ts';
+import { earlierRoundPair, sameBytes } from '../../rounds.ts';
 import type { Evidence } from '../../types.ts';
 import { stepWithArrows } from './arrows.ts';
 import { FileMeta } from './FileMeta.tsx';
@@ -34,6 +34,15 @@ export function ImageSingle({ evidence }: { evidence: Evidence }) {
   );
 }
 
+// The review's word when a round holds the very bytes of the round it is compared with (P5-F1).
+function SameNote({ from }: { from: number }) {
+  return (
+    <p className="t-cap ev-same" role="status">
+      {t('evidence.sameAsRound', { n: from })}
+    </p>
+  );
+}
+
 // Every image, oldest first: one large, the rest as thumbnails. It opens on the newest (the latest
 // round's), and follows a newer one that arrives until another is picked. Left and right step
 // through them. On a reviewed item each says the round it came in, the thumbnails too (P5-5), and
@@ -54,6 +63,7 @@ export function ImageGallery({ evidence, label }: { evidence: Evidence[]; label:
   if (!current) return null;
   const many = evidence.length > 1;
   const earlier = roundOf ? earlierRoundPair(evidence, roundOf, current) : undefined;
+  const unchanged = earlier !== undefined && sameBytes(earlier.before, current);
   if (comparing && earlier) {
     const names = {
       before: t('evidence.roundTag', { n: earlier.from }),
@@ -74,6 +84,7 @@ export function ImageGallery({ evidence, label }: { evidence: Evidence[]; label:
           ]}
           names={names}
         />
+        {unchanged ? <SameNote from={earlier.from} /> : null}
       </section>
     );
   }
@@ -125,6 +136,7 @@ export function ImageGallery({ evidence, label }: { evidence: Evidence[]; label:
       <FileMeta evidence={current} />
       {earlier ? (
         <div className="ev-gallery-tools">
+          {unchanged ? <SameNote from={earlier.from} /> : null}
           <Button size="sm" onClick={() => setComparing(true)}>
             {t('evidence.compareWithRound', { n: earlier.from })}
           </Button>
