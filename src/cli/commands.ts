@@ -1739,7 +1739,16 @@ function refuseUnlandedCommit(project: Project, cwd: string, move: BoardMoveInpu
   // A tip recorded as unchanged (main held nothing the remote lacked at the handoff) is checked
   // too: an agent that pushed before handing off got it that way, and wrote an older hash.
   const approved = tip && { commit: tip.commit };
-  const refused = landedCommitRefusal(cwd, part.name, value, base, approved);
+  // The commit must be this item's own (P1-F3): not one another item of the board landed with, and
+  // not one made before this item was first taken.
+  const others = listItems(project, { collection: item.collection }).flatMap((other) => {
+    const written = other.id === item.id ? undefined : other.fields[part.id];
+    return typeof written === 'string' ? [{ id: other.id, value: written }] : [];
+  });
+  const taken = item.events.find(({ type }) => type === 'claimed');
+  const claimedAt = taken === undefined ? Number.NaN : Date.parse(taken.at);
+  const own = { others, ...(Number.isNaN(claimedAt) ? {} : { claimedAt }) };
+  const refused = landedCommitRefusal(cwd, part.name, value, base, approved, own);
   if (refused) throw new OteaError('missing_fields', `${item.id} not handed off: ${refused}`);
 }
 
