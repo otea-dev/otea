@@ -2,6 +2,7 @@ import type { MergedOutside } from '../../src/cli/merged-outside.ts';
 import { withoutUndone } from '../../src/core/board/history.ts';
 import type { PerformanceView } from '../../src/core/board/performance.ts';
 import type { NotifyPrefs } from '../../src/core/notify/planner.ts';
+import { SURFACE_HEADER } from '../../src/core/surface.ts';
 import type { DiffOffTip } from '../../src/server/diff-tip.ts';
 import type { Drift } from '../../src/server/drift.ts';
 import type { FeedEvent } from './activity.ts';
@@ -168,12 +169,15 @@ async function post<T>(
   const form = payload instanceof FormData;
   const response = await fetch(apiUrl(path), {
     method: 'POST',
+    // Every write says it comes from the page (core/surface.ts), so the history can tell it from a
+    // direct call made with the same session.
     headers: form
-      ? { accept: 'application/json', ...languageHeader(), ...extra }
+      ? { accept: 'application/json', ...languageHeader(), [SURFACE_HEADER]: '1', ...extra }
       : {
           accept: 'application/json',
           'content-type': 'application/json',
           ...languageHeader(),
+          [SURFACE_HEADER]: '1',
           ...extra,
         },
     body: form ? payload : JSON.stringify(payload),

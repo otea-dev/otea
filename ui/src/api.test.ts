@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { SURFACE_HEADER } from '../../src/core/surface.ts';
 import {
   fetchCollections,
   fetchItem,
@@ -6,9 +7,11 @@ import {
   fetchProject,
   fetchSession,
   freshPairingCode,
+  moveItem,
   reassignItem,
   restartItem,
   resumeItem,
+  undoMove,
   undoRelease,
 } from './api.ts';
 import {
@@ -53,6 +56,24 @@ describe('a stuck item, from the UI', () => {
     stubFetch();
     await undoRelease('ERR-7');
     expect(calls).toEqual([{ path: '/api/items/ERR-7/undo', body: { release: true } }]);
+  });
+});
+
+// P1-S1: the page says it is the page on every write, so the record tells its moves from a direct
+// API call made with the same session.
+describe('a move, from the UI', () => {
+  it('says it comes from the page, as a direct call does not', async () => {
+    const heard: Headers[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_path: string, init: RequestInit) => {
+        heard.push(new Headers(init.headers));
+        return new Response('{}', { status: 200 });
+      }),
+    );
+    await moveItem('ERR-7', 'done', '');
+    await undoMove('ERR-7', 'review');
+    expect(heard.map((headers) => headers.get(SURFACE_HEADER))).toEqual(['1', '1']);
   });
 });
 

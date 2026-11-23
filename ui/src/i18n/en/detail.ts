@@ -593,6 +593,10 @@ export const detail = {
   'sheet.h.youMoved': 'You moved it to {state}',
   'sheet.h.relayed': 'Relayed by {via}, quoting "{quote}": {state}',
   'sheet.h.relayedBare': 'Relayed by {via}: {state}',
+  // Where a move of yours came from, under «you» (P1-S1).
+  'sheet.h.fromDesk': 'on the desk',
+  'sheet.h.fromPhone': 'from the phone',
+  'sheet.h.fromApi': 'by a direct API call, not from the desk or the phone',
   'sheet.h.agentApproved': 'Approved it: on to {state}',
   'sheet.h.agentSentBack': 'Sent it back to {state} with notes',
   'sheet.h.agentClosed': 'Closed it: {state}',
