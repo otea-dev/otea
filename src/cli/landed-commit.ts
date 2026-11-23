@@ -66,6 +66,41 @@ function remoteOfBase(cwd: string, base: string): string | undefined {
 // The work the person approved: what the item's handoff into review recorded (app/tips.ts).
 export type ApprovedWork = { commit: string };
 
+// What tells a commit is this item's own (P1-F3): the other items of its board with what they wrote
+// in the same field, and when this item was first taken (ms), if it ever was. An item that made no
+// commit went Done writing the hash of main, which was another item's.
+export type Ownership = { others: { id: string; value: string }[]; claimedAt?: number };
+
+// The refusal of a named commit that cannot be this item's work: another item landed with it, or it
+// was made before this item was taken (its committer date, which a rebase moves to when the work
+// was rebuilt). Undefined when each is fine, or when there is no claim to tell the time by.
+function notItsOwn(
+  cwd: string,
+  name: string,
+  commits: { word: string; full: string }[],
+  own: Ownership,
+): string | undefined {
+  const taken = new Map<string, string>();
+  for (const { id, value } of own.others) {
+    for (const word of value.match(HASH) ?? []) {
+      const full = commitOf(cwd, word.toLowerCase());
+      if (full !== undefined && !taken.has(full)) taken.set(full, id);
+    }
+  }
+  for (const { word, full } of commits) {
+    const holder = taken.get(full);
+    if (holder !== undefined) {
+      return `${name}: commit ${word} is already the commit ${holder} landed with, so it is not this item's work. Commit this item's own change and write the hash of that commit (git rev-parse --short HEAD).`;
+    }
+    if (own.claimedAt === undefined) continue;
+    const seconds = Number(git(cwd, 'show', '-s', '--format=%ct', full));
+    if (Number.isFinite(seconds) && seconds < Math.floor(own.claimedAt / 1000)) {
+      return `${name}: commit ${word} was made before this item was taken, so it is not this item's work. Commit this item's own change and write the hash of that commit (git rev-parse --short HEAD).`;
+    }
+  }
+  return undefined;
+}
+
 // The refusal of a handoff whose `name` field does not hold a commit of `base` as it stands now, or
 // undefined when it does. Every commit it names must be in the base: with a remote, on the remote's
 // branch of it as the remote has it now (a fetch, then git branch -r --contains), since a push a
@@ -79,6 +114,7 @@ export function landedCommitRefusal(
   value: string,
   base: string,
   approved?: ApprovedWork,
+  own: Ownership = { others: [] },
 ): string | undefined {
   const words = [...new Set((value.match(HASH) ?? []).map((id) => id.toLowerCase()))];
   const said = `${name} says "${value.trim().slice(0, 60)}"`;
@@ -136,6 +172,8 @@ export function landedCommitRefusal(
     }
     return `${name}: commit ${word} is not on ${upstream}. Write the hash of a commit of ${base} that is pushed (git rev-parse --short ${upstream}).`;
   }
+  const foreign = notItsOwn(cwd, name, commits, own);
+  if (foreign !== undefined) return foreign;
   if (approved === undefined) return undefined;
   const work = commitOf(cwd, approved.commit);
   if (work === undefined) {

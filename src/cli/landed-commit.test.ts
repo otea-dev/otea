@@ -224,6 +224,8 @@ describe('the commit a board says it landed', () => {
     // commit. It holds that "work", yet it was made before the item was taken.
     it('refuses the tip of main at the handoff of an item that made no commit', () => {
       commit('base.txt');
+      execFileSync('git', ['init', '--quiet', '--bare', '-b', 'main', origin], { stdio: 'ignore' });
+      git(dir, 'remote', 'add', 'origin', origin);
       git(dir, 'push', '-q', 'origin', 'main');
       const theirs = commitOn('a.txt', '2026-11-20T10:00:00Z');
       git(dir, 'push', '-q', 'origin', 'main');
