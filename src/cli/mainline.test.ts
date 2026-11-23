@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { updateItem } from '../app/items.ts';
+import { getItem, updateItem } from '../app/items.ts';
+import { claimItem } from '../app/leases.ts';
 import { approveItem, liveBoardOf } from '../app/next.ts';
 import { openProject } from '../app/project.ts';
 import { stateOf } from '../core/board/engine.ts';
@@ -286,6 +287,37 @@ describe('the Code on main board', () => {
     const own = await otea('handoff', third);
     expect(own.code, own.err).toBe(0);
     expect(own.out).toContain(`${third} is Done`);
+  });
+
+  // Only the item's first claim tells what was on main before it: the claim of the landing step
+  // comes after the agent's own commit, whose tips hold it, and must not refuse that commit.
+  it('takes the own commit of an item whose first claim recorded no tips, though a later claim did', async () => {
+    const project = openProject(repo.dir);
+    try {
+      claimItem(project, { id, actor: { kind: 'agent', name: 'lu' } });
+    } finally {
+      project.db.close();
+    }
+    change('regar.py', 'print(2)\n');
+    const head = git('rev-parse', '--short', 'HEAD');
+    expect((await otea('release', id)).code).toBe(0);
+    moveTo(id, 'Subir');
+    // The landing step's claim: it records the tips, and they hold head.
+    expect((await otea('claim', id)).code).toBe(0);
+    const read = openProject(repo.dir);
+    try {
+      const claims = getItem(read, id).events.filter(({ type }) => type === 'claimed');
+      expect(claims.map(({ data }) => data.baseTips)).toEqual([
+        undefined,
+        [git('rev-parse', 'HEAD')],
+      ]);
+    } finally {
+      read.db.close();
+    }
+    expect((await otea('update', id, '--field', `Commit subido=${head}`)).code).toBe(0);
+    const landed = await otea('handoff', id);
+    expect(landed.code, landed.err).toBe(0);
+    expect(landed.out).toContain(`${id} is Done`);
   });
 
   // P1-F2: the board says to work on main with no branch, and the notice said to make a worktree

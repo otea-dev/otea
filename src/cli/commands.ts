@@ -1707,14 +1707,17 @@ function boardMove(
 
 // What a claim records of the checkout it is made in (P1-F3): where the base its item's board
 // protects stands, so the commit an item later says it landed is told from what was already there.
-// Nothing for an item whose board protects no base. The FIRST claim with tips counts later, not each
-// step's: an item sent back for another round keeps the commits it made in the first.
+// Nothing ([]) for an item whose board protects no base. Only the item's FIRST claim counts later,
+// not each step's: an item sent back for another round keeps the commits it made in the first.
+// Git is asked here, for every board's base, before the claim's transaction opens: the lookup it
+// returns reads a map.
 function claimedBaseTips(project: Project, cwd: string): BaseTips {
-  return (item) => {
-    const board = liveBoardOf(project, item.collection);
-    const base = board && guardedBranch(board.def)?.guard.base;
-    return base === undefined ? [] : baseTipsOf(cwd, base);
-  };
+  const byCollection = new Map<string, string[]>();
+  for (const board of liveBoards(project)) {
+    const base = guardedBranch(board.def)?.guard.base;
+    if (base !== undefined) byCollection.set(board.collection, baseTipsOf(cwd, base));
+  }
+  return (item) => byCollection.get(item.collection) ?? [];
 }
 
 // A board that says a commit landed on its base (Commit pushed, Commit en main: the guard's
@@ -1752,9 +1755,11 @@ function refuseUnlandedCommit(project: Project, cwd: string, move: BoardMoveInpu
       ? [{ id: other.id, value: written }]
       : [];
   });
-  const claimTips = item.events
-    .map(({ type, data }) => (type === 'claimed' ? data.baseTips : undefined))
-    .find((tips): tips is string[] => Array.isArray(tips));
+  // Only the item's first claim: a later one (the landing step's, after its own commit) holds the
+  // item's own work. Without tips on it (an older item, or a claim made with no checkout) the rule
+  // is skipped.
+  const firstTips = item.events.find(({ type }) => type === 'claimed')?.data.baseTips;
+  const claimTips = Array.isArray(firstTips) ? (firstTips as string[]) : undefined;
   const own = { landed, ...(claimTips ? { claimTips } : {}) };
   const refused = landedCommitRefusal(cwd, part.name, value, base, approved, own);
   if (refused) throw new OteaError('missing_fields', `${item.id} not handed off: ${refused}`);

@@ -214,10 +214,25 @@ describe('the commit a board says it landed', () => {
       expect(ask(theirs, { landed: [], claimTips }, approved)).toContain(
         'was already on the base when this item was taken',
       );
-      // The remote-tracking tip counts too: commits pushed by others that this checkout has not
-      // merged were on the base before the item began.
-      git(dir, 'reset', '-q', '--hard', 'HEAD~1');
-      expect(baseTipsOf(dir, 'main')).toHaveLength(2);
+    });
+
+    // Commits others pushed that this checkout has not merged were on the base before the item
+    // began: the remote-tracking tip is recorded too, and a commit only origin/main holds is refused.
+    it('records the remote-tracking tip, and refuses a commit only origin/main holds', () => {
+      commit('base.txt');
+      execFileSync('git', ['init', '--quiet', '--bare', '-b', 'main', origin], { stdio: 'ignore' });
+      git(dir, 'remote', 'add', 'origin', origin);
+      git(dir, 'push', '-q', 'origin', 'main');
+      const behind = head();
+      const theirs = commit('a.txt');
+      git(dir, 'push', '-q', 'origin', 'main');
+      git(dir, 'reset', '-q', '--hard', behind);
+      const tips = baseTipsOf(dir, 'main');
+      expect(tips).toHaveLength(2);
+      const own = (claimTips: string[]) => ({ landed: [], claimTips });
+      // Against the local tip alone the commit looks new; against both tips it was already there.
+      expect(ask(theirs, own([behind]))).toBeUndefined();
+      expect(ask(theirs, own(tips))).toContain('was already on the base when this item was taken');
     });
 
     // A claim of B, then A commits and lands X: B writing X is refused, though X came after B's
