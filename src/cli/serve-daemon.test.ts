@@ -382,18 +382,24 @@ describe('serve start, status and stop', () => {
   }, 60_000);
 
   it('cleans up the record of a server that ended, and starts anew over it', async () => {
-    const gone = spawnSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))']);
+    // A process id no system hands out (Windows ids are multiples of 4, Linux stops at 2^22, macOS
+    // at 99999). The id of a process that has just ended is not a safe "gone": Windows gives it to
+    // the next process within seconds, and a busy runner starts hundreds. With the id alive again
+    // (and this home without a key), `serve start` rightly refuses to end what it cannot confirm,
+    // which is what made this test fail now and then.
+    const gone = 2_147_483_646;
+    expect(processAlive(gone)).toBe(false);
     mkdirSync(home(), { recursive: true });
-    writeFileSync(join(home(), SERVE_FILE), JSON.stringify({ port: 1, pid: Number(gone.stdout) }));
+    writeFileSync(join(home(), SERVE_FILE), JSON.stringify({ port: 1, pid: gone }));
 
     const status = await spawnCli(repo.dir, 'serve', 'status');
     expect(status.code).toBe(11);
     expect(existsSync(join(home(), SERVE_FILE))).toBe(false);
 
-    writeFileSync(join(home(), SERVE_FILE), JSON.stringify({ port: 1, pid: Number(gone.stdout) }));
+    writeFileSync(join(home(), SERVE_FILE), JSON.stringify({ port: 1, pid: gone }));
     const started = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
-    expect(started.code).toBe(0);
-    expect(readServeFile(home())?.pid).not.toBe(Number(gone.stdout));
+    expect(started.code, `${started.out}${started.err}`).toBe(0);
+    expect(readServeFile(home())?.pid).not.toBe(gone);
   }, 60_000);
 
   it('never ends a live process on the recorded port that answers something else', async () => {
