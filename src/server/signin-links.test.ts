@@ -129,7 +129,8 @@ describe('single-use sign-in links', () => {
   // The one-moment test above passes by luck on most runs: two processes have to read before either
   // removes. The same race, run round after round by processes that stay up, shows it every time.
   it('is used up by exactly one process in every one of many rounds of simultaneous redeems', async () => {
-    const rounds = 150;
+    // With the claim broken ('w' for 'wx') even 10 rounds failed in 5 of 5 runs; 30 leaves margin.
+    const rounds = 30;
     const processes = 4;
     const links = Array.from({ length: rounds }, () => issueSignInLink(home));
     writeFileSync(join(home, 'links'), links.join('\n'));
@@ -209,7 +210,7 @@ describe('single-use sign-in links', () => {
       (_, round) => lines.filter((own) => own[round + 1] === 'true').length,
     );
     expect(wins.filter((count) => count !== 1)).toEqual([]);
-  }, 90_000);
+  }, 60_000);
 
   it('does not clear a link another process is still writing, and survives a missing folder', () => {
     // issuing the first link finds no folder yet, and no error comes of sweeping it.
