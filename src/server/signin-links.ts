@@ -74,6 +74,11 @@ export function redeemSignInLink(home: string, given: string, now = Date.now()):
   } catch {
     return false;
   }
-  rmSync(path, { force: true });
+  try {
+    rmSync(path, { force: true });
+  } catch {
+    // Windows can refuse (EPERM, EBUSY) while another process still holds the file open. The link is
+    // used up by the mark already, and the sweep clears the file when it ends: this sign-in goes on.
+  }
   return endsAt > now;
 }

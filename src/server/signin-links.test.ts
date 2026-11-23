@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -10,7 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Project } from '../app/project.ts';
 import { createServer, type OteaServer } from './server.ts';
 import {
@@ -20,6 +20,13 @@ import {
   SIGNIN_LINK_LIFETIME_MS,
 } from './signin-links.ts';
 import { memoryProject, request, TOKEN } from './testing.ts';
+
+// Wraps rmSync so a test can make one remove fail the way Windows does (EBUSY); it runs as the real
+// one otherwise.
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return { ...actual, rmSync: vi.fn(actual.rmSync) };
+});
 
 // P3-F5: what a command prints for a person to open by hand is worth one sign-in, not the key.
 describe('single-use sign-in links', () => {
@@ -35,6 +42,16 @@ describe('single-use sign-in links', () => {
     const link = issueSignInLink(home);
 
     expect(link).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(redeemSignInLink(home, link)).toBe(true);
+    expect(redeemSignInLink(home, link)).toBe(false);
+  });
+
+  it('signs in the winner, and burns the link, when removing the link file is refused', () => {
+    const link = issueSignInLink(home);
+    vi.mocked(rmSync).mockImplementationOnce(() => {
+      throw Object.assign(new Error('resource busy or locked'), { code: 'EBUSY' });
+    });
+
     expect(redeemSignInLink(home, link)).toBe(true);
     expect(redeemSignInLink(home, link)).toBe(false);
   });
@@ -124,7 +141,9 @@ describe('single-use sign-in links', () => {
       'import(module).then((m) => {',
       "  console.log('ready');",
       '  links.forEach((link, round) => {',
-      '    while (!fs.existsSync(path.join(go, String(round)))) {}',
+      // A short sleep between looks: a busy loop starves the parent on a runner with two cores.
+      '    while (!fs.existsSync(path.join(go, String(round))))',
+      '      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1);',
       '    console.log(m.redeemSignInLink(home, link));',
       '  });',
       '});',
@@ -132,6 +151,8 @@ describe('single-use sign-in links', () => {
     const go = join(home, 'rounds');
     mkdirSync(go);
     const lines: string[][] = [];
+    const crashed: string[] = [];
+    const spawned: ChildProcess[] = [];
     const children = Array.from({ length: processes }, (_, index) => {
       lines[index] = [];
       const child = spawn(
@@ -146,24 +167,40 @@ describe('single-use sign-in links', () => {
         ],
         { stdio: ['ignore', 'pipe', 'inherit'] },
       );
+      spawned.push(child);
       let pending = '';
       child.stdout.on('data', (chunk) => {
         const parts = (pending + String(chunk)).split('\n');
         pending = parts.pop() ?? '';
         lines[index]?.push(...parts.map((part) => part.trim()));
       });
-      return new Promise<void>((resolve) => child.on('close', () => resolve()));
+      return new Promise<void>((resolve) =>
+        child.on('close', (code) => {
+          if (lines[index]?.length !== rounds + 1) crashed.push(`child ${index} exited (${code})`);
+          resolve();
+        }),
+      );
     });
     const everyone = (count: number) => lines.every((own) => own.length >= count);
+    // Waits for a round to be answered, and fails at once when a child died before its last round
+    // instead of waiting out the cap.
     const until = async (done: () => boolean) => {
       const limit = Date.now() + 45_000;
-      while (!done() && Date.now() < limit) await new Promise((resolve) => setTimeout(resolve, 5));
+      while (!done() && Date.now() < limit) {
+        if (crashed.length > 0) throw new Error(crashed.join('; '));
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
     };
 
-    await until(() => everyone(1));
-    for (let round = 0; round < rounds; round += 1) {
-      writeFileSync(join(go, String(round)), '');
-      await until(() => everyone(round + 2));
+    try {
+      await until(() => everyone(1));
+      for (let round = 0; round < rounds; round += 1) {
+        writeFileSync(join(go, String(round)), '');
+        await until(() => everyone(round + 2));
+      }
+    } catch (error) {
+      for (const child of spawned) child.kill();
+      throw error;
     }
     await Promise.all(children);
 
