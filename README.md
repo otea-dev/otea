@@ -170,6 +170,8 @@ otea --version
 
 That is for macOS and Linux (and Git Bash). `~` is not expanded everywhere (PowerShell and cmd pass it as it is), so the commands spell the folder with `$HOME`. On Windows the command lands in the prefix folder itself, not in a `bin` subfolder: in PowerShell run `npm i -g --prefix "$HOME\.otea-npm" @otea/cli` (in cmd, `%USERPROFILE%\.otea-npm`) and add that folder to your `PATH`. Update and remove with the same `--prefix` (`npm i -g --prefix "$HOME/.otea-npm" @otea/cli`, `npm uninstall -g --prefix "$HOME/.otea-npm" @otea/cli`).
 
+**On Windows, `otea` not found or "Cannot find module ...otea.mjs" in an agent's shell?** npm, not Otea, writes the shims next to the command: `otea.cmd`, `otea.ps1` and an extensionless `sh` script. A shell that is not Git Bash (opencode's, for one) can pick the `sh` script and fail, because it lacks `sh`, `sed` or `dirname`. Call `otea.cmd`, or run Node on the package directly: `node <prefix>\node_modules\@otea\cli\dist\cli\main.js <command>` (`npm root -g` prints the `node_modules` folder). The desktop app's `otea` also works from Git Bash.
+
 To update, run `npm i -g @otea/cli` again. To remove it, `npm uninstall -g @otea/cli`. Then run `otea start` in the folder you want to track: it makes the project, starts the desk and opens it ([Get started](#from-the-terminal-npm-or-source) says what it does).
 
 ### From source
