@@ -32,6 +32,36 @@ describe('nextText of a Done item that names no branch', () => {
   });
 });
 
+describe('nextText of a round sent back on an item with a branch', () => {
+  const sentBack = {
+    note: 'Cubre el caso vacío.',
+    by: { kind: 'person' as const, name: 'Ana' },
+    at: '2026-11-12T10:04:00.000Z',
+    step: 'Implementar',
+    round: 1,
+  };
+  const input = (fbranch: string) => ({
+    id: 'TAR-3',
+    title: 'Notas',
+    round: 2,
+    fields: { frepo: 'api', fbranch },
+    evidence: {},
+    position: { step: 'simpl', phase: 'doing' as const },
+    missing: [],
+    sentBack,
+  });
+
+  // F3: a new agent picked a sent-back item up and edited the main checkout.
+  it('names the branch to continue on, not the main checkout', () => {
+    const text = nextText(tareasDeRepo(), input('feat/notas'));
+    expect(text).toMatch(/Continue on feat\/notas/);
+  });
+
+  it('says nothing of a branch to continue on when the item has none', () => {
+    expect(nextText(tareasDeRepo(), input(''))).not.toMatch(/Continue on/);
+  });
+});
+
 const def = creatures();
 
 const base = {
