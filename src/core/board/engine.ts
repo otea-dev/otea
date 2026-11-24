@@ -173,6 +173,8 @@ export type ItemFacts = {
   unanswered?: readonly number[];
   // The points of each checklist part proved in the round, by part id (core/board/proofs.ts).
   proofs?: Readonly<Record<string, readonly string[]>>;
+  // The evidence parts (ids) the person waived for this item: a handoff does not lack them.
+  waived?: readonly string[];
   // The agents that did the step in its current round, none of which may review it.
   did?: readonly string[];
 };
@@ -389,6 +391,7 @@ function missingOf(def: BoardDefinition, step: Step, facts: ItemFacts): MissingP
     if (!isAsked(def, facts, hand)) return unprovedOf(part, facts, false);
     const fresh = hand.fresh && isEvidence(part);
     if (isEvidence(part)) {
+      if (facts.waived?.includes(part.id)) return [];
       const attached = facts.evidence.filter((entry) => entry.part === part.id && entry.size !== 0);
       if (attached.length === 0) return [{ ref: part.id, part, reason: 'missing', fresh }];
       const since = facts.roundStartedAt;

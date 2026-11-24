@@ -427,6 +427,18 @@ export async function answerRequest(c: Context): Promise<{ text: string }> {
   return { text: parsed.data.text };
 }
 
+const WaiveBody = z.object({ part: z.string().min(1), reason: z.string().optional() });
+
+// The person's waiver of a file a step asks for: the part, by name or id, and why.
+export async function waiveRequest(c: Context): Promise<{ part: string; reason?: string }> {
+  const raw: unknown = await c.req.json().catch(() => undefined);
+  const parsed = WaiveBody.safeParse(raw);
+  if (!parsed.success)
+    throw new RejectedRequest(400, 'invalid_body', 'Expected {"part": string, "reason"?: string}');
+  const { part, reason } = parsed.data;
+  return { part, ...(reason === undefined ? {} : { reason }) };
+}
+
 // A note from the person to the agent at work: its text, and the evidence it is on, if any.
 export async function noteRequest(c: Context): Promise<NoteRequest> {
   const raw: unknown = await c.req.json().catch(() => undefined);
