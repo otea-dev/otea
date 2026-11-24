@@ -409,7 +409,9 @@ describe('the commit a board says it landed', () => {
           git(dir, 'push', '-q', 'origin', 'main');
           git(dir, 'switch', '-q', '-c', 'item');
           change();
-          git(dir, 'add', '-A');
+          // Only keep.txt is staged here: «git add -A» would put a mode change back as the
+          // working tree has it, which a filesystem that keeps modes does not show as changed.
+          git(dir, 'add', 'keep.txt');
           git(dir, 'commit', '-q', '-m', 'the change');
           git(dir, 'push', '-q', 'origin', 'item');
           const tip = git(dir, 'rev-parse', 'HEAD');
