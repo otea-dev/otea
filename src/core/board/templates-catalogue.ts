@@ -397,8 +397,8 @@ const CONTENT: Template = {
       reviewer: 'you',
       hand: [['fdraft', 'always', true]],
       take: w(
-        'Write @{fdraft} from what was approved in @{foutline}. Cite a source for every fact.',
-        'Escribe @{fdraft} con lo aprobado en @{foutline}. Cita una fuente para cada dato.',
+        'Write @{fdraft} from what was approved in @{foutline}. Cite a source for every fact. The reader\'s text carries no internal item ids and no editorial notes (corrections, decisions, "the previous version").',
+        'Escribe @{fdraft} con lo aprobado en @{foutline}. Cita una fuente para cada dato. El texto del lector no lleva ids internos de elementos ni notas editoriales (correcciones, decisiones, "la versión anterior").',
       ),
       review: w(
         'Read it as the audience in @{fbrief} would.',
@@ -416,8 +416,8 @@ const CONTENT: Template = {
       reviewer: 'none',
       hand: [['furl', 'always', false]],
       take: w(
-        'Publish the approved draft as it is; do not rewrite it.',
-        'Publica el borrador aprobado tal cual; no lo reescribas.',
+        'Publish the approved draft as it is, without rewriting it, on the channel chosen in @{fchannel} (for Docs, as a page in the project\'s docs); then write where it lives in @{furl}.',
+        'Publica el borrador aprobado tal cual, sin reescribirlo, en el canal elegido en @{fchannel} (en Documentación, como página de la documentación del proyecto); luego escribe dónde quedó en @{furl}.',
       ),
     },
   ],
