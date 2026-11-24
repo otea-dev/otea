@@ -35,3 +35,11 @@ export function waiversFrom(events: readonly EventRecord[], since?: string): Wai
   }
   return [...out.values()];
 }
+
+// The file parts a person may waive: pictures and recordings an agent may have no way to make (no
+// browser for a screenshot). The code and logs of a change are its core evidence: never waived.
+export const WAIVABLE_KINDS: readonly string[] = ['images', 'video'];
+
+export function isWaivable(part: { kind: string }): boolean {
+  return WAIVABLE_KINDS.includes(part.kind);
+}

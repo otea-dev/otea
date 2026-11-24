@@ -152,12 +152,20 @@ export function HandChecklist({
                   </>
                 ) : null}
               </span>
-              <small>
-                {row.ok
-                  ? t('bi.hand.ready')
-                  : row.required
-                    ? t('bi.hand.missing')
-                    : t('bi.hand.optional')}
+              <small
+                title={
+                  row.waived
+                    ? [row.waived.by, row.waived.reason].filter(Boolean).join(' · ')
+                    : undefined
+                }
+              >
+                {row.waived
+                  ? t('bi.hand.waivedRow', { by: row.waived.by })
+                  : row.ok
+                    ? t('bi.hand.ready')
+                    : row.required
+                      ? t('bi.hand.missing')
+                      : t('bi.hand.optional')}
               </small>
             </div>
             {waiving === row.ref ? (

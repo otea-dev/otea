@@ -1,7 +1,7 @@
 import type { Channel } from '../core/authority.ts';
 import { isAsked, isClosed, positionOf } from '../core/board/engine.ts';
 import { isEvidence, type Part, partOf, stepById } from '../core/board/model.ts';
-import { EVIDENCE_WAIVED, type Waiver } from '../core/board/waivers.ts';
+import { EVIDENCE_WAIVED, isWaivable, type Waiver } from '../core/board/waivers.ts';
 import { OteaError } from '../core/errors.ts';
 import type { Actor } from '../core/item.ts';
 import { appendEvent } from '../store/queries.ts';
@@ -45,7 +45,7 @@ export function waiveEvidence(project: Project, input: WaiveInput, now = systemC
   const asked = (stepById(def, position.step)?.hand ?? [])
     .filter((hand) => isAsked(def, facts, hand))
     .map(({ ref }) => partOf(def, ref))
-    .filter((each): each is Part => each !== undefined && isEvidence(each));
+    .filter((each): each is Part => each !== undefined && isEvidence(each) && isWaivable(each));
   const part = asked.find((each) => each.id === input.part || fold(each.name) === fold(input.part));
   if (!part)
     throw new OteaError(

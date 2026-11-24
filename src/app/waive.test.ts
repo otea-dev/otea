@@ -6,7 +6,7 @@ import { creatures } from '../core/board/testing.ts';
 import type { Actor } from '../core/item.ts';
 import { createItem, requireItem } from './items.ts';
 import { claimItem } from './leases.ts';
-import { boardBlockOf, handoffItem, sendBackItem } from './next.ts';
+import { boardBlockOf, handoffItem, itemNextText, sendBackItem } from './next.ts';
 import type { Project } from './project.ts';
 import { memoryContext, projectOf, publishAs } from './testing.ts';
 import { waiveEvidence } from './waive.ts';
@@ -55,6 +55,9 @@ describe('waiving a required file', () => {
     expect(() => hand()).toThrowError(/missing Arte conceptual/);
     const waived = waive();
     expect(waived.text).toMatch(/Arte conceptual/);
+    // The agent reads it in next: who waived the file, and why.
+    const told = itemNextText(project, requireItem(project.db, id), 'quill', now) ?? '';
+    expect(told).toMatch(/✓ Arte conceptual: .*waived by fede \(no browser\)/);
     hand();
     expect(requireItem(project.db, id).state).toMatch(/__review$/);
     const block = boardBlockOf(project, requireItem(project.db, id));
@@ -98,5 +101,34 @@ describe('waiving a required file', () => {
       expect.objectContaining({ code: 'not_found' }),
     );
     expect(() => waiveOf('Barro')).toThrowError(expect.objectContaining({ code: 'not_found' }));
+  });
+});
+
+describe('the core evidence of a change is never waived', () => {
+  it('refuses a code part the step asks for, and the handoff stays refused', () => {
+    const root = mkdtempSync(join(tmpdir(), 'otea-waive-code-'));
+    try {
+      const def = creatures();
+      const concept = def.steps[0];
+      if (!concept) throw new Error('no step');
+      concept.hand = [{ ref: 'ecode', req: 'always', fresh: false }];
+      const ctx = memoryContext();
+      publishAs(ctx, def, 'bwaivecode', now);
+      const project = projectOf(root, ctx);
+      const { id } = createItem(
+        project,
+        { collection: 'Criaturas', title: 'Rana', fields: { fdesc: 'Lenta' }, actor: you },
+        now,
+      );
+      claimItem(project, { id, actor: quill }, now);
+      expect(() =>
+        waiveEvidence(project, { id, part: 'Cambios de código', actor: you, channel: 'cli' }, now),
+      ).toThrowError(expect.objectContaining({ code: 'not_found' }));
+      expect(() =>
+        handoffItem(project, { id, actor: quill, channel: 'cli', note: 'Listo' }, now),
+      ).toThrowError(/missing Cambios de código/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
