@@ -410,12 +410,12 @@ function baseCheck(
     const allowedIn = workflowOf(ctx, item).gates?.merge ?? [];
     const ahead = unpushed.find(({ branch: name }) => branch && name === item.fields[branch.id]);
     if (ahead) {
-      // On its land step the item's branch may take a rebase onto the base with the same result
-      // (landingPushRefusal): the refusal names that push first (P6-R3-1).
+      // On its land step the item's branch may take the base merged in (landingPushRefusal): the
+      // refusal names that push first, a plain one, never a force push (P6-R3-1).
       const rebase =
         gateAt(board.def, position, 'merge').why === 'landing' &&
         gateAt(board.def, position, 'push').allowed
-          ? ` To land a branch you rebased onto ${base}, push it first, git push --force-with-lease ${ahead.push ?? 'origin'} ${ahead.branch}, then push ${base} again, git push ${ahead.push ?? 'origin'} ${base}.`
+          ? ` To land a branch you brought up to date with ${base} (git merge ${ahead.push ?? 'origin'}/${base}), push it first, git push ${ahead.push ?? 'origin'} ${ahead.branch}, then push ${base} again, git push ${ahead.push ?? 'origin'} ${base}.`
           : '';
       return {
         id: item.id,

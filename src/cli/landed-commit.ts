@@ -134,6 +134,123 @@ export function baseTipsOf(cwd: string, base: string): string[] {
   return [...new Set(refs.flatMap((ref) => commitOf(cwd, ref) ?? []))];
 }
 
+// The bytes of a path at a revision, one `cat-file --batch` for all: undefined where a revision has
+// no such file (or git cannot say). Paths with a newline cannot be asked this way: they come back
+// undefined and so count as not carried.
+type Blobs = Map<string, Buffer | undefined>;
+
+function blobsAt(cwd: string, wanted: { rev: string; path: string }[]): Blobs {
+  const blobs: Blobs = new Map();
+  const asked = wanted.filter(({ path }) => !path.includes('\n'));
+  if (asked.length === 0) return blobs;
+  let out: Buffer;
+  try {
+    out = execFileSync('git', ['cat-file', '--batch'], {
+      cwd,
+      input: `${asked.map(({ rev, path }) => `${rev}:${path}`).join('\n')}\n`,
+      stdio: ['pipe', 'pipe', 'ignore'],
+      timeout: GIT_MS,
+      env: QUIET,
+      maxBuffer: 1 << 30,
+    });
+  } catch {
+    return blobs;
+  }
+  let at = 0;
+  for (const { rev, path } of asked) {
+    const end = out.indexOf(0x0a, at);
+    if (end < 0) break;
+    // «<id> <type> <size>», or «<asked> missing» (the asked path may hold spaces).
+    const head = /^[0-9a-f]+ (\w+) (\d+)$/.exec(out.toString('utf8', at, end));
+    at = end + 1;
+    if (head === null) {
+      blobs.set(`${rev}:${path}`, undefined);
+      continue;
+    }
+    const length = Number(head[2]);
+    blobs.set(`${rev}:${path}`, head[1] === 'blob' ? out.subarray(at, at + length) : undefined);
+    at += length + 1;
+  }
+  return blobs;
+}
+
+const linesOf = (bytes: Buffer): string[] =>
+  bytes
+    .toString('utf8')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+// Whether a file as `landed` leaves it still carries what the approved version `tip` changed from
+// `base`: it is the approved file, or (a conflict resolved by hand while rebasing or merging, so no
+// merge of the two is clean) it is no longer the file the base had, and every line the approved
+// change added is in it. A file the approved change deleted must be gone. Lines are compared
+// without their indentation and by content, not position: what the person approved is kept, not
+// that it sits where it did. A binary file must be the approved one.
+function carriesFile(base: Buffer | undefined, tip: Buffer | undefined, landed?: Buffer): boolean {
+  if (tip === undefined) return landed === undefined;
+  if (landed === undefined) return false;
+  if (landed.equals(tip)) return true;
+  if (base?.equals(landed)) return false;
+  if (tip.includes(0) || landed.includes(0)) return false;
+  const had = new Set(base === undefined ? [] : linesOf(base));
+  const has = new Set(linesOf(landed));
+  return linesOf(tip).every((line) => had.has(line) || has.has(line));
+}
+
+// Why a commit does not hold the approved commit's work, or undefined when it does. It holds it
+// when the approved commit is in its history, or it carries what the approved commit changed from
+// where the two diverged, as the base's tip after a rebase or a squash does: all of it, at the
+// same result (git merges the approved commit into it and nothing changes), or, where main changed
+// the same lines and the agent resolved the conflict, the approved lines kept in each file the
+// approved change touched. A commit older than the approved work, or of another line of work, or
+// one that leaves a file's approved change out, holds nothing of it. The text names which.
+function lackOf(cwd: string, tip: string, commit: string): string | undefined {
+  if (holds(cwd, commit, tip)) return undefined;
+  const base = git(cwd, 'merge-base', tip, commit);
+  if (base === undefined || base === '') {
+    return `it shares no history with it, so it is another line of work than the approved one.`;
+  }
+  if (base === commit) {
+    return `it is an older commit of {base}, from before the approved work.`;
+  }
+  const changed = git(
+    cwd,
+    '-c',
+    'diff.ignoreSubmodules=none',
+    'diff-tree',
+    '-r',
+    '-z',
+    '--name-only',
+    '--no-renames',
+    '--no-ext-diff',
+    '--ignore-submodules=none',
+    '--no-commit-id',
+    base,
+    tip,
+  );
+  const paths = (changed ?? '').split('\0').filter(Boolean);
+  if (paths.length === 0) {
+    return `the approved commit changes no files, so no other commit can be told to hold its work.`;
+  }
+  // The same change as it stands in the commit, whatever came into the base around it.
+  if (landedIn(cwd, tip, commit)) return undefined;
+  const blobs = blobsAt(
+    cwd,
+    paths.flatMap((path) => [
+      { rev: base, path },
+      { rev: tip, path },
+      { rev: commit, path },
+    ]),
+  );
+  const at = (rev: string, path: string) => blobs.get(`${rev}:${path}`);
+  const missed = paths.find(
+    (path) => !carriesFile(at(base, path), at(tip, path), at(commit, path)),
+  );
+  if (missed === undefined) return undefined;
+  return `it is built on what the approved work was, but does not carry the approved change to ${missed}: a rebase, a merge or a resolution left it out or rewrote it. If you resolved a conflict, keep every line the person approved there, or take the item back to the step before this one so the resolution is reviewed.`;
+}
+
 // The refusal of the commits that hold the work when none of them can be this item's: each is
 // another item's that landed already, or was on the base before this item was first claimed (so it
 // is reachable from a tip recorded then). One commit of its own among them is enough: the others
@@ -243,17 +360,11 @@ export function landedCommitRefusal(
     if (tip === undefined) {
       return `${name}: this checkout lacks the commit the person approved (${approved.commit.slice(0, 7)}), so it cannot tell that ${listed} holds it. Fetch it, then hand it off again.`;
     }
-    // What it changes may be in the commit as a rebase or a squash leaves it; and it must be built
-    // on what the approved commit was built on, or an empty approved change (which any commit
-    // "contains") would pass for an older one.
-    const parent = commitOf(cwd, `${tip}^`);
-    holding = commits.filter(
-      ({ full }) =>
-        holds(cwd, full, tip) ||
-        (landedIn(cwd, tip, full) && (parent === undefined || holds(cwd, full, parent))),
-    );
-    if (holding.length === 0) {
-      return `${name}: ${listed} does not hold the work the person approved (${tip.slice(0, 7)}): it is an older commit of ${base}. Write the hash of the commit where that work landed (git rev-parse --short ${base} once it is there).`;
+    const lacks = commits.map((each) => ({ ...each, why: lackOf(cwd, tip, each.full) }));
+    holding = lacks.filter(({ why }) => why === undefined);
+    const [unheld] = lacks;
+    if (holding.length === 0 && unheld?.why !== undefined) {
+      return `${name}: ${listed} does not hold the work the person approved (${tip.slice(0, 7)}): ${unheld.why.replaceAll('{base}', base)} Write the hash of the commit where that work landed (git rev-parse --short ${base} once it is there).`;
     }
   }
   // A commit that changes no file (git commit --allow-empty) is a new hash of the base with no work

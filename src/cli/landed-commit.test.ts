@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -205,6 +205,155 @@ describe('the commit a board says it landed', () => {
       const said = refusal(pushed);
       expect(said).toContain('origin has no main branch');
       expect(said).toContain('git push origin main');
+    });
+
+    // Field study, the Land step: the approved branch tip stops being main's ancestor once the
+    // agent rebased it (a multi-commit branch, or a rebase that had a conflict to resolve), and
+    // the refusal called main's own tip «an older commit of main».
+    describe('landing the approved branch after main moved on', () => {
+      const BRANCH = 'feat';
+      const write = (file: string, content: string, message = file) => {
+        writeFileSync(join(dir, file), content);
+        git(dir, 'add', file);
+        git(dir, 'commit', '-q', '-m', message);
+      };
+      const append = (file: string, line: string) => {
+        appendFileSync(join(dir, file), `${line}\n`);
+        git(dir, 'add', file);
+        git(dir, 'commit', '-q', '-m', line);
+      };
+      const head = () => git(dir, 'rev-parse', '--short', 'HEAD');
+      const ask = (value: string, tip: string) =>
+        landedCommitRefusal(dir, 'Commit on main', value, 'main', { commit: tip });
+      // The item's branch: two commits, one of them on a file another item will touch. Handed off
+      // and approved at its tip, which is what the review read (pushed).
+      let approved: string;
+      beforeEach(() => {
+        write('shared.txt', 'one\ntwo\n', 'shared');
+        git(dir, 'push', '-q', 'origin', 'main');
+        git(dir, 'switch', '-q', '-c', BRANCH);
+        write('feature.txt', 'feature\n');
+        append('shared.txt', 'item line');
+        git(dir, 'push', '-q', 'origin', BRANCH);
+        approved = git(dir, 'rev-parse', 'HEAD');
+        // Another item landed on main meanwhile.
+        git(dir, 'switch', '-q', 'main');
+      });
+      const mainMovesOnAnotherFile = () => {
+        write('other.txt', 'other\n');
+        git(dir, 'push', '-q', 'origin', 'main');
+      };
+      const mainTouchesTheSameLines = () => {
+        append('shared.txt', 'other line');
+        git(dir, 'push', '-q', 'origin', 'main');
+      };
+      // What an agent does with a conflict: keeps both lines.
+      const rebaseKeepingBoth = () => {
+        git(dir, 'switch', '-q', BRANCH);
+        expect(() => git(dir, 'rebase', 'main')).toThrow();
+        writeFileSync(join(dir, 'shared.txt'), 'one\ntwo\nother line\nitem line\n');
+        git(dir, 'add', 'shared.txt');
+        execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'rebase', '--continue'], {
+          cwd: dir,
+          stdio: 'pipe',
+          env: { ...process.env, GIT_EDITOR: 'true' },
+        });
+      };
+      const landBranchOnMain = () => {
+        git(dir, 'switch', '-q', 'main');
+        git(dir, 'merge', '-q', '--ff-only', BRANCH);
+        git(dir, 'push', '-q', 'origin', 'main');
+        return head();
+      };
+
+      const mergeMainIn = () => {
+        git(dir, 'switch', '-q', BRANCH);
+        git(dir, 'fetch', '-q', 'origin');
+        git(dir, 'merge', '-q', '--no-edit', 'origin/main');
+      };
+
+      it('takes the tip of a multi-commit branch rebased onto the new main', () => {
+        mainMovesOnAnotherFile();
+        git(dir, 'switch', '-q', BRANCH);
+        git(dir, 'rebase', '-q', 'main');
+        const landed = landBranchOnMain();
+        expect(ask(landed, approved)).toBeUndefined();
+      });
+
+      it('takes a rebase whose conflict was resolved keeping both sides', () => {
+        mainTouchesTheSameLines();
+        rebaseKeepingBoth();
+        const landed = landBranchOnMain();
+        expect(ask(landed, approved)).toBeUndefined();
+      });
+
+      it('takes the merge of main into the branch', () => {
+        mainMovesOnAnotherFile();
+        mergeMainIn();
+        git(dir, 'push', '-q', 'origin', BRANCH);
+        expect(ask(landBranchOnMain(), approved)).toBeUndefined();
+      });
+
+      it('takes the merge of main into the branch with the conflict resolved', () => {
+        mainTouchesTheSameLines();
+        git(dir, 'switch', '-q', BRANCH);
+        git(dir, 'fetch', '-q', 'origin');
+        expect(() => git(dir, 'merge', '--no-edit', 'origin/main')).toThrow();
+        writeFileSync(join(dir, 'shared.txt'), 'one\ntwo\nother line\nitem line\n');
+        git(dir, 'add', 'shared.txt');
+        git(dir, 'commit', '-q', '--no-edit');
+        const resolved = landBranchOnMain();
+        expect(ask(resolved, approved)).toBeUndefined();
+      });
+
+      it('still refuses an older commit of main, saying so', () => {
+        const older = git(dir, 'rev-parse', '--short', 'origin/main');
+        mainMovesOnAnotherFile();
+        git(dir, 'switch', '-q', BRANCH);
+        git(dir, 'rebase', '-q', 'main');
+        landBranchOnMain();
+        const said = ask(older, approved);
+        expect(said).toContain('does not hold the work the person approved');
+        expect(said).toContain('older commit of main');
+      });
+
+      // Landing a rebase whose resolution threw the item's line away is not landing the approved
+      // work: say which file lost it, never «an older commit».
+      it('refuses a resolution that dropped what the person approved, naming the file', () => {
+        mainTouchesTheSameLines();
+        git(dir, 'switch', '-q', BRANCH);
+        expect(() => git(dir, 'rebase', 'main')).toThrow();
+        writeFileSync(join(dir, 'shared.txt'), 'one\ntwo\nother line\n');
+        git(dir, 'add', 'shared.txt');
+        execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'rebase', '--continue'], {
+          cwd: dir,
+          stdio: 'pipe',
+          env: { ...process.env, GIT_EDITOR: 'true' },
+        });
+        const landed = landBranchOnMain();
+        const said = ask(landed, approved);
+        expect(said).toContain('shared.txt');
+        expect(said).not.toContain('older commit');
+      });
+
+      // Another commit that landed after the branch forked is built on the same base but carries
+      // none of the approved change.
+      it("refuses another item's later commit, saying it lacks the approved change", () => {
+        mainMovesOnAnotherFile();
+        const other = head();
+        const said = ask(other, approved);
+        expect(said).toContain('does not hold the work the person approved');
+        expect(said).toContain('feature.txt');
+        expect(said).not.toContain('older commit');
+      });
+
+      // A merge that keeps main's side whole adds nothing to main: a new hash, no work landed.
+      it('refuses a merge that kept main as it was', () => {
+        mainMovesOnAnotherFile();
+        git(dir, 'merge', '-q', '-s', 'ours', '--no-edit', approved);
+        git(dir, 'push', '-q', 'origin', 'main');
+        expect(ask(head(), approved)).toContain('changes no files');
+      });
     });
   });
 

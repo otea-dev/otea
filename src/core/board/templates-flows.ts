@@ -232,19 +232,20 @@ const IDEAS: Template = {
   },
 };
 
-// Where an approved change reaches main (Cambios, Implementación): an agent rebases its Rama on main
+// Where an approved change reaches main (Cambios, Implementación): an agent merges main into its Rama
 // and brings it in, so an approval never closes an item whose code lives only on its branch (P7-8).
+// Never a rebase: it needs a force push, which many people and harnesses forbid (field study).
 const LAND: Template['steps'][number] = {
   key: 'land',
   name: w('Land', 'Integrar'),
   doer: 'any',
   reviewer: 'none',
   hand: [['commit', 'always']],
-  // A rebase that conflicts goes back to the step it was done in, to be reviewed again (P1-R2-3).
+  // A merge that conflicts goes back to the step it was done in, to be reviewed again (P1-R2-3).
   ways: ['doit'],
   take: w(
-    'The person approved it: rebase @{branch} on main and bring it in with a fast-forward push of main or, where main takes changes only through a PR, open one and merge it with gh pr merge. Once rebased, push @{branch} first (git push --force-with-lease origin <branch>), then main: main takes the branch only as the remote has it. Add nothing the person did not approve. If the rebase conflicts with main, do not resolve it here: take it back to @{doit} with otea handoff <id> --way "@{doit}" --reason "<what conflicts>", so the resolution is reviewed.',
-    'La persona lo aprobó: rebasa @{branch} sobre main e intégrala con fast-forward y push de main o, si main solo acepta cambios por PR, abre uno y mergéalo con gh pr merge. Ya rebasada, sube primero @{branch} (git push --force-with-lease origin <rama>) y después main: main toma la rama solo como la tiene el remoto. No agregues nada que la persona no haya aprobado. Si el rebase choca con main, no lo resuelvas aquí: regrésalo a @{doit} con otea handoff <id> --way "@{doit}" --reason "<qué choca>", para que se revise la resolución.',
+    'The person approved it: if main moved on, merge it into @{branch} (git fetch origin, then git merge origin/main), never rebase: a pushed branch is not rewritten, so no force push is needed. Push @{branch} first (git push origin <branch>), then bring it into main with a fast-forward push (git push origin HEAD:main) or, where main takes changes only through a PR, open one and merge it with gh pr merge: main takes the branch only as the remote has it. Add nothing the person did not approve. If the merge conflicts with main, do not resolve it here: take it back to @{doit} with otea handoff <id> --way "@{doit}" --reason "<what conflicts>", so the resolution is reviewed.',
+    'La persona lo aprobó: si main avanzó, fusiónalo en @{branch} (git fetch origin y luego git merge origin/main), nunca rebases: una rama ya subida no se reescribe, así que no hace falta un force push. Sube primero @{branch} (git push origin <rama>) y luego intégrala en main con un push fast-forward (git push origin HEAD:main) o, si main solo acepta cambios por PR, abre uno y mergéalo con gh pr merge: main toma la rama solo como la tiene el remoto. No agregues nada que la persona no haya aprobado. Si el merge choca con main, no lo resuelvas aquí: regrésalo a @{doit} con otea handoff <id> --way "@{doit}" --reason "<qué choca>", para que se revise la resolución.',
   ),
   before: w(
     'Write in @{commit} the short hash of the commit that landed on main. Delete the branch if you may; your harness may ask the person to allow it, and Otea does not need it gone. If you landed it from the main checkout of the repository, leave that checkout on main.',
