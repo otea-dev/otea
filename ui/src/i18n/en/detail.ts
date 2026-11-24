@@ -683,7 +683,7 @@ export const detail = {
   'bi.hand.waive': 'Hand off without {part}',
   'bi.hand.waiveReason': 'Why (optional)',
   'bi.hand.waiveDo': 'Hand off without it',
-  'bi.hand.waivedRow': 'waived by {by}',
+  'bi.hand.waivedRow': 'waived by you',
   'bi.hand.waived': 'You waived {part} of “{title}”.',
   'bi.hand.waiveFailed': '{part} was not waived. Try again.',
   'bi.hand.saved': 'You saved {part} of “{title}”.',

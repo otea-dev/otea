@@ -152,15 +152,9 @@ export function HandChecklist({
                   </>
                 ) : null}
               </span>
-              <small
-                title={
-                  row.waived
-                    ? [row.waived.by, row.waived.reason].filter(Boolean).join(' · ')
-                    : undefined
-                }
-              >
+              <small title={row.waived?.reason}>
                 {row.waived
-                  ? t('bi.hand.waivedRow', { by: row.waived.by })
+                  ? t('bi.hand.waivedRow')
                   : row.ok
                     ? t('bi.hand.ready')
                     : row.required

@@ -691,7 +691,7 @@ export const detail = {
   'bi.hand.waive': 'Entregar sin {part}',
   'bi.hand.waiveReason': 'Por qué (opcional)',
   'bi.hand.waiveDo': 'Entregar sin eso',
-  'bi.hand.waivedRow': 'dispensada por {by}',
+  'bi.hand.waivedRow': 'dispensada por ti',
   'bi.hand.waived': 'Dispensaste {part} de «{title}».',
   'bi.hand.waiveFailed': 'No se dispensó {part}. Prueba otra vez.',
   'bi.hand.saved': 'Guardaste {part} de «{title}».',
