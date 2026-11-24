@@ -1056,6 +1056,8 @@ function mayTakeNow(
   // A step that waits for parts or blockers still being worked on is not the agent's work yet: its
   // handoff cannot pass, and offering it would loop the agent on it (P7-R2-2).
   if (waitsOpen(def, on)) return false;
+  // Nor is an item something open blocks, whatever its step declares (the desk says it waits).
+  if (position.phase === 'doing' && openBlockersOf(on).length > 0) return false;
   const mine =
     position.phase === 'doing'
       ? mayTake(def, position.step)
@@ -1189,6 +1191,11 @@ function waitsOpen(def: BoardDefinition, on: ItemOnBoard): boolean {
   const step = stepById(def, position.step);
   if (step === undefined) return false;
   return openWaits(step, on.facts).some(({ open }) => open?.some(({ unmerged }) => !unmerged));
+}
+
+// The items that block it and are still open (one Done and waiting only to be merged is merge work).
+function openBlockersOf(on: ItemOnBoard): string[] {
+  return on.links.blockers.filter(({ closed, unmerged }) => !closed && !unmerged).map(({ id }) => id);
 }
 
 // How far along its board an open item stands: whether it waits for a review, and its step's place.
@@ -2310,6 +2317,12 @@ export function assertMayClaim(
       throw new OteaError(
         'not_claimable',
         `${item.id} is at ${step.name}, which the person does; claim only what is yours (otea next)`,
+      );
+    const blockers = openBlockersOf(on);
+    if (blockers.length > 0)
+      throw new OteaError(
+        'not_claimable',
+        `${item.id} waits for ${blockers.join(', ')}, which block it and are not done; claim only what is yours (otea next)`,
       );
     const first = landTurnFor(ctx, item, agent, at);
     if (first) throw new OteaError('not_claimable', landsFirstText(item.id, first));
