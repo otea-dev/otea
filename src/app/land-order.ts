@@ -147,7 +147,10 @@ export function landsFirst(
   if (landing[0]) return landing[0];
   // Work on the base waits until what is committed there has landed: an item in review, or
   // approved and waiting for its push, still holds it.
-  if (own.work) {
+  // An item that is committed there itself (sent back after its handoff) is what the others wait
+  // for, so it never waits for them, or each would wait for the other and nothing could move.
+  const committed = own.work && holdsBase(ctx, board, item)?.key === own.key;
+  if (own.work && !committed) {
     for (const each of liveBoards(ctx)) {
       for (const other of selectItems(ctx.db, { collection: each.collection })) {
         const held = other.id === item.id ? undefined : holdsBase(ctx, each, other);
@@ -172,8 +175,14 @@ export function landsFirst(
     const [sa, sb] = [since(a), since(b)];
     return sa !== sb ? sa < sb : a.createdAt < b.createdAt;
   };
+  // Among the ones committed there the person's order decides; the ones not yet committed wait.
   const ahead = waiting
-    .filter(({ item: other, board: each }) => takeable(each, other) && before(other, item))
+    .filter(
+      ({ item: other, board: each }) =>
+        takeable(each, other) &&
+        before(other, item) &&
+        (!committed || holdsBase(ctx, each, other)?.key === own.key),
+    )
     .map(({ item: other }) => other);
   const first = ahead.reduce<ItemRecord | undefined>(
     (best, other) => (best === undefined || before(other, best) ? other : best),
