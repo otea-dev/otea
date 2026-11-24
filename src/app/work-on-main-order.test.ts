@@ -13,6 +13,26 @@ const agent = (name: string) => ({ kind: 'agent' as const, name });
 let tick = 0;
 const now = () => new Date(Date.UTC(2026, 10, 19, 9, 0, tick++)).toISOString();
 
+// The item was handed off with a commit on main and the person sent it back: it is in Hacerlo
+// again, committed there.
+function handedOffAndSentBack(ctx: ReturnType<typeof memoryContext>, id: string) {
+  const tip = { branch: 'main', commit: 'a'.repeat(40), tree: 'b'.repeat(40) };
+  appendEvent(ctx.db, {
+    itemId: id,
+    type: 'transitioned',
+    actor: agent('claude-b'),
+    at: now(),
+    data: { to: 'doit__review', tip },
+  });
+  appendEvent(ctx.db, {
+    itemId: id,
+    type: 'transitioned',
+    actor: you,
+    at: now(),
+    data: { to: 'doit' },
+  });
+}
+
 // P1-F2: the Code on main board has every agent work straight on main with no branch, while a
 // second agent in the same checkout was told to make its own worktree: three agents committing at
 // once, one index.lock, a commit that was another agent's. Everyone commits on main, so the board
@@ -191,6 +211,57 @@ describe('working straight on main, one agent at a time', () => {
     // Once it landed, the others go on, in the person's order.
     updateItemState(ctx.db, sent, 'done', now());
     expect(nextFor(ctx, 'claude-b', {}, now).item).toBe(second);
+  });
+
+  // A sent-back item does not build on commits it did not make: another item in review, or being
+  // landed, still holds main for it, whatever the order says.
+  it('keeps a sent-back item waiting for another item that is in review', () => {
+    const { ctx, def, doing } = board();
+    const sent = doing('sent back');
+    const other = doing('other');
+    handedOffAndSentBack(ctx, sent);
+    updateItemState(ctx.db, other, 'doit__review', now());
+    setOrder(ctx, { collection: def.name, ids: [sent, other], actor: you }, now);
+
+    expect(() => claimItem(ctx, { id: sent, actor: agent('quill') }, now)).toThrow(
+      `${sent} not claimed: ${other} is committed on main and waits for its review and its push`,
+    );
+    expect(nextFor(ctx, 'quill', {}, now).item).toBeNull();
+  });
+
+  it('keeps a sent-back item waiting for another item that is being landed', () => {
+    const { ctx, def, doing } = board();
+    const sent = doing('sent back');
+    const landing = doing('landing');
+    handedOffAndSentBack(ctx, sent);
+    updateItemState(ctx.db, landing, 'land', now());
+    setOrder(ctx, { collection: def.name, ids: [sent, landing], actor: you }, now);
+
+    expect(() => claimItem(ctx, { id: sent, actor: agent('quill') }, now)).toThrow(
+      `${sent} not claimed: ${landing} is committed on main and waits for its review and its push`,
+    );
+    expect(nextFor(ctx, 'quill', {}, now).item).toBe(landing);
+  });
+
+  // Two items sent back: the person's order decides between them, and an item that made no commit
+  // yet, even first in the order, waits for both.
+  it('puts committed items in the person order, ahead of any that is not committed', () => {
+    const { ctx, def, doing } = board();
+    const fresh = doing('fresh');
+    const second = doing('second');
+    const first = doing('first');
+    handedOffAndSentBack(ctx, second);
+    handedOffAndSentBack(ctx, first);
+    setOrder(ctx, { collection: def.name, ids: [fresh, first, second], actor: you }, now);
+
+    expect(nextFor(ctx, 'quill', {}, now).item).toBe(first);
+    expect(() => claimItem(ctx, { id: second, actor: agent('quill') }, now)).toThrow(
+      `${first} goes first on main (order 2), then ${second}`,
+    );
+    // It waits for committed work, not for the order.
+    expect(() => claimItem(ctx, { id: fresh, actor: agent('quill') }, now)).toThrow(
+      new RegExp(`^${fresh} not claimed: (${first}|${second}) is committed on main`),
+    );
   });
 
   it('holds nothing for an item whose handoff made no commit', () => {

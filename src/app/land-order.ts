@@ -148,15 +148,17 @@ export function landsFirst(
   // Work on the base waits until what is committed there has landed: an item in review, or
   // approved and waiting for its push, still holds it.
   // An item that is committed there itself (sent back after its handoff) is what the others wait
-  // for, so it never waits for them, or each would wait for the other and nothing could move.
+  // for, so it does not wait for another committed item at work (the order decides between them),
+  // or each would wait for the other and nothing could move. It still waits for one in review or
+  // on a land step: those commits are not its own to build on.
   const committed = own.work && holdsBase(ctx, board, item)?.key === own.key;
-  if (own.work && !committed) {
+  if (own.work) {
     for (const each of liveBoards(ctx)) {
       for (const other of selectItems(ctx.db, { collection: each.collection })) {
         const held = other.id === item.id ? undefined : holdsBase(ctx, each, other);
-        if (held?.key === own.key) {
-          return { first: other.id, base: own.base, work: true, review: true };
-        }
+        if (held?.key !== own.key) continue;
+        if (committed && landingIn(each, other)?.work) continue;
+        return { first: other.id, base: own.base, work: true, review: true };
       }
     }
   }
