@@ -490,17 +490,113 @@ describe('check', () => {
     // said anything until the person ran git log. The push gate would refuse these commits (the test
     // above); until a push, the agents and the person must be told that main holds work nobody
     // approved, because every worktree cut from main carries it.
-    it('says in show that the local base holds commits nobody approved, before any push', async () => {
-      person(task, 'implementing');
-      commit('keys');
-      await otea('move', task, 'implementing__review');
-      git('checkout', '-q', 'main');
-      commit('never reviewed');
-      const extra = git('rev-parse', 'HEAD').slice(0, 7);
+    describe('what show says of the local base', () => {
+      const WARNING = 'Warning: your local main holds';
+      const inReview = async () => {
+        person(task, 'implementing');
+        commit('keys');
+        await otea('move', task, 'implementing__review');
+        git('checkout', '-q', 'main');
+      };
+      const another = async (branch: string, repoName = name) =>
+        (
+          await json(
+            'create',
+            '--collection',
+            'Tareas de repo',
+            '--parent',
+            'CHANGES-1',
+            '--title',
+            'Other',
+            '--field',
+            `repo=${repoName}`,
+            '--field',
+            `branch=${branch}`,
+          )
+        ).id as string;
 
-      const shown = (await otea('show', task)).out;
-      expect(shown).toContain(extra);
-      expect(shown).toContain('never reviewed');
+      it('warns that the local base holds commits nobody approved, before any push', async () => {
+        await inReview();
+        commit('never reviewed');
+        const extra = git('rev-parse', 'HEAD');
+
+        const shown = (await otea('show', task)).out;
+        expect(shown).toContain(
+          `${WARNING} 1 commit that origin/main (as last fetched) lacks and no approved item holds or records, so nobody reviewed it: ${extra.slice(0, 7)} (never reviewed).`,
+        );
+        expect(shown).toContain(`Do not push main or cut a branch from it for ${task}`);
+        const data = await json('show', task);
+        expect(data.baseStray).toMatchObject({
+          base: 'main',
+          remote: 'origin/main',
+          commits: [{ commit: extra, subject: 'never reviewed' }],
+        });
+      });
+
+      it('says nothing when the base is where the remote has it', async () => {
+        await inReview();
+
+        expect((await otea('show', task)).out).not.toContain(WARNING);
+        expect((await json('show', task)).baseStray).toBeUndefined();
+      });
+
+      it('says nothing of a closed item', async () => {
+        await inReview();
+        person(task, 'done');
+        commit('never reviewed');
+
+        expect((await otea('show', task)).out).not.toContain(WARNING);
+      });
+
+      it('says nothing of an item that works on the base itself', async () => {
+        person(task, 'implementing');
+        await otea('update', task, '--field', 'branch=main');
+        git('checkout', '-q', 'main');
+        commit('its own work');
+
+        expect((await otea('show', task)).out).not.toContain(WARNING);
+      });
+
+      it('says nothing when the repo has no remote-tracking base to measure against', async () => {
+        await inReview();
+        git('update-ref', '-d', 'refs/remotes/origin/main');
+        commit('never reviewed');
+
+        expect((await otea('show', task)).out).not.toContain(WARNING);
+      });
+
+      it('says nothing of the base of another repo the project has no checkout of', async () => {
+        await inReview();
+        commit('never reviewed');
+        const elsewhere = await another('chg-2/there', 'elsewhere');
+
+        expect((await otea('show', elsewhere)).out).not.toContain(WARNING);
+      });
+
+      // The moment the agent must push: what the person approved is in the local base and waits for
+      // its push. It is no stray, so show must not tell the agent to push nothing.
+      it('does not warn of an approved branch merged into the local base', async () => {
+        const open = await another('chg-2/other');
+        await inReview();
+        person(task, 'done');
+        git('merge', '-q', '--ff-only', 'chg-1/keys');
+
+        expect((await otea('show', open)).out).not.toContain(WARNING);
+      });
+
+      it('does not warn of a commit an approved item records as its own, and warns again for another', async () => {
+        const open = await another('chg-2/other');
+        await inReview();
+        person(task, 'done');
+        commit('Logo 2026');
+        const logo = git('rev-parse', 'HEAD').slice(0, 7);
+        expect((await otea('show', open)).out).toContain(`${logo} (Logo 2026)`);
+        expect((await otea('merged', task, '--commit', logo)).code).toBe(0);
+
+        expect((await otea('show', open)).out).not.toContain(WARNING);
+        commit('never reviewed');
+        expect((await otea('show', open)).out).toContain('(never reviewed)');
+      });
     });
 
     // P5-R3-3: a board that commits approved work straight on main, in its land step, writes each
