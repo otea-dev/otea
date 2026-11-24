@@ -1,5 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  chmodSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -400,7 +407,10 @@ describe('the commit a board says it landed', () => {
         [
           'only changes a file mode',
           'run.sh',
-          () => git(dir, 'update-index', '--chmod=+x', 'run.sh'),
+          () => {
+            chmodSync(join(dir, 'run.sh'), 0o755);
+            git(dir, 'update-index', '--chmod=+x', 'run.sh');
+          },
         ],
       ])('an approved change that %s', (_what, file, change) => {
         it('is refused for a commit of main that lacks it, and taken when main has it', () => {
