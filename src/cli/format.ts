@@ -197,6 +197,10 @@ function describeAction({ type, data }: Event): string {
     const comment = typeof data.comment === 'string' ? `: ${JSON.stringify(data.comment)}` : '';
     return `chose ${String(data.option)} · ${String(data.name)}${comment}`;
   }
+  if (type === 'evidence_waived') {
+    const reason = typeof data.reason === 'string' ? `: ${JSON.stringify(data.reason)}` : '';
+    return `waived ${String(data.name)}${reason}`;
+  }
   if (type === 'question_asked' || type === 'question_answered')
     return `question ${String(data.question)}: ${JSON.stringify(String(data.text ?? ''))}`;
   if (type === 'point_proved') {

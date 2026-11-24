@@ -91,6 +91,7 @@ import { type ItemQuestion, openQuestion, questionsOf } from '../core/board/ques
 import { evidenceByName, readFieldInput, stateByName, stateName } from '../core/board/reading.ts';
 import { repeatedFresh, repeatedLines } from '../core/board/repeats.ts';
 import { readDefinition } from '../core/board/schema.ts';
+import { type Waiver, waiversFrom } from '../core/board/waivers.ts';
 import { OteaError } from '../core/errors.ts';
 import type { Actor } from '../core/item.ts';
 import { activeLease, type Lease } from '../core/lease.ts';
@@ -255,6 +256,8 @@ export type ItemOnBoard = {
   asking?: ItemQuestion;
   // The checklist points proved in the round of the step it stands on (core/board/proofs.ts).
   proofs: Proof[];
+  // The files the person waived for this item (core/board/waivers.ts).
+  waivers: Waiver[];
   // The option the person picked last, on an item that carries options (core/board/choices.ts).
   chosen?: ItemChoice;
 };
@@ -411,6 +414,7 @@ export function itemOnBoard(ctx: Context, item: ItemRecord, def: BoardDefinition
   const did = roundWorkers(position, events, startedAt);
   const proofs = step === undefined ? [] : proofsFrom(events, startedAt);
   const chosen = choiceOf(events);
+  const waivers = waiversFrom(events);
   const facts: ItemFacts = {
     fields: { ...item.fields, title: item.title },
     evidence,
@@ -421,6 +425,7 @@ export function itemOnBoard(ctx: Context, item: ItemRecord, def: BoardDefinition
     ...(unanswered.length === 0 ? {} : { unanswered }),
     ...(did.length === 0 ? {} : { did }),
     ...(proofs.length === 0 ? {} : { proofs: provedPoints(proofs) }),
+    ...(waivers.length === 0 ? {} : { waived: waivers.map(({ part }) => part) }),
   };
   const notes = handoffNotes(def, history).map(({ step: id, round: n, note, at, by }) => ({
     step: stepById(def, id)?.name ?? id,
@@ -444,6 +449,7 @@ export function itemOnBoard(ctx: Context, item: ItemRecord, def: BoardDefinition
     roundQuestions,
     ...(asking === undefined ? {} : { asking }),
     proofs,
+    waivers,
     ...(chosen === undefined ? {} : { chosen }),
   };
 }
@@ -482,6 +488,8 @@ export type BoardBlock = {
   merged?: Merged;
   // The checklist points proved in the round of the step it stands on (otea tick).
   proofs?: Proof[];
+  // The files the person waived for the item: its handoff went (or goes) without them.
+  waived?: Waiver[];
   // Each checklist that asks for proof, point by point: ticked or not, and its proof this round.
   checklists?: ProvedChecklist[];
 };
@@ -643,6 +651,7 @@ export function boardBlockOf(ctx: Context, item: ItemRecord): BoardBlock | undef
     ...(isClosed(on.position) ? { closedBy: closedByOf(board.def, events) } : {}),
     ...(merged === undefined ? {} : { merged }),
     ...(on.proofs.length === 0 ? {} : { proofs: on.proofs }),
+    ...(on.waivers.length === 0 ? {} : { waived: on.waivers }),
     ...(checklists.length === 0 ? {} : { checklists }),
   };
 }

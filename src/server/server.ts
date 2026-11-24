@@ -73,6 +73,7 @@ import {
 } from '../app/topics.ts';
 import { topicsEverywhere } from '../app/topics-everywhere.ts';
 import { undoMove } from '../app/undo.ts';
+import { waiveEvidence } from '../app/waive.ts';
 import { mergedOutside } from '../cli/merged-outside.ts';
 import { OTEA_VERSION } from '../cli/version.ts';
 import { agentPrompt, connectFacts, isPromptKind, PROMPT_KINDS } from '../core/agent-prompts.ts';
@@ -167,6 +168,7 @@ import {
   surfaceOf,
   undoRequest,
   updateRequest,
+  waiveRequest,
 } from './writes.ts';
 import { wantsPage, wrongAddressPage } from './wrong-address.ts';
 
@@ -849,6 +851,19 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         answerQuestion(project, { id, text, ...HUMAN_IN_UI });
         feed.notify();
         return c.json(showItem(project, id, HUMAN_IN_UI));
+      })
+      // The person lets an item go on without a file its step asks for (a screenshot an agent
+      // with no browser cannot make): its handoff then passes, and the review says so.
+      .post('/items/:id/waive', async (c) => {
+        assertWritable(c, auth);
+        const request = await waiveRequest(c);
+        const waived = waiveEvidence(project, {
+          id: c.req.param('id'),
+          ...request,
+          ...HUMAN_IN_UI,
+        });
+        feed.notify();
+        return c.json(waived);
       })
       .post('/items/:id/update', async (c) => {
         assertWritable(c, auth);
