@@ -184,13 +184,24 @@ describe('the Entregas con PR set', () => {
   });
 });
 
-// P6-R3-1: the second item landed in main needs a rebase, and the push of main is refused until
-// the rebased branch is pushed; the land step says so.
-describe('a land step that rebases the branch', () => {
-  it('says to push the rebased branch with --force-with-lease before main, in Cambios and Implementación', () => {
+// Field study: the land step told agents to rebase and force-push the branch, which harness auto
+// modes and many people forbid, so agents stopped to ask. It merges main into the branch and never
+// asks for a force push.
+describe('a land step that merges main into the branch', () => {
+  it('says to merge, push the branch, then fast-forward main, and never to force-push, in both languages', () => {
     const says = {
-      en: 'Once rebased, push @{branch} first (git push --force-with-lease origin <branch>), then main: main takes the branch only as the remote has it.',
-      es: 'Ya rebasada, sube primero @{branch} (git push --force-with-lease origin <rama>) y después main: main toma la rama solo como la tiene el remoto.',
+      en: [
+        'git merge origin/main',
+        'git push origin <branch>',
+        'git push origin HEAD:main',
+        'never rebase',
+      ],
+      es: [
+        'git merge origin/main',
+        'git push origin <rama>',
+        'git push origin HEAD:main',
+        'nunca rebases',
+      ],
     };
     for (const lang of ['en', 'es'] as const) {
       const changes = instantiate(requireTemplate('changes'), lang, {}, sequenceIds());
@@ -198,10 +209,9 @@ describe('a land step that rebases the branch', () => {
       for (const def of [changes, tasks]) {
         if (!def) throw new Error('no board');
         const land = def.steps.find((step) => isLandStep(def, step.id));
-        const branch = partNamed(def, lang === 'es' ? 'Rama' : 'Branch')?.name ?? '';
-        expect(mentionText(def, land?.instructions.take ?? '')).toContain(
-          says[lang].replaceAll('@{branch}', branch),
-        );
+        const take = mentionText(def, land?.instructions.take ?? '');
+        for (const part of says[lang]) expect(take).toContain(part);
+        expect(take).not.toContain('--force');
       }
     }
   });

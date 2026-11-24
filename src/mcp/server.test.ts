@@ -278,7 +278,8 @@ describe('mcp server', () => {
 
       const parsed = JSON.parse(draft);
       expect(parsed.name).toBe('Cambios');
-      expect(draft).toContain('git push --force-with-lease origin <branch>');
+      expect(draft).toContain('git push origin <branch>');
+      expect(draft).not.toContain('--force');
       expect(draft).toContain('otea handoff <id> --way');
     });
 

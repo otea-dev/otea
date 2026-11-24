@@ -8,11 +8,11 @@ import { landStepOf, stateOf } from '../core/board/engine.ts';
 import { updateItemState } from '../store/queries.ts';
 import { type Cli, cliAt, declareProfiles, tempGitRepo } from './testing.ts';
 
-// P6-R3-1: the second item landed in a base needs a rebase onto the new main. The agent rebased,
-// merged it into main and pushed main: the hook refused it, since the branch held commits its
-// remote never got, but said nothing of the push it does allow first (the rebased branch, with
-// --force-with-lease), so the agent stopped and asked.
-describe('landing a branch rebased onto the base', () => {
+// P6-R3-1: the second item landed in a base needs the new main brought into its branch. The agent
+// did, merged it into main and pushed main: the hook refused it, since the branch held commits its
+// remote never got, but said nothing of the push it does allow first (the branch, plainly: the land
+// step never asks for a force push), so the agent stopped and asked.
+describe('landing a branch brought up to date with the base', () => {
   let repo: ReturnType<typeof tempGitRepo>;
   let otea: Cli;
   const BRANCH = 'cambio/1-regar';
@@ -71,24 +71,25 @@ describe('landing a branch rebased onto the base', () => {
       project.db.close();
     }
     expect((await otea('claim', 'CAM-1')).code).toBe(0);
-    // The agent rebases the branch onto the new main and merges it there.
+    // The agent merges the new main into the branch and fast-forwards main to it.
     git('checkout', '-q', BRANCH);
-    git('rebase', '-q', 'main');
+    git('merge', '-q', '--no-edit', 'main');
     git('checkout', '-q', 'main');
     git('merge', '-q', '--ff-only', BRANCH);
   });
 
   afterEach(() => repo.remove());
 
-  it('refuses main first, naming the push of the rebased branch and then of main', async () => {
+  it('refuses main first, naming the plain push of the branch and then of main', async () => {
     const refused = await otea('check', '--gate', 'push', '--branch');
     expect(refused.code, refused.out + refused.err).toBe(19);
     expect(refused.out).toContain(
-      `push refused: ${BRANCH} holds commits origin/${BRANCH} never got, so nobody reviewed them; main takes CAM-1's branch only as it was pushed. To land a branch you rebased onto main, push it first, git push --force-with-lease origin ${BRANCH}, then push main again, git push origin main.`,
+      `push refused: ${BRANCH} holds commits origin/${BRANCH} never got, so nobody reviewed them; main takes CAM-1's branch only as it was pushed. To land a branch you brought up to date with main (git merge origin/main), push it first, git push origin ${BRANCH}, then push main again, git push origin main.`,
     );
+    expect(refused.out).not.toContain('--force');
   });
 
-  it('lets through the force push it names', async () => {
+  it('lets through the plain push it names', async () => {
     const pushed = git('rev-parse', `origin/${BRANCH}`);
     const rebased = git('rev-parse', BRANCH);
     const allowed = await otea(
