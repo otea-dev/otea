@@ -1,12 +1,12 @@
 import type { Channel } from '../core/authority.ts';
-import { isClosed, positionOf } from '../core/board/engine.ts';
-import { isEvidence, type Part } from '../core/board/model.ts';
+import { isAsked, isClosed, positionOf } from '../core/board/engine.ts';
+import { isEvidence, type Part, partOf, stepById } from '../core/board/model.ts';
 import { EVIDENCE_WAIVED, type Waiver } from '../core/board/waivers.ts';
 import { OteaError } from '../core/errors.ts';
 import type { Actor } from '../core/item.ts';
 import { appendEvent } from '../store/queries.ts';
 import { requireWritableItem, systemClock } from './items.ts';
-import { liveBoardOf } from './next.ts';
+import { itemOnBoard, liveBoardOf } from './next.ts';
 import type { Project } from './project.ts';
 
 export type WaiveInput = {
@@ -37,14 +37,20 @@ export function waiveEvidence(project: Project, input: WaiveInput, now = systemC
   const board = liveBoardOf(project, item.collection);
   if (!board) throw new OteaError('invalid_type', `${item.id} is not on a board`);
   const { def } = board;
-  if (isClosed(positionOf(item.state)))
+  const position = positionOf(item.state);
+  if (isClosed(position))
     throw new OteaError('item_closed', `${item.id} is closed: nothing to waive`);
-  const files: Part[] = Object.values(def.parts).filter(isEvidence);
-  const part = files.find((each) => each.id === input.part || fold(each.name) === fold(input.part));
+  // Only a file the step the item stands on asks for now: that step's hand, as its facts hold.
+  const facts = itemOnBoard(project, item, def).facts;
+  const asked = (stepById(def, position.step)?.hand ?? [])
+    .filter((hand) => isAsked(def, facts, hand))
+    .map(({ ref }) => partOf(def, ref))
+    .filter((each): each is Part => each !== undefined && isEvidence(each));
+  const part = asked.find((each) => each.id === input.part || fold(each.name) === fold(input.part));
   if (!part)
     throw new OteaError(
       'not_found',
-      `${def.name} has no file part "${input.part}"; its file parts are ${files.map(({ name }) => name).join(', ') || 'none'}`,
+      `${item.id} is asked for no file "${input.part}" at this step; it asks for ${asked.map(({ name }) => name).join(', ') || 'none'}`,
     );
   const reason = input.reason?.trim() ?? '';
   const at = now();

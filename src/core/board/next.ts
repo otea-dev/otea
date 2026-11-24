@@ -132,6 +132,8 @@ export type NextInput = {
   merged?: { commit?: string };
   // The option the person picked last, on an item that carries options.
   chosen?: ItemChoice;
+  // The files the person waived this round: its handoff does not lack them.
+  waived?: readonly { part: string; by: string; reason?: string }[];
   // Its place in the person's order (app/priority.ts): put on top (pin), or in the order they
   // fixed on the Matrix (rank); why next offers it before others.
   order?: { pin?: number; rank?: number };
@@ -231,6 +233,9 @@ function isEmpty(part: Part, input: NextInput): boolean {
 function valueText(part: Part, input: NextInput, lang: Lang): string {
   if (isEvidence(part)) {
     const count = input.evidence[part.id] ?? 0;
+    const waiver = input.waived?.find((each) => each.part === part.id);
+    if (count === 0 && waiver)
+      return `waived by ${waiver.by}${waiver.reason ? ` (${waiver.reason})` : ''}`;
     return count === 0 ? 'none yet' : count === 1 ? '1 file' : `${count} files`;
   }
   const value = part.id === 'title' ? input.title : input.fields[part.id];

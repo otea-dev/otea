@@ -17,6 +17,7 @@ import {
   postNote,
   editNote as postNoteEdit,
   withdrawNote as postNoteWithdraw,
+  postWaive,
   reassignItem,
   restartItem,
   resumeItem,
@@ -107,6 +108,8 @@ export type AppActions = {
   withdrawNote(id: string, note: number): Promise<void>;
   // Your answer to an agent's question: the turn goes back to it, with no move to undo.
   answer(id: string, text: string, toast?: string): Promise<void>;
+  // You let the item go on without a file its step asks for (by the part's name).
+  waive(id: string, part: string, reason: string, toast?: string): Promise<void>;
   // A stuck item: back in the queue of its step (restart), or left for an agent (reassign). Both
   // run as any change does (the lists' handoff), then the toast offers Deshacer: the lease that
   // ran out comes back while the toast is up.
@@ -229,6 +232,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       async answer(id, text, message) {
         await Q.run(() => postAnswer(id, text));
+        if (message === undefined) return;
+        await landed();
+        toast({ msg: message, id });
+      },
+      async waive(id, part, reason, message) {
+        await Q.run(() => postWaive(id, part, reason));
         if (message === undefined) return;
         await landed();
         toast({ msg: message, id });

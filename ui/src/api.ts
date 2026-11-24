@@ -351,6 +351,14 @@ export async function postAnswer(id: string, text: string): Promise<void> {
   await post(`/api/items/${encodeURIComponent(id)}/answer`, { text });
 }
 
+// You let the item go on without a file its step asks for: its handoff stops asking for it.
+export async function postWaive(id: string, part: string, reason: string): Promise<void> {
+  await post(`/api/items/${encodeURIComponent(id)}/waive`, {
+    part,
+    ...(reason.trim() ? { reason: reason.trim() } : {}),
+  });
+}
+
 export async function undoRelease(id: string): Promise<void> {
   await post(`/api/items/${encodeURIComponent(id)}/undo`, { release: true });
 }

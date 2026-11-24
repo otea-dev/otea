@@ -6,7 +6,7 @@ import { creatures } from '../core/board/testing.ts';
 import type { Actor } from '../core/item.ts';
 import { createItem, requireItem } from './items.ts';
 import { claimItem } from './leases.ts';
-import { boardBlockOf, handoffItem } from './next.ts';
+import { boardBlockOf, handoffItem, sendBackItem } from './next.ts';
 import type { Project } from './project.ts';
 import { memoryContext, projectOf, publishAs } from './testing.ts';
 import { waiveEvidence } from './waive.ts';
@@ -66,5 +66,37 @@ describe('waiving a required file', () => {
   it('is never the agent who waives it', () => {
     expect(() => waive(quill)).toThrowError(expect.objectContaining({ code: 'forbidden' }));
     expect(() => hand()).toThrowError(/missing Arte conceptual/);
+  });
+
+  it('holds for its round only: a send-back asks for the file again', () => {
+    waive();
+    hand();
+    sendBackItem(project, { id, actor: you, channel: 'ui', reason: 'Otra vez' }, now);
+    claimItem(project, { id, actor: quill }, now);
+    expect(() => hand()).toThrowError(/missing Arte conceptual/);
+    expect(boardBlockOf(project, requireItem(project.db, id))?.waived).toBeUndefined();
+  });
+
+  it('waives for one item only', () => {
+    const other = createItem(
+      project,
+      { collection: 'Criaturas', title: 'Sapo', fields: { fdesc: 'Verde' }, actor: you },
+      now,
+    ).id;
+    claimItem(project, { id: other, actor: quill }, now);
+    waive();
+    expect(() =>
+      handoffItem(project, { id: other, actor: quill, channel: 'cli', note: 'Listo' }, now),
+    ).toThrowError(/missing Arte conceptual/);
+  });
+
+  it('refuses a part that is not a file, or that the step does not ask for', () => {
+    const waiveOf = (part: string) =>
+      waiveEvidence(project, { id, part, actor: you, channel: 'cli' }, now);
+    // A text field, and a file asked only for a swamp creature (not this one).
+    expect(() => waiveOf('Descripción')).toThrowError(
+      expect.objectContaining({ code: 'not_found' }),
+    );
+    expect(() => waiveOf('Barro')).toThrowError(expect.objectContaining({ code: 'not_found' }));
   });
 });

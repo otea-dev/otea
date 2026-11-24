@@ -762,6 +762,8 @@ export type HandRow = {
   // A field the page can fill in place ("Rellenar"), and how; evidence is attached by an agent.
   part?: Part;
   control?: FillControl;
+  // A file the step asks for (a screenshot, a recording): the person may waive it for the item.
+  file?: boolean;
 };
 
 export function handRows(
@@ -792,7 +794,9 @@ export function handRows(
       name: part.name,
       ok: hand.req === 'no' ? (filled?.(hand.ref) ?? false) : !lacks.has(hand.ref),
       required: hand.req !== 'no',
-      ...(isEvidence(part) ? {} : { part, control: fillControl(part, boardSpeech(def)) }),
+      ...(isEvidence(part)
+        ? { file: true }
+        : { part, control: fillControl(part, boardSpeech(def)) }),
     });
   }
   // «Al menos N de»: one row for each group, done when enough of its parts hold a file.
