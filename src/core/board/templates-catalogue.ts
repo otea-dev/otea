@@ -416,7 +416,7 @@ const CONTENT: Template = {
       reviewer: 'none',
       hand: [['furl', 'always', false]],
       take: w(
-        'Publish the approved draft as it is, without rewriting it, on the channel chosen in @{fchannel} (for Docs, as a page in the project\'s docs); then write where it lives in @{furl}.',
+        "Publish the approved draft as it is, without rewriting it, on the channel chosen in @{fchannel} (for Docs, as a page in the project's docs); then write where it lives in @{furl}.",
         'Publica el borrador aprobado tal cual, sin reescribirlo, en el canal elegido en @{fchannel} (en Documentación, como página de la documentación del proyecto); luego escribe dónde quedó en @{furl}.',
       ),
     },
