@@ -478,7 +478,13 @@ function branchLines(
         : [
             `  ${base} is protected too: push or merge ${branch.value} into it only once ${input.id} is ${DONE_NAME}.`,
           ];
-  return [...pushLines(def, step, position, branch), ...into];
+  // A round sent back is picked up by whoever is next, often in the main checkout: name the branch.
+  const resume = input.sentBack
+    ? [
+        `  Continue on ${branch.value}${branch.repo ? ` in ${branch.repo}` : ''}: check it out (or its worktree) before editing; do not edit the main checkout.`,
+      ]
+    : [];
+  return [...resume, ...pushLines(def, step, position, branch), ...into];
 }
 
 // What is true of the push on an item that leaves its branch empty: with no branch the board asks
