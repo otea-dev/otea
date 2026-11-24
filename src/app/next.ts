@@ -954,6 +954,10 @@ function textFor(
     ...(groups === undefined ? {} : { groups }),
     parts: on.links.parts,
     blockers: on.links.blockers,
+    blockersAside: on.links.blockers
+      .filter(({ closed }) => !closed)
+      .map(({ id }) => id)
+      .filter((id) => setAsideBy(ctx, id) !== undefined),
     ...(child === undefined ? {} : { child: child.def }),
     ...(me === undefined ? {} : { me }),
     ...(on.sentBack === undefined ? {} : { sentBack: on.sentBack }),
@@ -1057,7 +1061,9 @@ function mayTakeNow(
   // handoff cannot pass, and offering it would loop the agent on it (P7-R2-2).
   if (waitsOpen(def, on)) return false;
   // Nor is an item something open blocks, whatever its step declares (the desk says it waits).
-  if (position.phase === 'doing' && openBlockersOf(on).length > 0) return false;
+  // The agent holding it keeps working: a block linked since applies to new claims only.
+  if (position.phase === 'doing' && openBlockersOf(on, def).length > 0 && lease?.holder !== agent)
+    return false;
   const mine =
     position.phase === 'doing'
       ? mayTake(def, position.step)
@@ -1194,7 +1200,10 @@ function waitsOpen(def: BoardDefinition, on: ItemOnBoard): boolean {
 }
 
 // The items that block it and are still open (one Done and waiting only to be merged is merge work).
-function openBlockersOf(on: ItemOnBoard): string[] {
+// A step that declares `waits: blockers` has its own wait and message, so none are counted here.
+function openBlockersOf(on: ItemOnBoard, def: BoardDefinition): string[] {
+  const position = on.position;
+  if (!isClosed(position) && stepById(def, position.step)?.waits.includes('blockers')) return [];
   return on.links.blockers
     .filter(({ closed, unmerged }) => !closed && !unmerged)
     .map(({ id }) => id);
@@ -1240,22 +1249,40 @@ function byOrder(a: number, b: number): number {
 // set-aside holds for every agent, P7-R3-6), and how to take it up again. The first of them in the
 // person's order (on top, then the Matrix order) is named with its place, as the one to take up
 // first (P7-R3-1).
-function setAsideOn(ctx: Context, boards: readonly LiveBoard[]): { id: string; by: string }[] {
+function setAsideOn(
+  ctx: Context,
+  boards: readonly LiveBoard[],
+): { id: string; by: string; claimable: boolean }[] {
   return boards.flatMap((board) =>
     selectItems(ctx.db, { collection: board.collection }).flatMap((item) => {
-      const by = isClosed(positionOf(item.state)) ? undefined : setAsideBy(ctx, item.id);
-      return by === undefined ? [] : [{ id: item.id, by }];
+      const position = positionOf(item.state);
+      const by = isClosed(position) ? undefined : setAsideBy(ctx, item.id);
+      if (by === undefined || isClosed(position)) return [];
+      // Claiming takes it up again only where an agent may: not at a person's step, not blocked.
+      const claimable =
+        position.phase === 'doing' &&
+        mayTake(board.def, position.step) &&
+        openBlockersOf(itemOnBoard(ctx, item, board.def), board.def).length === 0;
+      return [{ id: item.id, by, claimable }];
     }),
   );
 }
 
 // With work to offer: that some items stay out of every agent's queue because one was set aside for
 // later, and how to bring one back, so they do not drop out of sight (G2).
-function setAsideCount(ctx: Context, boards: readonly LiveBoard[]): string[] {
-  const ids = setAsideOn(ctx, boards).map(({ id }) => id);
-  if (ids.length === 0) return [];
+function setAsideCount(ctx: Context, boards: readonly LiveBoard[], scope?: string): string[] {
+  const aside = setAsideOn(ctx, boards);
+  if (aside.length === 0) return [];
+  const shown = aside.slice(0, 5).map(({ id }) => id);
+  const list =
+    aside.length > 5 ? `${shown.join(', ')} and ${aside.length - 5} more` : shown.join(', ');
+  const where = scope === undefined ? '' : ` on ${scope}`;
+  const first = aside.find(({ claimable }) => claimable);
+  const how = first
+    ? `otea claim ${first.id} takes ${aside.length === 1 ? 'it' : 'one'} up again.`
+    : 'none can be taken up yet (a person’s step, or something open blocks it).';
   return [
-    `${ids.length} set aside for later (${ids.join(', ')}), out of every agent's queue: otea claim ${ids[0]} takes ${ids.length === 1 ? 'it' : 'one'} up again.`,
+    `${aside.length} set aside for later${where} (${list}), out of every agent's queue: ${how}`,
   ];
 }
 
@@ -1483,7 +1510,7 @@ export function nextFor(
         textFor(ctx, item, board.def, at, agent, look),
         ...mergeLines(toMerge),
         ...(later === undefined ? [] : [later]),
-        ...setAsideCount(ctx, boards),
+        ...setAsideCount(ctx, boards, options.collection === undefined ? undefined : named),
       ].join('\n'),
       ...(brief ? { brief: true as const } : {}),
       ...(sentBack === undefined ? {} : { sentBack }),
@@ -2335,11 +2362,11 @@ export function assertMayClaim(
         'not_claimable',
         `${item.id} is at ${step.name}, which the person does; claim only what is yours (otea next)`,
       );
-    const blockers = openBlockersOf(on);
-    if (blockers.length > 0)
+    const blockers = openBlockersOf(on, board.def);
+    if (blockers.length > 0 && activeLease(item.lease, at)?.holder !== agent)
       throw new OteaError(
         'not_claimable',
-        `${item.id} waits for ${blockers.join(', ')}, which block it and are not done; claim only what is yours (otea next)`,
+        `${item.id} waits for ${blockers.join(', ')}, which ${blockers.length === 1 ? 'blocks' : 'block'} it and ${blockers.length === 1 ? 'is' : 'are'} not done; claim only what is yours (otea next), or otea unlink ${blockers[0]} blocks ${item.id} drops the block`,
       );
     const first = landTurnFor(ctx, item, agent, at);
     if (first) throw new OteaError('not_claimable', landsFirstText(item.id, first));
