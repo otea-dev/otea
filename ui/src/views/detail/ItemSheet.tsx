@@ -318,7 +318,8 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
       : value != null && String(value).trim() !== '';
     return held || item.evidence.some(({ module }) => module === ref);
   };
-  const hand = live && ownStep ? handRows(live, ownStep, missing, item.fields, filled) : [];
+  const hand =
+    live && ownStep ? handRows(live, ownStep, missing, item.fields, filled, block0?.waived) : [];
 
   // ---- notes to the agent while it does its step (the notes mock) ----
   const thread = useMemo(() => threadOf(block, item.events), [block, item.events]);
@@ -351,7 +352,10 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   const worker = block?.worker;
   const noteTo = worker?.name ?? facts.agent;
   // What the agent has to hand, read only: its parts, then the wait for your notes' answers.
-  const agentHand = live && agentStep ? handRows(live, agentStep, missing, item.fields) : [];
+  const agentHand =
+    live && agentStep
+      ? handRows(live, agentStep, missing, item.fields, undefined, block0?.waived)
+      : [];
   const deliverable = agentHand.filter((r) => r.required && r.ref !== NOTE_REF);
   const had = { done: deliverable.filter((r) => r.ok).length, of: deliverable.length };
   const pieces = useMemo(

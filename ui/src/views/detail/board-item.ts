@@ -35,6 +35,7 @@ import {
 } from '../../../../src/core/board/model.ts';
 import type { ItemNote } from '../../../../src/core/board/notes.ts';
 import type { ItemQuestion } from '../../../../src/core/board/questions.ts';
+import { isWaivable, type Waiver } from '../../../../src/core/board/waivers.ts';
 import {
   type DefinitionRoute,
   definitionRoute,
@@ -144,6 +145,8 @@ export type ItemBoardBlock = {
   branch: { value: string; repo?: string } | null;
   // While its step is being done: what the handoff still lacks (parts by ref, `note`, the waits).
   missing?: { ref: string; name: string; reason: string }[];
+  // The files you waived for this round: its handoff does not lack them.
+  waived?: Waiver[];
   // On a Pedido an agent drafts a board on: that board, and how the draft is handed in.
   request?: DraftRequest;
   // The notes the person left on the item, every round's, oldest first (core/board/notes.ts).
@@ -762,9 +765,16 @@ export type HandRow = {
   // A field the page can fill in place ("Rellenar"), and how; evidence is attached by an agent.
   part?: Part;
   control?: FillControl;
-  // A file the step asks for (a screenshot, a recording): the person may waive it for the item.
+  // A picture or recording the step asks for: the person may waive it for the item.
   file?: boolean;
+  // You waived it: who, and why.
+  waived?: { by: string; reason?: string };
 };
+
+function waivedRow(waiver: Waiver | undefined): Pick<HandRow, 'waived'> {
+  if (!waiver) return {};
+  return { waived: { by: waiver.by, ...(waiver.reason ? { reason: waiver.reason } : {}) } };
+}
 
 export function handRows(
   def: BoardDefinition,
@@ -776,6 +786,8 @@ export function handRows(
   // Whether a part holds something (a field's value, a file): an optional deliverable is done only
   // then, as the engine never counts it missing.
   filled?: (ref: string) => boolean,
+  // The files you waived: their rows say so instead of "ready".
+  waived: readonly Waiver[] = [],
 ): HandRow[] {
   const lacks = new Set(missing.map(({ ref }) => ref));
   const applies = (hand: Step['hand'][number]) =>
@@ -795,7 +807,10 @@ export function handRows(
       ok: hand.req === 'no' ? (filled?.(hand.ref) ?? false) : !lacks.has(hand.ref),
       required: hand.req !== 'no',
       ...(isEvidence(part)
-        ? { file: true }
+        ? {
+            ...(isWaivable(part) ? { file: true } : {}),
+            ...waivedRow(waived.find((one) => one.part === part.id)),
+          }
         : { part, control: fillControl(part, boardSpeech(def)) }),
     });
   }

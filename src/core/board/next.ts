@@ -679,9 +679,16 @@ function partLines(def: BoardDefinition, hands: readonly Hand[], input: NextInpu
         : hand.req === 'when'
           ? whenText(def, hand)
           : `optional${fresh}`;
-    const mark = missing ? '✗' : hand.req === 'always' ? '✓' : '·';
+    const waiver = isEvidence(part)
+      ? input.waived?.find(({ part: id }) => id === hand.ref)
+      : undefined;
+    const mark = missing ? '✗' : waiver || hand.req === 'always' ? '✓' : '·';
     const proof = part.kind === 'check' && part.proof ? ', each ticked point with its proof' : '';
-    const line = `  ${mark} ${part.name}: ${req}${proof}${missing ? ` (${reasonText(missing)})` : ''}${choicesText(part, hand.req !== 'no', langOf(def))}`;
+    // A file the person waived: said with who and why, so the agent hands off without it.
+    const waived = waiver
+      ? `; waived by ${waiver.by}${waiver.reason ? ` (${waiver.reason})` : ''}: hand it off without it`
+      : '';
+    const line = `  ${mark} ${part.name}: ${req}${waived}${proof}${missing ? ` (${reasonText(missing)})` : ''}${choicesText(part, hand.req !== 'no', langOf(def))}`;
     return part.hint && hand.req !== 'no' ? [line, `      what goes here: ${part.hint}`] : [line];
   });
 }
