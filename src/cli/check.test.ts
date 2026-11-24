@@ -485,6 +485,24 @@ describe('check', () => {
       expect((await push('--branch', '--repo')).code).toBe(0);
     });
 
+    // Field study F1, day 2: an agent committed straight on main in the shared checkout while CAM-1
+    // was in review. No hook runs on a commit, and the repo had no pre-push hook either, so nothing
+    // said anything until the person ran git log. The push gate would refuse these commits (the test
+    // above); until a push, the agents and the person must be told that main holds work nobody
+    // approved, because every worktree cut from main carries it.
+    it('says in show that the local base holds commits nobody approved, before any push', async () => {
+      person(task, 'implementing');
+      commit('keys');
+      await otea('move', task, 'implementing__review');
+      git('checkout', '-q', 'main');
+      commit('never reviewed');
+      const extra = git('rev-parse', 'HEAD').slice(0, 7);
+
+      const shown = (await otea('show', task)).out;
+      expect(shown).toContain(extra);
+      expect(shown).toContain('never reviewed');
+    });
+
     // P5-R3-3: a board that commits approved work straight on main, in its land step, writes each
     // commit's id on its item (Commit en main). git push origin main was refused all the same, «this
     // push brings in none», and the only advice was --no-verify.
