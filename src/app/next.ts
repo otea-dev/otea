@@ -414,7 +414,7 @@ export function itemOnBoard(ctx: Context, item: ItemRecord, def: BoardDefinition
   const did = roundWorkers(position, events, startedAt);
   const proofs = step === undefined ? [] : proofsFrom(events, startedAt);
   const chosen = choiceOf(events);
-  const waivers = waiversFrom(events);
+  const waivers = step === undefined ? [] : waiversFrom(events, startedAt);
   const facts: ItemFacts = {
     fields: { ...item.fields, title: item.title },
     evidence,
@@ -979,6 +979,7 @@ function textFor(
     ...(on.roundNotes.length === 0 ? {} : { notes: on.roundNotes }),
     ...(on.roundQuestions.length === 0 ? {} : { questions: on.roundQuestions }),
     ...(on.chosen === undefined ? {} : { chosen: on.chosen }),
+    ...(on.waivers.length === 0 ? {} : { waived: on.waivers }),
     ...(order && (order.pin !== undefined || order.rank !== undefined) ? { order } : {}),
     ...(handIn ? { handIn } : {}),
     ...(retaken === undefined ? {} : { retaken }),

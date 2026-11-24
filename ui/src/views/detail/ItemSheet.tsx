@@ -855,6 +855,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                       item={item}
                       rows={agentHand}
                       canWrite={false}
+                      canWaive={app.session.canWrite}
                       notes={roundNotes.length ? { unanswered } : undefined}
                     />
                   ) : null}
@@ -1058,6 +1059,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                   item={item}
                   rows={agentHand}
                   canWrite={false}
+                  canWaive={app.session.canWrite}
                   notes={roundNotes.length ? { unanswered } : undefined}
                 />
               ) : null}

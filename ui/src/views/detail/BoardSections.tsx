@@ -59,10 +59,13 @@ export function HandChecklist({
   rows,
   canWrite,
   notes,
+  canWaive = false,
 }: {
   item: Pick<ItemView, 'id' | 'title' | 'fields'>;
   rows: readonly HandRow[];
   canWrite: boolean;
+  // You may hand the item on without a file the step asks for (an agent with no way to make it).
+  canWaive?: boolean;
   // While an agent does the step and you left it notes: the wait for its answers, after a rule.
   notes?: { unanswered: number } | undefined;
 }) {
@@ -71,7 +74,23 @@ export function HandChecklist({
   const [value, setValue] = useState('');
   const [failed, setFailed] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [waiving, setWaiving] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
   if (!rows.length && !notes) return null;
+  const waive = (row: HandRow) => {
+    if (saving) return;
+    setSaving(true);
+    app
+      .waive(item.id, row.name, reason, t('bi.hand.waived', { part: row.name, title: item.title }))
+      .then(
+        () => {
+          setWaiving(null);
+          setReason('');
+        },
+        () => setFailed(t('bi.hand.waiveFailed', { part: row.name })),
+      )
+      .finally(() => setSaving(false));
+  };
   const fill = (row: HandRow) => {
     setOpen(open === row.ref ? null : row.ref);
     setValue(item.fields[row.ref] ?? '');
@@ -115,6 +134,23 @@ export function HandChecklist({
                     </button>
                   </>
                 ) : null}
+                {!row.ok && row.file && row.required && canWaive ? (
+                  <>
+                    {' '}
+                    <button
+                      type="button"
+                      className="lnk"
+                      aria-expanded={waiving === row.ref}
+                      onClick={() => {
+                        setWaiving(waiving === row.ref ? null : row.ref);
+                        setReason('');
+                        setFailed(null);
+                      }}
+                    >
+                      {t('bi.hand.waive', { part: row.name })}
+                    </button>
+                  </>
+                ) : null}
               </span>
               <small>
                 {row.ok
@@ -124,6 +160,39 @@ export function HandChecklist({
                     : t('bi.hand.optional')}
               </small>
             </div>
+            {waiving === row.ref ? (
+              <form
+                className="bi-fill"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  waive(row);
+                }}
+              >
+                <input
+                  aria-label={t('bi.hand.waiveReason')}
+                  type="text"
+                  maxLength={500}
+                  value={reason}
+                  placeholder={t('bi.hand.waiveReason')}
+                  onChange={(e) => setReason(e.target.value)}
+                  // biome-ignore lint/a11y/noAutofocus: opened by its own button, to type at once
+                  autoFocus
+                />
+                <div className="actions">
+                  <Button variant="primary" type="submit" disabled={saving}>
+                    {t('bi.hand.waiveDo')}
+                  </Button>
+                  <Button variant="quiet" type="button" onClick={() => setWaiving(null)}>
+                    {t('bi.hand.cancel')}
+                  </Button>
+                </div>
+                {failed ? (
+                  <p className="said warn" role="alert">
+                    {failed}
+                  </p>
+                ) : null}
+              </form>
+            ) : null}
             {editing && row.part ? (
               <form
                 className="bi-fill"

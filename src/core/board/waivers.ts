@@ -15,11 +15,13 @@ export type Waiver = {
   by: string;
 };
 
-// The waivers recorded on an item, one per part (the last wins), in the order first given.
-export function waiversFrom(events: readonly EventRecord[]): Waiver[] {
+// The waivers given since `since` (the round start), one per part (the last wins): a send-back
+// starts a round that asks for the file again.
+export function waiversFrom(events: readonly EventRecord[], since?: string): Waiver[] {
   const out = new Map<string, Waiver>();
   for (const event of events) {
     if (event.type !== EVIDENCE_WAIVED || event.actor.kind !== 'human') continue;
+    if (since !== undefined && event.at < since) continue;
     const { data } = event;
     const part = String(data.part ?? '');
     if (!part) continue;

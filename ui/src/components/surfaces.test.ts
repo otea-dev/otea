@@ -85,6 +85,7 @@ function fakeApp(o: Partial<App> = {}): App {
     editNote: async () => undefined,
     withdrawNote: async () => undefined,
     answer: async () => undefined,
+    waive: async () => undefined,
     restart: async () => undefined,
     reassign: async () => undefined,
     resume: async () => undefined,

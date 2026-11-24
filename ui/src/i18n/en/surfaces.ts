@@ -372,6 +372,8 @@ export const surfaces = {
   'activity.provedYou': 'You proved a checklist point on {id}',
   'activity.chose': 'picked an option on {id}',
   'activity.choseYou': 'You picked an option on {id}',
+  'activity.waived': 'waived a required file on {id}',
+  'activity.waivedYou': 'You waived a required file on {id}',
   'activity.touched': 'updated {id}',
   'activity.touchedYou': 'You updated {id}',
   'activity.movedYou': 'You moved {id} to {state}',

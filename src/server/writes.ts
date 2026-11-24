@@ -427,7 +427,8 @@ export async function answerRequest(c: Context): Promise<{ text: string }> {
   return { text: parsed.data.text };
 }
 
-const WaiveBody = z.object({ part: z.string().min(1), reason: z.string().optional() });
+// A reason is a line or two: capped so a page cannot keep a wall of text on an item.
+const WaiveBody = z.object({ part: z.string().min(1), reason: z.string().max(500).optional() });
 
 // The person's waiver of a file a step asks for: the part, by name or id, and why.
 export async function waiveRequest(c: Context): Promise<{ part: string; reason?: string }> {

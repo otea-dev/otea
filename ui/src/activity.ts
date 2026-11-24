@@ -83,6 +83,7 @@ export type Phrase =
         | 'activity.merged'
         | 'activity.proved'
         | 'activity.chose'
+        | 'activity.waived'
         | 'activity.touched';
     };
 
@@ -199,6 +200,7 @@ const SAID: Record<string, Pick<FeedLine, 'kind' | 'phrase'>> = {
   merged: { kind: 'other', phrase: { key: 'activity.merged' } },
   point_proved: { kind: 'other', phrase: { key: 'activity.proved' } },
   option_chosen: { kind: 'other', phrase: { key: 'activity.chose' } },
+  evidence_waived: { kind: 'other', phrase: { key: 'activity.waived' } },
 };
 
 // The name a move wrote for its step, kept beside the step's key.
