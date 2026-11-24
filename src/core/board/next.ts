@@ -98,6 +98,8 @@ export type NextInput = {
   // What the item's waits read: its parts and what blocks it (names as people read them).
   parts?: readonly Linked[];
   blockers?: readonly Linked[];
+  // Which of the open blockers an agent set aside for later.
+  blockersAside?: readonly string[];
   // The board its parts are on, when the board divides (itself, for parts of the same kind).
   child?: BoardDefinition;
   // The send-back that started this round, while the step is being done.
@@ -788,8 +790,19 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
     reviewing || step.waits.includes('blockers')
       ? []
       : (input.blockers ?? []).filter(({ closed, unmerged }) => !closed && !unmerged);
-  if (blocking.length > 0)
-    return `${head}\nNot yet: ${and(blocking.map(({ id }) => id))} ${blocking.length === 1 ? 'blocks' : 'block'} it and ${blocking.length === 1 ? 'is' : 'are'} not done. otea next offers it once ${blocking.length === 1 ? 'it closes' : 'they close'}; pick another item.`;
+  // The agent holding it keeps working: a block added since applies to new claims only.
+  const holding = input.holder !== undefined && input.holder.name === input.me;
+  const ids = blocking.map(({ id }) => id);
+  const many = ids.length > 1;
+  const blockNote = `${and(ids)} ${many ? 'block' : 'blocks'} it and ${many ? 'are' : 'is'} not done`;
+  const unlink = `otea unlink ${ids[0]} blocks ${id} drops the block`;
+  const aside = input.blockersAside ?? [];
+  const allAside = ids.length > 0 && ids.every((each) => aside.includes(each));
+  const way = allAside
+    ? `${and(ids)} ${many ? 'are' : 'is'} set aside for later, so nothing will close ${many ? 'them' : 'it'} soon: otea claim ${ids[0]} takes ${many ? 'one' : 'it'} up again, or ${unlink}`
+    : `otea next offers it once ${many ? 'they close' : 'it closes'}; ${unlink}`;
+  if (blocking.length > 0 && !holding)
+    return `${head}\nNot yet: ${blockNote}. ${way}. Pick another item.`;
   const open = reviewing ? undefined : input.questions?.find(({ answer }) => !answer);
   if (open) return [head, ...waitingAnswerText(open, input.me)].join('\n');
 
@@ -823,6 +836,10 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
         .trim()
         .split(/\r?\n/)
         .map((line) => `  ${line}`),
+    );
+  if (blocking.length > 0)
+    lines.push(
+      `${blockNote} (linked since you took it): finish it, or otea release ${id}; ${unlink}.`,
     );
   if (!reviewing) lines.push(...notesBlock(id, input.notes ?? [], input.me));
   if (!reviewing && input.sentBack) lines.push(...sentBackLines(input.sentBack));
