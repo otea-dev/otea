@@ -1,5 +1,4 @@
 import { execFileSync } from 'node:child_process';
-import { landedIn } from './gitrepo.ts';
 
 // What a board's «Commit pushed» (Commit en main) field claims: the commit it names holds the work
 // the person approved, and reached the base the board protects. The field took any text, «banana»
@@ -134,121 +133,89 @@ export function baseTipsOf(cwd: string, base: string): string[] {
   return [...new Set(refs.flatMap((ref) => commitOf(cwd, ref) ?? []))];
 }
 
-// The bytes of a path at a revision, one `cat-file --batch` for all: undefined where a revision has
-// no such file (or git cannot say). Paths with a newline cannot be asked this way: they come back
-// undefined and so count as not carried.
-type Blobs = Map<string, Buffer | undefined>;
+// What git leaves of the files when the approved commit `tip` is merged into `commit` (in memory,
+// nothing is written to a branch): the merged tree equals `commit`'s own when all the approved
+// change is in it already, as a rebase or squash of it onto the base leaves it. Otherwise the files
+// the merge would still change, or `conflicts` when git cannot merge the two cleanly (they changed
+// the same lines differently). git finds the merge base itself, several of them included.
+type Merged = { same: true } | { files: string[] } | { conflicts: true } | undefined;
 
-function blobsAt(cwd: string, wanted: { rev: string; path: string }[]): Blobs {
-  const blobs: Blobs = new Map();
-  const asked = wanted.filter(({ path }) => !path.includes('\n'));
-  if (asked.length === 0) return blobs;
-  let out: Buffer;
+function mergedInto(cwd: string, tip: string, commit: string): Merged {
+  let out: string;
   try {
-    out = execFileSync('git', ['cat-file', '--batch'], {
+    out = execFileSync('git', ['merge-tree', '--write-tree', '--no-messages', commit, tip], {
       cwd,
-      input: `${asked.map(({ rev, path }) => `${rev}:${path}`).join('\n')}\n`,
-      stdio: ['pipe', 'pipe', 'ignore'],
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
       timeout: GIT_MS,
       env: QUIET,
-      maxBuffer: 1 << 30,
     });
-  } catch {
-    return blobs;
+  } catch (error) {
+    const { status } = error as { status?: number | null };
+    return status === 1 ? { conflicts: true } : undefined;
   }
-  let at = 0;
-  for (const { rev, path } of asked) {
-    const end = out.indexOf(0x0a, at);
-    if (end < 0) break;
-    // «<id> <type> <size>», or «<asked> missing» (the asked path may hold spaces).
-    const head = /^[0-9a-f]+ (\w+) (\d+)$/.exec(out.toString('utf8', at, end));
-    at = end + 1;
-    if (head === null) {
-      blobs.set(`${rev}:${path}`, undefined);
-      continue;
-    }
-    const length = Number(head[2]);
-    blobs.set(`${rev}:${path}`, head[1] === 'blob' ? out.subarray(at, at + length) : undefined);
-    at += length + 1;
-  }
-  return blobs;
+  const merged = out.split(/\r?\n/)[0]?.trim();
+  const own = git(cwd, 'rev-parse', '--verify', '--quiet', `${commit}^{tree}`);
+  if (!merged || !own) return undefined;
+  if (merged === own) return { same: true };
+  const files = git(cwd, 'diff-tree', '-r', '--name-only', '--no-renames', own, merged) ?? '';
+  return { files: files.split(/\r?\n/).filter(Boolean) };
 }
 
-const linesOf = (bytes: Buffer): string[] =>
-  bytes
-    .toString('utf8')
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-// Whether a file as `landed` leaves it still carries what the approved version `tip` changed from
-// `base`: it is the approved file, or (a conflict resolved by hand while rebasing or merging, so no
-// merge of the two is clean) it is no longer the file the base had, and every line the approved
-// change added is in it. A file the approved change deleted must be gone. Lines are compared
-// without their indentation and by content, not position: what the person approved is kept, not
-// that it sits where it did. A binary file must be the approved one.
-function carriesFile(base: Buffer | undefined, tip: Buffer | undefined, landed?: Buffer): boolean {
-  if (tip === undefined) return landed === undefined;
-  if (landed === undefined) return false;
-  if (landed.equals(tip)) return true;
-  if (base?.equals(landed)) return false;
-  if (tip.includes(0) || landed.includes(0)) return false;
-  const had = new Set(base === undefined ? [] : linesOf(base));
-  const has = new Set(linesOf(landed));
-  return linesOf(tip).every((line) => had.has(line) || has.has(line));
-}
+// What `lackOf` needs to tell why a commit is earlier than the approved work.
+type Context = {
+  // The base as it stands (the remote's, else the local branch) and whether it holds the approved
+  // commit; the base tips recorded when the item was first claimed, when there are any.
+  baseHoldsTip: boolean;
+  claimTips?: string[] | undefined;
+};
 
 // Why a commit does not hold the approved commit's work, or undefined when it does. It holds it
-// when the approved commit is in its history, or it carries what the approved commit changed from
-// where the two diverged, as the base's tip after a rebase or a squash does: all of it, at the
-// same result (git merges the approved commit into it and nothing changes), or, where main changed
-// the same lines and the agent resolved the conflict, the approved lines kept in each file the
-// approved change touched. A commit older than the approved work, or of another line of work, or
-// one that leaves a file's approved change out, holds nothing of it. The text names which.
-function lackOf(cwd: string, tip: string, commit: string): string | undefined {
+// when the approved commit is in its history (a merge of the base into the branch, then a
+// fast-forward, always), or when git merging the approved commit into it changes nothing: all the
+// approved change is in it at the same result, as a rebase or squash onto a base that moved leaves
+// it. The approved change must not be empty from where the two diverged, or any commit built on that
+// point would pass for holding it. A rebase whose conflict was resolved by hand does not merge back
+// cleanly and is refused: land by merging the base into the branch, so the resolution is reviewed.
+// The text names the real cause of each refusal.
+function lackOf(cwd: string, tip: string, commit: string, context: Context): string | undefined {
   if (holds(cwd, commit, tip)) return undefined;
-  const base = git(cwd, 'merge-base', tip, commit);
-  if (base === undefined || base === '') {
+  const short = tip.slice(0, 7);
+  const bases = (git(cwd, 'merge-base', '--all', tip, commit) ?? '').split(/\r?\n/).filter(Boolean);
+  if (bases.length === 0) {
     return `it shares no history with it, so it is another line of work than the approved one.`;
   }
-  if (base === commit) {
-    return `it is an older commit of {base}, from before the approved work.`;
+  // The commit is part of the approved work's own history: older than it.
+  if (holds(cwd, tip, commit)) {
+    if (context.baseHoldsTip) {
+      return `it is an older commit of {base}: the approved work is on {base} at a later commit.`;
+    }
+    if (context.claimTips?.some((claimed) => holds(cwd, claimed, commit))) {
+      return `it is an older commit of {base}, from before this item began.`;
+    }
+    const part = `only part of the approved work: {base} was brought to ${commit.slice(0, 7)}, an earlier commit than ${short}, so the commits after it are not on {base} (a partial landing). Push the rest (the approved branch fast-forwarded into {base}) and write the hash of the last commit.`;
+    return context.claimTips === undefined
+      ? `it is an older commit of {base}, from before the approved work, or ${part}`
+      : `it is ${part}`;
   }
-  const changed = git(
-    cwd,
-    '-c',
-    'diff.ignoreSubmodules=none',
-    'diff-tree',
-    '-r',
-    '-z',
-    '--name-only',
-    '--no-renames',
-    '--no-ext-diff',
-    '--ignore-submodules=none',
-    '--no-commit-id',
-    base,
-    tip,
-  );
-  const paths = (changed ?? '').split('\0').filter(Boolean);
-  if (paths.length === 0) {
-    return `the approved commit changes no files, so no other commit can be told to hold its work.`;
+  // The approved change as git sees it from each point the two diverged: with none, nothing to hold.
+  const trees = bases.map((base) => git(cwd, 'rev-parse', `${base}^{tree}`));
+  const tipTree = git(cwd, 'rev-parse', `${tip}^{tree}`);
+  const emptyFrom = bases.find((_, at) => trees[at] === tipTree);
+  if (emptyFrom !== undefined) {
+    return `the approved work leaves the files as they were at ${emptyFrom.slice(0, 7)}, where it and this commit diverged, so it has no change this commit could be told to hold.`;
   }
-  // The same change as it stands in the commit, whatever came into the base around it.
-  if (landedIn(cwd, tip, commit)) return undefined;
-  const blobs = blobsAt(
-    cwd,
-    paths.flatMap((path) => [
-      { rev: base, path },
-      { rev: tip, path },
-      { rev: commit, path },
-    ]),
-  );
-  const at = (rev: string, path: string) => blobs.get(`${rev}:${path}`);
-  const missed = paths.find(
-    (path) => !carriesFile(at(base, path), at(tip, path), at(commit, path)),
-  );
-  if (missed === undefined) return undefined;
-  return `it is built on what the approved work was, but does not carry the approved change to ${missed}: a rebase, a merge or a resolution left it out or rewrote it. If you resolved a conflict, keep every line the person approved there, or take the item back to the step before this one so the resolution is reviewed.`;
+  const merged = mergedInto(cwd, tip, commit);
+  if (merged === undefined) {
+    return `git could not compare it with the approved work (${short}).`;
+  }
+  if ('same' in merged) return undefined;
+  if ('conflicts' in merged) {
+    return `it does not hold the approved commit and git cannot merge the two: they changed the same lines differently (a rebase with a conflict resolved by hand, or other work on {base}), so what it landed is not what was reviewed. Land by merging {base} into the approved branch (git merge origin/{base}), so the approved commit is in its history, push the branch, then fast-forward {base} to it; if the merge conflicts, send the item back to the step before this one so the resolution is reviewed.`;
+  }
+  const shown = merged.files.slice(0, 3).join(', ');
+  const more = merged.files.length > 3 ? ` and ${merged.files.length - 3} more` : '';
+  return `part of the approved change is missing from it: merging ${short} into it would still change ${shown}${more}. Land the approved commit itself (merge {base} into the approved branch, push it, then fast-forward {base} to it).`;
 }
 
 // The refusal of the commits that hold the work when none of them can be this item's: each is
@@ -360,7 +327,12 @@ export function landedCommitRefusal(
     if (tip === undefined) {
       return `${name}: this checkout lacks the commit the person approved (${approved.commit.slice(0, 7)}), so it cannot tell that ${listed} holds it. Fetch it, then hand it off again.`;
     }
-    const lacks = commits.map((each) => ({ ...each, why: lackOf(cwd, tip, each.full) }));
+    const baseRef = upstream ?? `refs/heads/${base}`;
+    const context: Context = {
+      baseHoldsTip: holds(cwd, baseRef, tip),
+      claimTips: own.claimTips,
+    };
+    const lacks = commits.map((each) => ({ ...each, why: lackOf(cwd, tip, each.full, context) }));
     holding = lacks.filter(({ why }) => why === undefined);
     const [unheld] = lacks;
     if (holding.length === 0 && unheld?.why !== undefined) {
