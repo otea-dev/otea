@@ -223,6 +223,7 @@ import {
   profileView,
   selectMcpLoads,
 } from '../store/queries.ts';
+import { baseStrayLine } from './base-strays.ts';
 import {
   type Command,
   CommandFailure,
@@ -1289,11 +1290,14 @@ const show: Command = {
       // The person's notes of this round, as data too: the text has them in its Next: block.
       const notes = roundNotesOf(project, item.id);
       const data = itemData(project, item);
-      const outside = mergedOutsideLine(project, input.cwd, shown);
+      const heads = [
+        mergedOutsideLine(project, input.cwd, shown),
+        baseStrayLine(project, input.cwd, shown),
+      ].filter((line): line is string => line !== undefined);
       const said =
-        outside === undefined
+        heads.length === 0
           ? text
-          : `${outside}
+          : `${heads.join('\n')}
 
 ${text}`;
       return { data: notes.length === 0 ? data : { ...data, notes }, text: said };
