@@ -103,4 +103,17 @@ describe.runIf(IS_WIN)('bin/otea in Git Bash', () => {
     expect(status).toBe(0);
     expect(got).toEqual({ args: ['next'], asNode: '1' });
   });
+
+  // A shell that does not convert POSIX paths for native programs (opencode's does not) hands the
+  // exe /c/Users/... which it reads as D:\c\Users\...; the shim has to pass a Windows path.
+  it('hands the native app a Windows path even when the shell does not convert paths', () => {
+    const res = fakeApp('Otea.exe', 'resources');
+    const result = spawnSync('sh', [join(res, 'bin', 'otea').replaceAll('\\', '/'), 'next'], {
+      encoding: 'utf8',
+      windowsHide: true,
+      env: { ...process.env, MSYS_NO_PATHCONV: '1', MSYS2_ARG_CONV_EXCL: '*' },
+    });
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout.trim().split('\n').at(-1) ?? '').args).toEqual(['next']);
+  });
 });
