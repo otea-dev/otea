@@ -280,11 +280,18 @@ describe('the commit a board says it landed', () => {
         expect(ask(landed, approved)).toBeUndefined();
       });
 
-      it('takes a rebase whose conflict was resolved keeping both sides', () => {
+      // A rebase with a conflict resolved by hand is not the approved change: git cannot merge the
+      // approved commit back into it, nothing says the resolution kept what was approved, and the
+      // push gate refuses it too. Land by merging main into the branch instead.
+      it('refuses a rebase whose conflict was resolved by hand, pointing to the merge-based Land', () => {
         mainTouchesTheSameLines();
         rebaseKeepingBoth();
         const landed = landBranchOnMain();
-        expect(ask(landed, approved)).toBeUndefined();
+        const said = ask(landed, approved);
+        expect(said).toContain('does not hold the work the person approved');
+        expect(said).toContain('git cannot merge the two');
+        expect(said).toContain('git merge origin/main');
+        expect(said).not.toContain('older commit');
       });
 
       it('takes the merge of main into the branch', () => {
@@ -317,34 +324,109 @@ describe('the commit a board says it landed', () => {
         expect(said).toContain('older commit of main');
       });
 
-      // Landing a rebase whose resolution threw the item's line away is not landing the approved
-      // work: say which file lost it, never «an older commit».
-      it('refuses a resolution that dropped what the person approved, naming the file', () => {
-        mainTouchesTheSameLines();
-        git(dir, 'switch', '-q', BRANCH);
-        expect(() => git(dir, 'rebase', 'main')).toThrow();
-        writeFileSync(join(dir, 'shared.txt'), 'one\ntwo\nother line\n');
-        git(dir, 'add', 'shared.txt');
-        execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'rebase', '--continue'], {
-          cwd: dir,
-          stdio: 'pipe',
-          env: { ...process.env, GIT_EDITOR: 'true' },
-        });
-        const landed = landBranchOnMain();
-        const said = ask(landed, approved);
-        expect(said).toContain('shared.txt');
-        expect(said).not.toContain('older commit');
-      });
-
       // Another commit that landed after the branch forked is built on the same base but carries
-      // none of the approved change.
-      it("refuses another item's later commit, saying it lacks the approved change", () => {
+      // none of the approved change: it names what is missing.
+      it("refuses another item's later commit, saying what of the approved change is missing", () => {
         mainMovesOnAnotherFile();
         const other = head();
         const said = ask(other, approved);
         expect(said).toContain('does not hold the work the person approved');
+        expect(said).toContain('part of the approved change is missing');
         expect(said).toContain('feature.txt');
         expect(said).not.toContain('older commit');
+      });
+
+      // The agent fast-forwarded main only to the first commit of the approved branch: that is a
+      // partial landing, not «an older commit of main», whatever the hash it wrote.
+      it('calls main moved only to an earlier commit of the approved branch a partial landing', () => {
+        const claimTips = baseTipsOf(dir, 'main');
+        git(dir, 'push', '-q', 'origin', `${approved}~1:main`);
+        git(dir, 'fetch', '-q', 'origin');
+        const first = git(dir, 'rev-parse', '--short', 'origin/main');
+        const said = landedCommitRefusal(
+          dir,
+          'Commit on main',
+          first,
+          'main',
+          { commit: approved },
+          { landed: [], claimTips },
+        );
+        expect(said).toContain('does not hold the work the person approved');
+        expect(said).toContain('a partial landing');
+        expect(said).not.toContain('older commit');
+        // With the base tips of the claim unknown, an earlier commit can be either; it says so.
+        expect(ask(first, approved)).toContain('a partial landing');
+      });
+
+      // The work is on main already, at a later commit: an older hash is just that.
+      it('calls an earlier commit an older commit once the approved work is on main', () => {
+        const older = git(dir, 'rev-parse', '--short', 'origin/main');
+        landBranchOnMain();
+        const said = ask(older, approved);
+        expect(said).toContain('older commit of main');
+        expect(said).toContain('later commit');
+      });
+
+      // An approved branch that nets out to no change from where it diverged (a commit and its
+      // revert) has nothing another commit could hold: it says that, not «changes no files».
+      it('refuses to tell any commit holds an approved change that nets out to nothing', () => {
+        git(dir, 'switch', '-q', BRANCH);
+        git(dir, 'revert', '--no-edit', 'HEAD~1');
+        git(dir, 'revert', '--no-edit', 'HEAD~1');
+        git(dir, 'push', '-q', 'origin', BRANCH);
+        const netted = git(dir, 'rev-parse', 'HEAD');
+        git(dir, 'switch', '-q', 'main');
+        mainMovesOnAnotherFile();
+        const said = ask(head(), netted);
+        expect(said).toContain('leaves the files as they were');
+        expect(said).not.toContain('changes no files');
+      });
+
+      // What a clean merge can still miss when only a line is deleted, only whitespace changes, a
+      // line duplicates one already there, or only a file mode changes: the named commit lacks the
+      // change, so merging the approved commit into it would still change the file.
+      describe.each([
+        ['deletes a line', 'keep.txt', () => writeFileSync(join(dir, 'keep.txt'), 'a\nb\n')],
+        [
+          'only changes whitespace',
+          'keep.txt',
+          () => writeFileSync(join(dir, 'keep.txt'), 'a\n  secret=x\nb\n'),
+        ],
+        [
+          'adds a line that duplicates another',
+          'keep.txt',
+          () => writeFileSync(join(dir, 'keep.txt'), 'a\nsecret=x\nb\na\n'),
+        ],
+        [
+          'only changes a file mode',
+          'run.sh',
+          () => git(dir, 'update-index', '--chmod=+x', 'run.sh'),
+        ],
+      ])('an approved change that %s', (_what, file, change) => {
+        it('is refused for a commit of main that lacks it, and taken when main has it', () => {
+          write('keep.txt', 'a\nsecret=x\nb\n');
+          write('run.sh', 'echo hi\n');
+          git(dir, 'push', '-q', 'origin', 'main');
+          git(dir, 'switch', '-q', '-c', 'item');
+          change();
+          git(dir, 'add', '-A');
+          git(dir, 'commit', '-q', '-m', 'the change');
+          git(dir, 'push', '-q', 'origin', 'item');
+          const tip = git(dir, 'rev-parse', 'HEAD');
+          git(dir, 'switch', '-q', 'main');
+          mainMovesOnAnotherFile();
+          const said = ask(head(), tip);
+          expect(said).toContain('part of the approved change is missing');
+          expect(said).toContain(file);
+          // Landing it (main fast-forwarded to the branch, after main's change was merged in).
+          git(dir, 'switch', '-q', 'item');
+          git(dir, 'merge', '-q', '--no-edit', 'main');
+          git(dir, 'push', '-q', 'origin', 'item');
+          git(dir, 'switch', '-q', 'main');
+          git(dir, 'merge', '-q', '--ff-only', 'item');
+          git(dir, 'push', '-q', 'origin', 'main');
+          expect(ask(head(), tip)).toBeUndefined();
+        });
       });
 
       // A merge that keeps main's side whole adds nothing to main: a new hash, no work landed.
