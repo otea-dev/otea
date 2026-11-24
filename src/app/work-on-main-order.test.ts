@@ -157,6 +157,42 @@ describe('working straight on main, one agent at a time', () => {
     );
   });
 
+  // Field G6 day 2: the sent-back item came back to Hacerlo after its siblings, so the order put
+  // them first, while its commits on main made them wait for it: nobody could take anything.
+  it('offers the sent-back item first: its commits on main are what the others wait for', () => {
+    const { ctx, doing } = board();
+    const sent = doing('sent back');
+    const second = doing('second');
+    doing('third');
+    appendEvent(ctx.db, {
+      itemId: sent,
+      type: 'transitioned',
+      actor: agent('claude-b'),
+      at: now(),
+      data: {
+        to: 'doit__review',
+        tip: { branch: 'main', commit: 'a'.repeat(40), tree: 'b'.repeat(40) },
+      },
+    });
+    // The person sends it back: it enters Hacerlo again, later than the other two.
+    appendEvent(ctx.db, {
+      itemId: sent,
+      type: 'transitioned',
+      actor: you,
+      at: now(),
+      data: { to: 'doit' },
+    });
+
+    expect(nextFor(ctx, 'quill', {}, now).item).toBe(sent);
+    expect(claimItem(ctx, { id: sent, actor: agent('quill') }, now).lease?.holder).toBe('quill');
+    expect(() => claimItem(ctx, { id: second, actor: agent('claude-b') }, now)).toThrow(
+      `${second} not claimed: quill works on main with ${sent} now`,
+    );
+    // Once it landed, the others go on, in the person's order.
+    updateItemState(ctx.db, sent, 'done', now());
+    expect(nextFor(ctx, 'claude-b', {}, now).item).toBe(second);
+  });
+
   it('holds nothing for an item whose handoff made no commit', () => {
     const { ctx, doing } = board();
     const first = doing('first');
