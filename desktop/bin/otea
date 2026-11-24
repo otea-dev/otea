@@ -15,7 +15,7 @@ main="$resources/otea/src/cli/main.ts"
 # Git Bash and other MSYS shells give POSIX paths (/c/Users/...) that the native Otea.exe reads as
 # D:\c\Users\...; hand it a Windows path. Not there on macOS and Linux.
 if command -v cygpath >/dev/null 2>&1; then
-  main="$(cygpath -w "$main")"
+  w="$(cygpath -w "$main" 2>/dev/null)" && [ -n "$w" ] && main="$w"
 fi
 for app in "$resources/../MacOS/Otea" "$resources/../otea-desktop" "$resources/../Otea.exe"; do
   if [ -f "$app" ]; then

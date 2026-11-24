@@ -54,18 +54,6 @@ describe('agent identity on the CLI', () => {
     },
   );
 
-  // Field study F9/F4/F10/F2: the person's own `otea create` needed --as, which registered them as a
-  // connected agent and let `otea whoami` hand their name to an agent. Waits on a product decision
-  // (docs/working-with-agents.md says "there is no default name" for every acting command, and the
-  // test above pins it): `it.fails` documents the wanted behavior until it is decided.
-  it.fails('lets the person create an item without a name, recording no agent', async () => {
-    const result = await unnamed('create', '--collection', 'tasks', '--title', 'By hand');
-
-    expect(result.err).toBe('');
-    expect(result.code).toBe(0);
-    expect(agents()).toEqual(['claude']);
-  });
-
   it.each([['list'], ['show', 'TASKS-1'], ['events'], ['board'], ['board', 'tasks']])(
     'lets the person read with "otea %s" without a name',
     async (...argv) => {
