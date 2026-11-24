@@ -156,7 +156,14 @@ export type Brought = {
   landsAs?: (landing: readonly Landing[], onto?: string) => boolean;
 };
 
-export function branchesBrought(cwd: string, to: string, from?: string): Brought {
+// `lean`: only the branches and `outside`, for a caller that asks no push or merge question
+// (unpushed and landsAs are left out: one git call per local branch, and per landing).
+export function branchesBrought(
+  cwd: string,
+  to: string,
+  from?: string,
+  { lean = false }: { lean?: boolean } = {},
+): Brought {
   const tip = commitOf(cwd, to);
   if (!tip) return { branches: [], unpushed: [] };
   const base = from === undefined ? undefined : commitOf(cwd, from);
@@ -176,24 +183,27 @@ export function branchesBrought(cwd: string, to: string, from?: string): Brought
     const branch = remote === undefined ? undefined : short.slice(remote.length + 1);
     return branch === undefined || branch === 'HEAD' ? [] : [branch];
   });
-  const unpushed = local.flatMap((branch) => {
-    const remote = remoteName(cwd, branch);
-    if (remote === undefined) return [];
-    return isAncestor(cwd, `refs/heads/${branch}`, remote)
-      ? []
-      : [{ branch, remote, push: pushRemote(cwd, branch) }];
-  });
+  const unpushed = lean
+    ? []
+    : local.flatMap((branch) => {
+        const remote = remoteName(cwd, branch);
+        if (remote === undefined) return [];
+        return isAncestor(cwd, `refs/heads/${branch}`, remote)
+          ? []
+          : [{ branch, remote, push: pushRemote(cwd, branch) }];
+      });
   const brought: Brought = { branches: [...new Set([...local, ...fromRemotes])], unpushed };
   // With nothing on the remote to start from, the whole history would count as brought in: only a
   // push onto a branch the remote has is asked which commits ride along.
   if (base)
     brought.outside = (held, tips = []) =>
       commitsOutside(cwd, tip, base, held, refs, remotes, tips);
-  brought.landsAs = (landing, onto) => {
-    const start =
-      onto === undefined ? base : (commitOf(cwd, remoteOf(cwd, onto)) ?? commitOf(cwd, onto));
-    return landsAs(cwd, tip, start, landing);
-  };
+  if (!lean)
+    brought.landsAs = (landing, onto) => {
+      const start =
+        onto === undefined ? base : (commitOf(cwd, remoteOf(cwd, onto)) ?? commitOf(cwd, onto));
+      return landsAs(cwd, tip, start, landing);
+    };
   return brought;
 }
 
