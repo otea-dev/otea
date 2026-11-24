@@ -479,11 +479,13 @@ function branchLines(
             `  ${base} is protected too: push or merge ${branch.value} into it only once ${input.id} is ${DONE_NAME}.`,
           ];
   // A round sent back is picked up by whoever is next, often in the main checkout: name the branch.
-  const resume = input.sentBack
-    ? [
-        `  Continue on ${branch.value}${branch.repo ? ` in ${branch.repo}` : ''}: check it out (or its worktree) before editing; do not edit the main checkout.`,
-      ]
-    : [];
+  // Only the doer is told (not a reviewer), and never to "continue on" the protected base itself.
+  const resume =
+    input.sentBack && 'phase' in position && position.phase === 'doing' && branch.value !== base
+      ? [
+          `  Continue on ${branch.value}${branch.repo ? ` in ${branch.repo}` : ''}: check it out (or its worktree) before editing; do not edit the main checkout.`,
+        ]
+      : [];
   return [...resume, ...pushLines(def, step, position, branch), ...into];
 }
 
