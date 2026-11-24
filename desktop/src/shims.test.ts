@@ -13,7 +13,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -102,6 +102,21 @@ describe.runIf(IS_WIN)('bin/otea in Git Bash', () => {
     const { status, got } = run('sh', [join(res, 'bin', 'otea').replaceAll('\\', '/'), 'next']);
     expect(status).toBe(0);
     expect(got).toEqual({ args: ['next'], asNode: '1' });
+  });
+
+  it('still runs the app when cygpath fails', () => {
+    const res = fakeApp('Otea.exe', 'resources');
+    const fake = join(root, `fake-cygpath-${Math.random()}`.replace('.', ''));
+    mkdirSync(fake, { recursive: true });
+    writeFileSync(join(fake, 'cygpath'), '#!/bin/sh\nexit 1\n');
+    chmodSync(join(fake, 'cygpath'), 0o755);
+    const result = spawnSync('sh', [join(res, 'bin', 'otea').replaceAll('\\', '/'), 'next'], {
+      encoding: 'utf8',
+      windowsHide: true,
+      env: { ...process.env, PATH: `${fake}${delimiter}${process.env.PATH ?? ''}` },
+    });
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout.trim().split('\n').at(-1) ?? '').args).toEqual(['next']);
   });
 
   // A shell that does not convert POSIX paths for native programs (opencode's does not) hands the
