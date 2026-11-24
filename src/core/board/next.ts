@@ -784,7 +784,10 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
   const elsewhere = heldElsewhere(input);
   if (elsewhere) return `${head}\n${elsewhere}`;
   // Something open that blocks it holds it back from every agent, whatever its step declares.
-  const blocking = reviewing ? [] : (input.blockers ?? []).filter(({ closed, unmerged }) => !closed && !unmerged);
+  const blocking =
+    reviewing || step.waits.includes('blockers')
+      ? []
+      : (input.blockers ?? []).filter(({ closed, unmerged }) => !closed && !unmerged);
   if (blocking.length > 0)
     return `${head}\nNot yet: ${and(blocking.map(({ id }) => id))} ${blocking.length === 1 ? 'blocks' : 'block'} it and ${blocking.length === 1 ? 'is' : 'are'} not done. otea next offers it once ${blocking.length === 1 ? 'it closes' : 'they close'}; pick another item.`;
   const open = reviewing ? undefined : input.questions?.find(({ answer }) => !answer);

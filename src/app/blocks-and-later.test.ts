@@ -6,7 +6,7 @@ import { insertEvidence } from '../store/queries.ts';
 import { createBoard, publishBoard, saveDraft } from './boards.ts';
 import type { Context } from './context.ts';
 import { createItem, requireItem } from './items.ts';
-import { claimItem } from './leases.ts';
+import { claimItem, releaseItem } from './leases.ts';
 import { approveItem, handoffItem, itemNextText, nextFor } from './next.ts';
 import { linkItems } from './relations.ts';
 import { memoryContext } from './testing.ts';
@@ -89,5 +89,23 @@ describe('an item that something open blocks', () => {
     const shown = itemNextText(ctx, requireItem(ctx.db, blocked.id), 'kiln', now) ?? '';
     expect(shown).toContain(blocker.id);
     expect(shown).not.toContain('Your turn');
+  });
+});
+
+// G2 day 2: an item set aside with release --later vanished from every agent's next.
+describe('an item set aside for later', () => {
+  it('stays out of the queue but next says how many are set aside and how to bring one back', () => {
+    const ctx = memoryContext();
+    plainBoard(ctx);
+    const aside = animating(ctx, 'Para luego');
+    const other = animating(ctx, 'Ahora');
+    claimItem(ctx, { id: aside.id, actor: kiln }, now);
+    releaseItem(ctx, { id: aside.id, actor: kiln, later: true }, now);
+
+    const answer = nextFor(ctx, 'kiln', {}, now);
+
+    expect(answer.item).toBe(other.id);
+    expect(answer.text).toContain(`1 set aside for later (${aside.id})`);
+    expect(answer.text).toContain(`otea claim ${aside.id}`);
   });
 });

@@ -1195,7 +1195,9 @@ function waitsOpen(def: BoardDefinition, on: ItemOnBoard): boolean {
 
 // The items that block it and are still open (one Done and waiting only to be merged is merge work).
 function openBlockersOf(on: ItemOnBoard): string[] {
-  return on.links.blockers.filter(({ closed, unmerged }) => !closed && !unmerged).map(({ id }) => id);
+  return on.links.blockers
+    .filter(({ closed, unmerged }) => !closed && !unmerged)
+    .map(({ id }) => id);
 }
 
 // How far along its board an open item stands: whether it waits for a review, and its step's place.
@@ -1238,13 +1240,27 @@ function byOrder(a: number, b: number): number {
 // set-aside holds for every agent, P7-R3-6), and how to take it up again. The first of them in the
 // person's order (on top, then the Matrix order) is named with its place, as the one to take up
 // first (P7-R3-1).
-function setAsideLines(ctx: Context, boards: readonly LiveBoard[], agent: string): string[] {
-  const aside = boards.flatMap((board) =>
+function setAsideOn(ctx: Context, boards: readonly LiveBoard[]): { id: string; by: string }[] {
+  return boards.flatMap((board) =>
     selectItems(ctx.db, { collection: board.collection }).flatMap((item) => {
       const by = isClosed(positionOf(item.state)) ? undefined : setAsideBy(ctx, item.id);
       return by === undefined ? [] : [{ id: item.id, by }];
     }),
   );
+}
+
+// With work to offer: that some items stay out of every agent's queue because one was set aside for
+// later, and how to bring one back, so they do not drop out of sight (G2).
+function setAsideCount(ctx: Context, boards: readonly LiveBoard[]): string[] {
+  const ids = setAsideOn(ctx, boards).map(({ id }) => id);
+  if (ids.length === 0) return [];
+  return [
+    `${ids.length} set aside for later (${ids.join(', ')}), out of every agent's queue: otea claim ${ids[0]} takes ${ids.length === 1 ? 'it' : 'one'} up again.`,
+  ];
+}
+
+function setAsideLines(ctx: Context, boards: readonly LiveBoard[], agent: string): string[] {
+  const aside = setAsideOn(ctx, boards);
   if (aside.length === 0) return [];
   const setters = [...new Set(aside.map(({ by }) => by))].sort(
     (a, b) => Number(b === agent) - Number(a === agent),
@@ -1467,6 +1483,7 @@ export function nextFor(
         textFor(ctx, item, board.def, at, agent, look),
         ...mergeLines(toMerge),
         ...(later === undefined ? [] : [later]),
+        ...setAsideCount(ctx, boards),
       ].join('\n'),
       ...(brief ? { brief: true as const } : {}),
       ...(sentBack === undefined ? {} : { sentBack }),
