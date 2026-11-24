@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.6.1](https://github.com/otea-dev/otea/compare/v0.6.0...v0.6.1) (2026-11-24)
+
+
+### Bug fixes
+
+* **boards:** keep internal ids and editorial notes out of the Content board's text, and say where it goes live ([da92173](https://github.com/otea-dev/otea/commit/da92173aabaacbf6ee7719a5d5120bc6d400697f))
+* **desk:** a waived file's row says you waived it, with the reason on hover ([cab420b](https://github.com/otea-dev/otea/commit/cab420b1bf55a7148e5225a45d807a172bd60056))
+* **desktop:** give the native app a Windows path to the CLI from Git Bash ([fa209cf](https://github.com/otea-dev/otea/commit/fa209cfa007def35192f92d7f1c95203d6517435))
+* **desktop:** keep the CLI path when cygpath fails; drop the pending-decision placeholder test ([cbcaa2d](https://github.com/otea-dev/otea/commit/cbcaa2dda9d394d2c645ba11e1adfee08e7daa6f))
+* **handoff:** let the person waive a required file for one item ([679afcd](https://github.com/otea-dev/otea/commit/679afcdf9d691ad7e4e26f00300f41e95d9ae827))
+* **handoff:** say a waived file in the desk row and in next, and waive only pictures and recordings ([a00c83c](https://github.com/otea-dev/otea/commit/a00c83cd71bbe7b215f398532de35dfe7650a055))
+* **handoff:** waive for the round only, say it in show and the feed, add the desk button ([a2e27fd](https://github.com/otea-dev/otea/commit/a2e27fdf9627350780fef1e180ce1f0bf177dd55))
+* **land:** hold a landing to git's own merge of the approved commit, drop the line check ([5615220](https://github.com/otea-dev/otea/commit/56152209b2356d15d00f213008ff751f6e1e49ac))
+* **land:** land by merging main into the branch, and tell a rebased landing's real cause ([2d5cd4b](https://github.com/otea-dev/otea/commit/2d5cd4b826d1cc552cc0faee7318ee2637315bfd))
+* **next:** a block linked after a claim leaves the holder working, and names how to unlink ([c383074](https://github.com/otea-dev/otea/commit/c383074285ca91dffbb4c8937d7a52359fc5a5aa))
+* **next:** a sent-back item on a main board no longer waits for the items waiting for it ([99fffd9](https://github.com/otea-dev/otea/commit/99fffd98fc6f069d19f24834e173adf55ebc2b24))
+* **next:** a sent-back item still waits for commits in review or landing on main ([b341aae](https://github.com/otea-dev/otea/commit/b341aae60c6ec537097378aebfd561d261aeb157))
+* **next:** an item something open blocks is not offered or claimed, and says what it waits for ([7df8718](https://github.com/otea-dev/otea/commit/7df871876dbb942013d410ee3688d8053c219e68))
+* **next:** name the item's branch to continue on when a round is sent back ([97d0b02](https://github.com/otea-dev/otea/commit/97d0b028aa8ac63b34f7961487589551eacd7951))
+* **next:** say how many items are set aside for later and how to bring one back ([ff1cbd8](https://github.com/otea-dev/otea/commit/ff1cbd8c52d864b6e0ac1368621bc048a9b8e012))
+* **next:** tell only the doer to continue on a sent-back branch, never the protected base ([3c0a6aa](https://github.com/otea-dev/otea/commit/3c0a6aa729bbef27003d2909c9fef4db9d603010))
+* **show:** ask the item's repo checkout, stay cheap, and test what must not warn ([2447b8a](https://github.com/otea-dev/otea/commit/2447b8a70926aa9e59f898b435121d5a304b0245))
+* **show:** say when the local base holds commits no approved item holds ([b5ff900](https://github.com/otea-dev/otea/commit/b5ff900f5009732f59dd717ce18d4cae38cffc57))
+
 ## [0.6.0](https://github.com/otea-dev/otea/compare/v0.5.0...v0.6.0) (2026-11-23)
 
 
