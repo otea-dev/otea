@@ -6,6 +6,7 @@ import {
   FRESH_RULE,
   handedText,
   idleText,
+  type NextInput,
   nextText,
   noWayText,
   refusalText,
@@ -35,12 +36,12 @@ describe('nextText of a Done item that names no branch', () => {
 describe('nextText of a round sent back on an item with a branch', () => {
   const sentBack = {
     note: 'Cubre el caso vacío.',
-    by: { kind: 'person' as const, name: 'Ana' },
+    by: { kind: 'human' as const, name: 'Ana' },
     at: '2026-11-12T10:04:00.000Z',
     step: 'Implementar',
     round: 1,
   };
-  const input = (fbranch: string) => ({
+  const input = (fbranch: string): NextInput => ({
     id: 'TAR-3',
     title: 'Notas',
     round: 2,
@@ -59,6 +60,26 @@ describe('nextText of a round sent back on an item with a branch', () => {
 
   it('says nothing of a branch to continue on when the item has none', () => {
     expect(nextText(tareasDeRepo(), input(''))).not.toMatch(/Continue on/);
+  });
+
+  it('does not send the doer to the protected base itself', () => {
+    const guarded = tareasDeRepo();
+    const guard = guarded.parts.fbranch?.guard;
+    if (guard) guard.base = 'main';
+    expect(nextText(guarded, input('main'))).not.toMatch(/Continue on/);
+  });
+
+  it('tells the doer only, not a reviewer of the resubmitted round', () => {
+    const text = nextText(tareasDeRepo(), {
+      ...input('feat/notas'),
+      position: { step: 'simpl', phase: 'review' as const },
+    });
+    expect(text).not.toMatch(/Continue on/);
+  });
+
+  it('says nothing when the round was not sent back', () => {
+    const { sentBack: _sent, ...fresh } = input('feat/notas');
+    expect(nextText(tareasDeRepo(), fresh)).not.toMatch(/Continue on/);
   });
 });
 
