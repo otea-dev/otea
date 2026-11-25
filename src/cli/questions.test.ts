@@ -105,14 +105,25 @@ describe('an agent asks the person, on the CLI and over MCP', () => {
     );
   });
 
-  it('lets the person at a terminal answer with otea answer, without a name', async () => {
+  // A pty is no proof a person types: an agent in one must not answer its own question as them.
+  it('refuses otea answer without a name at a terminal, leaving the question open', async () => {
     await otea('ask', 'CRI-1', '¿Caparazón liso o con musgo?');
-    const person = cliAt(repo.dir, {}, undefined, undefined, undefined, undefined, true, {}, true);
+    const terminal = cliAt(
+      repo.dir,
+      {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      true,
+      {},
+      true,
+    );
 
-    const answered = await person('answer', 'CRI-1', 'Con musgo');
+    const refused = await terminal('answer', 'CRI-1', 'Con musgo', '--json');
 
-    expect(answered.code).toBe(0);
-    expect((await otea('next')).out).toContain('The person answered: "Con musgo"');
+    expect(JSON.parse(refused.err).error.code).toBe('unnamed_agent');
+    expect((await otea('show', 'CRI-1')).out).toContain('Waiting for the person to answer');
   });
 
   // P4-R2-2: the person answered in the chat, and otea reply could not put it on the question.

@@ -344,6 +344,8 @@ export const surfaces = {
   'activity.handed': 'handed you {id} in {state}',
   'activity.moved': 'moved {id} to {state}',
   'activity.created': 'created {id} in {state}',
+  'activity.createdTerminal': 'created {id} in {state}, from a terminal',
+  'activity.createdTerminalYou': 'You created {id} in {state}, from a terminal',
   'activity.attached': 'attached {file} to {id}',
   'activity.edited': 'edited {id}',
   'activity.linked': 'linked: {relation}',
