@@ -135,6 +135,69 @@ describe('agent identity on the CLI', () => {
     expect(item.lease.holder).toBe('codex');
   });
 
+  // The person at a terminal (stdin and stdout) acts as themselves in create and answer; an agent
+  // never has a terminal, and one piped or redirected is still refused.
+  describe('the person at a terminal', () => {
+    const atTerminal = (env: Record<string, string> = {}) =>
+      cliAt(repo.dir, env, undefined, undefined, undefined, undefined, true, {}, true);
+
+    it('creates an item as the person, without --as, recording no agent', async () => {
+      const made = await atTerminal()(
+        'create',
+        '--collection',
+        'tasks',
+        '--title',
+        'Mine',
+        '--json',
+      );
+
+      expect(made.code).toBe(0);
+      expect(agents()).toEqual(['claude']);
+      const listed = JSON.parse((await unnamed('list', '--json')).out);
+      expect(JSON.stringify(listed)).toContain('Mine');
+    });
+
+    it('still refuses an unnamed create when stdin or stdout is not a terminal', async () => {
+      const stdoutOnly = cliAt(repo.dir, {}, undefined, undefined, undefined, undefined, true);
+      const stdinOnly = cliAt(
+        repo.dir,
+        {},
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        {},
+        true,
+      );
+      for (const cli of [stdoutOnly, stdinOnly]) {
+        const { error } = await errorOf(cli, 'create', '--collection', 'tasks', '--title', 'T');
+        expect(error.code).toBe('unnamed_agent');
+      }
+    });
+
+    it('keeps claim agent-only, and a named agent an agent, even at a terminal', async () => {
+      expect((await errorOf(atTerminal(), 'claim', 'TASKS-1')).error.code).toBe('unnamed_agent');
+      const named = await atTerminal({ OTEA_AGENT: 'codex' })(
+        'create',
+        '--collection',
+        'tasks',
+        '--title',
+        'By codex',
+      );
+      expect(named.code).toBe(0);
+      expect(agents()).toContain('codex');
+    });
+
+    it('never hands the person out as a name to an agent asking whoami', async () => {
+      await atTerminal()('create', '--collection', 'tasks', '--title', 'Mine');
+      const told = JSON.parse((await unnamed('whoami', '--json')).out);
+
+      expect(JSON.stringify(told)).not.toMatch(/human/);
+      expect(agents()).toEqual(['claude']);
+    });
+  });
+
   it('runs setup commands without a name', async () => {
     expect((await unnamed('projects', 'current')).code).toBe(0);
   });
