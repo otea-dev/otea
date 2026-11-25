@@ -1,0 +1,61 @@
+# SPEC: Otea 0.8, the secretary
+
+## 1. Goal
+
+The person talks to one AI secretary per project and decides; they no longer babysit agents. From the desk or the phone, the new **Hablar** view is a chat with that project's secretary, which lives in the person's own harness session on their PC. The secretary turns what the person says into **requests** (items, board drafts) or **consultations** (saved Q&A), shows which, and keeps workers running. A rough note captured from the phone lands in a **Bandeja** and a refiner subagent turns it into a proper item, asking what's missing with buttons. Every request/consultation shows the items it produced, and every item links back to the conversation. When the secretary is offline, messages wait and the person is told. Notifications cover only what needs the person.
+
+## 2. Non-goals
+
+- Otea launching or keeping agents alive (it shows who is missing; harnesses launch).
+- Recorded voice notes / transcription (phone keyboard dictation only).
+- Per-board review policy and the independent reviewer (0.9).
+- A cloud relay; push to the phone stays Tailscale or the desktop app.
+- One secretary across projects.
+
+## 3. Constraints (locked; see D:\otea-explore\report\0.8-decisions.md)
+
+1. One secretary per project, in that project's harness session, with its context. Hablar is one conversation per project; Te toca still joins all projects.
+2. The secretary classifies each message as request or consultation by itself and shows it ("Pedido → CAM-12" / "Consulta guardada"); unsure → two buttons; the person corrects with one tap.
+3. Attachments: images/screenshots and files (PDF, text…). No audio.
+4. Quick capture → Bandeja → a refiner subagent fills What I want / How I check it, asks on the item with options, files it on its board. No subagents → the secretary does it.
+5. Secretary offline: Hablar says since when; the person keeps writing and capturing; all is kept and processed in order on return; one notice if a message waited long.
+6. Notify: an agent's question (with options), the secretary's reply, an item reaching the person's review, something down (secretary offline with waiting messages, a board with nobody). Everything else waits in Te toca.
+7. Same way of working with or without subagents: without them the secretary tells the person how many sessions to open and the exact text for each.
+8. Traceability both ways (conversation turn ⇄ items/boards/consultation).
+9. Look: DESIGN.md Editorial, the Hablar mock (D:\otea-explore\report\hablar-v2.html): lanes (secretary | tú), nodes with their looks, lane light, a branch of item chips per request, a secretary colour of its own (new token), "pensando…", composer with attach + suggestions, "Lo que salió" column (desk) / tab (phone). Spanish de tú.
+10. Person-only acts go through the desk's authenticated routes; an agent can never post as the person. Questions use 0.7's options (`otea ask --option`).
+11. No backwards compatibility needed (Otea is not in real use). Topics become consultations.
+
+## 4. Context
+
+- Agents: `src/app/agents.ts`, `agent-status.ts` (listening/working), `src/core/agent-status.ts` (`itemUnheard`), `src/app/keep-waiting.ts`, the `wait` command in `src/cli/commands.ts`.
+- Topics today: `src/app/topics.ts`, `topics-everywhere.ts`, `src/server/topics*`, `ui/src/views/topics`.
+- Questions with options: `src/app/questions.ts`, `src/core/board/questions.ts`.
+- Notifications: `src/core/notify/*`, `src/server/notifier.ts`, `desktop/src/live.ts`.
+- Role texts: `src/core/agent-prompts.ts`, `src/app/agent-prompts.ts`, agent guide `src/core/agent-guide.ts`.
+- Attachments: `src/server/attach-files*`, evidence storage.
+- Desk: `ui/src/views/*`, `ui/src/lanes/*`, `ui/src/motion/*`, `ui/src/styles/tokens.css`, i18n `ui/src/i18n/{en,es}`.
+- Checks: `npx vitest run <files> --maxWorkers=2`, `npm run typecheck`, `npm run check` once per push; desk in a real browser with agent-browser (390 / 1280), own temp OTEA_HOME, `serve --no-open`.
+
+## 5. Milestones
+
+- **M1 Secretary role and its wait.** A project has at most one secretary agent (declared with `otea profile --role secretary` or `otea connect --role secretary`). `otea wait --secretary` (and MCP) wakes on: a new person message, a Bandeja item, a board with work and nobody listening, a question escalated to it. The desk no longer counts the secretary as listening on boards (the unheard notice works again). API/desk expose secretary status: connected / offline since T. Tests: `src/app/secretary.test.ts`, `src/cli/secretary-wait.test.ts`. Files: app/agents, agent-status, cli wait, server.
+- **M2 Conversation.** Per-project message store: person and secretary messages, attachments (images/files, existing size limits), order, delivered/pending state. Person posts via desk route only; secretary reads/replies via `otea say <text> [--file]` / MCP `say` and `otea conversation` / MCP read tool. A message can be marked request (links to items/board drafts it produced) or consultation (question + answer = what topics are now; topics data migrates or is replaced). One-tap correction by the person. Item ⇄ message backlinks. Tests: `src/app/conversation.test.ts`, `src/server/conversation.test.ts`, `src/cli/say.test.ts`.
+- **M3 Hablar view (desk + phone).** As the mock: lanes, nodes, branch chips with live state, thinking state while the secretary holds the turn, composer with attach and suggestions, Lo que salió (column ≥ 1240 px, tab on phone), offline banner, backlink from an item page to its turn. Motion per DESIGN.md (message unfolds from its node; branch draws with ink; reduced motion = 160 ms fade). Tests: `ui/src/views/hablar/*.test.tsx`; real-browser check at 390 and 1280 with screenshots.
+- **M4 Short answers.** Secretary output rule in its text and in the guide: one-line conclusion first, then at most a few lines; long content as an attachment/page; questions always with options. Tests on the role text; a desk test that a long secretary message folds behind "ver más".
+- **M5 Bandeja and refiner.** "Nuevo ítem" free text + attachments → Bandeja (a per-project inbox, not a board). Secretary wakes; launches a refiner (`otea prompt --role refiner`) or refines itself; refiner asks on the item with options; files it on a board with What I want / How I check it; Bandeja shows state. Tests: `src/app/bandeja.test.ts`, CLI/MCP for refiner flow.
+- **M6 Notifications.** New kinds: secretary reply; secretary offline with person messages waiting (once). Respect existing switches, quiet hours, grace. Tests in `src/core/notify/*.test.ts`, `src/server/notify.test.ts`.
+- **M7 Role texts and fallback.** `otea prompt --role secretary` (replaces coordinator), `worker`, `refiner`; secretary text covers: classify, keep workers, launch refiner, reply short, wait with `--secretary`, and the no-subagents fallback (tell the person how many sessions to open and print each text). Docs: working-with-agents canon section, README pointer. Tests: `src/core/agent-prompts.test.ts`.
+
+## 6. End-to-end check
+
+`npx vitest run src/e2e/secretary.e2e.test.ts` — one test drives a real server and CLI agents: the person posts "the Aprobar button is hidden on the phone" with an image via the desk API; the secretary's `wait --secretary` returns; it replies with `say`, creates an item linked as a request; a worker picks it up and asks with options; the person answers by option via the desk; a raw Bandeja capture is refined and filed; the secretary goes offline, the person posts, the message waits and is delivered on return; item → message and message → item links resolve. Plus the real-browser screenshots of Hablar at 390 and 1280.
+
+## 7. Open decisions (default taken)
+
+- Secretary colour: a new token `--sec` (lilac), used only for the secretary. Default: yes.
+- Message format: plain text with links and item ids; no markdown rendering. Default: plain.
+- Retention: keep all messages; consultations searchable. Default: keep.
+- Suggestions in the composer: "¿Qué me espera hoy?", "Resumime lo que se hizo", "Armá un tablero para…". Default: these three, static.
+- Bandeja is per project; a capture without project on the phone goes to the last project used. Default: yes.
+- Topics: replaced by consultations (no migration needed: no real users). Default: replace.
