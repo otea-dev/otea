@@ -9,6 +9,7 @@ import {
 } from 'react';
 import type { FeedEvent } from '../activity.ts';
 import {
+  type AnswerGiven,
   linkItems,
   type MoveChoiceInput,
   moveItem,
@@ -106,8 +107,9 @@ export type AppActions = {
   // A review comment of the review still open, changed or taken back before it goes.
   editNote(id: string, note: number, text: string): Promise<void>;
   withdrawNote(id: string, note: number): Promise<void>;
-  // Your answer to an agent's question: the turn goes back to it, with no move to undo.
-  answer(id: string, text: string, toast?: string): Promise<void>;
+  // Your answer to an agent's question (your words, one of its options, or the decision left to
+  // it): the turn goes back to it, with no move to undo.
+  answer(id: string, given: AnswerGiven, toast?: string): Promise<void>;
   // You let the item go on without a file its step asks for (by the part's name).
   waive(id: string, part: string, reason: string, toast?: string): Promise<void>;
   // A stuck item: back in the queue of its step (restart), or left for an agent (reassign). Both
@@ -230,8 +232,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       async withdrawNote(id, note) {
         await Q.run(() => postNoteWithdraw(id, note));
       },
-      async answer(id, text, message) {
-        await Q.run(() => postAnswer(id, text));
+      async answer(id, given, message) {
+        await Q.run(() => postAnswer(id, given));
         if (message === undefined) return;
         await landed();
         toast({ msg: message, id });

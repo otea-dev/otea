@@ -117,10 +117,27 @@ describe('mcp server', () => {
             .filter((name) => !omitted.includes(name))
             .map((name) => name.replaceAll('-', '_')),
         ];
+        // ask names its options after what a tool takes: a list of options and the recommended one.
+        const given =
+          tool.name === 'ask'
+            ? expected.map((key) =>
+                key === 'option' ? 'options' : key === 'recommend' ? 'recommended' : key,
+              )
+            : expected;
         expect(Object.keys(tool.inputSchema.properties ?? {}).sort(), tool.name).toEqual(
-          expected.sort(),
+          given.sort(),
         );
       }
+    });
+
+    it('takes ask’s options as a list and its recommendation as a number', async () => {
+      const { tools } = await client.listTools();
+      const properties = tools.find(({ name }) => name === 'ask')?.inputSchema.properties as
+        | Record<string, { type?: string; anyOf?: unknown[] }>
+        | undefined;
+
+      expect(properties?.options?.type).toBe('array');
+      expect(JSON.stringify(properties?.recommended)).toContain('number');
     });
 
     // reply's note was described as "n", and an agent answering a send-back reason with it failed

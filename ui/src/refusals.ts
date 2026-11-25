@@ -307,6 +307,11 @@ function said(details: RefusalDetails): string | undefined {
       return t('refusal.boardNotArchived', { board: details.board });
     case 'note':
       return t(NOTE_WHY[details.why], { item: details.item });
+    // An answer to a question that is no longer the one that waits (answered, or asked again).
+    case 'question':
+      return details.why === 'stale' || details.why === 'none_open'
+        ? t('refusal.questionChanged')
+        : undefined;
     default:
       return undefined;
   }

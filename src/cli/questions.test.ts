@@ -18,12 +18,12 @@ describe('an agent asks the person, on the CLI and over MCP', () => {
   let repo: TempRepo;
   let otea: Cli;
 
-  const answer = (text: string) => {
+  const answer = (given: string | { option: number }) => {
     const project = openProject(repo.dir);
     try {
       return answerQuestion(project, {
         id: 'CRI-1',
-        text,
+        ...(typeof given === 'string' ? { text: given } : given),
         actor: { kind: 'human', name: 'human' },
         channel: 'ui',
       });
@@ -185,6 +185,79 @@ describe('an agent asks the person, on the CLI and over MCP', () => {
     const data = JSON.parse(reply.content[0]?.text ?? 'null');
     expect(data.question).toMatchObject({ question: 1, text: '¿A o B?', by: 'claude' });
     expect(data.text).toContain('the turn is theirs');
+    await client.close();
+  });
+
+  it('asks with options and a recommendation, and gives the pick back, on the CLI', async () => {
+    const asked = await otea(
+      'ask',
+      'CRI-1',
+      '¿Caparazón?',
+      '--option',
+      'Liso',
+      '--option',
+      'Con musgo',
+      '--recommend',
+      '2',
+    );
+    expect(asked.code).toBe(0);
+    const shown = JSON.parse((await otea('show', 'CRI-1', '--json')).out);
+    expect(shown.asks).toMatchObject({ options: ['Liso', 'Con musgo'], recommended: 2 });
+    expect((await otea('show', 'CRI-1')).out).toContain(
+      'Options: 1. Liso · 2. Con musgo (recommended)',
+    );
+
+    answer({ option: 2 });
+
+    const next = (await otea('next')).out;
+    expect(next).toContain('You asked the person: "¿Caparazón?"');
+    expect(next).toContain('The person chose option 2: "Con musgo"');
+  });
+
+  it('refuses options it cannot offer, and a recommendation with none, on the CLI', async () => {
+    const one = await otea('ask', 'CRI-1', '¿A?', '--option', 'Solo');
+    expect(one.code).not.toBe(0);
+    expect(one.err).toContain('2 to 4 options');
+    const stray = await otea('ask', 'CRI-1', '¿A?', '--recommend', '1');
+    expect(stray.code).not.toBe(0);
+    expect(stray.err).toContain('needs options');
+    const word = await otea(
+      'ask',
+      'CRI-1',
+      '¿A?',
+      '--option',
+      'a',
+      '--option',
+      'b',
+      '--recommend',
+      'x',
+    );
+    expect(word.code).not.toBe(0);
+    expect(word.err).toContain('--recommend');
+    expect(JSON.parse((await otea('show', 'CRI-1', '--json')).out).asks).toBeUndefined();
+  });
+
+  it('asks with options over MCP, as options and recommended', async () => {
+    const server = createMcpServer(COMMANDS, {
+      json: true,
+      cwd: repo.dir,
+      agent: 'claude',
+      warn: () => {},
+    });
+    const client = new Client({ name: 'test', version: '0' });
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverSide);
+    await client.connect(clientSide);
+    const tools = await client.listTools();
+    const schema = tools.tools.find((tool) => tool.name === 'ask')?.inputSchema.properties;
+    expect(Object.keys(schema ?? {})).toEqual(expect.arrayContaining(['options', 'recommended']));
+    const reply = (await client.callTool({
+      name: 'ask',
+      arguments: { id: 'CRI-1', question: '¿A o B?', options: ['A', 'B'], recommended: 1 },
+    })) as { isError?: boolean; content: { text: string }[] };
+    expect(reply.isError).toBe(false);
+    const data = JSON.parse(reply.content[0]?.text ?? 'null');
+    expect(data.question).toMatchObject({ options: ['A', 'B'], recommended: 1 });
     await client.close();
   });
 });

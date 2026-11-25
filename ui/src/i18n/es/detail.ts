@@ -518,6 +518,8 @@ export const detail = {
   'sheet.qa.free': 'O respóndele con tus palabras',
   'sheet.qa.placeholder': 'Escribe tu respuesta…',
   'sheet.qa.send': 'Enviar respuesta',
+  'sheet.qa.delegate': 'Decide tú',
+  'sheet.qa.delegated': 'Le dejaste la decisión al agente',
   'sheet.qa.goesOn': '{agent} sigue con lo que digas',
   'sheet.qa.offline': 'Sin conexión con tu equipo: podrás responder cuando vuelva a conectarse.',
   'pick.label': 'Elige una opción',

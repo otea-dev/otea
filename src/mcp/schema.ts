@@ -1,7 +1,7 @@
 import { type ZodType, z } from 'zod';
 import type { Command, OptionSpec } from '../cli/command.ts';
 import { RELATION_KINDS } from '../core/relations.ts';
-import { NAMELESS_READS } from './commands.ts';
+import { NAMELESS_READS, parameterName } from './commands.ts';
 
 // What each tool takes, as the model reads it in tools/list: a type that says what the value is, and
 // a description with the shape or an example. The CLI's placeholders ("id", "n") are not enough
@@ -9,16 +9,16 @@ import { NAMELESS_READS } from './commands.ts';
 
 // A tool's parameter is named after its option, with underscores: some harnesses map tools to
 // functions of a language, or check names against [A-Za-z0-9_], and refuse a hyphen.
-export const schemaKey = (name: string) => name.replaceAll('-', '_');
+const schemaKey = parameterName;
 
 // The values a call gave, with each option under the name the command reads it by.
 export function optionValues(
-  command: Pick<Command, 'options'>,
+  command: Pick<Command, 'name' | 'options'>,
   values: Record<string, unknown>,
 ): Record<string, unknown> {
   const out = { ...values };
   for (const name of Object.keys(command.options)) {
-    const key = schemaKey(name);
+    const key = schemaKey(command.name, name);
     if (key !== name && key in out) out[name] = out[key];
   }
   return out;
@@ -96,7 +96,7 @@ export function inputSchema(
     shape[key] = optional ? text.optional() : text;
   }
   for (const [name, spec] of Object.entries(command.options)) {
-    if (!omitted.includes(name)) shape[schemaKey(name)] = optionSchema(name, spec);
+    if (!omitted.includes(name)) shape[schemaKey(command.name, name)] = optionSchema(name, spec);
   }
   // Loose, not strict: a strict schema says additionalProperties:false in every tool, which every
   // agent pays for in its context. A key the tool does not take is refused by the call instead
@@ -107,7 +107,7 @@ export function inputSchema(
 // The keys a call gave that the tool does not take. An option keeps taking the name it had before
 // the hyphens became underscores (`all-projects`), so a client written for it still works.
 export function unknownParameters(
-  command: Pick<Command, 'args' | 'options'>,
+  command: Pick<Command, 'name' | 'args' | 'options'>,
   omitted: readonly string[],
   values: Record<string, unknown>,
 ): string[] {
@@ -115,7 +115,7 @@ export function unknownParameters(
   for (const name of Object.keys(command.options)) {
     if (omitted.includes(name)) continue;
     known.add(name);
-    known.add(schemaKey(name));
+    known.add(schemaKey(command.name, name));
   }
   return Object.keys(values).filter((key) => !known.has(key));
 }

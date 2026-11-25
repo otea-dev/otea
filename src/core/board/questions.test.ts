@@ -49,7 +49,7 @@ describe('an agent’s questions to the person, read from the item’s events', 
     ] satisfies QuestionEvent[];
     expect(questionsOf(events)).toEqual([
       question(1, {
-        answer: { text: 'respuesta 1', at: '2026-11-13T13:05:00.000Z', by: 'fede' },
+        answer: { text: 'respuesta 1', at: '2026-11-13T13:05:00.000Z', by: 'fede', mode: 'text' },
       }),
       question(2, { at: '2026-11-13T13:10:00.000Z' }),
     ]);
@@ -97,8 +97,11 @@ describe('what agents read of a question', () => {
     const at = new Date(Date.now() - 5 * 60_000).toISOString();
     const lines = answersBlock(
       [
-        question(1, { answer: { text: 'la A', at, by: 'fede' } }),
-        question(2, { text: 'línea uno\nlínea dos', answer: { text: 'la B', at, by: 'fede' } }),
+        question(1, { answer: { text: 'la A', at, by: 'fede', mode: 'text' } }),
+        question(2, {
+          text: 'línea uno\nlínea dos',
+          answer: { text: 'la B', at, by: 'fede', mode: 'text' },
+        }),
         question(3),
       ],
       'claude-d',

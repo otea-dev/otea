@@ -3099,14 +3099,29 @@ const tick: Command = {
 const ask: Command = {
   name: 'ask',
   summary:
-    'Ask the person a question while you do a step: the turn is theirs until they answer (the step, round and lease stay); wait wakes on the answer, and next and show give it',
+    'Ask the person a question while you do a step: the turn is theirs until they answer (the step, round and lease stay); wait wakes on the answer, and next and show give it. Offer 2 to 4 short --option answers to tap, and --recommend the one you would choose',
   args: ['id', 'question'],
-  options: {},
+  options: {
+    option: { multiple: true, placeholder: 'text', about: '2 to 4 answers to tap' },
+    recommend: { placeholder: 'n', about: 'number (from 1) of the one you would choose' },
+  },
   execute: (input) => {
     const [id = '', question = ''] = input.args;
     const { actor, channel } = input;
+    const options = input.options('option');
+    const given = input.option('recommend');
+    const recommended = given === undefined ? undefined : Number(given.replace(/^#/, ''));
+    if (recommended !== undefined && !Number.isInteger(recommended))
+      throw new UsageError('--recommend is the number of an option, from 1');
     return withAgent(input, (project) => {
-      const asked = askQuestion(project, { id, text: question, actor, channel });
+      const asked = askQuestion(project, {
+        id,
+        text: question,
+        ...(options.length === 0 ? {} : { options }),
+        ...(recommended === undefined ? {} : { recommended }),
+        actor,
+        channel,
+      });
       return { data: asked, text: asked.text };
     });
   },

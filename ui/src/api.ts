@@ -364,9 +364,15 @@ export async function postOpened(id: string, evidence: number): Promise<void> {
   await post(`/api/items/${encodeURIComponent(id)}/opened`, { evidence });
 }
 
+// What you answer an agent's question with: your words, one of its options (by number, from 1), or
+// the decision left to the agent, and the number of the question you were shown: an answer to one
+// that has since changed is refused.
+export type AnswerWords = { text: string } | { option: number } | { delegate: true };
+export type AnswerGiven = { question: number } & AnswerWords;
+
 // Your answer to an agent's question (otea ask): the turn goes back to the agent, in the same round.
-export async function postAnswer(id: string, text: string): Promise<void> {
-  await post(`/api/items/${encodeURIComponent(id)}/answer`, { text });
+export async function postAnswer(id: string, given: AnswerGiven): Promise<void> {
+  await post(`/api/items/${encodeURIComponent(id)}/answer`, given);
 }
 
 // You let the item go on without a file its step asks for: its handoff stops asking for it.

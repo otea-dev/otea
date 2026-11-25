@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { AnswerWords } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { Unheard } from '../../components/Unheard.tsx';
 import { mainPath } from '../../derive/path.ts';
@@ -404,6 +405,24 @@ export function Acts({
     const options = hasOptions ? parseOptions(item.fields.options ?? '') : [];
     const answer = [opt, free.trim()].filter(Boolean).join('. ');
     const ago = facts.handed ? agoText(facts.handed.at, app.now) : '';
+    // What an agent's question (otea ask) offers: one tap on an option, or on «Decide tú», answers.
+    const offered = item.asks?.options ?? [];
+    const recommended = item.asks?.recommended;
+    // The answer says which question it is to: one that changed while the page was open is refused,
+    // and the page says so (the item itself comes back fresh with the live feed).
+    const refusedBy = (error: unknown) => {
+      const changed = t('refusal.questionChanged');
+      const said =
+        error instanceof Error && error.message === changed ? changed : t('sheet.refused');
+      setRefused({ k: refusalKey, text: said });
+    };
+    const answerWith = (given: AnswerWords) => {
+      if (!item.asks) return;
+      const message = toastOf('answer', item.title, '');
+      app
+        .answer(item.id, { ...given, question: item.asks.question }, message)
+        .then(() => dropDraft(draftStore(), answerKey), refusedBy);
+    };
     body = (
       <section className="qa" data-key="qa">
         <div className="margin-label">
@@ -430,8 +449,26 @@ export function Acts({
               })}
             </div>
           ) : null}
+          {offered.length > 0 ? (
+            <div className="opts stack">
+              {offered.map((text, i) => (
+                <button
+                  key={text}
+                  type="button"
+                  className="opt"
+                  disabled={offline}
+                  onClick={() => answerWith({ option: i + 1 })}
+                >
+                  {text}
+                  {recommended === i + 1 ? (
+                    <span className="opt-rec"> · {t('pick.recommended')}</span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <label className="free">
-            {freeAnswerLabel(options.length > 0)}
+            {freeAnswerLabel(options.length > 0 || offered.length > 0)}
             <textarea
               placeholder={t('sheet.qa.placeholder')}
               rows={2}
@@ -452,23 +489,31 @@ export function Acts({
               variant="primary"
               disabled={!answer || offline}
               onClick={() => {
-                const refused = () => setRefused({ k: refusalKey, text: t('sheet.refused') });
                 // An agent's question (otea ask) takes the answer with no move; an old handoff
                 // that asked is answered by sending it back with it.
-                const sent = item.asks
-                  ? app.answer(item.id, answer, toastOf('answer', item.title, ''))
-                  : back
-                    ? app.move(item.id, back.move.to, answer, toastOf('answer', item.title, ''))
-                    : Promise.reject(new Error('no way to answer'));
-                sent.then(() => dropDraft(draftStore(), answerKey), refused);
+                if (item.asks) return answerWith({ text: answer });
+                const sent = back
+                  ? app.move(item.id, back.move.to, answer, toastOf('answer', item.title, ''))
+                  : Promise.reject(new Error('no way to answer'));
+                sent.then(() => dropDraft(draftStore(), answerKey), refusedBy);
               }}
             >
               {t('sheet.qa.send')}
             </Button>
+            {item.asks && !offline ? (
+              <Button variant="quiet" onClick={() => answerWith({ delegate: true })}>
+                {t('sheet.qa.delegate')}
+              </Button>
+            ) : null}
             {offline ? null : (
               <span className="closeas">{t('sheet.qa.goesOn', { agent: agent ?? '—' })}</span>
             )}
           </div>
+          {refusedNow ? (
+            <p className="said warn" role="alert">
+              {refusedNow}
+            </p>
+          ) : null}
           {/* Its own line: a narrow sheet hides the close-as hint beside the button. */}
           {offline ? (
             <p className="said offline" role="status">

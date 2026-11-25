@@ -412,3 +412,189 @@ describe('a question after a move the person took back', () => {
     expect(on?.questions).toEqual([]);
   });
 });
+
+// A question the agent asks with options to pick with one tap (2 to 4, one maybe recommended).
+describe('a question with options', () => {
+  const OPTIONS = ['Liso', 'Con musgo', 'Con hongos'];
+  const askWith = (ctx: Context, id: string, options?: string[], recommended?: number) =>
+    askQuestion(
+      ctx,
+      {
+        id,
+        text: '¿Caparazón?',
+        ...(options === undefined ? {} : { options }),
+        ...(recommended === undefined ? {} : { recommended }),
+        actor: kiln,
+        channel: 'cli',
+      },
+      now,
+    );
+  const refusedWith = (options?: string[], recommended?: number) => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+    const error = refusal(() => askWith(ctx, item.id, options, recommended));
+    expect(askingItem(ctx.db, item.id)).toBeUndefined();
+    return error;
+  };
+
+  it('keeps the options and the recommendation with the question, for the desk to read', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+
+    const asked = askWith(ctx, item.id, ['  Liso ', 'Con musgo'], 2);
+
+    expect(asked.question).toMatchObject({ options: ['Liso', 'Con musgo'], recommended: 2 });
+    expect(getItem(ctx, item.id, now).asks).toMatchObject({
+      options: ['Liso', 'Con musgo'],
+      recommended: 2,
+    });
+    expect(askingItem(ctx.db, item.id)?.options).toEqual(['Liso', 'Con musgo']);
+  });
+
+  it('keeps a question with no options in words only', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+    const asked = askWith(ctx, item.id);
+    expect(asked.question.options).toBeUndefined();
+    expect(getItem(ctx, item.id, now).asks).not.toHaveProperty('options');
+  });
+
+  it('refuses a count outside 2 to 4, an empty or long option, a repeat, and a recommendation out of range', () => {
+    expect(refusedWith(['Solo uno']).message).toContain('2 to 4 options');
+    expect(refusedWith(['a', 'b', 'c', 'd', 'e']).message).toContain('2 to 4 options');
+    expect(refusedWith(['a', '  ']).message).toContain('empty');
+    expect(refusedWith(['a', 'x'.repeat(121)]).message).toContain('120 characters');
+    expect(refusedWith(['Liso', ' liso ']).message).toContain('same');
+    expect(refusedWith(['a', 'b'], 3).message).toContain('from 1 to 2');
+    expect(refusedWith(['a', 'b'], 0).message).toContain('from 1 to 2');
+    expect(refusedWith(undefined, 1).message).toContain('needs options');
+    expect(refusedWith(['a', 'b'], 1.5).code).toBe('invalid_fields');
+  });
+
+  it('is answered by one tap on an option: its words are the answer, and the agent reads which', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+    askWith(ctx, item.id, OPTIONS, 2);
+
+    const answered = answerQuestion(
+      ctx,
+      { id: item.id, option: 3, actor: you, channel: 'ui' },
+      now,
+    );
+
+    expect(answered.answer).toMatchObject({ mode: 'option', option: 3, text: 'Con hongos' });
+    const text = itemNextText(ctx, getItem(ctx, item.id, now), 'kiln', now) ?? '';
+    expect(text).toContain('The person chose option 3: "Con hongos"');
+    expect(text).not.toContain('left the decision');
+  });
+
+  it('is answered in the person’s own words, which the agent reads as none of its options', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+    askWith(ctx, item.id, OPTIONS, 2);
+
+    const answered = answerQuestion(
+      ctx,
+      { id: item.id, text: 'Pintado a mano', actor: you, channel: 'ui' },
+      now,
+    );
+
+    expect(answered.answer).toMatchObject({ mode: 'text', text: 'Pintado a mano' });
+    expect(itemNextText(ctx, getItem(ctx, item.id, now), 'kiln', now)).toContain(
+      'The person answered in their own words: "Pintado a mano"',
+    );
+  });
+
+  it('is left to the agent, which reads its own recommendation back', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+    askWith(ctx, item.id, OPTIONS, 2);
+
+    const answered = answerQuestion(
+      ctx,
+      { id: item.id, delegate: true, actor: you, channel: 'ui' },
+      now,
+    );
+
+    expect(answered.answer).toMatchObject({ mode: 'delegated', text: 'delegated' });
+    const after = getItem(ctx, item.id, now);
+    expect(after.turn).toBe('agent');
+    expect(itemNextText(ctx, after, 'kiln', now)).toContain(
+      'left the decision to you: go with your recommendation, option 2 "Con musgo"',
+    );
+  });
+
+  it('is left to an agent that recommended nothing, which reads that it decides', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+    askWith(ctx, item.id, OPTIONS);
+
+    answerQuestion(ctx, { id: item.id, delegate: true, actor: you, channel: 'ui' }, now);
+
+    expect(itemNextText(ctx, getItem(ctx, item.id, now), 'kiln', now)).toContain(
+      'left the decision to you (you recommended nothing): decide it yourself',
+    );
+  });
+
+  it('keeps an option to one line: control characters and line breaks become a space', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+
+    const asked = askWith(ctx, item.id, ['Liso\n  - Con musgo', 'Con\u0007 hongos‮'], 1);
+
+    expect(asked.question.options).toEqual(['Liso - Con musgo', 'Con hongos']);
+    const text = itemNextText(ctx, getItem(ctx, item.id, now), 'kiln', now) ?? '';
+    expect(text).toContain('Options: 1. Liso - Con musgo (recommended) · 2. Con hongos');
+    expect(text).not.toContain('\u0007');
+    expect(text).not.toContain('‮');
+  });
+
+  it('refuses an option that is only control characters', () => {
+    expect(refusedWith(['a', '\u0007\n\t']).message).toContain('empty');
+    expect(refusedWith(['Liso', 'Liso\n']).message).toContain('same');
+  });
+
+  it('records a chat answer that says an option, by its words or its number, as that option', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+    const note = (text: string) =>
+      noteChatAnswer(ctx, { id: item.id, text, actor: kiln, channel: 'cli' }, now).question.answer;
+
+    askWith(ctx, item.id, OPTIONS);
+    expect(note('Con musgo')).toMatchObject({
+      mode: 'option',
+      option: 2,
+      text: 'Con musgo',
+      via: 'kiln',
+    });
+
+    askWith(ctx, item.id, OPTIONS);
+    expect(note('3')).toMatchObject({ mode: 'option', option: 3, text: 'Con hongos' });
+
+    askWith(ctx, item.id, OPTIONS);
+    expect(note('con musgo, pero más claro')).toMatchObject({ mode: 'text' });
+
+    askWith(ctx, item.id, OPTIONS);
+    expect(note('4')).toMatchObject({ mode: 'text', text: '4' });
+  });
+
+  it('refuses an option the question does not have, and keeps the question open', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+    askWith(ctx, item.id, OPTIONS);
+
+    const error = refusal(() =>
+      answerQuestion(ctx, { id: item.id, option: 4, actor: you, channel: 'ui' }, now),
+    );
+
+    expect(error.message).toContain('no option 4');
+    expect(askingItem(ctx.db, item.id)).toBeDefined();
+    const none = refusal(() => {
+      const plain = memoryContext();
+      const other = working(plain);
+      askWith(plain, other.id);
+      answerQuestion(plain, { id: other.id, option: 1, actor: you, channel: 'ui' }, now);
+    });
+    expect(none.message).toContain('no option 1');
+  });
+});
