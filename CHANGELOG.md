@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.7.0](https://github.com/otea-dev/otea/compare/v0.6.1...v0.7.0) (2026-11-25)
+
+
+### Features
+
+* **ask:** questions come with options to tap, free text and a way to leave the decision to the agent ([2d372fe](https://github.com/otea-dev/otea/commit/2d372fef6987c9a4ac0a95a29aad0a31330671b1))
+* **cli:** the person at a terminal runs create and answer without --as ([5b19219](https://github.com/otea-dev/otea/commit/5b19219adbadd7fcefd958138b7037b4583f5de6))
+* **land:** wait for an overlapping approved item that goes first, even when it cannot be taken now ([90286fa](https://github.com/otea-dev/otea/commit/90286fa91d586bbf3814624e6154f08209279e8c))
+* **notify:** put the agent's question in the ask notice ([38a874f](https://github.com/otea-dev/otea/commit/38a874ff463cb1e0711a6917f548dd4376cf6ddc))
+* **notify:** tell when work waits for an agent and nobody is listening ([9a0741a](https://github.com/otea-dev/otea/commit/9a0741a5180acc6f355de80b8c91113ece1ebc4e))
+* **overlap:** say at handoff, in show and in the review which open items change the same files ([8f973ec](https://github.com/otea-dev/otea/commit/8f973ec9e297e6ce6ae7711269e6846fc26c49c4))
+* **prompt:** print the coordinator and worker texts, and an interview with four outcomes ([b81d758](https://github.com/otea-dev/otea/commit/b81d7585c123501e9f216c0fbe41c19012d43153))
+* **review:** show only the merge when a round just merges main into approved work ([c0f1c1d](https://github.com/otea-dev/otea/commit/c0f1c1d2d877c73593f84dd00d678637e92a5843))
+
+
+### Bug fixes
+
+* **boards:** the Content board asks for its channel at the Write step ([8b88120](https://github.com/otea-dev/otea/commit/8b88120fabf37210430c74c336f585bdc67199e1))
+* **cli:** keep answering desk-only and mark an unnamed terminal create ([c910e45](https://github.com/otea-dev/otea/commit/c910e45c919befc17f6e05fadf1d09e460cf6a7b))
+* **notify:** grace period for unheard, hide-question-text pref, tolerant prefs schema ([26608c9](https://github.com/otea-dev/otea/commit/26608c99f9f343d24b682b9d454de00fe5ec27ef))
+* **prompt:** give the coordinator a wait that parses, validate the board, tidy the role texts ([f1cc7f2](https://github.com/otea-dev/otea/commit/f1cc7f2be70a5aca169f8d8c705948f9e2cddc20))
+* **review:** trust the remote's base, show the whole merge, park means parked, read recorded overlaps ([2783480](https://github.com/otea-dev/otea/commit/2783480a16a8e0170f63f285f55407c1aa4b6c8f))
+
 ## [0.6.1](https://github.com/otea-dev/otea/compare/v0.6.0...v0.6.1) (2026-11-24)
 
 
