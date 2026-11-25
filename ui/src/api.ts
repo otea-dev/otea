@@ -1,3 +1,4 @@
+import type { MergeOnly } from '../../src/app/merge-only.ts';
 import type { Overlap } from '../../src/app/overlap.ts';
 import type { MergedOutside } from '../../src/cli/merged-outside.ts';
 import { withoutUndone } from '../../src/core/board/history.ts';
@@ -349,6 +350,14 @@ export async function fetchOverlaps(id: string, signal: AbortSignal): Promise<Ov
   const url = `/api/items/${encodeURIComponent(id)}/overlaps`;
   const body = (await (await get(url, signal)).json()) as { overlaps: Overlap[] };
   return body.overlaps;
+}
+
+// The round that only merges main into the work the person approved, with what the merge changed
+// by hand (src/app/merge-only.ts): null for any other round.
+export async function fetchMergeOnly(id: string, signal: AbortSignal): Promise<MergeOnly | null> {
+  const url = `/api/items/${encodeURIComponent(id)}/merge-only`;
+  const body = (await (await get(url, signal)).json()) as { merge: MergeOnly | null };
+  return body.merge;
 }
 
 export async function postOpened(id: string, evidence: number): Promise<void> {

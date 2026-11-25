@@ -77,6 +77,7 @@ import { boardFactsOf, factsOf, standAgentOf, standOf } from './facts.ts';
 import { pressInView, toastOf } from './frame.ts';
 import { History } from './History.tsx';
 import { historyOf } from './history.ts';
+import { useMergeOnly } from './merge-only.ts';
 import { useMergedOutside } from './merged-outside.ts';
 import { draftWaitsOf, type MoveChoice, planMoves } from './moves.ts';
 import { NotesForm } from './NotesForm.tsx';
@@ -222,6 +223,8 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   const same = useRoundSame(item.id, strip?.key === 'frozen', item.updatedAt);
   // And which other open items change the same files, so one of them meets a conflict.
   const overlaps = useOverlaps(item.id, strip?.key === 'frozen', item.updatedAt);
+  // And whether this round only merges main into what was approved: the review is that merge.
+  const merge = useMergeOnly(item.id, strip?.key === 'frozen', item.updatedAt);
   const split = live?.split;
   const childSummary =
     split && split.board !== SAME ? summaries.find((b) => b.id === split.board) : undefined;
@@ -855,6 +858,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                     same={same}
                     item={item.id}
                     overlaps={overlaps}
+                    merge={merge}
                   />
                   {hand.length ? (
                     <HandChecklist item={item} rows={hand} canWrite={app.session.canWrite} />
@@ -1171,6 +1175,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                 same={same}
                 item={item.id}
                 overlaps={overlaps}
+                merge={merge}
               />
               {block?.request ? (
                 <DraftRequestLine
