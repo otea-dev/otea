@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { assertIconName } from '../icons.ts';
 import { viewsOf } from './analysis.ts';
-import { backWaysOf, initialPosition, mayTake, waysOf } from './engine.ts';
+import { backWaysOf, handoffCheck, initialPosition, mayTake, waysOf } from './engine.ts';
 import { sequenceIds } from './ids.ts';
 import { mentionText } from './mentions.ts';
 import {
@@ -305,6 +305,33 @@ describe('templates that fit the work', () => {
       return [partOf(def, ref)?.name, req, fresh, cond ? `${cond.name}=${value}` : undefined];
     });
   };
+
+  // Field study: Go live read «on the channel chosen in <empty>» when the optional Channel was left
+  // empty, so the Write step now holds the handoff until the channel is chosen.
+  it.each(['en', 'es'] as const)(
+    'holds the Content draft until its channel is chosen, so Go live never reads an empty one (%s)',
+    (lang) => {
+      const def = instantiate(requireTemplate('content'), lang, {}, sequenceIds());
+      const write = def.steps.find(({ key }) => key === 'sdraft');
+      const draft = Object.values(def.parts).find(({ name }) => /^(Draft|Borrador)$/.test(name));
+      const channel = Object.values(def.parts).find(({ name }) => /^(Channel|Canal)$/.test(name));
+      if (!write || !draft || !channel) throw new Error('the Content board lost a step or a part');
+      const note = 'cut nothing';
+      const blank = handoffCheck(def, write.id, {
+        fields: { [draft.id]: 'text' },
+        evidence: [],
+        note,
+      });
+      const chosen = handoffCheck(def, write.id, {
+        fields: { [draft.id]: 'text', [channel.id]: channel.options[0]?.id },
+        evidence: [],
+        note,
+      });
+
+      expect(blank.missing.map(({ name }) => name)).toEqual([channel.name]);
+      expect(chosen.ok).toBe(true);
+    },
+  );
 
   it('offers a board for work that is not code: no branch, no diff, no tests', () => {
     expect(LISTED_KEYS[0]).toBe('todos');
