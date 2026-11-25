@@ -16,6 +16,49 @@ describe('noticeText', () => {
     expect(noticeText(review, 'en').title).toBe('Your turn');
   });
 
+  describe('the options of a question', () => {
+    const ask = {
+      ...review,
+      kind: 'ask',
+      by: 'claude',
+      text: '¿Caparazón liso o con musgo?',
+      options: ['Liso', 'Con musgo'],
+    } as Notice;
+
+    it('follow the question when they all fit in the body', () => {
+      expect(noticeText(ask, 'es').body).toBe(
+        '¿Caparazón liso o con musgo?\n1) Liso  2) Con musgo',
+      );
+    });
+
+    it('are left out when they would not fit, so the body keeps its budget', () => {
+      const long = { ...ask, options: ['x'.repeat(60), 'y'.repeat(60)] } as Notice;
+      expect(noticeText(long, 'en').body).toBe('¿Caparazón liso o con musgo?');
+      const wordy = { ...ask, text: 'q '.repeat(60) } as Notice;
+      for (const notice of [ask, long, wordy]) {
+        expect(noticeText(notice, 'en').body.length).toBeLessThanOrEqual(140);
+      }
+    });
+
+    it('lose their control characters and line breaks', () => {
+      const messy = { ...ask, options: ['Li\u0007so\n\rx', 'Con‮ musgo'] } as Notice;
+      expect(noticeText(messy, 'en').body).toBe(
+        '¿Caparazón liso o con musgo?\n1) Li so x  2) Con musgo',
+      );
+    });
+
+    it('are not said without the question: the person hid its words', () => {
+      const { text: _hidden, ...hidden } = ask as Notice & { text: string };
+      expect(noticeText(hidden, 'es').body).toBe('TASKS-7 · Ship the login');
+    });
+
+    it('belong to a question alone', () => {
+      expect(noticeText({ ...ask, kind: 'turn' } as Notice, 'en').body).toBe(
+        'TASKS-7 · Ship the login',
+      );
+    });
+  });
+
   it.each([
     [{ kind: 'ask', by: 'claude' }, 'claude te pregunta', 'claude asks you'],
     [{ kind: 'aside', by: 'kiln' }, 'kiln lo dejó para después', 'kiln set it aside for later'],

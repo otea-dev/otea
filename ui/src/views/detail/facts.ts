@@ -35,13 +35,15 @@ export type Facts = {
     at: string;
     asked?: { agent: string; text: string };
     via?: string;
+    // You left the decision to the agent: no words of yours to show.
+    delegated?: true;
   } | null;
   visited: string[];
   // The rounds you sent back, oldest first, with the state the agent had handed it to.
   sentBack: { n: number; at: string; state: string }[];
   // The agent's questions you answered while it did the round it handed you, oldest first: what
   // shaped the work you review (IDEA3-10).
-  answers?: { agent: string; question: string; answer: string }[];
+  answers?: { agent: string; question: string; answer: string; delegated?: true }[];
 };
 
 const reasonOf = (e: ItemEvent) => (typeof e.data.reason === 'string' ? e.data.reason : '');
@@ -68,6 +70,7 @@ function answeredQuestion(events: readonly ItemEvent[]): Facts['answered'] {
     at: answer.at,
     ...(asked ? { asked: { agent: asked.actor.name, text: String(asked.data.text ?? '') } } : {}),
     ...(typeof answer.data.via === 'string' ? { via: answer.data.via } : {}),
+    ...(answer.data.mode === 'delegated' ? { delegated: true as const } : {}),
   };
 }
 
@@ -89,6 +92,7 @@ function roundAnswers(events: readonly ItemEvent[]): NonNullable<Facts['answers'
         agent: asked.actor.name,
         question: String(asked.data.text ?? ''),
         answer: String(e.data.text ?? ''),
+        ...(e.data.mode === 'delegated' ? { delegated: true as const } : {}),
       },
     ];
   });

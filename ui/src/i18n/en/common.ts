@@ -279,6 +279,7 @@ export const common = {
     other: 'Deleting {board} deletes {count} items: type the board’s name to confirm.',
   },
   'refusal.boardNotArchived': '{board} is not archived.',
+  'refusal.questionChanged': 'This question has changed. See the new one and answer it.',
   'refusal.deskOnly':
     'Only the browser on this computer, signed in with `otea open`, changes the project setup.',
   'refusal.note.notPerson': 'No note left on {item}: only you leave notes.',

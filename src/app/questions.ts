@@ -5,6 +5,8 @@ import { NOTE_LEFT } from '../core/board/notes.ts';
 import {
   askedText,
   chatAnswerText,
+  checkOptions,
+  DELEGATED,
   type ItemQuestion,
   QUESTION_ANSWERED,
   QUESTION_ASKED,
@@ -37,10 +39,19 @@ import { liftSetAside, SET_ASIDE_LIFTED } from './set-aside.ts';
 // round. Neither moves the item. The person's notes (notes.ts) are another thread, which changes
 // no turn: an agent's doubts go here.
 
-type Why = 'not_agent' | 'not_person' | 'empty' | 'not_working' | 'asking' | 'none_open';
+type Why =
+  | 'not_agent'
+  | 'not_person'
+  | 'empty'
+  | 'not_working'
+  | 'asking'
+  | 'none_open'
+  | 'options'
+  | 'no_option'
+  | 'stale';
 
 function refuse(
-  code: 'forbidden' | 'reason_required' | 'invalid_transition',
+  code: 'forbidden' | 'reason_required' | 'invalid_transition' | 'invalid_fields',
   id: string,
   why: Why,
   message: string,
@@ -48,7 +59,16 @@ function refuse(
   throw new OteaError(code, message, { kind: 'question', item: id, why });
 }
 
-export type AskInput = { id: string; text: string; actor: Actor; channel: Channel };
+// `options`: 2 to 4 short answers the person picks with one tap; `recommended`: the number (from 1)
+// of the one the agent would choose.
+export type AskInput = {
+  id: string;
+  text: string;
+  options?: readonly string[];
+  recommended?: number;
+  actor: Actor;
+  channel: Channel;
+};
 
 export type AskResult = { question: ItemQuestion; text: string };
 
@@ -78,6 +98,9 @@ export function askQuestion(ctx: Context, input: AskInput, now = systemClock): A
     refuse('forbidden', id, 'not_agent', `Not asked: only an agent asks the person on ${id}`);
   const text = input.text.trim();
   if (text === '') refuse('reason_required', id, 'empty', `Not asked on ${id}: say your question`);
+  const checked = checkOptions(input.options, input.recommended);
+  if ('problem' in checked)
+    refuse('invalid_fields', id, 'options', `Not asked on ${id}: ${checked.problem}`);
   return transaction(ctx.db, () => {
     const item = requireWritableItem(ctx.db, id);
     const at = now();
@@ -104,6 +127,12 @@ export function askQuestion(ctx: Context, input: AskInput, now = systemClock): A
         stepName: stepById(board.def, step)?.name ?? step,
         round: on.round,
         channel: input.channel,
+        ...(checked.options.length === 0
+          ? {}
+          : {
+              options: checked.options,
+              ...(checked.recommended === undefined ? {} : { recommended: checked.recommended }),
+            }),
       },
     });
     const asked = questionsOf(selectEvents(ctx.db, item.id)).find(
@@ -116,14 +145,59 @@ export function askQuestion(ctx: Context, input: AskInput, now = systemClock): A
 
 export type AnswerInput = { id: string; text: string; actor: Actor; channel: Channel };
 
+// What the person gives: their own words, the number (from 1) of one of the question's options, or
+// the decision left to the agent. Exactly one. `question`: the number of the question it answers;
+// the desk always says it, so a tap made on a question that has since changed is refused rather
+// than recorded on the new one.
+export type PersonAnswer = { id: string; actor: Actor; channel: Channel; question?: number } & (
+  | { text: string; option?: never; delegate?: never }
+  | { option: number; text?: never; delegate?: never }
+  | { delegate: true; text?: never; option?: never }
+);
+
 // The person answers the question that waits: the turn goes back to the agent, in the same round.
-export function answerQuestion(ctx: Context, input: AnswerInput, now = systemClock): ItemQuestion {
+export function answerQuestion(ctx: Context, input: PersonAnswer, now = systemClock): ItemQuestion {
   const { id } = input;
   if (input.actor.kind !== 'human')
     refuse('forbidden', id, 'not_person', `Not answered: the person answers questions on ${id}`);
-  const text = input.text.trim();
+  const base = {
+    id,
+    actor: input.actor,
+    channel: input.channel,
+    ...(input.question === undefined ? {} : { question: input.question }),
+  };
+  if (input.delegate)
+    return recordAnswer(ctx, { ...base, text: DELEGATED }, {}, now, () => ({
+      text: DELEGATED,
+      data: { mode: 'delegated' },
+    })).question;
+  if (input.option !== undefined) {
+    const { option } = input;
+    return recordAnswer(ctx, { ...base, text: '' }, {}, now, (open) => {
+      const text = open.options?.[option - 1];
+      if (text === undefined)
+        refuse(
+          'invalid_fields',
+          id,
+          'no_option',
+          `Not answered on ${id}: the question has no option ${option}`,
+        );
+      return { text, data: { mode: 'option', option } };
+    }).question;
+  }
+  const text = (input.text ?? '').trim();
   if (text === '') refuse('reason_required', id, 'empty', `Not answered on ${id}: say your answer`);
-  return recordAnswer(ctx, { ...input, text }, {}, now).question;
+  return recordAnswer(ctx, { ...base, text }, {}, now, () => ({ text, data: { mode: 'text' } }))
+    .question;
+}
+
+// The option a relayed answer says: its exact words, or its number, on a question with options.
+function optionSaid(open: ItemQuestion, text: string): number | undefined {
+  const options = open.options ?? [];
+  const byWords = options.indexOf(text);
+  if (byWords >= 0) return byWords + 1;
+  const number = /^\d+$/.test(text) ? Number(text) : undefined;
+  return number !== undefined && number >= 1 && number <= options.length ? number : undefined;
 }
 
 export type ChatAnswerResult = { question: ItemQuestion; text: string };
@@ -155,7 +229,19 @@ export function noteChatAnswer(
       `Not noted: ${liveBoardOf(ctx, collection)?.def.name ?? collection} does not take answers noted through an agent, so the person answers ${id} themselves on the desk. Ask them with otea ask ${id} "<your question>" and wait for them; never record their answer for them.`,
     );
   const data = { via: actor.name, source: 'conversation' };
-  const { question, gone } = recordAnswer(ctx, { ...input, text, actor: RELAYED_HUMAN }, data, now);
+  // What they said matches one of the options: it is that option, as if they had tapped it.
+  const { question, gone } = recordAnswer(
+    ctx,
+    { ...input, text, actor: RELAYED_HUMAN },
+    data,
+    now,
+    (open) => {
+      const option = optionSaid(open, text);
+      return option === undefined
+        ? { text, data: { mode: 'text' } }
+        : { text: open.options?.[option - 1] ?? text, data: { mode: 'option', option } };
+    },
+  );
   const asker = question.by === actor.name ? undefined : { name: question.by, gone };
   return { question, text: chatAnswerText(id, asker) };
 }
@@ -163,11 +249,14 @@ export function noteChatAnswer(
 // The question answered, and whether the session of the agent that asked it ended (`gone`).
 function recordAnswer(
   ctx: Context,
-  input: AnswerInput,
+  input: AnswerInput & { question?: number },
   extra: Record<string, string>,
   now: () => string,
+  // The words and the way it was answered (option, text, delegated), read off the question that
+  // waits.
+  resolve: (open: ItemQuestion) => { text: string; data: Record<string, string | number> },
 ): { question: ItemQuestion; gone: boolean } {
-  const { id, text } = input;
+  const { id } = input;
   return transaction(ctx.db, () => {
     const item = requireWritableItem(ctx.db, id);
     const board = liveBoardOf(ctx, item.collection);
@@ -179,12 +268,28 @@ function recordAnswer(
         'none_open',
         `${item.id}: no question waits for ${extra.via ? 'the person' : 'you'}`,
       );
+    // The desk answers the question it showed: a tap on one that has since been answered and
+    // asked again is not an answer to the new one.
+    if (input.question !== undefined && input.question !== open.question)
+      refuse(
+        'invalid_transition',
+        item.id,
+        'stale',
+        `${item.id}: question ${input.question} is no longer the one that waits (it is question ${open.question}): read it again`,
+      );
+    const chosen = resolve(open);
     appendEvent(ctx.db, {
       itemId: item.id,
       type: QUESTION_ANSWERED,
       actor: input.actor,
       at: now(),
-      data: { question: open.question, text, channel: input.channel, ...extra },
+      data: {
+        question: open.question,
+        text: chosen.text,
+        channel: input.channel,
+        ...extra,
+        ...chosen.data,
+      },
     });
     const answered = questionsOf(selectEvents(ctx.db, item.id)).find(
       (each) => each.question === open.question,

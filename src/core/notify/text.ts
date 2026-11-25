@@ -25,6 +25,15 @@ const MAX_QUESTION = 140;
 const short = (text: string, max = MAX_BODY) =>
   text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 
+// A question's options after it, numbered as the desk shows them, with no control characters, only
+// when all of them fit in the body's budget: a half-said list would mislead.
+function withOptions(question: string, options: readonly string[] | undefined): string {
+  const clean = (options ?? []).map((option) => option.replace(/[\p{Cc}\p{Cf}\s]+/gu, ' ').trim());
+  if (clean.length === 0 || clean.some((option) => option === '')) return question;
+  const list = clean.map((option, i) => `${i + 1}) ${option}`).join('  ');
+  return question.length + 1 + list.length <= MAX_QUESTION ? `${question}\n${list}` : question;
+}
+
 export const itemUrl = (id: string) => `/#/i/${encodeURIComponent(id)}`;
 
 const WORDS = {
@@ -97,7 +106,10 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
   const title = question ? `${said} · ${notice.item}` : said;
   return {
     title,
-    body: question ? short(question, MAX_QUESTION) : short(`${notice.item} · ${notice.title}`),
+    // Its options follow the question, only while the question is shown (the person may hide it).
+    body: question
+      ? withOptions(short(question, MAX_QUESTION), notice.options)
+      : short(`${notice.item} · ${notice.title}`),
     tag: `otea-item-${notice.item}`,
     url: itemUrl(notice.item),
     item: notice.item,

@@ -38,7 +38,8 @@ describe("Otea's agent guide", () => {
       'every subagent',
       "never reuse your parent's",
       '--as <name>',
-      'otea ask <id> "<question>"',
+      'otea ask <id> "<short question>" --option "<answer>" (2 to 4) --recommend <n>',
+      'always offer options and mark the one you choose',
       // P3C-R3-8: what the session says, never a config file read outside the project.
       'Declare what this session tells you (your instructions, or what the person says)',
       'never open config files outside the project for it. Otherwise declare unknown.',
@@ -59,7 +60,7 @@ describe("Otea's agent guide", () => {
       'A new board or a change to one goes through rule 11, never otea create.',
       'A subagent releases what it holds before it ends',
       // P4-R2-2: the person's answer is theirs; one given in the chat goes on the question.
-      'an answer they give in the chat goes on it: otea answer <id> "<their words>"',
+      'answer they give in the chat goes on it: otea answer <id> "<their words>"',
       // P2S-6, P8-R2-13, P8-R2-11: only a running wait hears the desk, and it is stopped safely.
       'Only a running wait hears the desk',
       'after a chat reply, wait again',

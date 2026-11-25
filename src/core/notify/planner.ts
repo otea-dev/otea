@@ -48,6 +48,8 @@ export type ItemNotice = {
   title: string;
   by?: string;
   text?: string;
+  // A question's options, said after its text when they fit.
+  options?: string[];
 };
 
 export type GroupNotice = {
@@ -92,12 +94,15 @@ const RANK: Record<NotifyKind, number> = {
 function noticeOf(signal: Signal, prefs: NotifyPrefs): ItemNotice {
   const { kind, item, title, by } = signal;
   const text = prefs.askText ? signal.text : undefined;
+  // The options are the question's words too: hidden with it.
+  const options = text === undefined ? undefined : signal.options;
   return {
     kind,
     item,
     title,
     ...(by === undefined ? {} : { by }),
     ...(text === undefined ? {} : { text }),
+    ...(options === undefined ? {} : { options }),
   };
 }
 

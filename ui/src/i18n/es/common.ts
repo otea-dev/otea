@@ -286,6 +286,7 @@ export const common = {
     other: 'Eliminar {board} elimina {count} ítems: escribe el nombre del tablero para confirmar.',
   },
   'refusal.boardNotArchived': '{board} no está archivado.',
+  'refusal.questionChanged': 'Esta pregunta ya cambió. Mira la nueva y respóndela.',
   'refusal.deskOnly':
     'Solo el navegador de este equipo, con la sesión de `otea open`, cambia la configuración del proyecto.',
   'refusal.note.notPerson': 'No se dejó la nota en {item}: solo tú dejas notas.',

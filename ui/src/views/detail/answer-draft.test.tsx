@@ -60,8 +60,8 @@ afterEach(() => {
 
 const app: App = testApp({
   collections: [errores],
-  answer: async (_id, text) => {
-    answered.push(text);
+  answer: async (_id, given) => {
+    if ('text' in given) answered.push(given.text);
   },
 });
 
