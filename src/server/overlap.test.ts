@@ -49,6 +49,24 @@ describe('the desk review of an item that shares files with another', () => {
     project.db.close();
   });
 
+  it('says on the row of an approved item which one lands first and why', async () => {
+    const at = new Date().toISOString();
+    updateItemState(project.db, 'CAM-1', 'land', at);
+    updateItemState(project.db, 'CAM-2', 'land', at);
+    const response = await server.app.request(
+      '/p/memory-aaaaaa/api/items',
+      { headers: { host: LOCAL_HOST, cookie: SESSION_COOKIE } },
+      { incoming: { socket: { remoteAddress: '127.0.0.1' } } },
+    );
+    const rows = (await response.json()) as { id: string; landsAfter?: unknown }[];
+
+    expect(rows.find(({ id }) => id === 'CAM-1')?.landsAfter).toBeUndefined();
+    expect(rows.find(({ id }) => id === 'CAM-2')?.landsAfter).toEqual({
+      first: 'CAM-1',
+      text: "CAM-2 waits to land in main: CAM-1 lands there first (approved before it; both change src/y.ts); one agent lands at a time on main, in the person's order.",
+    });
+  });
+
   it('names the other item, the files and whether it lands first', async () => {
     expect(await overlaps('CAM-1')).toEqual([
       { id: 'CAM-2', title: 'b', files: ['src/y.ts'], landing: false },

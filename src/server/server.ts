@@ -27,11 +27,11 @@ import { rememberLanguage, storedLanguage } from '../app/language.ts';
 import type { Launcher } from '../app/launcher.ts';
 import { memoryMachine } from '../app/machine.ts';
 import { mergeOnlyOf } from '../app/merge-only.ts';
-import { boardRoundOf, liveBoards, rowFactsOf } from '../app/next.ts';
+import { boardRoundOf, landWaitOf, liveBoards, rowFactsOf } from '../app/next.ts';
 import { editNote, leaveNote, notesSummary, notesView, withdrawNote } from '../app/notes.ts';
 import { listTargets } from '../app/notify-targets.ts';
 import { markOpened, openedFiles } from '../app/opened.ts';
-import { overlapsOf } from '../app/overlap.ts';
+import { overlapsOf, scanned } from '../app/overlap.ts';
 import { performanceAcross, performanceOf } from '../app/performance.ts';
 import {
   adoptTailscale,
@@ -575,6 +575,8 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         // The questions that wait for the person: an item held by an agent that asks elsewhere.
         const asking = askingItems(project.db);
         const at = new Date().toISOString();
+        // Git is asked about each branch once for the whole list.
+        const scan = scanned(project);
         const estimated = estimatesOfItems(
           project,
           items,
@@ -595,9 +597,12 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
             const setAside = setAsideOf(selectEvents(project.db, item.id));
             // Held by an agent whose question waits for you on another item (P7-R3-9).
             const holderAsks = holderAsksOf(asking, item, at);
+            // Approved and waiting for another to land first (src/app/land-order.ts).
+            const landsAfter = landWaitOf(scan, item, at);
             return {
               ...item,
               ...row,
+              ...(landsAfter === undefined ? {} : { landsAfter }),
               ...(setAside === undefined ? {} : { setAside }),
               ...(holderAsks === undefined ? {} : { holderAsks }),
               ...(enteredAt === undefined ? {} : { enteredAt }),

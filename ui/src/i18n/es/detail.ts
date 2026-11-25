@@ -784,10 +784,10 @@ export const detail = {
     '{item} toca los mismos archivos que {other} ({files}), que también está abierto: el que se integre segundo debe fusionar main primero y puede chocar.',
   'bi.branch.overlapMore': 'y {n} más',
   'bi.branch.mergeOnly':
-    'Desde el commit que aprobaste ({since}), esta ronda solo fusiona main en {branch}, y la fusión cambió {files} a mano: eso es lo que queda por revisar. Aprobar toma {tip} tal como está; lo demás es lo que aprobaste, y lo que trajo main aterrizó con su propia revisión.',
+    'Desde el commit que aprobaste ({since}), esta ronda solo fusiona main en {branch}. La fusión misma cambió {files}: todo lo de este diff es nuevo y aún sin revisar, incluso los archivos que no chocaron. Lo demás es lo que aprobaste, y lo que trajo main aterrizó con su propia revisión. Aprobar toma {tip} tal como está.',
   'bi.branch.mergeOnlyClean':
-    'Desde el commit que aprobaste ({since}), esta ronda solo fusiona main en {branch}, y no se cambió nada a mano. Aprobar toma {tip} tal como está.',
-  'bi.branch.mergeOnlyDiff': 'Lo que la fusión cambió a mano',
+    'Desde el commit que aprobaste ({since}), esta ronda solo fusiona main en {branch}, y la fusión misma no agregó nada. Aprobar toma {tip} tal como está.',
+  'bi.branch.mergeOnlyDiff': 'Lo que cambió la fusión',
   'bi.request.board': 'Tablero {name}',
   'bi.request.waiting': 'espera el esbozo',
   'bi.request.arrived': 'el esbozo llegó: revísalo y publícalo',

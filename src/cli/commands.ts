@@ -67,7 +67,7 @@ import { type Launcher, oteaLauncher, runningRoot, withHome } from '../app/launc
 import type { BaseTips } from '../app/lease-take.ts';
 import { claimItem, heartbeatItem, releaseItem } from '../app/leases.ts';
 import { openMachine, rememberLocalProject, withMachine } from '../app/machine.ts';
-import { mergeOnlyOf, mergeOnlyText } from '../app/merge-only.ts';
+import { mergeOnlyOf, mergeOnlyText, mergeRoundOf } from '../app/merge-only.ts';
 import { markMerged, reopenItem } from '../app/merged.ts';
 import { type MigrationReport, migrateToCommon } from '../app/migrate.ts';
 import {
@@ -90,7 +90,7 @@ import {
   wokeLines,
 } from '../app/next.ts';
 import { agentNotes, noteWaiting, replyNote, roundNotesOf } from '../app/notes.ts';
-import { overlapsOf, overlapText } from '../app/overlap.ts';
+import { overlapsOf, overlapsRecord, overlapText } from '../app/overlap.ts';
 import { performanceOf } from '../app/performance.ts';
 import { lanOpen, type Probe, type TransportKind } from '../app/phone.ts';
 import {
@@ -1893,7 +1893,12 @@ function handedBranch(
   project: Project,
   cwd: string,
   move: BoardMoveInput,
-): { tip?: NonNullable<BoardMoveInput['tip']>; warning?: string; said?: string } {
+): {
+  tip?: NonNullable<BoardMoveInput['tip']>;
+  warning?: string;
+  said?: string;
+  overlaps?: NonNullable<BoardMoveInput['overlaps']>;
+} {
   const item = getItem(project, move.id);
   const board = liveBoardOf(project, item.collection);
   const position = positionOf(item.state);
@@ -1988,10 +1993,11 @@ function handedBranch(
   // The files this branch shares with other open items' pushed branches: whichever lands second
   // merges main with the other's change in it, and a conflict there is another review round, so the
   // agent hears it now and the person in the review (src/app/overlap.ts).
-  const sharing =
+  const recorded =
     tip && hands && forward && step?.reviewer !== 'none' && !unchanged && !unpushed
-      ? overlapsOf(project, requireItem(project.db, item.id))
-      : [];
+      ? overlapsRecord(project, requireItem(project.db, item.id))
+      : undefined;
+  const sharing = recorded?.list ?? [];
   const notes = [
     ...sharing.map((overlap) => `Note: ${overlapText(item.id, overlap)}`),
     ...(unpushed
@@ -2014,6 +2020,7 @@ function handedBranch(
     ...(kept ? { tip: unchanged ? { ...kept, unchanged: true as const } : kept } : {}),
     ...(warning ? { warning } : {}),
     ...(said ? { said } : {}),
+    ...(recorded ? { overlaps: recorded } : {}),
   };
 }
 
@@ -2092,7 +2099,14 @@ const handoffCommand: Command = {
       refuseUnlandedCommit(project, input.cwd, move);
       warning = handed.warning;
       said = handed.said;
-      const done = handoffItem(project, { ...move, ...(handed.tip ? { tip: handed.tip } : {}) });
+      // A round that only merges main into the approved work: asked of the remote once, here.
+      const merge = handed.tip ? mergeRoundOf(project, move.id, handed.tip) : undefined;
+      const done = handoffItem(project, {
+        ...move,
+        ...(handed.tip ? { tip: handed.tip } : {}),
+        ...(merge ? { merge } : {}),
+        ...(handed.overlaps ? { overlaps: handed.overlaps } : {}),
+      });
       // A round that only merges main into the approved work is reviewed as that merge alone.
       const only = mergeOnlyOf(project, move.id);
       if (only)

@@ -222,9 +222,9 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   // And whether this round holds the same files as the one it answers (P5-F2).
   const same = useRoundSame(item.id, strip?.key === 'frozen', item.updatedAt);
   // And which other open items change the same files, so one of them meets a conflict.
-  const overlaps = useOverlaps(item.id, strip?.key === 'frozen', item.updatedAt);
+  const overlaps = useOverlaps(item.id, strip?.key === 'frozen');
   // And whether this round only merges main into what was approved: the review is that merge.
-  const merge = useMergeOnly(item.id, strip?.key === 'frozen', item.updatedAt);
+  const merge = useMergeOnly(item.id, strip?.key === 'frozen');
   const split = live?.split;
   const childSummary =
     split && split.board !== SAME ? summaries.find((b) => b.id === split.board) : undefined;
@@ -859,6 +859,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                     item={item.id}
                     overlaps={overlaps}
                     merge={merge}
+                    waits={item.landsAfter?.text}
                   />
                   {hand.length ? (
                     <HandChecklist item={item} rows={hand} canWrite={app.session.canWrite} />
@@ -1176,6 +1177,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                 item={item.id}
                 overlaps={overlaps}
                 merge={merge}
+                waits={item.landsAfter?.text}
               />
               {block?.request ? (
                 <DraftRequestLine

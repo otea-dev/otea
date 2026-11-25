@@ -29,13 +29,13 @@ export function overlapTexts(item: string, overlaps: readonly Overlap[]): string
 }
 
 // The overlaps of the item while `asking` (it waits for the person's review); none otherwise, and
-// while the PC has not answered. Asked again whenever the item changes (`at`).
-export function useOverlaps(item: string, asking: boolean, at: string): Overlap[] {
+// while the PC has not answered. Asked once on entering the review, not on every change of the
+// item: the PC reads what the handoff recorded until a branch moves.
+export function useOverlaps(item: string, asking: boolean): Overlap[] {
   const [heard, setHeard] = useState<{ item: string; overlaps: Overlap[] }>({
     item,
     overlaps: [],
   });
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a change to the item asks again
   useEffect(() => {
     if (!asking) return;
     const abort = new AbortController();
@@ -44,6 +44,6 @@ export function useOverlaps(item: string, asking: boolean, at: string): Overlap[
       () => undefined,
     );
     return () => abort.abort();
-  }, [item, asking, at]);
+  }, [item, asking]);
   return asking && heard.item === item ? heard.overlaps : [];
 }

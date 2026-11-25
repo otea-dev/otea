@@ -83,28 +83,60 @@ export function repeatsLastRound(
   return sameAsEarlier(ctx, id, from, tip);
 }
 
-// The tip the person approved, when the review the item is in now answers a bounce from the land
-// step: it was approved, an agent met a conflict landing it and took it back to the step before
-// (otea handoff --way), and this handoff is that step's next round. `approved` is the tip of the
-// review that was approved, `now` the tip of this one, of the same branch. `lands` tells the state of
-// a step an agent lands in. Undefined for any other round: a send-back by the person with comments,
-// a first review, a round that never went through the land step.
-export function approvedBeforeBounce(
+// The tip of the last review the item was handed off into, when it was approved and then bounced
+// from the land step: an agent met a conflict landing it and took it back to the step before
+// (otea handoff --way), so the handoff now made is that step's next round. `lands` tells the state
+// of a step an agent lands in. Undefined for any other round: a send-back by the person with
+// comments, a first review, a round that never went through the land step.
+export function bouncedTip(
   ctx: Context,
   id: string,
   lands: (state: string) => boolean,
-): { approved: Tip; now: Tip } | undefined {
-  const events = selectEvents(ctx.db, id).filter(({ type }) => type === 'transitioned');
-  const reviews = handoffs(ctx, id);
-  const [last, before] = [reviews.at(-1), reviews.at(-2)];
-  const [now, approved] = [last?.data.tip, before?.data.tip];
-  if (!last || !before || !isTip(now) || !isTip(approved) || now.branch !== approved.branch)
-    return undefined;
-  if (now.unchanged || approved.unchanged) return undefined;
-  const bounced = events
-    .filter(({ id: at }) => at > before.id && at < last.id)
+): Tip | undefined {
+  const last = lastHandoff(ctx, id);
+  const tip = last?.data.tip;
+  if (!last || !isTip(tip) || tip.unchanged) return undefined;
+  const bounced = selectEvents(ctx.db, id)
+    .filter(({ type, id: at }) => type === 'transitioned' && at > last.id)
     .some(({ data }) => lands(String(data.from)) && !lands(String(data.to)));
-  return bounced ? { approved, now } : undefined;
+  return bounced ? tip : undefined;
+}
+
+// What a handoff into a review recorded of the round beyond its tip: the merge it only was
+// (app/merge-only.ts), and the items that change the files it does (app/overlap.ts). Each is
+// kept only with the tip it was worked out for.
+export type Recorded = {
+  merge?: { since: string; tip: string; joined: string; files: string[] };
+  overlaps?: { stamp: string; list: unknown[] };
+};
+
+export function recordedWith(ctx: Context, id: string): (Recorded & { tip: Tip }) | undefined {
+  const last = lastHandoff(ctx, id);
+  const tip = last?.data.tip;
+  if (!last || !isTip(tip)) return undefined;
+  const { merge, overlaps } = last.data as Record<string, unknown>;
+  const recorded: Recorded = {};
+  if (isMerge(merge) && merge.tip === tip.commit) recorded.merge = merge;
+  if (isOverlaps(overlaps)) recorded.overlaps = overlaps;
+  return { tip, ...recorded };
+}
+
+function isMerge(value: unknown): value is NonNullable<Recorded['merge']> {
+  if (value === null || typeof value !== 'object') return false;
+  const { since, tip, joined, files } = value as Record<string, unknown>;
+  return (
+    typeof since === 'string' &&
+    typeof tip === 'string' &&
+    typeof joined === 'string' &&
+    Array.isArray(files) &&
+    files.every((file) => typeof file === 'string')
+  );
+}
+
+function isOverlaps(value: unknown): value is NonNullable<Recorded['overlaps']> {
+  if (value === null || typeof value !== 'object') return false;
+  const { stamp, list } = value as Record<string, unknown>;
+  return typeof stamp === 'string' && Array.isArray(list);
 }
 
 // Whether the item was ever handed off into a review: from then on its branch on the remote holds

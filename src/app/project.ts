@@ -33,7 +33,7 @@ import {
 } from '../store/registry.ts';
 import { migrateProjectBoards } from './board-migration.ts';
 import { ensureRequestsBoard, syncBoardPresets } from './boards.ts';
-import { filesChangedAt } from './branch-files.ts';
+import { filesChangedAt, stampAt } from './branch-files.ts';
 import { nameImplicitTypes } from './collections.ts';
 import type { Context } from './context.ts';
 import {
@@ -238,6 +238,7 @@ function open(
       identity: ensureIdentity(db, identity),
       // What two items' branches share is asked of the checkout this project is seen from.
       changed: filesChangedAt(found.root),
+      stamp: stampAt(found.root),
     };
     // Published boards join the catalog as compiled presets (app/boards.ts); a collection still on a
     // preset file is read as a published board, and every project has its Pedidos board.
