@@ -268,9 +268,10 @@ describe('the role prompts', () => {
       const text = rolePrompt('worker', lang, { board: 'Cambios', name: 'ana-cambios' });
       expect(text).toContain('otea next --collection Cambios --claim --as ana-cambios');
       expect(text).toContain(
-        `otea profile --model <id> --effort <${lang === 'es' ? 'nivel' : 'level'}> --as ana-cambios`,
+        `otea profile --model <id> --effort <${lang === 'es' ? 'nivel' : 'level'}> --harness <harness> --as ana-cambios`,
       );
       expect(text).toContain('otea ask <id>');
+      expect(text).toContain('otea release <id> --as ana-cambios');
       expect(text).toContain('otea wait --turn agent --unclaimed --as ana-cambios');
       // It lands with a merge of main, never a force push.
       expect(text).toContain('git merge origin/main');
@@ -295,7 +296,12 @@ describe('the role prompts', () => {
       expect(text).toContain('otea whoami');
       expect(text).toContain('otea profile --model');
       expect(text).toContain('otea create');
-      expect(text).toContain('otea wait');
+      // `otea wait` needs --turn: a bare one fails. This one wakes for the person's notes on its
+      // topics and for items no worker took (src/cli/prompt.test.ts runs it through the CLI).
+      expect(text).toContain('`otea wait --turn agent --unclaimed --as <');
+      expect(text).toContain(
+        `otea prompt --role worker --board <${lang === 'es' ? 'tablero' : 'board'}> --as <`,
+      );
       expect(text).toContain(
         `otea prompt --role worker --board <${lang === 'es' ? 'tablero' : 'board'}>`,
       );
@@ -308,6 +314,15 @@ describe('the role prompts', () => {
     expect(named).toContain('your name is ana');
     expect(named).not.toContain('otea whoami');
     expect(rolePrompt('coordinator', 'es', {})).not.toBe(rolePrompt('coordinator', 'en', {}));
-    expect(rolePrompt('worker', 'es', { board: 'Cambios' })).toContain('Eres un worker');
+    expect(rolePrompt('worker', 'es', { board: 'Cambios' })).toContain('Eres un trabajador');
+  });
+
+  // The Spanish texts say "trabajador"; `--role worker` stays the command's value.
+  it('says trabajador in Spanish, keeping only the --role value in English', () => {
+    for (const role of ROLES) {
+      const text = rolePrompt(role, 'es', { board: 'Cambios', name: 'ana' });
+      expect(text.replaceAll('--role worker', '')).not.toMatch(/\bworkers?\b/i);
+    }
+    expect(rolePrompt('coordinator', 'es', {})).toContain('--role worker');
   });
 });

@@ -1,7 +1,9 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { JoinFacts, PromptKind } from '../core/agent-prompts.ts';
+import { OteaError } from '../core/errors.ts';
 import { listBoardSummaries } from './boards.ts';
+import { getCollection } from './collections.ts';
 import type { Context } from './context.ts';
 import { listItems, systemClock } from './items.ts';
 import { liveBoardOf } from './next.ts';
@@ -14,6 +16,18 @@ type Place = Context & { root?: string };
 // never uses git) gets prompts with no repository, history, CI or worktree in them.
 function isRepo({ root }: Place): boolean {
   return root === undefined || existsSync(join(root, '.git'));
+}
+
+// The board a worker's text names: one that exists in the project, by the name it has there. The
+// name goes into commands the worker runs, so one with a quote, a backtick or a control character
+// (a newline above all) is refused: it could not be read back as one argument.
+export function roleBoard(ctx: Context, name: string): string {
+  if (name.trim() === '' || /[\p{Cc}"'`]/u.test(name))
+    throw new OteaError(
+      'invalid_name',
+      'A board is named without quotes, backticks or line breaks',
+    );
+  return getCollection(ctx.db, name).name;
 }
 
 // The project as an agent joining it reads it: each published board of the person's (Pedidos

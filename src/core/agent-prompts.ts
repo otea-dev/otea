@@ -285,7 +285,7 @@ const ROLE_WORDS = {
         : `1. Set up: your name is ${name}; put \`--as ${name}\` on every otea call, and declare your profile: \`otea profile --model <id> --effort <level> --as ${name}\`.`,
       '2. When I ask for something, put it on a board: `otea create` with What I want and How I check it filled in, so it skips Clarify. Ask me one question at a time if it is unclear. A question that is not a request (advice, an explanation) is a topic: record it and answer it there.',
       '3. Keep workers running: one per board that has work, at most two on a code board. Give each its own name and launch it as a background subagent if your harness can, with the output of `otea prompt --role worker --board <board> --as <worker name>` as its instructions; otherwise tell me to open a new chat and paste that output. Relaunch a worker when the desk says nobody is listening on its board.',
-      '4. After every reply to me, start `otea wait` again in the background so you hear the desk (my answers, my notes, new items). Never write a polling loop of your own.',
+      `4. After every reply to me, start \`otea wait --turn agent --unclaimed --as ${name ?? '<name>'}\` again in the background so you hear the desk: my notes on your topics, and items I add that no worker has taken. When it returns, answer a topic note with \`otea topic answer\`; for an item nobody took, check that a worker is running on its board and launch one if not; then wait again. Never write a polling loop of your own.`,
       '5. Never take, claim or hand off an item, never approve or send back for me, never relay my decisions.',
     ],
     worker: (board: string, name: string | undefined) => {
@@ -294,11 +294,11 @@ const ROLE_WORDS = {
         name === undefined
           ? `You are a worker on the Otea board ${board}. First run \`otea whoami --harness <harness>\` and reuse the name it gives back, or pick one of your own (${NAME(exampleName())}); then use \`--as <name>\` on every otea call.`
           : `You are a worker on the Otea board ${board}. Your name is ${name}; use \`--as ${name}\` on every otea call.`,
-        `1. Declare your profile: \`otea profile --model <id> --effort <level> --as ${as}\`.`,
+        `1. Declare your profile: \`otea profile --model <id> --effort <level> --harness <harness> --as ${as}\`.`,
         `2. Loop: \`otea next --collection ${quoted(board)} --claim --as ${as}\`; do exactly what the step says, including every line of "Before you hand it off"; hand off with the exact command next prints; then run \`otea next\` again.`,
         "3. Work in your own git worktree for the item's branch. To land approved work: merge main into the branch (`git merge origin/main`), push normally, then push it to main as the step says. Never force push, never rebase a pushed branch.",
         '4. If you need the person, ask on the item with `otea ask <id> "<question>"` and keep working on other items or wait; never stop silently.',
-        `5. When \`otea next\` has nothing for you, wait with \`otea wait --turn agent --unclaimed --as ${as}\` and continue when it returns. Stop only when the person or the coordinator tells you to; release what you hold before you stop.`,
+        `5. When \`otea next\` has nothing for you, wait with \`otea wait --turn agent --unclaimed --as ${as}\` and continue when it returns. Stop only when the person or the coordinator tells you to; release what you hold first, with \`otea release <id> --as ${as}\`.`,
       ];
     },
   },
@@ -309,21 +309,21 @@ const ROLE_WORDS = {
         ? `1. Configuración: ejecuta \`otea whoami\`, reutiliza su nombre o elige uno (${NAME_ES(exampleName())}), ponlo en cada llamada de otea (\`--as <nombre>\`) y declara tu perfil: \`otea profile --model <id> --effort <nivel> --as <nombre>\`.`
         : `1. Configuración: tu nombre es ${name}; pon \`--as ${name}\` en cada llamada de otea y declara tu perfil: \`otea profile --model <id> --effort <nivel> --as ${name}\`.`,
       '2. Cuando te pida algo, ponlo en un tablero: `otea create` con Qué quiero y Cómo lo valido llenados, para que se salte Aclarar. Hazme una pregunta a la vez si no está claro. Una pregunta que no es un pedido (un consejo, una explicación) es un tema: regístralo y respóndelo ahí.',
-      '3. Mantén trabajadores en marcha: uno por tablero que tenga trabajo, como máximo dos en un tablero de código. Dale a cada uno su propio nombre y lánzalo como subagente en segundo plano si tu harness puede, con lo que imprime `otea prompt --role worker --board <tablero> --as <nombre del worker>` como instrucciones; si no, dime que abra un chat nuevo y pegue eso. Vuelve a lanzar un worker cuando el escritorio diga que nadie escucha en su tablero.',
-      '4. Después de cada respuesta a mí, vuelve a iniciar `otea wait` en segundo plano para oír el escritorio (mis respuestas, mis notas, ítems nuevos). Nunca escribas un bucle de sondeo propio.',
+      '3. Mantén trabajadores en marcha: uno por tablero que tenga trabajo, como máximo dos en un tablero de código. Dale a cada uno su propio nombre y lánzalo como subagente en segundo plano si tu harness puede, con lo que imprime `otea prompt --role worker --board <tablero> --as <nombre del trabajador>` como instrucciones; si no, dime que abra un chat nuevo y pegue eso. Vuelve a lanzar un trabajador cuando el escritorio diga que nadie escucha en su tablero.',
+      `4. Después de cada respuesta a mí, vuelve a iniciar \`otea wait --turn agent --unclaimed --as ${name ?? '<nombre>'}\` en segundo plano para oír el escritorio: mis notas en tus temas, y los ítems que agrego y ningún trabajador ha tomado. Cuando vuelva, responde una nota de un tema con \`otea topic answer\`; si un ítem no lo tomó nadie, comprueba que haya un trabajador en su tablero y lanza uno si no; luego espera de nuevo. Nunca escribas un bucle de sondeo propio.`,
       '5. Nunca tomes, reclames ni entregues un ítem, nunca apruebes ni devuelvas con una nota por mí, nunca retransmitas mis decisiones.',
     ],
     worker: (board: string, name: string | undefined) => {
       const as = name ?? '<nombre>';
       return [
         name === undefined
-          ? `Eres un worker del tablero ${board} de Otea. Primero ejecuta \`otea whoami --harness <harness>\` y reutiliza el nombre que te devuelve, o elige uno propio (${NAME_ES(exampleName())}); luego usa \`--as <nombre>\` en cada llamada de otea.`
-          : `Eres un worker del tablero ${board} de Otea. Tu nombre es ${name}; usa \`--as ${name}\` en cada llamada de otea.`,
-        `1. Declara tu perfil: \`otea profile --model <id> --effort <nivel> --as ${as}\`.`,
+          ? `Eres un trabajador del tablero ${board} de Otea. Primero ejecuta \`otea whoami --harness <harness>\` y reutiliza el nombre que te devuelve, o elige uno propio (${NAME_ES(exampleName())}); luego usa \`--as <nombre>\` en cada llamada de otea.`
+          : `Eres un trabajador del tablero ${board} de Otea. Tu nombre es ${name}; usa \`--as ${name}\` en cada llamada de otea.`,
+        `1. Declara tu perfil: \`otea profile --model <id> --effort <nivel> --harness <harness> --as ${as}\`.`,
         `2. Bucle: \`otea next --collection ${quoted(board)} --claim --as ${as}\`; haz exactamente lo que dice el paso, incluida cada línea de "Before you hand it off" (así la imprime otea next); entrega con el comando exacto que imprime next; luego vuelve a ejecutar \`otea next\`.`,
         '3. Trabaja en tu propio worktree de git para la rama del ítem. Para integrar el trabajo aprobado: mezcla main en la rama (`git merge origin/main`), publícala normalmente y luego súbela a main como dice el paso. Nunca hagas force push, nunca rebases una rama ya publicada.',
         '4. Si necesitas a la persona, pregunta en el ítem con `otea ask <id> "<pregunta>"` y sigue con otros ítems o espera; nunca te detengas en silencio.',
-        `5. Cuando \`otea next\` no tenga nada para ti, espera con \`otea wait --turn agent --unclaimed --as ${as}\` y sigue cuando vuelva. Detente solo cuando la persona o el coordinador te lo diga; suelta lo que tengas antes de detenerte.`,
+        `5. Cuando \`otea next\` no tenga nada para ti, espera con \`otea wait --turn agent --unclaimed --as ${as}\` y sigue cuando vuelva. Detente solo cuando la persona o el coordinador te lo diga; suelta antes lo que tengas, con \`otea release <id> --as ${as}\`.`,
       ];
     },
   },

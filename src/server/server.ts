@@ -4,7 +4,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 import { agentDetail } from '../app/agent-detail.ts';
-import { promptFacts, promptKindOf } from '../app/agent-prompts.ts';
+import { promptFacts, promptKindOf, roleBoard } from '../app/agent-prompts.ts';
 import { askingItems, holderAsksOf } from '../app/asking.ts';
 import { syncBoardPresets } from '../app/boards.ts';
 import { briefFor } from '../app/brief.ts';
@@ -556,7 +556,7 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
           return c.json({
             kind: role,
             prompt: rolePrompt(role, projectLanguage(project, env), {
-              ...(board ? { board } : {}),
+              ...(board ? { board: roleBoard(project, board) } : {}),
               ...(name ? { name } : {}),
             }),
           });
