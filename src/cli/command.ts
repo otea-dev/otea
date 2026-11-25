@@ -33,6 +33,9 @@ export type Input = {
   readonly reader: Actor;
   // The name the agent gave, unchecked, or none: for a command that may run unnamed (otea mcp).
   agent: string | undefined;
+  // The command acts as the person because it ran at a terminal with no name given: what it writes
+  // is marked as from a terminal, since a terminal does not prove a person typed.
+  unnamedTerminal?: boolean;
   // How the agent reached the command, recorded on its writes: the CLI itself or the MCP server.
   channel: AgentChannel;
   // What the agent came through, recorded with its presence: the MCP client, or the CLI itself.

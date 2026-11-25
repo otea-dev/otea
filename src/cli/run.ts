@@ -111,9 +111,10 @@ function agentName(values: Values, env: Io['env']): string | undefined {
   return given || env.OTEA_AGENT || undefined;
 }
 
-// The commands a person runs for themselves at a terminal, with no agent name: making an item and
-// answering an agent's question. The person is never recorded as an agent.
-const PERSON_COMMANDS: ReadonlySet<string> = new Set(['create', 'answer']);
+// The commands that run with no agent name at a terminal, as the person: making an item only. A
+// terminal does not prove a person types (an agent can have a pty), so nothing that decides for
+// the person (answering, approving) is here, and the create is marked as from a terminal.
+const PERSON_COMMANDS: ReadonlySet<string> = new Set(['create']);
 
 const NAME_YOURSELF = 'pass --as <name> or set OTEA_AGENT=<name>';
 
@@ -195,6 +196,7 @@ function inputFor(command: Command, values: Values, args: string[], io: Io, json
       return readerActor(agent);
     },
     agent,
+    unnamedTerminal: asPerson,
     channel: 'cli',
     harness: CLI_HARNESS,
     signal: io.signal,

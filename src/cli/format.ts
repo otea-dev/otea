@@ -385,8 +385,14 @@ export function gitHookLine({
 }
 
 function createdLine({ createdBy, createdAt, events }: ItemView): string {
-  const channel = events.find(({ type }) => type === 'created')?.data.channel;
-  const via = typeof channel === 'string' ? ` via ${channel}` : '';
+  const data = events.find(({ type }) => type === 'created')?.data;
+  const channel = data?.channel;
+  const via =
+    data?.via === 'terminal'
+      ? ' from a terminal, with no name given'
+      : typeof channel === 'string'
+        ? ` via ${channel}`
+        : '';
   return `created by ${actorLabel(createdBy)}${via} at ${timeText(createdAt)}`;
 }
 

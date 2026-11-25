@@ -87,6 +87,15 @@ describe('feedLines', () => {
   });
 
   // P7-R3-1: an agent's set-aside read «soltó», and your Retomar «actualizaste».
+  it('says an item made at a terminal with no name as from a terminal, not as made on the desk', () => {
+    const made = (data: object) =>
+      feedLines([ev('WORK-1', 'created', you, 0, { state: 'todo', ...data })], turnOf)[0]?.phrase
+        .key;
+
+    expect(made({ channel: 'cli', via: 'terminal' })).toBe('activity.createdTerminal');
+    expect(made({ channel: 'ui' })).toBe('activity.created');
+  });
+
   it('says an agent set an item aside for later, and that you took it up again', () => {
     const lines = feedLines(
       [

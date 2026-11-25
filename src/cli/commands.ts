@@ -134,7 +134,6 @@ import {
 import { projectLanguage, setProjectLanguage } from '../app/project-language.ts';
 import { type ProofSource, tickPoint } from '../app/proofs.ts';
 import {
-  answerQuestion,
   answerWaiting,
   askedByAgent,
   askQuestion,
@@ -1143,6 +1142,7 @@ const create: Command = {
         ...(parent === undefined ? {} : { parent }),
         actor,
         channel,
+        ...(input.unnamedTerminal ? { via: 'terminal' as const } : {}),
       });
       if (topic) linkTopic(project, { id: topic.id, item: item.id, via: 'from' });
       // On a board: where it starts, and why when its first step was skipped or lacks something.
@@ -3021,11 +3021,6 @@ const answer: Command = {
     const [id = '', text = ''] = input.args;
     const { actor, channel } = input;
     return withAgent(input, (project) => {
-      // The person at a terminal answers for themselves, as on the desk: no agent notes it.
-      if (actor.kind === 'human') {
-        const answered = answerQuestion(project, { id, text, actor, channel });
-        return { data: answered, text: `Answered the question on ${id}.` };
-      }
       const noted = noteChatAnswer(project, { id, text, actor, channel });
       // It ends with the exact wait: after a chat answer an agent said it waited, running no
       // wait (P3C-R3-9).
