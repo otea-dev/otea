@@ -68,9 +68,12 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // Raised to 830 with rule 3 listing the real order next offers in (what you hold, what the
   // person left you, sent-back, merges first, on top, approved, new) and --brief for repeat reads
   // (measured at 815 and 825).
-  // Raised to 870 and 865 for rule 10: ask with 2 to 4 options and the one you recommend, so the
-  // person taps instead of reading and typing (measured at 864 and 855).
-  'board index': { text: 870, json: 53, mcp: 865 },
+  // Raised to 870 with rule 11 naming the four outcomes of the interview (a template as it is,
+  // with changes, a board of its own, or Otea is no fit), so an agent never drafts a board for
+  // work that does not need one (measured at 857).
+  // Raised again for rule 10: ask with 2 to 4 options and the one you recommend, so the person
+  // taps instead of reading and typing (raised to 895 and 890; measured at 894 and 885).
+  'board index': { text: 895, json: 53, mcp: 890 },
   // The bug board's own words and each step's instructions, read once per session; show's Next:
   // block covers the step at hand. Raised when a preset collection read as a board kept its
   // playbook as the board's text: what agents read on the preset, as before.
@@ -156,9 +159,9 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // measured at 727).
   // Raised to 810 for rule 3: the real order next offers in, and --brief for repeat reads, which
   // a new session or a compacted agent would otherwise be handed without the step (measured at
-  // 796).
-  // Raised to 840 for rule 10: ask always with options and a recommendation (measured at 834).
-  instructions: { mcp: 840 },
+  // 796). Raised to 850 with rule 11's four outcomes (measured at 826).
+  // Raised to 870 for rule 10: ask always with options and a recommendation (measured at 865).
+  instructions: { mcp: 870 },
   // The AGENTS.md block, in the context of every agent whose harness reads AGENTS.md: it says where
   // the guide is and holds no copy of it, which the instructions or otea board's index give
   // (MCP-TOKENS: the guide was in context two or three times; measured at 874 with the copy, 107).

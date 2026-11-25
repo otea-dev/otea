@@ -5,7 +5,7 @@ import { findOnPath, installRoot } from '../app/launcher.ts';
 import type { Probe } from '../app/phone.ts';
 import { CLI_HARNESS } from '../app/presence.ts';
 import { NO_TAILSCALE, type TailscaleCli } from '../app/tailscale.ts';
-import { type Actor, agentActor, readerActor } from '../core/item.ts';
+import { type Actor, agentActor, PERSON_READER, readerActor } from '../core/item.ts';
 import {
   type Command,
   errorData,
@@ -43,6 +43,8 @@ export type Io = {
   // The fetch the once-a-day check for a newer @otea/cli asks the npm registry with, only where
   // otea runs for a person (main.ts); none elsewhere, so no test reaches the network.
   fetch?: typeof fetch;
+  // Whether stdin is a terminal (a person types here, nothing is piped in).
+  stdinIsTTY?: boolean;
   // Present only when a person can answer at the terminal.
   ask?: (question: string) => Promise<string>;
   // Present only when something is piped in.
@@ -109,6 +111,11 @@ function agentName(values: Values, env: Io['env']): string | undefined {
   return given || env.OTEA_AGENT || undefined;
 }
 
+// The commands that run with no agent name at a terminal, as the person: making an item only. A
+// terminal does not prove a person types (an agent can have a pty), so nothing that decides for
+// the person (answering, approving) is here, and the create is marked as from a terminal.
+const PERSON_COMMANDS: ReadonlySet<string> = new Set(['create']);
+
 const NAME_YOURSELF = 'pass --as <name> or set OTEA_AGENT=<name>';
 
 function validate(command: Command, values: Values, args: string[]): void {
@@ -173,15 +180,23 @@ function inputFor(command: Command, values: Values, args: string[], io: Io, json
     return PATH_ARGS.has(name) ? arg : text(arg);
   });
   const agent = agentName(values, io.env);
+  // The person at a terminal (stdin and stdout both a terminal, no name given) acts as themselves
+  // in the commands that are theirs to run; an agent never has a terminal, so it must name itself.
+  const asPerson =
+    agent === undefined &&
+    PERSON_COMMANDS.has(command.name) &&
+    io.stdinIsTTY === true &&
+    io.stdout.isTTY === true;
   return {
     cwd: io.cwd,
     get actor(): Actor {
-      return agentActor(agent, NAME_YOURSELF);
+      return asPerson ? PERSON_READER : agentActor(agent, NAME_YOURSELF);
     },
     get reader(): Actor {
       return readerActor(agent);
     },
     agent,
+    unnamedTerminal: asPerson,
     channel: 'cli',
     harness: CLI_HARNESS,
     signal: io.signal,

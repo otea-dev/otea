@@ -395,7 +395,12 @@ const CONTENT: Template = {
       name: w('Write', 'Redactar'),
       doer: 'any',
       reviewer: 'you',
-      hand: [['fdraft', 'always', true]],
+      // The draft is written in the channel's format and Go live publishes to it, so the channel
+      // is asked here, before the text exists, and never left empty for the step that reads it.
+      hand: [
+        ['fdraft', 'always', true],
+        ['fchannel', 'always'],
+      ],
       take: w(
         'Write @{fdraft} from what was approved in @{foutline}. Cite a source for every fact. The reader\'s text carries no internal item ids and no editorial notes (corrections, decisions, "the previous version").',
         'Escribe @{fdraft} con lo aprobado en @{foutline}. Cita una fuente para cada dato. El texto del lector no lleva ids internos de elementos ni notas editoriales (correcciones, decisiones, "la versión anterior").',

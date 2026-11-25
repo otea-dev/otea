@@ -184,6 +184,80 @@ describe('Planner', () => {
     ]);
   });
 
+  it('tells that nobody listens unless the person turned that off, and after a question or a turn', () => {
+    const unheard: Signal = {
+      key: 'unheard:A:review:',
+      kind: 'unheard',
+      item: 'A',
+      title: 'Title A',
+    };
+    planner.offer([unheard], prefs, T0);
+    expect(planner.take(T0 + GATHER_MS, keys([unheard]), prefs)).toEqual([
+      { kind: 'unheard', item: 'A', title: 'Title A' },
+    ]);
+
+    const off = { ...prefs, unheard: false };
+    const quiet = new Planner(minuteOfDay);
+    quiet.offer([unheard], off, T0);
+    expect(quiet.hasPending()).toBe(false);
+
+    const both = new Planner(minuteOfDay);
+    both.offer([unheard, turn('A')], prefs, T0);
+    expect(both.take(T0 + GATHER_MS, keys([unheard, turn('A')]), prefs)).toEqual([
+      { kind: 'turn', item: 'A', title: 'Title A' },
+    ]);
+  });
+
+  it('keeps the question’s words out of the notice when the person chose to hide them', () => {
+    const ask: Signal = {
+      key: 'turn:A:review::q1',
+      kind: 'ask',
+      item: 'A',
+      title: 'Title A',
+      by: 'kiln',
+      text: 'Is the discount stackable?',
+    };
+    planner.offer([ask], prefs, T0);
+    expect(planner.take(T0 + GATHER_MS, keys([ask]), prefs)).toEqual([
+      { kind: 'ask', item: 'A', title: 'Title A', by: 'kiln', text: 'Is the discount stackable?' },
+    ]);
+    const hidden = { ...prefs, askText: false };
+    const other = new Planner(minuteOfDay);
+    other.offer([ask], hidden, T0);
+    expect(other.take(T0 + GATHER_MS, keys([ask]), hidden)).toEqual([
+      { kind: 'ask', item: 'A', title: 'Title A', by: 'kiln' },
+    ]);
+  });
+
+  it('keeps the question’s options with its words, and hides them with them', () => {
+    const ask: Signal = {
+      key: 'turn:A:review::q1',
+      kind: 'ask',
+      item: 'A',
+      title: 'Title A',
+      by: 'kiln',
+      text: 'Stackable?',
+      options: ['Yes', 'No'],
+    };
+    planner.offer([ask], prefs, T0);
+    expect(planner.take(T0 + GATHER_MS, keys([ask]), prefs)).toEqual([
+      {
+        kind: 'ask',
+        item: 'A',
+        title: 'Title A',
+        by: 'kiln',
+        text: 'Stackable?',
+        options: ['Yes', 'No'],
+      },
+    ]);
+    const hidden = { ...prefs, askText: false };
+    const other = new Planner(minuteOfDay);
+    other.offer([ask], hidden, T0);
+    expect(other.take(T0 + GATHER_MS, keys([ask]), hidden)).toEqual([
+      { kind: 'ask', item: 'A', title: 'Title A', by: 'kiln' },
+    ]);
+  });
+
   it('tells nothing from a project the person muted, not even what waited', () => {
     const web = new Planner(minuteOfDay, 'web-1');
     web.offer([turn('A')], prefs, T0);
@@ -246,6 +320,8 @@ describe('Planner', () => {
       replied: true,
       stuck: true,
       aside: false,
+      unheard: true,
+      askText: true,
       quiet: null,
       muted: [],
     });

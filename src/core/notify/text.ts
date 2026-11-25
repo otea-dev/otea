@@ -20,16 +20,18 @@ export const isNoticeLang = (value: unknown): value is NoticeLang =>
   value === 'es' || value === 'en';
 
 const MAX_BODY = 100;
+const MAX_QUESTION = 140;
 
 const short = (text: string, max = MAX_BODY) =>
   text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 
-// A question's options after the item, numbered as the desk shows them, only when all of them fit
-// in the body: a half-said list would mislead.
-function withOptions(head: string, options: readonly string[] | undefined): string {
-  if (!options || options.length === 0) return head;
-  const list = options.map((option, i) => `${i + 1}) ${option}`).join('  ');
-  return head.length + 1 + list.length <= MAX_BODY ? `${head}\n${list}` : head;
+// A question's options after it, numbered as the desk shows them, with no control characters, only
+// when all of them fit in the body's budget: a half-said list would mislead.
+function withOptions(question: string, options: readonly string[] | undefined): string {
+  const clean = (options ?? []).map((option) => option.replace(/[\p{Cc}\p{Cf}\s]+/gu, ' ').trim());
+  if (clean.length === 0 || clean.some((option) => option === '')) return question;
+  const list = clean.map((option, i) => `${i + 1}) ${option}`).join('  ');
+  return question.length + 1 + list.length <= MAX_QUESTION ? `${question}\n${list}` : question;
 }
 
 export const itemUrl = (id: string) => `/#/i/${encodeURIComponent(id)}`;
@@ -41,12 +43,14 @@ const WORDS = {
     replied: (by: string) => `${by} contestó tu nota`,
     stuck: (by: string) => `Se atascó · ${by} no responde`,
     aside: (by: string) => `${by} lo dejó para después`,
+    unheard: () => 'Nadie escucha',
     group: {
       turn: (n: number) => `${n} cosas te tocan`,
       ask: (n: number) => `${n} preguntas te esperan`,
       replied: (n: number) => `${n} notas contestadas`,
       stuck: (n: number) => `${n} cosas se atascaron`,
       aside: (n: number) => `${n} cosas apartadas`,
+      unheard: (n: number) => `${n} cosas esperan a un agente y nadie escucha`,
       mixed: (n: number) => `${n} cosas te esperan`,
     },
     in: (title: string, project: string) => `${title} en ${project}`,
@@ -57,12 +61,14 @@ const WORDS = {
     replied: (by: string) => `${by} answered your note`,
     stuck: (by: string) => `Stuck · ${by} went quiet`,
     aside: (by: string) => `${by} set it aside for later`,
+    unheard: () => 'Nobody is listening',
     group: {
       turn: (n: number) => `${n} things are yours`,
       ask: (n: number) => `${n} questions wait for you`,
       replied: (n: number) => `${n} notes answered`,
       stuck: (n: number) => `${n} things got stuck`,
       aside: (n: number) => `${n} things set aside`,
+      unheard: (n: number) => `${n} things wait for an agent, and nobody is listening`,
       mixed: (n: number) => `${n} things wait for you`,
     },
     in: (title: string, project: string) => `${title} in ${project}`,
@@ -93,11 +99,17 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
     };
   }
   const by = notice.by ?? '';
-  const title = notice.kind === 'turn' ? words.turn : words[notice.kind](by);
-  const head = short(`${notice.item} · ${notice.title}`);
+  const said = notice.kind === 'turn' ? words.turn : words[notice.kind](by);
+  // A question goes in the notice itself, with the item's id in the title.
+  const question =
+    notice.kind === 'ask' ? notice.text?.replace(/[\p{Cc}\p{Cf}\s]+/gu, ' ').trim() : undefined;
+  const title = question ? `${said} · ${notice.item}` : said;
   return {
     title,
-    body: notice.kind === 'ask' ? withOptions(head, notice.options) : head,
+    // Its options follow the question, only while the question is shown (the person may hide it).
+    body: question
+      ? withOptions(short(question, MAX_QUESTION), notice.options)
+      : short(`${notice.item} · ${notice.title}`),
     tag: `otea-item-${notice.item}`,
     url: itemUrl(notice.item),
     item: notice.item,

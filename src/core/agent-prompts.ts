@@ -94,14 +94,19 @@ const WORDS = {
       repo
         ? '2. Read the project before asking me anything: the README, how the code is laid out, the git history (how often it changes, in what bursts), CLAUDE.md or AGENTS.md, and its CI.'
         : '2. Read the project before asking me anything: what is in this folder, any README or notes, and CLAUDE.md or AGENTS.md.',
-      '3. Ask me, one question at a time and in plain words, only what you still need:',
-      '- what kind of work happens here, and what you do and what I do;',
-      `- what I need to see to approve something (${repo ? 'a diff, screenshots, a video, test results, a document' : 'screenshots, the page or file itself, a document'});`,
-      '- how many review rounds are usual;',
-      `- what must never happen without me${repo ? ' (for code: whether anything may reach the remote before I see it)' : ''}.`,
+      '3. Understand what I need before you propose anything. Ask me, one question at a time and in plain words, only what you still need:',
+      '- what work I want agents to do here, and what you do and what I do;',
+      `- what "done" looks like: what I need to see to approve something (${repo ? 'a diff, screenshots, a video, test results, a document' : 'screenshots, the page or file itself, a document'});`,
+      '- who reviews it, and how many review rounds are usual;',
+      `- where the result lands${repo ? ' (for code: whether anything may reach the remote before I see it)' : ''}, and what must never happen without me.`,
       `- ${TOPICS}`,
-      '4. Design the board or boards:',
-      `- Start from the closest template (\`otea board draft --help\` lists them, sets too) and adapt it: \`${DRAFT}\`.`,
+      '4. Then tell me plainly which of four outcomes fits, and why; templates are a starting point, never the only option:',
+      '- A stock template fits as it is: name it (`otea board draft --help` lists them, sets too).',
+      '- A template fits with these changes: name it and list the changes.',
+      '- This needs a board of its own: say why and what it would hold.',
+      '- Otea is not a good fit for this (for example, one-off tiny tasks are faster in plain chat): say why and do not draft anything.',
+      '- For the first three, wait for my answer, then design the board or boards:',
+      `- Start from the closest template and adapt it: \`${DRAFT}\`.`,
       '- `otea board draft <request id>` (the id it printed) prints it as JSON. Edit it, with the evidence each review needs.',
       '- Hand it in with `otea board draft <request id> --file board.json` until it reports nothing wrong. You never publish it.',
       '5. Tell me where to review it (Studio, from the link the draft prints), that I publish it, and to try it with a first item; offer to adjust it with a new draft if something does not fit.',
@@ -152,14 +157,19 @@ const WORDS = {
       repo
         ? '2. Lee el proyecto antes de preguntarme nada: el README, cómo está organizado el código, el historial de git (cada cuánto cambia y en qué rachas), CLAUDE.md o AGENTS.md, y su CI.'
         : '2. Lee el proyecto antes de preguntarme nada: qué hay en esta carpeta, el README o las notas que tenga, y CLAUDE.md o AGENTS.md.',
-      '3. Pregúntame, una pregunta a la vez y con palabras simples, solo lo que te falte:',
-      '- qué clase de trabajo se hace aquí, y qué haces tú y qué hago yo;',
-      `- qué necesito ver para aprobar algo (${repo ? 'un diff, capturas, un vídeo, resultados de pruebas, un documento' : 'capturas, la página o el archivo mismo, un documento'});`,
-      '- cuántas rondas de revisión son normales;',
-      `- qué no debe pasar nunca sin mí${repo ? ' (en el código: si algo puede llegar al remoto antes de que yo lo vea)' : ''}.`,
+      '3. Entiende lo que necesito antes de proponer nada. Pregúntame, una pregunta a la vez y con palabras simples, solo lo que te falte:',
+      '- qué trabajo quiero que hagan los agentes aquí, y qué haces tú y qué hago yo;',
+      `- cómo se ve "terminado": qué necesito ver para aprobar algo (${repo ? 'un diff, capturas, un vídeo, resultados de pruebas, un documento' : 'capturas, la página o el archivo mismo, un documento'});`,
+      '- quién lo revisa, y cuántas rondas de revisión son normales;',
+      `- dónde termina el resultado${repo ? ' (en el código: si algo puede llegar al remoto antes de que yo lo vea)' : ''}, y qué no debe pasar nunca sin mí.`,
       `- ${TOPICS_ES}`,
-      '4. Diseña el tablero o los tableros:',
-      `- Parte de la plantilla más cercana (\`otea board draft --help\` las lista, también los conjuntos) y adáptala: \`${DRAFT_ES}\`.`,
+      '4. Luego dime con claridad cuál de cuatro resultados encaja, y por qué; las plantillas son un punto de partida, nunca la única opción:',
+      '- Una plantilla de serie encaja tal cual: nómbrala (`otea board draft --help` las lista, también los conjuntos).',
+      '- Una plantilla encaja con estos cambios: nómbrala y lista los cambios.',
+      '- Esto necesita un tablero propio: di por qué y qué contendría.',
+      '- Otea no es una buena opción para esto (por ejemplo, las tareas sueltas y mínimas van más rápido en un chat normal): di por qué y no crees ningún borrador.',
+      '- En los tres primeros, espera mi respuesta y luego diseña el tablero o los tableros:',
+      `- Parte de la plantilla más cercana y adáptala: \`${DRAFT_ES}\`.`,
       '- `otea board draft <id del Pedido>` (el id que imprimió) lo imprime en JSON. Edítalo, con la evidencia que pide cada revisión.',
       '- Entrégalo con `otea board draft <id del Pedido> --file board.json` hasta que no marque nada mal. Nunca lo publicas tú.',
       '5. Dime dónde revisarlo (Studio, desde el enlace que imprime el borrador), que lo publico yo, y que lo pruebe con un primer ítem; ofréceme ajustarlo con un borrador nuevo si algo no encaja.',
@@ -245,6 +255,86 @@ export function connectFacts(facts: JoinFacts): ConnectFacts {
     .filter(({ agentSteps }) => agentSteps.length > 0)
     .map(({ name, agentSteps }) => ({ name, steps: agentSteps }));
   return { code: facts.repo !== false, boards };
+}
+
+// The canonical way of working: one chat coordinates and never does an item, a worker per board
+// does them, and the person decides on the desk or the phone. Otea never launches an agent: the
+// coordinator launches its workers with the worker text, or the person pastes it into a chat of
+// each. Two texts, in the language of the project like the moments above.
+export const ROLES = ['coordinator', 'worker'] as const;
+
+export type Role = (typeof ROLES)[number];
+
+export function isRole(role: string): role is Role {
+  return (ROLES as readonly string[]).includes(role);
+}
+
+// What a role text is filled with: the board a worker works (a coordinator names none: each worker
+// it launches has its own) and the name the agent works under, when it is already chosen.
+export type RoleFacts = { board?: string; name?: string };
+
+// A board name as a command takes it: quoted when it has a space.
+const quoted = (board: string) => (/\s/.test(board) ? `"${board}"` : board);
+
+const ROLE_WORDS = {
+  en: {
+    coordinator: (name: string | undefined) => [
+      "You are the coordinator for this project's Otea boards. Your job is to talk with me and keep the work moving; you never do an item yourself.",
+      name === undefined
+        ? `1. Set up: run \`otea whoami\`, reuse its name or pick one (${NAME(exampleName())}), put it on every otea call (\`--as <name>\`), and declare your profile: \`otea profile --model <id> --effort <level> --as <name>\`.`
+        : `1. Set up: your name is ${name}; put \`--as ${name}\` on every otea call, and declare your profile: \`otea profile --model <id> --effort <level> --as ${name}\`.`,
+      '2. When I ask for something, put it on a board: `otea create` with What I want and How I check it filled in, so it skips Clarify. Ask me one question at a time if it is unclear. A question that is not a request (advice, an explanation) is a topic: record it and answer it there.',
+      '3. Keep workers running: one per board that has work, at most two on a code board. Give each its own name and launch it as a background subagent if your harness can, with the output of `otea prompt --role worker --board <board> --as <worker name>` as its instructions; otherwise tell me to open a new chat and paste that output. Relaunch a worker when the desk says nobody is listening on its board.',
+      `4. After every reply to me, start \`otea wait --turn agent --unclaimed --as ${name ?? '<name>'}\` again in the background so you hear the desk: my notes on your topics, and items I add that no worker has taken. When it returns, answer a topic note with \`otea topic answer\`; for an item nobody took, check that a worker is running on its board and launch one if not; then wait again. Never write a polling loop of your own.`,
+      '5. Never take, claim or hand off an item, never approve or send back for me, never relay my decisions.',
+    ],
+    worker: (board: string, name: string | undefined) => {
+      const as = name ?? '<name>';
+      return [
+        name === undefined
+          ? `You are a worker on the Otea board ${board}. First run \`otea whoami --harness <harness>\` and reuse the name it gives back, or pick one of your own (${NAME(exampleName())}); then use \`--as <name>\` on every otea call.`
+          : `You are a worker on the Otea board ${board}. Your name is ${name}; use \`--as ${name}\` on every otea call.`,
+        `1. Declare your profile: \`otea profile --model <id> --effort <level> --harness <harness> --as ${as}\`.`,
+        `2. Loop: \`otea next --collection ${quoted(board)} --claim --as ${as}\`; do exactly what the step says, including every line of "Before you hand it off"; hand off with the exact command next prints; then run \`otea next\` again.`,
+        "3. Work in your own git worktree for the item's branch. To land approved work: merge main into the branch (`git merge origin/main`), push normally, then push it to main as the step says. Never force push, never rebase a pushed branch.",
+        '4. If you need the person, ask on the item with `otea ask <id> "<question>"` and keep working on other items or wait; never stop silently.',
+        `5. When \`otea next\` has nothing for you, wait with \`otea wait --turn agent --unclaimed --as ${as}\` and continue when it returns. Stop only when the person or the coordinator tells you to; release what you hold first, with \`otea release <id> --as ${as}\`.`,
+      ];
+    },
+  },
+  es: {
+    coordinator: (name: string | undefined) => [
+      'Eres el coordinador de los tableros de Otea de este proyecto. Tu trabajo es hablar conmigo y mantener el trabajo en marcha; nunca haces un ítem tú mismo.',
+      name === undefined
+        ? `1. Configuración: ejecuta \`otea whoami\`, reutiliza su nombre o elige uno (${NAME_ES(exampleName())}), ponlo en cada llamada de otea (\`--as <nombre>\`) y declara tu perfil: \`otea profile --model <id> --effort <nivel> --as <nombre>\`.`
+        : `1. Configuración: tu nombre es ${name}; pon \`--as ${name}\` en cada llamada de otea y declara tu perfil: \`otea profile --model <id> --effort <nivel> --as ${name}\`.`,
+      '2. Cuando te pida algo, ponlo en un tablero: `otea create` con Qué quiero y Cómo lo valido llenados, para que se salte Aclarar. Hazme una pregunta a la vez si no está claro. Una pregunta que no es un pedido (un consejo, una explicación) es un tema: regístralo y respóndelo ahí.',
+      '3. Mantén trabajadores en marcha: uno por tablero que tenga trabajo, como máximo dos en un tablero de código. Dale a cada uno su propio nombre y lánzalo como subagente en segundo plano si tu harness puede, con lo que imprime `otea prompt --role worker --board <tablero> --as <nombre del trabajador>` como instrucciones; si no, dime que abra un chat nuevo y pegue eso. Vuelve a lanzar un trabajador cuando el escritorio diga que nadie escucha en su tablero.',
+      `4. Después de cada respuesta a mí, vuelve a iniciar \`otea wait --turn agent --unclaimed --as ${name ?? '<nombre>'}\` en segundo plano para oír el escritorio: mis notas en tus temas, y los ítems que agrego y ningún trabajador ha tomado. Cuando vuelva, responde una nota de un tema con \`otea topic answer\`; si un ítem no lo tomó nadie, comprueba que haya un trabajador en su tablero y lanza uno si no; luego espera de nuevo. Nunca escribas un bucle de sondeo propio.`,
+      '5. Nunca tomes, reclames ni entregues un ítem, nunca apruebes ni devuelvas con una nota por mí, nunca retransmitas mis decisiones.',
+    ],
+    worker: (board: string, name: string | undefined) => {
+      const as = name ?? '<nombre>';
+      return [
+        name === undefined
+          ? `Eres un trabajador del tablero ${board} de Otea. Primero ejecuta \`otea whoami --harness <harness>\` y reutiliza el nombre que te devuelve, o elige uno propio (${NAME_ES(exampleName())}); luego usa \`--as <nombre>\` en cada llamada de otea.`
+          : `Eres un trabajador del tablero ${board} de Otea. Tu nombre es ${name}; usa \`--as ${name}\` en cada llamada de otea.`,
+        `1. Declara tu perfil: \`otea profile --model <id> --effort <nivel> --harness <harness> --as ${as}\`.`,
+        `2. Bucle: \`otea next --collection ${quoted(board)} --claim --as ${as}\`; haz exactamente lo que dice el paso, incluida cada línea de "Before you hand it off" (así la imprime otea next); entrega con el comando exacto que imprime next; luego vuelve a ejecutar \`otea next\`.`,
+        '3. Trabaja en tu propio worktree de git para la rama del ítem. Para integrar el trabajo aprobado: mezcla main en la rama (`git merge origin/main`), publícala normalmente y luego súbela a main como dice el paso. Nunca hagas force push, nunca rebases una rama ya publicada.',
+        '4. Si necesitas a la persona, pregunta en el ítem con `otea ask <id> "<pregunta>"` y sigue con otros ítems o espera; nunca te detengas en silencio.',
+        `5. Cuando \`otea next\` no tenga nada para ti, espera con \`otea wait --turn agent --unclaimed --as ${as}\` y sigue cuando vuelva. Detente solo cuando la persona o el coordinador te lo diga; suelta antes lo que tengas, con \`otea release <id> --as ${as}\`.`,
+      ];
+    },
+  },
+} as const;
+
+// The text of a role. A worker's board is required (the CLI and the server ask for it); the one
+// without a name tells the agent to pick it with whoami, and the commands carry a placeholder.
+export function rolePrompt(role: Role, lang: Lang, facts: RoleFacts): string {
+  const words = ROLE_WORDS[lang];
+  if (role === 'coordinator') return words.coordinator(facts.name).join('\n');
+  return words.worker(facts.board ?? '<board>', facts.name).join('\n');
 }
 
 // The prompt for a moment, `join` built from the project's facts.

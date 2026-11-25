@@ -13,6 +13,8 @@ import type { NotifyKind, Signal } from './signals.ts';
 export type QuietHours = { from: string; to: string };
 
 export type NotifyPrefs = Record<NotifyKind, boolean> & {
+  // Whether a question's own words go in its notice, which a lock screen shows to anyone.
+  askText: boolean;
   quiet: QuietHours | null;
   // The projects (their ids) nothing is told from.
   muted: string[];
@@ -26,6 +28,8 @@ export const DEFAULT_PREFS: NotifyPrefs = {
   replied: true,
   stuck: true,
   aside: false,
+  unheard: true,
+  askText: true,
   quiet: null,
   muted: [],
 };
@@ -43,7 +47,8 @@ export type ItemNotice = {
   item: string;
   title: string;
   by?: string;
-  // A question's options, to say them in the notice when they fit.
+  text?: string;
+  // A question's options, said after its text when they fit.
   options?: string[];
 };
 
@@ -77,15 +82,26 @@ export const localMinuteOfDay = (ms: number): number => {
 };
 
 // Of an item's news, the one told: a question first, its turn, that it got stuck, then the rest.
-const RANK: Record<NotifyKind, number> = { ask: 0, turn: 1, stuck: 2, replied: 3, aside: 4 };
+const RANK: Record<NotifyKind, number> = {
+  ask: 0,
+  turn: 1,
+  stuck: 2,
+  unheard: 3,
+  replied: 4,
+  aside: 5,
+};
 
-function noticeOf(signal: Signal): ItemNotice {
-  const { kind, item, title, by, options } = signal;
+function noticeOf(signal: Signal, prefs: NotifyPrefs): ItemNotice {
+  const { kind, item, title, by } = signal;
+  const text = prefs.askText ? signal.text : undefined;
+  // The options are the question's words too: hidden with it.
+  const options = text === undefined ? undefined : signal.options;
   return {
     kind,
     item,
     title,
     ...(by === undefined ? {} : { by }),
+    ...(text === undefined ? {} : { text }),
     ...(options === undefined ? {} : { options }),
   };
 }
@@ -153,7 +169,7 @@ export class Planner {
     for (const { item } of ready) this.told.set(item, now);
     this.sentAt = now;
     const [only] = ready;
-    if (ready.length === 1 && only) return [noticeOf(only)];
+    if (ready.length === 1 && only) return [noticeOf(only, prefs)];
     const kinds = new Set(ready.map(({ kind }) => kind));
     const [same] = kinds;
     return [

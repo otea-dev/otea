@@ -61,6 +61,7 @@ export const toca = {
   'toca.sub.waitsFor': 'waiting for {agent}',
   'toca.sub.waitsAgent': 'waiting for an agent',
   'toca.sub.waitsKids': 'waiting for its children',
+  'toca.sub.landsAfter': 'lands after {agent}',
   'toca.sub.setAside': '{agent} set it aside for later',
   'toca.sub.didIt': 'done by {agent}',
   'toca.sub.closedBy': 'closed by {agent}',

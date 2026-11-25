@@ -1,4 +1,4 @@
-import { LISTEN_WINDOW_MS } from '../../src/core/agent-status.ts';
+import { itemUnheard, LISTEN_WINDOW_MS } from '../../src/core/agent-status.ts';
 import { isClosed, isLandStep, positionOf } from '../../src/core/board/engine.ts';
 import type { BoardDefinition } from '../../src/core/board/model.ts';
 import { activeLease } from './active-lease.ts';
@@ -178,11 +178,14 @@ export function unheard(
   agents: readonly Agent[] | null | undefined,
   now: number,
 ): boolean {
-  if (item.turn !== 'agent' || item.setAside || anyoneWaits(agents)) return false;
   const lease = activeLease(item.lease, now);
-  if (!lease) return true;
-  const holder = agents?.find((a) => a.name === lease.holder);
-  return !holder || statusOf(holder) !== 'working';
+  const holder = lease ? agents?.find((a) => a.name === lease.holder) : undefined;
+  return itemUnheard({
+    turn: item.turn,
+    setAside: !!item.setAside,
+    anyoneWaits: anyoneWaits(agents),
+    holderWorking: !!holder && statusOf(holder) === 'working',
+  });
 }
 
 // The items waiting behind `item` to land: on a board's land step (one agent lands at a time on a

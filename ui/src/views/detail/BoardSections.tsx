@@ -35,7 +35,9 @@ import {
 } from './board-item.ts';
 import { type DiffFilesOff, type DiffOffTip, diffFilesText, diffOffTipText } from './diff-tip.ts';
 import { type Drift, driftText } from './drift.ts';
+import { type MergeOnly, mergeOnlyText } from './merge-only.ts';
 import type { MergedOutside } from './merged-outside.ts';
+import { type Overlap, overlapTexts } from './overlaps.ts';
 import { type RoundSame, roundSameText } from './round-same.ts';
 
 // The item page of a Studio board (the mock's itemHtml, 75-cover.js): what its step waits for in
@@ -344,6 +346,10 @@ export function BranchLine({
   off = null,
   files = null,
   same = null,
+  item = '',
+  overlaps = [],
+  merge = null,
+  waits,
 }: {
   strip: BranchStrip | null;
   drift?: Drift | null;
@@ -351,6 +357,11 @@ export function BranchLine({
   off?: DiffOffTip | null;
   files?: DiffFilesOff | null;
   same?: RoundSame | null;
+  item?: string;
+  overlaps?: readonly Overlap[];
+  merge?: MergeOnly | null;
+  // Why it waits to land after another item (src/app/land-order.ts), as the PC words it.
+  waits?: string | undefined;
 }) {
   if (!strip) return null;
   const said = branchSaid(strip, outside);
@@ -363,7 +374,7 @@ export function BranchLine({
       <span className="bsaid">{said}</span>
     </div>
   );
-  if (!drift && !off && !files && !same) return line;
+  if (!drift && !off && !files && !same && !merge && !waits && overlaps.length === 0) return line;
   return (
     <>
       {line}
@@ -391,6 +402,30 @@ export function BranchLine({
           <span>{roundSameText(same)}</span>
         </div>
       ) : null}
+      {waits ? (
+        <div className="bstrip drift" data-c role="status">
+          <Icon name="warn" />
+          <span>{waits}</span>
+        </div>
+      ) : null}
+      {merge ? (
+        <div className="bstrip drift merge" data-c role="status">
+          <Icon name="branch" />
+          <span>{mergeOnlyText(merge)}</span>
+          {merge.diff === '' ? null : (
+            <details>
+              <summary>{t('bi.branch.mergeOnlyDiff')}</summary>
+              <pre className="mono">{merge.diff}</pre>
+            </details>
+          )}
+        </div>
+      ) : null}
+      {overlapTexts(item, overlaps).map((text) => (
+        <div key={text} className="bstrip drift" data-c role="status">
+          <Icon name="warn" />
+          <span>{text}</span>
+        </div>
+      ))}
     </>
   );
 }

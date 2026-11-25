@@ -16,26 +16,80 @@ describe('noticeText', () => {
     expect(noticeText(review, 'en').title).toBe('Your turn');
   });
 
-  it('lists the options of a question when they all fit, and leaves them out when they do not', () => {
-    const ask: Notice = { ...review, kind: 'ask', by: 'claude', options: ['Liso', 'Con musgo'] };
-    expect(noticeText(ask, 'es').body).toBe('TASKS-7 · Ship the login\n1) Liso  2) Con musgo');
-    const long = { ...ask, options: ['x'.repeat(60), 'y'.repeat(60)] } as Notice;
-    expect(noticeText(long, 'en').body).toBe('TASKS-7 · Ship the login');
-    // Only a question has options to say.
-    expect(noticeText({ ...ask, kind: 'turn' } as Notice, 'en').body).toBe(
-      'TASKS-7 · Ship the login',
-    );
+  describe('the options of a question', () => {
+    const ask = {
+      ...review,
+      kind: 'ask',
+      by: 'claude',
+      text: '¿Caparazón liso o con musgo?',
+      options: ['Liso', 'Con musgo'],
+    } as Notice;
+
+    it('follow the question when they all fit in the body', () => {
+      expect(noticeText(ask, 'es').body).toBe(
+        '¿Caparazón liso o con musgo?\n1) Liso  2) Con musgo',
+      );
+    });
+
+    it('are left out when they would not fit, so the body keeps its budget', () => {
+      const long = { ...ask, options: ['x'.repeat(60), 'y'.repeat(60)] } as Notice;
+      expect(noticeText(long, 'en').body).toBe('¿Caparazón liso o con musgo?');
+      const wordy = { ...ask, text: 'q '.repeat(60) } as Notice;
+      for (const notice of [ask, long, wordy]) {
+        expect(noticeText(notice, 'en').body.length).toBeLessThanOrEqual(140);
+      }
+    });
+
+    it('lose their control characters and line breaks', () => {
+      const messy = { ...ask, options: ['Li\u0007so\n\rx', 'Con‮ musgo'] } as Notice;
+      expect(noticeText(messy, 'en').body).toBe(
+        '¿Caparazón liso o con musgo?\n1) Li so x  2) Con musgo',
+      );
+    });
+
+    it('are not said without the question: the person hid its words', () => {
+      const { text: _hidden, ...hidden } = ask as Notice & { text: string };
+      expect(noticeText(hidden, 'es').body).toBe('TASKS-7 · Ship the login');
+    });
+
+    it('belong to a question alone', () => {
+      expect(noticeText({ ...ask, kind: 'turn' } as Notice, 'en').body).toBe(
+        'TASKS-7 · Ship the login',
+      );
+    });
   });
 
   it.each([
     [{ kind: 'ask', by: 'claude' }, 'claude te pregunta', 'claude asks you'],
     [{ kind: 'aside', by: 'kiln' }, 'kiln lo dejó para después', 'kiln set it aside for later'],
+    [{ kind: 'unheard' }, 'Nadie escucha', 'Nobody is listening'],
     [{ kind: 'replied', by: 'claude' }, 'claude contestó tu nota', 'claude answered your note'],
     [{ kind: 'stuck', by: 'codex' }, 'Se atascó · codex no responde', 'Stuck · codex went quiet'],
   ] as const)('says %j in Spanish and English', (what, es, en) => {
     const notice = { ...review, ...what } as Notice;
     expect(noticeText(notice, 'es').title).toBe(es);
     expect(noticeText(notice, 'en').title).toBe(en);
+  });
+
+  it('puts the question itself in a single ask, trimmed, and keeps the item id in the title', () => {
+    const ask = {
+      ...review,
+      kind: 'ask',
+      by: 'kiln',
+      text: '¿El descuento se acumula con el cupón?',
+    } as Notice;
+    expect(noticeText(ask, 'es')).toMatchObject({
+      title: 'kiln te pregunta · TASKS-7',
+      body: '¿El descuento se acumula con el cupón?',
+    });
+    expect(noticeText(ask, 'en').title).toBe('kiln asks you · TASKS-7');
+    const messy = { ...ask, text: 'Drop\u0007 it\u001b[31m?‮ ​now\r\n\tplease' } as Notice;
+    expect(noticeText(messy, 'en').body).toBe('Drop it [31m? now please');
+    const long = { ...ask, text: `line one\n${'word '.repeat(60)}` } as Notice;
+    const body = noticeText(long, 'en').body;
+    expect(body.length).toBeLessThanOrEqual(140);
+    expect(body.startsWith('line one word')).toBe(true);
+    expect(body.endsWith('…')).toBe(true);
   });
 
   it('counts a burst and opens Te toca', () => {
@@ -61,6 +115,9 @@ describe('noticeText', () => {
     expect(noticeText({ ...group, of: 'replied' }, 'en').title).toBe('3 notes answered');
     expect(noticeText({ ...group, of: 'ask' }, 'es').title).toBe('3 preguntas te esperan');
     expect(noticeText({ ...group, of: 'aside' }, 'en').title).toBe('3 things set aside');
+    expect(noticeText({ ...group, of: 'unheard' }, 'en').title).toBe(
+      '3 things wait for an agent, and nobody is listening',
+    );
   });
 
   it('names the project a burst comes from, and keeps one burst per project on screen', () => {

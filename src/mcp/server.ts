@@ -19,13 +19,7 @@ import {
 import { inputSchema, optionValues, unknownParameters } from './schema.ts';
 import { mcpWords } from './words.ts';
 
-export {
-  AGENT_COMMANDS,
-  CLI_ONLY_COMMANDS,
-  OMITTED_OPTIONS,
-  parameterName,
-  toolName,
-} from './commands.ts';
+export { AGENT_COMMANDS, CLI_ONLY_COMMANDS, OMITTED_OPTIONS, toolName } from './commands.ts';
 
 // Clients time out long tool calls, so a wait gives up after this unless told otherwise, and never
 // waits longer than the cap.

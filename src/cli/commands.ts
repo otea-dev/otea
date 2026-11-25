@@ -11,7 +11,7 @@ import {
   type Submitted,
   submitAgentDraft,
 } from '../app/agent-draft.ts';
-import { promptFacts, promptKindOf } from '../app/agent-prompts.ts';
+import { promptFacts, promptKindOf, roleBoard } from '../app/agent-prompts.ts';
 import {
   type AgentsMdAction,
   assertPinned,
@@ -56,6 +56,7 @@ import {
   listItems,
   moveItem,
   oldestWaiting,
+  requireItem,
   showItem,
   systemClock,
   updateItem,
@@ -66,6 +67,7 @@ import { type Launcher, oteaLauncher, runningRoot, withHome } from '../app/launc
 import type { BaseTips } from '../app/lease-take.ts';
 import { claimItem, heartbeatItem, releaseItem } from '../app/leases.ts';
 import { openMachine, rememberLocalProject, withMachine } from '../app/machine.ts';
+import { mergeOnlyOf, mergeOnlyText, mergeRoundOf } from '../app/merge-only.ts';
 import { markMerged, reopenItem } from '../app/merged.ts';
 import { type MigrationReport, migrateToCommon } from '../app/migrate.ts';
 import {
@@ -88,6 +90,7 @@ import {
   wokeLines,
 } from '../app/next.ts';
 import { agentNotes, noteWaiting, replyNote, roundNotesOf } from '../app/notes.ts';
+import { overlapsOf, overlapsRecord, overlapText } from '../app/overlap.ts';
 import { performanceOf } from '../app/performance.ts';
 import { lanOpen, type Probe, type TransportKind } from '../app/phone.ts';
 import {
@@ -177,7 +180,17 @@ import { topicsEverywhere, topicsEverywhereText } from '../app/topics-everywhere
 import { validateProject } from '../app/validate.ts';
 import { watch } from '../app/watch.ts';
 import { agentGuideFor, TOPICS_REMINDER, TOPICS_RULE } from '../core/agent-guide.ts';
-import { agentPrompt, isPromptKind, PROMPT_KINDS, type PromptKind } from '../core/agent-prompts.ts';
+import {
+  agentPrompt,
+  isPromptKind,
+  isRole,
+  PROMPT_KINDS,
+  type PromptKind,
+  ROLES,
+  type Role,
+  type RoleFacts,
+  rolePrompt,
+} from '../core/agent-prompts.ts';
 import { isClosed, isLandStep, positionOf, waysOf } from '../core/board/engine.ts';
 import {
   type BoardDefinition,
@@ -1142,6 +1155,7 @@ const create: Command = {
         ...(parent === undefined ? {} : { parent }),
         actor,
         channel,
+        ...(input.unnamedTerminal ? { via: 'terminal' as const } : {}),
       });
       if (topic) linkTopic(project, { id: topic.id, item: item.id, via: 'from' });
       // On a board: where it starts, and why when its first step was skipped or lacks something.
@@ -1291,9 +1305,16 @@ const show: Command = {
       const notes = roundNotesOf(project, item.id);
       const data = itemData(project, item);
       const stray = baseStray(project, input.cwd, shown);
-      const heads = [mergedOutsideLine(project, input.cwd, shown), stray?.text].filter(
-        (line): line is string => line !== undefined,
-      );
+      // Other open items that change the files this one does (src/app/overlap.ts).
+      const sharing = overlapsOf(project, requireItem(project.db, shown.id));
+      // A round that only merges main into the approved work (src/app/merge-only.ts).
+      const mergeOnly = mergeOnlyOf(project, shown.id);
+      const heads = [
+        mergedOutsideLine(project, input.cwd, shown),
+        stray?.text,
+        ...(mergeOnly ? [mergeOnlyText(shown.id, mergeOnly)] : []),
+        ...sharing.map((overlap) => overlapText(shown.id, overlap)),
+      ].filter((line): line is string => line !== undefined);
       const said =
         heads.length === 0
           ? text
@@ -1305,6 +1326,8 @@ ${text}`;
           ...data,
           ...(notes.length === 0 ? {} : { notes }),
           ...(stray ? { baseStray: stray } : {}),
+          ...(sharing.length === 0 ? {} : { overlaps: sharing }),
+          ...(mergeOnly ? { mergeOnly } : {}),
         },
         text: said,
       };
@@ -1586,12 +1609,42 @@ function projectPrompt(cwd: string, kind: PromptKind | undefined, asked: Lang | 
   }
 }
 
+// The language a role's text is written in: the one asked, else the project's, else the one the
+// person uses where there is no project yet.
+// A worker's board must exist in the project (and is named as the project names it).
+function projectRolePrompt(
+  cwd: string,
+  role: Role,
+  asked: Lang | undefined,
+  facts: RoleFacts,
+): string {
+  let project: Project;
+  try {
+    project = openProject(cwd);
+  } catch (error) {
+    // No project: a coordinator's text needs none, a worker's board cannot exist.
+    if (error instanceof OteaError && error.code === 'not_found' && role === 'coordinator')
+      return rolePrompt(role, asked ?? defaultLang(), facts);
+    throw error;
+  }
+  try {
+    const board = facts.board === undefined ? {} : { board: roleBoard(project, facts.board) };
+    return rolePrompt(role, asked ?? projectLanguage(project), { ...facts, ...board });
+  } finally {
+    project.db.close();
+  }
+}
+
 const promptCommand: Command = {
   name: 'prompt',
   summary:
-    "Print what to paste into an agent's chat: start (a new project: set up, connect, read the project, interview you one question at a time and draft its boards), join (one more agent working the boards there are, named from the project now) or design (one more board); without one, start until the project has boards of its own, then join. --lang en|es (default: the project's language, set when it was made; with no project yet, the one you use: the desk's, else this computer's, else English)",
+    "Print what to paste into an agent's chat: start (a new project: set up, connect, read the project, interview you to understand what you need, one question at a time, tell you plainly whether a template fits, fits with changes, needs a board of its own or Otea is not a good fit, and draft its boards), join (one more agent working the boards there are, named from the project now) or design (one more board); without one, start until the project has boards of its own, then join. Or --role coordinator (the chat you talk to: it puts your requests on boards and launches workers, never doing an item itself) or --role worker --board <name> [--as <name>] (what the coordinator gives each worker, or you paste into a new chat; without --as it tells the worker to pick a name with otea whoami). --lang en|es (default: the project's language, set when it was made; with no project yet, the one you use: the desk's, else this computer's, else English)",
   args: ['moment?'],
-  options: { lang: { placeholder: 'en|es' } },
+  options: {
+    lang: { placeholder: 'en|es' },
+    role: { placeholder: ROLES.join('|') },
+    board: { placeholder: 'name' },
+  },
   execute: (input) => {
     const [moment] = input.args;
     if (moment !== undefined && !isPromptKind(moment))
@@ -1599,7 +1652,30 @@ const promptCommand: Command = {
     const lang = input.option('lang');
     if (lang !== undefined && lang !== 'en' && lang !== 'es')
       throw new UsageError('--lang is en or es');
-    const text = projectPrompt(input.cwd, moment as PromptKind | undefined, lang);
+    const role = input.option('role');
+    const board = input.option('board');
+    const name = input.option('as');
+    if (role === undefined) {
+      if (board !== undefined || name !== undefined)
+        throw new UsageError(`--board and --as go with --role ${ROLES.join('|')}`);
+      const text = projectPrompt(input.cwd, moment as PromptKind | undefined, lang);
+      return { data: { prompt: text }, text };
+    }
+    if (!isRole(role)) throw new UsageError(`--role is one of ${ROLES.join(', ')}`);
+    if (moment !== undefined) throw new UsageError('Give a moment or a --role, not both');
+    if (role === 'worker' && board === undefined)
+      throw new UsageError('--role worker needs --board <name>: the board it works');
+    if (role === 'coordinator' && board !== undefined)
+      throw new UsageError(
+        '--role coordinator takes no --board: each worker it launches gets its own',
+      );
+    // Only a name given with --as fills the text: the session's own (OTEA_AGENT) is the printer's,
+    // never the worker's.
+    if (name !== undefined) assertAgentName(name);
+    const text = projectRolePrompt(input.cwd, role, lang, {
+      ...(board === undefined ? {} : { board }),
+      ...(name === undefined ? {} : { name }),
+    });
     return { data: { prompt: text }, text };
   },
 };
@@ -1881,7 +1957,12 @@ function handedBranch(
   project: Project,
   cwd: string,
   move: BoardMoveInput,
-): { tip?: NonNullable<BoardMoveInput['tip']>; warning?: string; said?: string } {
+): {
+  tip?: NonNullable<BoardMoveInput['tip']>;
+  warning?: string;
+  said?: string;
+  overlaps?: NonNullable<BoardMoveInput['overlaps']>;
+} {
   const item = getItem(project, move.id);
   const board = liveBoardOf(project, item.collection);
   const position = positionOf(item.state);
@@ -1973,7 +2054,16 @@ function handedBranch(
     tip && hands && forward && step?.reviewer !== 'none' && !unchanged
       ? repeatsLastRound(project, item.id, item.state, tip)
       : undefined;
+  // The files this branch shares with other open items' pushed branches: whichever lands second
+  // merges main with the other's change in it, and a conflict there is another review round, so the
+  // agent hears it now and the person in the review (src/app/overlap.ts).
+  const recorded =
+    tip && hands && forward && step?.reviewer !== 'none' && !unchanged && !unpushed
+      ? overlapsRecord(project, requireItem(project.db, item.id))
+      : undefined;
+  const sharing = recorded?.list ?? [];
   const notes = [
+    ...sharing.map((overlap) => `Note: ${overlapText(item.id, overlap)}`),
     ...(unpushed
       ? [
           `Note: ${branch} was never pushed to ${state.push}. If the person reviews it on the forge (a pull request), they cannot see it there: ${frozen}.`,
@@ -1994,6 +2084,7 @@ function handedBranch(
     ...(kept ? { tip: unchanged ? { ...kept, unchanged: true as const } : kept } : {}),
     ...(warning ? { warning } : {}),
     ...(said ? { said } : {}),
+    ...(recorded ? { overlaps: recorded } : {}),
   };
 }
 
@@ -2072,7 +2163,19 @@ const handoffCommand: Command = {
       refuseUnlandedCommit(project, input.cwd, move);
       warning = handed.warning;
       said = handed.said;
-      return handoffItem(project, { ...move, ...(handed.tip ? { tip: handed.tip } : {}) });
+      // A round that only merges main into the approved work: asked of the remote once, here.
+      const merge = handed.tip ? mergeRoundOf(project, move.id, handed.tip) : undefined;
+      const done = handoffItem(project, {
+        ...move,
+        ...(handed.tip ? { tip: handed.tip } : {}),
+        ...(merge ? { merge } : {}),
+        ...(handed.overlaps ? { overlaps: handed.overlaps } : {}),
+      });
+      // A round that only merges main into the approved work is reviewed as that merge alone.
+      const only = mergeOnlyOf(project, move.id);
+      if (only)
+        warning = [warning, `Note: ${mergeOnlyText(move.id, only)}`].filter(Boolean).join('\n');
+      return done;
     });
     // An agent goes on to the next item, and waits when there is none: the reply ends with the
     // exact commands, so it neither stops after one nor says it waits with no wait running

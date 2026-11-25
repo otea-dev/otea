@@ -1,3 +1,5 @@
+import type { MergeOnly } from '../../src/app/merge-only.ts';
+import type { Overlap } from '../../src/app/overlap.ts';
 import type { MergedOutside } from '../../src/cli/merged-outside.ts';
 import { withoutUndone } from '../../src/core/board/history.ts';
 import type { PerformanceView } from '../../src/core/board/performance.ts';
@@ -342,20 +344,35 @@ export async function fetchRoundSame(id: string, signal: AbortSignal): Promise<R
   return body.same;
 }
 
+// The other open items whose pushed branches change the files this one does
+// (src/app/overlap.ts): none when no branch is shared.
+export async function fetchOverlaps(id: string, signal: AbortSignal): Promise<Overlap[]> {
+  const url = `/api/items/${encodeURIComponent(id)}/overlaps`;
+  const body = (await (await get(url, signal)).json()) as { overlaps: Overlap[] };
+  return body.overlaps;
+}
+
+// The round that only merges main into the work the person approved, with what the merge changed
+// by hand (src/app/merge-only.ts): null for any other round.
+export async function fetchMergeOnly(id: string, signal: AbortSignal): Promise<MergeOnly | null> {
+  const url = `/api/items/${encodeURIComponent(id)}/merge-only`;
+  const body = (await (await get(url, signal)).json()) as { merge: MergeOnly | null };
+  return body.merge;
+}
+
 export async function postOpened(id: string, evidence: number): Promise<void> {
   await post(`/api/items/${encodeURIComponent(id)}/opened`, { evidence });
 }
 
 // What you answer an agent's question with: your words, one of its options (by number, from 1), or
-// the decision left to the agent.
-export type AnswerGiven = string | { option: number } | { delegate: true };
+// the decision left to the agent, and the number of the question you were shown: an answer to one
+// that has since changed is refused.
+export type AnswerWords = { text: string } | { option: number } | { delegate: true };
+export type AnswerGiven = { question: number } & AnswerWords;
 
 // Your answer to an agent's question (otea ask): the turn goes back to the agent, in the same round.
 export async function postAnswer(id: string, given: AnswerGiven): Promise<void> {
-  await post(
-    `/api/items/${encodeURIComponent(id)}/answer`,
-    typeof given === 'string' ? { text: given } : given,
-  );
+  await post(`/api/items/${encodeURIComponent(id)}/answer`, given);
 }
 
 // You let the item go on without a file its step asks for: its handoff stops asking for it.
@@ -557,7 +574,7 @@ export async function fetchProjects(signal: AbortSignal): Promise<ProjectOvervie
 // moment (the first contact while it has no board of its own, then one more agent joining).
 // `first`: a join prompt for a project's first agent, which connects since nobody else works there.
 export type AgentPromptView = {
-  kind: 'start' | 'join' | 'design';
+  kind: 'start' | 'join' | 'design' | 'coordinator' | 'worker';
   prompt: string;
   first?: boolean;
   // For the plain words beside the prompt (core/agent-prompts.ts connectFacts): whether the work is
@@ -571,6 +588,19 @@ export async function fetchAgentPrompt(
   signal: AbortSignal,
 ): Promise<AgentPromptView> {
   const query = new URLSearchParams(kind ? { kind } : {});
+  return (await get(`/api/agent-prompt?${query}`, signal)).json();
+}
+
+// The canonical text of a role (a coordinator, or a worker of one board, under a name when it has
+// one): what a desk button copies, the same text `otea prompt --role` prints.
+export async function fetchRolePrompt(
+  role: 'coordinator' | 'worker',
+  options: { board?: string; name?: string },
+  signal: AbortSignal,
+): Promise<AgentPromptView> {
+  const query = new URLSearchParams({ role });
+  if (options.board) query.set('board', options.board);
+  if (options.name) query.set('as', options.name);
   return (await get(`/api/agent-prompt?${query}`, signal)).json();
 }
 

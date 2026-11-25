@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { AnswerGiven } from '../../api.ts';
+import type { AnswerWords } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { Unheard } from '../../components/Unheard.tsx';
 import { mainPath } from '../../derive/path.ts';
@@ -408,11 +408,20 @@ export function Acts({
     // What an agent's question (otea ask) offers: one tap on an option, or on «Decide tú», answers.
     const offered = item.asks?.options ?? [];
     const recommended = item.asks?.recommended;
-    const answerWith = (given: AnswerGiven) => {
-      const refused = () => setRefused({ k: refusalKey, text: t('sheet.refused') });
+    // The answer says which question it is to: one that changed while the page was open is refused,
+    // and the page says so (the item itself comes back fresh with the live feed).
+    const refusedBy = (error: unknown) => {
+      const changed = t('refusal.questionChanged');
+      const said =
+        error instanceof Error && error.message === changed ? changed : t('sheet.refused');
+      setRefused({ k: refusalKey, text: said });
+    };
+    const answerWith = (given: AnswerWords) => {
+      if (!item.asks) return;
+      const message = toastOf('answer', item.title, '');
       app
-        .answer(item.id, given, toastOf('answer', item.title, ''))
-        .then(() => dropDraft(draftStore(), answerKey), refused);
+        .answer(item.id, { ...given, question: item.asks.question }, message)
+        .then(() => dropDraft(draftStore(), answerKey), refusedBy);
     };
     body = (
       <section className="qa" data-key="qa">
@@ -480,15 +489,13 @@ export function Acts({
               variant="primary"
               disabled={!answer || offline}
               onClick={() => {
-                const refused = () => setRefused({ k: refusalKey, text: t('sheet.refused') });
                 // An agent's question (otea ask) takes the answer with no move; an old handoff
                 // that asked is answered by sending it back with it.
-                const sent = item.asks
-                  ? app.answer(item.id, answer, toastOf('answer', item.title, ''))
-                  : back
-                    ? app.move(item.id, back.move.to, answer, toastOf('answer', item.title, ''))
-                    : Promise.reject(new Error('no way to answer'));
-                sent.then(() => dropDraft(draftStore(), answerKey), refused);
+                if (item.asks) return answerWith({ text: answer });
+                const sent = back
+                  ? app.move(item.id, back.move.to, answer, toastOf('answer', item.title, ''))
+                  : Promise.reject(new Error('no way to answer'));
+                sent.then(() => dropDraft(draftStore(), answerKey), refusedBy);
               }}
             >
               {t('sheet.qa.send')}
@@ -502,6 +509,11 @@ export function Acts({
               <span className="closeas">{t('sheet.qa.goesOn', { agent: agent ?? '—' })}</span>
             )}
           </div>
+          {refusedNow ? (
+            <p className="said warn" role="alert">
+              {refusedNow}
+            </p>
+          ) : null}
           {/* Its own line: a narrow sheet hides the close-as hint beside the button. */}
           {offline ? (
             <p className="said offline" role="status">

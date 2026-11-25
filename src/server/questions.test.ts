@@ -88,7 +88,7 @@ describe('an agent’s question over the API', () => {
   it('answers as the person, from the phone too, and the turn goes back to the agent', async () => {
     const response = await call(
       '/items/CRI-1/answer',
-      { method: 'POST', body: { text: 'Sí, mucho' } },
+      { method: 'POST', body: { question: 1, text: 'Sí, mucho' } },
       'phone',
     );
     expect(response.status).toBe(200);
@@ -105,7 +105,7 @@ describe('an agent’s question over the API', () => {
   it('gives the options on the list and the item, and takes the pick, the words or the delegation', async () => {
     const answer = (body: unknown) =>
       call('/items/CRI-1/answer', { method: 'POST', body }, 'phone').then((r) => r.json());
-    await answer({ text: 'Sí' });
+    await answer({ question: 1, text: 'Sí' });
     askQuestion(project, {
       id: 'CRI-1',
       text: '¿Qué caparazón?',
@@ -121,7 +121,7 @@ describe('an agent’s question over the API', () => {
     };
     expect(shown.board.asking).toMatchObject({ options: ['Liso', 'Con musgo'], recommended: 2 });
 
-    const picked = (await answer({ option: 1 })) as {
+    const picked = (await answer({ question: 2, option: 1 })) as {
       turn: string;
       board: { questions: { answer?: unknown }[] };
     };
@@ -139,34 +139,74 @@ describe('an agent’s question over the API', () => {
       actor: kiln,
       channel: 'cli',
     });
-    const left = (await answer({ delegate: true })) as {
+    const left = (await answer({ question: 3, delegate: true })) as {
       board: { questions: { answer?: unknown }[] };
     };
     expect(left.board.questions[2]?.answer).toMatchObject({ mode: 'delegated' });
   });
 
+  it('refuses an answer that does not say which question it is to', async () => {
+    const bare = await call('/items/CRI-1/answer', { method: 'POST', body: { text: 'Sí' } });
+    expect(bare.status).toBe(400);
+    expect(askingItem(project.db, 'CRI-1')).toBeDefined();
+  });
+
+  it('refuses a tap on the first question’s option once a second question was asked', async () => {
+    await call('/items/CRI-1/answer', { method: 'POST', body: { question: 1, text: 'Sí' } });
+    askQuestion(project, {
+      id: 'CRI-1',
+      text: '¿Y el color?',
+      options: ['Verde', 'Gris'],
+      actor: kiln,
+      channel: 'cli',
+    });
+
+    const stale = await call('/items/CRI-1/answer', {
+      method: 'POST',
+      body: { question: 1, option: 2 },
+    });
+
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({
+      error: { details: { kind: 'question', item: 'CRI-1', why: 'stale' } },
+    });
+    expect(askingItem(project.db, 'CRI-1')?.question).toBe(2);
+  });
+
   it('refuses an option the question lacks and a body that says two things', async () => {
-    const lacks = await call('/items/CRI-1/answer', { method: 'POST', body: { option: 1 } });
+    const lacks = await call('/items/CRI-1/answer', {
+      method: 'POST',
+      body: { question: 1, option: 1 },
+    });
     expect(await lacks.json()).toMatchObject({
       error: { details: { kind: 'question', why: 'no_option' } },
     });
     const both = await call('/items/CRI-1/answer', {
       method: 'POST',
-      body: { text: 'x', delegate: true },
+      body: { question: 1, text: 'x', delegate: true },
     });
     expect(both.status).toBe(400);
     expect(askingItem(project.db, 'CRI-1')).toBeDefined();
   });
 
   it('refuses a malformed answer, an empty one, and one with no question waiting', async () => {
-    const malformed = await call('/items/CRI-1/answer', { method: 'POST', body: { text: 3 } });
+    const malformed = await call('/items/CRI-1/answer', {
+      method: 'POST',
+      body: { question: 1, text: 3 },
+    });
     expect(malformed.status).toBe(400);
-    const empty = await call('/items/CRI-1/answer', { method: 'POST', body: { text: ' ' } });
+    const empty = await call('/items/CRI-1/answer', {
+      method: 'POST',
+      body: { question: 1, text: ' ' },
+    });
     expect(await empty.json()).toMatchObject({
       error: { details: { kind: 'question', item: 'CRI-1', why: 'empty' } },
     });
-    await call('/items/CRI-1/answer', { method: 'POST', body: { text: 'Sí' } });
-    const again = await call('/items/CRI-1/answer', { method: 'POST', body: { text: 'Sí' } });
+    await call('/items/CRI-1/answer', { method: 'POST', body: { question: 1, text: 'Sí' } });
+    const again = await call('/items/CRI-1/answer', {
+      method: 'POST',
+      body: { question: 1, text: 'Sí' },
+    });
     expect(await again.json()).toMatchObject({
       error: { details: { kind: 'question', why: 'none_open' } },
     });

@@ -67,7 +67,7 @@ export type Phrase =
       state: string;
       name?: string;
     }
-  | { key: 'activity.created'; state: string; name?: string }
+  | { key: 'activity.created' | 'activity.createdTerminal'; state: string; name?: string }
   | { key: 'activity.attached'; file: string }
   | { key: 'activity.edited' }
   | { key: 'activity.linked' | 'activity.unlinked'; kind: string; from: string; to: string }
@@ -171,7 +171,11 @@ function phraseOf(
   if (type === 'created')
     return {
       kind: 'other',
-      phrase: { key: 'activity.created', state: text(data.state), ...named(data.stateName) },
+      phrase: {
+        key: data.via === 'terminal' ? 'activity.createdTerminal' : 'activity.created',
+        state: text(data.state),
+        ...named(data.stateName),
+      },
     };
   if (type === 'updated') return { kind: 'other', phrase: { key: 'activity.edited' } };
   if (type === 'relation_added' || type === 'relation_removed') {

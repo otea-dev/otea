@@ -48,13 +48,15 @@ describe('Preferencias › Avisos', () => {
   it('shows what is told, all on by default, and how to turn them off', () => {
     setLanguage('es');
     const html = render({ view: { ...view, subscribed: true } });
-    expect(html.match(/role="switch" aria-checked="true"/g)).toHaveLength(4);
+    expect(html.match(/role="switch" aria-checked="true"/g)).toHaveLength(6);
+    expect(html).toContain('Mostrar el texto de la pregunta');
     expect(html.match(/role="switch" aria-checked="false"/g)).toHaveLength(2);
     expect(html).toContain('Te toca');
     expect(html).toContain('una revisión o una aprobación');
     expect(html).toContain('Un agente te pregunta');
     expect(html).toContain('Un agente contestó tu nota');
     expect(html).toContain('Algo se atascó');
+    expect(html).toContain('Hay trabajo para un agente y nadie escucha');
     expect(html).toContain('Un agente dejó algo para después');
     expect(html).toContain('Horas de silencio');
     expect(html).toContain('Desactivar en este teléfono');

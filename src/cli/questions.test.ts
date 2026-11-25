@@ -6,7 +6,7 @@ import { answerQuestion } from '../app/questions.ts';
 import { creatures } from '../core/board/testing.ts';
 import { createMcpServer } from '../mcp/server.ts';
 import { COMMANDS } from './commands.ts';
-import { type Cli, declareProfiles, seedOnce, type TempRepo } from './testing.ts';
+import { type Cli, cliAt, declareProfiles, seedOnce, type TempRepo } from './testing.ts';
 
 // What wait ends with for claude once it woke.
 const AGAIN =
@@ -103,6 +103,27 @@ describe('an agent asks the person, on the CLI and over MCP', () => {
     expect(woken.out).toBe(
       `CRI-1: the person answered your question. Read it: otea show CRI-1\n${AGAIN}`,
     );
+  });
+
+  // A pty is no proof a person types: an agent in one must not answer its own question as them.
+  it('refuses otea answer without a name at a terminal, leaving the question open', async () => {
+    await otea('ask', 'CRI-1', '¿Caparazón liso o con musgo?');
+    const terminal = cliAt(
+      repo.dir,
+      {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      true,
+      {},
+      true,
+    );
+
+    const refused = await terminal('answer', 'CRI-1', 'Con musgo', '--json');
+
+    expect(JSON.parse(refused.err).error.code).toBe('unnamed_agent');
+    expect((await otea('show', 'CRI-1')).out).toContain('Waiting for the person to answer');
   });
 
   // P4-R2-2: the person answered in the chat, and otea reply could not put it on the question.

@@ -536,6 +536,48 @@ describe('a question with options', () => {
     );
   });
 
+  it('keeps an option to one line: control characters and line breaks become a space', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+
+    const asked = askWith(ctx, item.id, ['Liso\n  - Con musgo', 'Con\u0007 hongos‮'], 1);
+
+    expect(asked.question.options).toEqual(['Liso - Con musgo', 'Con hongos']);
+    const text = itemNextText(ctx, getItem(ctx, item.id, now), 'kiln', now) ?? '';
+    expect(text).toContain('Options: 1. Liso - Con musgo (recommended) · 2. Con hongos');
+    expect(text).not.toContain('\u0007');
+    expect(text).not.toContain('‮');
+  });
+
+  it('refuses an option that is only control characters', () => {
+    expect(refusedWith(['a', '\u0007\n\t']).message).toContain('empty');
+    expect(refusedWith(['Liso', 'Liso\n']).message).toContain('same');
+  });
+
+  it('records a chat answer that says an option, by its words or its number, as that option', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+    const note = (text: string) =>
+      noteChatAnswer(ctx, { id: item.id, text, actor: kiln, channel: 'cli' }, now).question.answer;
+
+    askWith(ctx, item.id, OPTIONS);
+    expect(note('Con musgo')).toMatchObject({
+      mode: 'option',
+      option: 2,
+      text: 'Con musgo',
+      via: 'kiln',
+    });
+
+    askWith(ctx, item.id, OPTIONS);
+    expect(note('3')).toMatchObject({ mode: 'option', option: 3, text: 'Con hongos' });
+
+    askWith(ctx, item.id, OPTIONS);
+    expect(note('con musgo, pero más claro')).toMatchObject({ mode: 'text' });
+
+    askWith(ctx, item.id, OPTIONS);
+    expect(note('4')).toMatchObject({ mode: 'text', text: '4' });
+  });
+
   it('refuses an option the question does not have, and keeps the question open', () => {
     const ctx = memoryContext();
     const item = working(ctx);

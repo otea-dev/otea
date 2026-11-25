@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AnswerGiven } from '../../api.ts';
 import { type App, AppTestProvider } from '../../app/context.tsx';
 import { ago, officialType } from '../../derive/fixtures.ts';
-import { setLanguage } from '../../i18n/i18n.ts';
+import { setLanguage, t } from '../../i18n/i18n.ts';
 import { testApp } from '../../shell/test-app.ts';
 import { buttonNamed, type Mounted, mount, press, stubServer, typeInto } from '../../test-dom.tsx';
 import type { CollectionView, ItemView } from '../../types.ts';
@@ -44,8 +44,11 @@ const asking = (asks: Partial<NonNullable<ItemView['asks']>> = {}): ItemView => 
 
 let page: Mounted | undefined;
 let given: AnswerGiven[];
+// What the server refuses the answer with, when a test has it refuse.
+let refusal: Error | undefined;
 
 beforeEach(() => {
+  refusal = undefined;
   setLanguage('es');
   stubServer();
   window.localStorage.clear();
@@ -63,6 +66,7 @@ const app: App = testApp({
   collections: [errores],
   answer: async (_id, answer) => {
     given.push(answer);
+    if (refusal) throw refusal;
   },
 });
 
@@ -107,7 +111,20 @@ describe('a question with options', () => {
 
     await press(rows(root)[2]);
 
-    expect(given).toEqual([{ option: 3 }]);
+    // It says which question the tap is for: the page may be showing one that has since changed.
+    expect(given).toEqual([{ question: 1, option: 3 }]);
+  });
+
+  it('says when the question changed under it, and sends nothing more', async () => {
+    refusal = new Error(t('refusal.questionChanged'));
+    const root = open(asking(offered));
+
+    await press(rows(root)[0]);
+
+    expect(root.querySelector('.said.warn')?.textContent).toBe(
+      'Esta pregunta ya cambió. Mira la nueva y respóndela.',
+    );
+    expect(given).toHaveLength(1);
   });
 
   it('answers with your own words, typed below the options', async () => {
@@ -116,7 +133,7 @@ describe('a question with options', () => {
     await typeInto(root.querySelector('.qa textarea'), 'Solo si es rápido');
     await press(buttonNamed(root, 'Enviar respuesta'));
 
-    expect(given).toEqual(['Solo si es rápido']);
+    expect(given).toEqual([{ question: 1, text: 'Solo si es rápido' }]);
   });
 
   it('leaves the decision to the agent, with or without options', async () => {
@@ -124,10 +141,17 @@ describe('a question with options', () => {
     page?.unmount();
     await press(buttonNamed(open(asking()), 'Decide tú'));
 
-    expect(given).toEqual([{ delegate: true }, { delegate: true }]);
+    expect(given).toEqual([
+      { question: 1, delegate: true },
+      { question: 1, delegate: true },
+    ]);
   });
 
-  it('draws no option buttons for a question with none', () => {
-    expect(rows(open(asking()))).toEqual([]);
+  it('keeps a question with no options to words and the decision left to the agent', () => {
+    const root = open(asking());
+
+    expect(root.querySelector('.qa .opts')).toBeNull();
+    expect(root.querySelector('.qa textarea')).not.toBeNull();
+    expect(buttonNamed(root, 'Decide tú')).toBeDefined();
   });
 });

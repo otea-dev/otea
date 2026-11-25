@@ -780,6 +780,16 @@ export const detail = {
     '{base} cambió después de la entrega: ahora está en {now}. Aprobar aprueba solo lo entregado, {handed}.',
   'bi.branch.roundSame':
     'Esta ronda tiene los mismos archivos que la ronda {round} ({earlier}): no cambió nada en {branch} desde esa ronda. Aprobar aprueba lo que esa ronda ya tenía.',
+  'bi.branch.overlapLanding':
+    '{item} toca los mismos archivos que {other} ({files}), que se integra primero: main tendrá su cambio cuando {item} se integre, así que habrá que fusionar main y quizá resolver un conflicto.',
+  'bi.branch.overlapOpen':
+    '{item} toca los mismos archivos que {other} ({files}), que también está abierto: el que se integre segundo debe fusionar main primero y puede chocar.',
+  'bi.branch.overlapMore': 'y {n} más',
+  'bi.branch.mergeOnly':
+    'Desde el commit que aprobaste ({since}), esta ronda solo fusiona main en {branch}. La fusión misma cambió {files}: todo lo de este diff es nuevo y aún sin revisar, incluso los archivos que no chocaron. Lo demás es lo que aprobaste, y lo que trajo main aterrizó con su propia revisión. Aprobar toma {tip} tal como está.',
+  'bi.branch.mergeOnlyClean':
+    'Desde el commit que aprobaste ({since}), esta ronda solo fusiona main en {branch}, y la fusión misma no agregó nada. Aprobar toma {tip} tal como está.',
+  'bi.branch.mergeOnlyDiff': 'Lo que cambió la fusión',
   'bi.request.board': 'Tablero {name}',
   'bi.request.waiting': 'espera el esbozo',
   'bi.request.arrived': 'el esbozo llegó: revísalo y publícalo',

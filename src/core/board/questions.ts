@@ -54,7 +54,9 @@ export function checkOptions(
   options: readonly string[] | undefined,
   recommended: number | undefined,
 ): { options: string[]; recommended?: number } | { problem: string } {
-  const given = (options ?? []).map((option) => option.trim());
+  // An option is one line: control and format characters and line breaks become one space, so it
+  // cannot break the layout of what next and show print, nor of a notice.
+  const given = (options ?? []).map((option) => option.replace(/[\p{Cc}\p{Cf}\s]+/gu, ' ').trim());
   if (given.length === 0)
     return recommended === undefined
       ? { options: [] }

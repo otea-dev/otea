@@ -4,7 +4,15 @@ import { activeLease } from '../core/lease.ts';
 import { timeText } from '../core/time.ts';
 import { type ItemRecord, selectItems, selectStateEntries } from '../store/queries.ts';
 import type { Context } from './context.ts';
-import { type LiveBoard, leftFor, liveBoardOf, liveBoards } from './next.ts';
+import {
+  itemOnBoard,
+  type LiveBoard,
+  leftFor,
+  liveBoardOf,
+  liveBoards,
+  setAsideBy,
+} from './next.ts';
+import { filesText, scanned, sharedFiles } from './overlap.ts';
 import { sessionEnded, sessionRuns } from './presence.ts';
 import { type Priority, priorityOf } from './priority.ts';
 import { approvedTipOf } from './tips.ts';
@@ -87,11 +95,17 @@ function placeText(priority: Priority | undefined, work: boolean): string {
 // the person's order says why). `work`: the item does its work on the base, not lands in it;
 // `review`: `first` is committed on the base and waits for its review or its push. `until`: when the
 // holder's lease runs out, if it holds one now (its calls extend it).
-export type LandsFirst = { first: string; base: string; work?: true } & (
-  | { holder: string; until?: string }
-  | { place: string }
-  | { review: true }
-);
+// `overlap`: the files `first` and the item both change (app/overlap.ts), the reason to wait for
+// `first` even when nothing else would hold the item back.
+export type LandsFirst = {
+  first: string;
+  base: string;
+  work?: true;
+  overlap?: string[];
+  // Why `first` is waited for though no agent could take it now: it waits for an answer, was left
+  // for another agent, or is held up otherwise. Said with the way out.
+  blocked?: string;
+} & ({ holder: string; until?: string } | { place: string } | { review: true });
 
 // What lands in the item's base before it, for the agent asking; undefined when the item is not on
 // a land step, or its turn to land is now. `takeable` says whether the agent could take another
@@ -132,17 +146,18 @@ export function landsFirst(
         : !lease && other.lease && sessionRuns(ctx.db, other.lease.holder, () => at)
           ? other.lease.holder
           : undefined;
-    return holder === undefined
-      ? []
-      : [
-          {
-            first: other.id,
-            base: own.base,
-            holder,
-            ...(lease ? { until: lease.expiresAt } : {}),
-            ...(own.work ? { work: true as const } : {}),
-          },
-        ];
+    if (holder === undefined) return [];
+    const overlap = sharedFiles(scanned(ctx), item, other);
+    return [
+      {
+        first: other.id,
+        base: own.base,
+        holder,
+        ...(lease ? { until: lease.expiresAt } : {}),
+        ...(own.work ? { work: true as const } : {}),
+        ...(overlap.length > 0 ? { overlap } : {}),
+      },
+    ];
   });
   if (landing[0]) return landing[0];
   // Work on the base waits until what is committed there has landed: an item in review, or
@@ -178,26 +193,64 @@ export function landsFirst(
     return sa !== sb ? sa < sb : a.createdAt < b.createdAt;
   };
   // Among the ones committed there the person's order decides; the ones not yet committed wait.
+  // One that cannot be taken now holds up nothing, unless it is in flight (it waits for an answer,
+  // was left for another agent) and changes files the item changes too: landing past it would put
+  // the item's change on the base first, and when it came back it would conflict, another review
+  // round. One set aside for later is parked, and parked holds nothing up.
+  const scan = scanned(ctx);
   const ahead = waiting
     .filter(
       ({ item: other, board: each }) =>
-        takeable(each, other) &&
         before(other, item) &&
-        (!committed || holdsBase(ctx, each, other)?.key === own.key),
+        (!committed || holdsBase(ctx, each, other)?.key === own.key) &&
+        (takeable(each, other) ||
+          (setAsideBy(ctx, other.id) === undefined && sharedFiles(scan, item, other).length > 0)),
     )
-    .map(({ item: other }) => other);
-  const first = ahead.reduce<ItemRecord | undefined>(
-    (best, other) => (best === undefined || before(other, best) ? other : best),
+    .map(({ item: other, board: each }) => ({ other, each }));
+  const winner = ahead.reduce<(typeof ahead)[number] | undefined>(
+    (best, now) => (best === undefined || before(now.other, best.other) ? now : best),
     undefined,
   );
-  if (!first) return undefined;
+  if (!winner) return undefined;
+  const { other: first, each } = winner;
+  const overlap = sharedFiles(scan, item, first);
+  const blocked = takeable(each, first) ? undefined : heldUpText(ctx, each, first, item.id);
   return {
     first: first.id,
     base: own.base,
     place: placeText(priority.get(first.id), own.work),
     ...(own.work ? { work: true as const } : {}),
+    ...(overlap.length > 0 ? { overlap } : {}),
+    ...(blocked ? { blocked } : {}),
   };
 }
+
+// What keeps an item no agent can take from landing, and the way out for `waiting`, the item
+// behind it. A parked item never gets here (set aside holds nothing up).
+function heldUpText(ctx: Context, board: LiveBoard, item: ItemRecord, waiting: string): string {
+  const matrix = `move ${waiting} above ${item.id} on the Matrix`;
+  if (itemOnBoard(ctx, item, board.def).asking)
+    return `${item.id} waits for your answer to its question: answer it, ${matrix}, or have its agent set it aside`;
+  const left = leftFor(ctx, item.id);
+  if (left !== undefined)
+    return `${item.id} was left for ${left}: ${matrix}, or have ${left} set it aside`;
+  return `${item.id} is held up: ${matrix}, or have its agent set it aside`;
+}
+
+// Why the item waits for that one besides its place: they change the same files, and it may be
+// stuck, with the way out.
+const bothText = (first: LandsFirst) => {
+  if (!first.overlap) return '';
+  const both = `both change ${filesText(first.overlap)}`;
+  return first.blocked ? `${both}; ${first.blocked}` : both;
+};
+
+// The item's place in the person's order, and the files it shares with the one before it.
+const placed = (first: LandsFirst) => {
+  const place = 'place' in first ? first.place : '';
+  const both = bothText(first);
+  return both ? `${place}; ${both}` : place;
+};
 
 // The holder's lease, so the agent knows until when the base is taken at the latest: its calls
 // extend it, and the item moving on frees the base sooner (P1-S4).
@@ -219,10 +272,11 @@ export function landsFirstText(id: string, first: LandsFirst): string {
         : `${first.first} goes first on ${base} (${first.place}), then ${id}`;
     return `${id} not claimed: ${ahead}: this board works straight on ${base}, so one agent at a time, in the person's order, or two would change the same files. ${meanwhile}`;
   }
+  const both = bothText(first);
   const ahead =
     'holder' in first
-      ? `${first.holder} lands ${first.first} in ${base} now${leaseUntil(first)}; ${id} lands after it`
-      : `${first.first} lands in ${base} first (${'place' in first ? first.place : ''}), then ${id}`;
+      ? `${first.holder} lands ${first.first} in ${base} now${leaseUntil(first)}; ${id} lands after it${both ? ` (${both})` : ''}`
+      : `${first.first} lands in ${base} first (${placed(first)}), then ${id}`;
   return `${id} not claimed: ${ahead}: one agent lands at a time on ${base}, in the person's order, so no landing conflicts with another under way. Items that do not land in ${base} can be taken now: otea next.`;
 }
 
@@ -238,9 +292,10 @@ export function landsFirstLine(id: string, first: LandsFirst): string {
           : `${first.first} goes first there (${first.place})`;
     return `${id} waits to work on ${base}: ${waits}; one agent at a time works straight on ${base}, in the person's order.`;
   }
+  const both = bothText(first);
   const ahead =
     'holder' in first
-      ? `${first.holder} lands ${first.first} there now`
-      : `${first.first} lands there first (${'place' in first ? first.place : ''})`;
+      ? `${first.holder} lands ${first.first} there now${both ? ` (${both})` : ''}`
+      : `${first.first} lands there first (${placed(first)})`;
   return `${id} waits to land in ${base}: ${ahead}; one agent lands at a time on ${base}, in the person's order.`;
 }

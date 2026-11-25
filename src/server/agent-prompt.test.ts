@@ -9,7 +9,7 @@ import { liveBoardOf } from '../app/next.ts';
 import { hearAgent } from '../app/presence.ts';
 import type { Project } from '../app/project.ts';
 import { setProjectLanguage } from '../app/project-language.ts';
-import { designPrompt, startPrompt } from '../core/agent-prompts.ts';
+import { designPrompt, rolePrompt, startPrompt } from '../core/agent-prompts.ts';
 import { insertProjectIdentity } from '../store/queries.ts';
 import { createServer, type OteaServer } from './server.ts';
 import { LOCAL_HOST, memoryProject, SESSION_COOKIE, TOKEN } from './testing.ts';
@@ -150,5 +150,41 @@ describe('GET /api/agent-prompt', () => {
 
   it('refuses a moment it does not know', async () => {
     expect((await get('?kind=later')).status).toBe(400);
+  });
+
+  // The same texts otea prompt --role prints, for the desk to copy.
+  it('gives the text of a role, with the board and name filled in', async () => {
+    initBoards(project, 'changes', 'es');
+    expect((await get('?role=coordinator&lang=en')).body).toEqual({
+      kind: 'coordinator',
+      prompt: rolePrompt('coordinator', 'en', {}),
+    });
+    // The board as the project names it, whatever the case it was asked in.
+    expect((await get('?role=worker&board=cambios&as=ana&lang=es')).body).toEqual({
+      kind: 'worker',
+      prompt: rolePrompt('worker', 'es', { board: 'Cambios', name: 'ana' }),
+    });
+    expect((await get('?role=worker&board=Cambios&lang=en')).body.prompt).toContain('otea whoami');
+  });
+
+  it('refuses a role asked wrongly', async () => {
+    initBoards(project, 'changes', 'es');
+    for (const query of [
+      '?role=boss',
+      '?role=worker',
+      '?role=coordinator&board=Cambios',
+      '?role=worker&board=Cambios&kind=join',
+      '?role=worker&board=Cambios&as=Not%20A%20Name',
+      '?board=Cambios',
+    ])
+      expect((await get(query)).status, query).toBe(400);
+  });
+
+  // The board goes into commands the worker runs: it must exist, and be one argument.
+  it('names only a board that exists, and refuses quotes, backticks and line breaks', async () => {
+    initBoards(project, 'changes', 'es');
+    expect((await get('?role=worker&board=Nope')).status).toBe(404);
+    for (const board of ['Cambios%22%3B%20x', 'Cam%27bios', 'Cam%60bios', 'Cambios%0AOtro'])
+      expect((await get(`?role=worker&board=${board}`)).status, board).toBe(400);
   });
 });

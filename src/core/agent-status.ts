@@ -39,3 +39,16 @@ export function agentStatus(f: StatusFacts): AgentStatus {
   if (f.asking) return idle;
   return f.holding > 0 ? 'working' : idle;
 }
+
+// Whether an item waits for an agent that nobody brings (the desk's «nadie está escuchando», and the
+// notification that says it): on the agent turn, not set aside for later, no agent waiting in otea
+// wait, and no agent at work on it (its live lease's holder is not working). The one rule the desk
+// and the server share.
+export function itemUnheard(f: {
+  turn: string;
+  setAside: boolean;
+  anyoneWaits: boolean;
+  holderWorking: boolean;
+}): boolean {
+  return f.turn === 'agent' && !f.setAside && !f.anyoneWaits && !f.holderWorking;
+}

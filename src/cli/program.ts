@@ -31,6 +31,7 @@ process.exitCode = await run(process.argv.slice(2), {
   gh: 'gh',
   forge: ghForge('gh'),
   fetch: globalThis.fetch,
+  stdinIsTTY: process.stdin.isTTY === true,
   // A terminal on stdin is never read as a pipe; it is asked only when the question has one too.
   ...(process.stdin.isTTY ? (canAsk(process.stdin, process.stderr) ? { ask } : {}) : { stdin }),
 });

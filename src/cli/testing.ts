@@ -25,6 +25,8 @@ export function cliAt(
   terminal = false,
   // A fake tailscale CLI and network probe (otea phone), and a fake forge (gh); none by default.
   network: Pick<Io, 'tailscale' | 'probe' | 'forge'> = {},
+  // Whether stdin is a terminal too: with stdout, the person at a keyboard.
+  stdinTerminal = false,
 ): Cli {
   return async (...argv) => {
     let out = '';
@@ -35,6 +37,7 @@ export function cliAt(
       signal,
       openUrl,
       ...network,
+      stdinIsTTY: stdinTerminal,
       ...(ask ? { ask } : {}),
       ...(stdin === undefined ? {} : { stdin: async () => stdin }),
       stdout: { write: (chunk: string) => (out += chunk), isTTY: terminal },

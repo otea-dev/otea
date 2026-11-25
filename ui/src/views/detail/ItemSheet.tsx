@@ -77,6 +77,7 @@ import { boardFactsOf, factsOf, standAgentOf, standOf } from './facts.ts';
 import { pressInView, toastOf } from './frame.ts';
 import { History } from './History.tsx';
 import { historyOf } from './history.ts';
+import { useMergeOnly } from './merge-only.ts';
 import { useMergedOutside } from './merged-outside.ts';
 import { draftWaitsOf, type MoveChoice, planMoves } from './moves.ts';
 import { NotesForm } from './NotesForm.tsx';
@@ -91,6 +92,7 @@ import {
   threadOf,
 } from './notes.ts';
 import { useOpened } from './opened.ts';
+import { useOverlaps } from './overlaps.ts';
 import { PhoneItem } from './PhoneItem.tsx';
 import { ProofChecklist } from './ProofChecklist.tsx';
 import { partNames, phoneRounds, readerOf, requestLine, unopenedOf } from './phone-review.ts';
@@ -219,6 +221,10 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   const files = useDiffFiles(item.id, strip?.key === 'frozen', item.updatedAt);
   // And whether this round holds the same files as the one it answers (P5-F2).
   const same = useRoundSame(item.id, strip?.key === 'frozen', item.updatedAt);
+  // And which other open items change the same files, so one of them meets a conflict.
+  const overlaps = useOverlaps(item.id, strip?.key === 'frozen');
+  // And whether this round only merges main into what was approved: the review is that merge.
+  const merge = useMergeOnly(item.id, strip?.key === 'frozen');
   const split = live?.split;
   const childSummary =
     split && split.board !== SAME ? summaries.find((b) => b.id === split.board) : undefined;
@@ -850,6 +856,10 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                     off={off}
                     files={files}
                     same={same}
+                    item={item.id}
+                    overlaps={overlaps}
+                    merge={merge}
+                    waits={item.landsAfter?.text}
                   />
                   {hand.length ? (
                     <HandChecklist item={item} rows={hand} canWrite={app.session.canWrite} />
@@ -1164,6 +1174,10 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                 off={off}
                 files={files}
                 same={same}
+                item={item.id}
+                overlaps={overlaps}
+                merge={merge}
+                waits={item.landsAfter?.text}
               />
               {block?.request ? (
                 <DraftRequestLine

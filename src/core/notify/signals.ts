@@ -5,9 +5,11 @@
 // - ask: an agent asks you something (otea ask), the turn yours until you answer;
 // - replied: an agent answered one of your notes (otea reply);
 // - stuck: an agent's lease ran out with nobody releasing it or taking the item again;
-// - aside: an agent set the item aside for later (otea release --later).
+// - aside: an agent set the item aside for later (otea release --later);
+// - unheard: the item waits for an agent and none is listening or at work (the desk's «nadie está
+//   escuchando», core/agent-status.ts itemUnheard).
 
-export const NOTIFY_KINDS = ['turn', 'ask', 'replied', 'stuck', 'aside'] as const;
+export const NOTIFY_KINDS = ['turn', 'ask', 'replied', 'stuck', 'aside', 'unheard'] as const;
 
 export type NotifyKind = (typeof NOTIFY_KINDS)[number];
 
@@ -22,10 +24,12 @@ export type NotifyFacts = {
   round?: number;
   lease: Lease | null;
   expiredLease?: Lease;
-  asks?: { question: number; by: string; options?: string[] };
+  asks?: { question: number; by: string; text?: string; options?: string[] };
   notes?: { replied?: { note: number; by: string; at: string } };
   // Set aside for later by an agent, while nothing lifted it (app/set-aside.ts).
   setAside?: { by: string; at: string };
+  // Waits for an agent that nobody brings (the server works it out from the agents' statuses).
+  unheard?: boolean;
 };
 
 export type Signal = {
@@ -35,7 +39,8 @@ export type Signal = {
   title: string;
   // Who asks (a question), answered, went quiet or set it aside.
   by?: string;
-  // The options a question offers to pick.
+  // The question, for an ask, and the options it offers to pick.
+  text?: string;
   options?: string[];
 };
 
@@ -56,6 +61,7 @@ export function signalsOf(items: readonly NotifyFacts[], now: number): Signal[] 
               item,
               title,
               by: facts.asks.by,
+              ...(facts.asks.text ? { text: facts.asks.text } : {}),
               ...(facts.asks.options ? { options: facts.asks.options } : {}),
             }
           : { key: base, kind: 'turn', item, title },
@@ -69,6 +75,14 @@ export function signalsOf(items: readonly NotifyFacts[], now: number): Signal[] 
         item,
         title,
         by: quiet.holder,
+      });
+    }
+    if (facts.turn === 'agent' && facts.unheard) {
+      out.push({
+        key: `unheard:${item}:${facts.state}:${facts.round ?? ''}`,
+        kind: 'unheard',
+        item,
+        title,
       });
     }
     const aside = facts.setAside;
@@ -93,6 +107,33 @@ export function signalsOf(items: readonly NotifyFacts[], now: number): Signal[] 
     }
   }
   return out;
+}
+
+// How long an item must stay unheard, without a break, before it is told: an agent between two
+// steps is back in otea wait well within it.
+export const UNHEARD_GRACE_MS = 2 * 60_000;
+
+// The key an item's unheard stretch is counted under: a new state or round starts it over.
+export const unheardKey = (facts: Pick<NotifyFacts, 'id' | 'state' | 'round'>): string =>
+  `${facts.id}:${facts.state}:${facts.round ?? ''}`;
+
+// Which of the items unheard now (`unheard`, by unheardKey) have been so for the grace. `since`
+// is the state kept between looks: when each stretch began. Those unheard at the first look
+// (`starting`) were there before the watching began and are never told, until heard again.
+export function settleUnheard(
+  since: Map<string, number | null>,
+  unheard: ReadonlySet<string>,
+  now: number,
+  starting: boolean,
+): Set<string> {
+  for (const key of since.keys()) if (!unheard.has(key)) since.delete(key);
+  const told = new Set<string>();
+  for (const key of unheard) {
+    if (!since.has(key)) since.set(key, starting ? null : now);
+    const began = since.get(key);
+    if (typeof began === 'number' && now - began >= UNHEARD_GRACE_MS) told.add(key);
+  }
+  return told;
 }
 
 // The signals that were not there the last time; the first look (`before` undefined) is where

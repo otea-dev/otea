@@ -133,6 +133,7 @@ function sentence(line: FeedLine, id: ReactNode, state: (s: string) => string): 
     case 'activity.approved':
     case 'activity.closed':
     case 'activity.created':
+    case 'activity.createdTerminal':
       return tx(you ? `${phrase.key}You` : phrase.key, {
         id,
         state: named(phrase, state),

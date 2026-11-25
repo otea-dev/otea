@@ -4,7 +4,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 import { agentDetail } from '../app/agent-detail.ts';
-import { promptFacts, promptKindOf } from '../app/agent-prompts.ts';
+import { promptFacts, promptKindOf, roleBoard } from '../app/agent-prompts.ts';
 import { askingItems, holderAsksOf } from '../app/asking.ts';
 import { syncBoardPresets } from '../app/boards.ts';
 import { briefFor } from '../app/brief.ts';
@@ -19,16 +19,19 @@ import {
   type ListItemsFilter,
   listItems,
   moveItem,
+  requireItem,
   showItem,
   updateItem,
 } from '../app/items.ts';
 import { rememberLanguage, storedLanguage } from '../app/language.ts';
 import type { Launcher } from '../app/launcher.ts';
 import { memoryMachine } from '../app/machine.ts';
-import { boardRoundOf, liveBoards, rowFactsOf } from '../app/next.ts';
+import { mergeOnlyOf } from '../app/merge-only.ts';
+import { boardRoundOf, landWaitOf, liveBoards, rowFactsOf } from '../app/next.ts';
 import { editNote, leaveNote, notesSummary, notesView, withdrawNote } from '../app/notes.ts';
 import { listTargets } from '../app/notify-targets.ts';
 import { markOpened, openedFiles } from '../app/opened.ts';
+import { overlapsOf, scanned } from '../app/overlap.ts';
 import { performanceAcross, performanceOf } from '../app/performance.ts';
 import {
   adoptTailscale,
@@ -76,11 +79,20 @@ import { undoMove } from '../app/undo.ts';
 import { waiveEvidence } from '../app/waive.ts';
 import { mergedOutside } from '../cli/merged-outside.ts';
 import { OTEA_VERSION } from '../cli/version.ts';
-import { agentPrompt, connectFacts, isPromptKind, PROMPT_KINDS } from '../core/agent-prompts.ts';
+import {
+  agentPrompt,
+  connectFacts,
+  isPromptKind,
+  isRole,
+  PROMPT_KINDS,
+  ROLES,
+  rolePrompt,
+} from '../core/agent-prompts.ts';
 import { PERIOD_HINT, parsePeriod } from '../core/board/performance.ts';
 import { LANGS, type Lang } from '../core/board/template-words.ts';
 import { OteaError } from '../core/errors.ts';
 import { MAX_EVIDENCE_MB } from '../core/evidence.ts';
+import { isAgentName } from '../core/item.ts';
 import { TURNS, type Turn } from '../core/workflow.ts';
 import {
   type EventFilter,
@@ -530,9 +542,29 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       // What to paste into an agent's chat (Conectar un agente, the empty project): the first contact,
       // one more agent joining, or one more board; without a kind, the project's moment.
       .get('/agent-prompt', (c) => {
-        const { kind } = c.req.query();
+        const { kind, role, board, as: name } = c.req.query();
         if (kind !== undefined && !isPromptKind(kind))
           throw new InvalidQuery(`kind must be one of ${PROMPT_KINDS.join(', ')}`);
+        // A role's text (the canonical way of working): the same one otea prompt --role prints, for
+        // the desk to copy. A worker's board is required; a coordinator has none.
+        if (role === undefined && (board !== undefined || name !== undefined))
+          throw new InvalidQuery(`board and as go with role (${ROLES.join(', ')})`);
+        if (role !== undefined) {
+          if (!isRole(role)) throw new InvalidQuery(`role must be one of ${ROLES.join(', ')}`);
+          if (kind !== undefined) throw new InvalidQuery('give a kind or a role, not both');
+          if (role === 'worker' && !board) throw new InvalidQuery('role worker needs a board');
+          if (role === 'coordinator' && board !== undefined)
+            throw new InvalidQuery('role coordinator takes no board');
+          if (name !== undefined && !isAgentName(name))
+            throw new InvalidQuery(`"${name}" cannot name an agent`);
+          return c.json({
+            kind: role,
+            prompt: rolePrompt(role, projectLanguage(project, env), {
+              ...(board ? { board: roleBoard(project, board) } : {}),
+              ...(name ? { name } : {}),
+            }),
+          });
+        }
         const moment = kind ?? promptKindOf(project);
         // The pasted prompt and the list beside it name each board and step as the agent reads them
         // (`otea next`, `otea board`: each in the language it was made in), whatever the desk's
@@ -573,6 +605,8 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         // The questions that wait for the person: an item held by an agent that asks elsewhere.
         const asking = askingItems(project.db);
         const at = new Date().toISOString();
+        // Git is asked about each branch once for the whole list.
+        const scan = scanned(project);
         const estimated = estimatesOfItems(
           project,
           items,
@@ -593,9 +627,12 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
             const setAside = setAsideOf(selectEvents(project.db, item.id));
             // Held by an agent whose question waits for you on another item (P7-R3-9).
             const holderAsks = holderAsksOf(asking, item, at);
+            // Approved and waiting for another to land first (src/app/land-order.ts).
+            const landsAfter = landWaitOf(scan, item, at);
             return {
               ...item,
               ...row,
+              ...(landsAfter === undefined ? {} : { landsAfter }),
               ...(setAside === undefined ? {} : { setAside }),
               ...(holderAsks === undefined ? {} : { holderAsks }),
               ...(enteredAt === undefined ? {} : { enteredAt }),
@@ -760,6 +797,16 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       // A round whose work holds the same files as the round it answers (P5-F2): the desk says so
       // before the person approves a change that did not happen.
       .get('/items/:id/round-same', (c) => c.json({ same: roundSame(project, c.req.param('id')) }))
+      // A round that only merges main into the work the person approved, with what the merge
+      // changed by hand: the review shows that alone (src/app/merge-only.ts).
+      .get('/items/:id/merge-only', (c) =>
+        c.json({ merge: mergeOnlyOf(project, c.req.param('id')) }),
+      )
+      // The other open items whose pushed branches change the files this one does: the one that
+      // lands second meets a conflict, so the desk says so in the review.
+      .get('/items/:id/overlaps', (c) =>
+        c.json({ overlaps: overlapsOf(project, requireItem(project.db, c.req.param('id'))) }),
+      )
       .get('/items/:id/opened', (c) =>
         c.json({ evidence: openedFiles(project, c.req.param('id')) }),
       )

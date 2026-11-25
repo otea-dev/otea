@@ -772,6 +772,16 @@ export const detail = {
     '{base} changed after the handoff: it is now at {now}. Approving approves only what was handed off, {handed}.',
   'bi.branch.roundSame':
     'This round holds the same files as round {round} ({earlier}): nothing changed in {branch} since that round. Approving approves what that round already had.',
+  'bi.branch.overlapLanding':
+    '{item} touches the same files as {other} ({files}), which lands first: main will hold its change when {item} lands, so expect to merge main and maybe resolve a conflict.',
+  'bi.branch.overlapOpen':
+    '{item} touches the same files as {other} ({files}), which is open too: whichever lands second must merge main first and may meet a conflict.',
+  'bi.branch.overlapMore': 'and {n} more',
+  'bi.branch.mergeOnly':
+    'Since the commit you approved ({since}) this round only merges main into {branch}. The merge itself changed {files}: everything in this diff is new and not reviewed yet, including files that did not conflict. The rest is what you approved, and what main brought in landed through its own review. Approving takes {tip} as it is.',
+  'bi.branch.mergeOnlyClean':
+    'Since the commit you approved ({since}) this round only merges main into {branch}, and the merge itself added nothing. Approving takes {tip} as it is.',
+  'bi.branch.mergeOnlyDiff': 'What the merge itself changed',
   'bi.request.board': 'Board {name}',
   'bi.request.waiting': 'waiting for the draft',
   'bi.request.arrived': 'the draft arrived: review and publish it',

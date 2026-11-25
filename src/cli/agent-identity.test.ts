@@ -135,6 +135,106 @@ describe('agent identity on the CLI', () => {
     expect(item.lease.holder).toBe('codex');
   });
 
+  // An unnamed create at a terminal (stdin and stdout) is recorded as the person's, marked as from
+  // a terminal: a terminal does not prove a person types, so nothing that decides for the person
+  // (answer, approve, send-back) runs unnamed there, and a name given still makes an agent.
+  describe('an unnamed terminal', () => {
+    const atTerminal = (env: Record<string, string> = {}) =>
+      cliAt(repo.dir, env, undefined, undefined, undefined, undefined, true, {}, true);
+
+    it('creates an item as the person, marked as from a terminal, recording no agent', async () => {
+      const made = await atTerminal()(
+        'create',
+        '--collection',
+        'tasks',
+        '--title',
+        'Mine',
+        '--json',
+      );
+
+      expect(made.code).toBe(0);
+      expect(agents()).toEqual(['claude']);
+      const listed = JSON.parse((await unnamed('list', '--json')).out);
+      expect(JSON.stringify(listed)).toContain('Mine');
+      const id = JSON.parse(made.out).id;
+      const shown = await unnamed('show', id);
+      expect(shown.out).toContain('created by human:human from a terminal, with no name given');
+      const events = JSON.parse((await unnamed('show', id, '--json')).out).events;
+      expect(events.find(({ type }: { type: string }) => type === 'created').data.via).toBe(
+        'terminal',
+      );
+    });
+
+    it('never answers, approves or sends back as the person without a name', async () => {
+      for (const argv of [
+        ['answer', 'TASKS-1', 'yes'],
+        ['approve', 'TASKS-1'],
+        ['send-back', 'TASKS-1', '--reason', 'no'],
+      ]) {
+        const { code, error } = await errorOf(atTerminal(), ...argv);
+        expect(code).toBe(2);
+        expect(error.code).toBe('unnamed_agent');
+      }
+    });
+
+    it('acts as the agent --as names, even at a terminal', async () => {
+      const made = await atTerminal()(
+        'create',
+        '--collection',
+        'tasks',
+        '--title',
+        'Named',
+        '--as',
+        'codex',
+        '--json',
+      );
+
+      expect(made.code).toBe(0);
+      expect(agents()).toContain('codex');
+      expect(JSON.parse(made.out).createdBy).toEqual({ kind: 'agent', name: 'codex' });
+    });
+
+    it('still refuses an unnamed create when stdin or stdout is not a terminal', async () => {
+      const stdoutOnly = cliAt(repo.dir, {}, undefined, undefined, undefined, undefined, true);
+      const stdinOnly = cliAt(
+        repo.dir,
+        {},
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        {},
+        true,
+      );
+      for (const cli of [stdoutOnly, stdinOnly]) {
+        const { error } = await errorOf(cli, 'create', '--collection', 'tasks', '--title', 'T');
+        expect(error.code).toBe('unnamed_agent');
+      }
+    });
+
+    it('keeps claim agent-only, and a named agent an agent, even at a terminal', async () => {
+      expect((await errorOf(atTerminal(), 'claim', 'TASKS-1')).error.code).toBe('unnamed_agent');
+      const named = await atTerminal({ OTEA_AGENT: 'codex' })(
+        'create',
+        '--collection',
+        'tasks',
+        '--title',
+        'By codex',
+      );
+      expect(named.code).toBe(0);
+      expect(agents()).toContain('codex');
+    });
+
+    it('never hands the person out as a name to an agent asking whoami', async () => {
+      await atTerminal()('create', '--collection', 'tasks', '--title', 'Mine');
+      const told = JSON.parse((await unnamed('whoami', '--json')).out);
+
+      expect(JSON.stringify(told)).not.toMatch(/human/);
+      expect(agents()).toEqual(['claude']);
+    });
+  });
+
   it('runs setup commands without a name', async () => {
     expect((await unnamed('projects', 'current')).code).toBe(0);
   });

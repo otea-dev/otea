@@ -428,14 +428,20 @@ export async function answerRequest(c: Context): Promise<{ text: string }> {
 }
 
 // What the person gives an agent's question: their words, one of its options by number, or the
-// decision left to the agent.
+// decision left to the agent; always with the number of the question it answers, so an answer to
+// a question that has since changed is refused.
+const question = z.number().int().positive();
 const ChosenAnswerBody = z.union([
-  z.object({ text: z.string() }).strict(),
-  z.object({ option: z.number().int().positive() }).strict(),
-  z.object({ delegate: z.literal(true) }).strict(),
+  z.object({ question, text: z.string() }).strict(),
+  z.object({ question, option: z.number().int().positive() }).strict(),
+  z.object({ question, delegate: z.literal(true) }).strict(),
 ]);
 
-export type ChosenAnswer = { text: string } | { option: number } | { delegate: true };
+export type ChosenAnswer = { question: number } & (
+  | { text: string }
+  | { option: number }
+  | { delegate: true }
+);
 
 export async function chosenAnswerRequest(c: Context): Promise<ChosenAnswer> {
   const raw: unknown = await c.req.json().catch(() => undefined);
@@ -444,7 +450,7 @@ export async function chosenAnswerRequest(c: Context): Promise<ChosenAnswer> {
     throw new RejectedRequest(
       400,
       'invalid_body',
-      'Expected {"text": string}, {"option": number} or {"delegate": true}',
+      'Expected {"question": number} with {"text": string}, {"option": number} or {"delegate": true}',
     );
   return parsed.data;
 }

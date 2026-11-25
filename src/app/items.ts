@@ -146,6 +146,9 @@ export type CreateItemInput = {
   parent?: string;
   actor: Actor;
   channel?: Channel;
+  // Made at a terminal with no agent name, recorded as the person's: marked, since a terminal does
+  // not prove a person typed.
+  via?: 'terminal';
   // The client's key for this create (Idempotency-Key), kept with the item in the same write.
   clientKey?: string;
 };
@@ -192,7 +195,11 @@ export function insertNewItem(
   if (input.clientKey !== undefined) insertClientKey(db, input.clientKey, item.id, at);
   const { channel } = input;
   const named = { state, ...stateNames(type.workflow, { state }) };
-  const data = channel === undefined ? named : { ...named, channel };
+  const data = {
+    ...named,
+    ...(channel === undefined ? {} : { channel }),
+    ...(input.via === undefined ? {} : { via: input.via }),
+  };
   appendEvent(db, { itemId: item.id, type: 'created', actor: input.actor, at, data });
   const created = present(item, type.workflow, at);
   if (input.parent === undefined) return { item, created };
