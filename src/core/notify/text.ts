@@ -92,7 +92,8 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
   const by = notice.by ?? '';
   const said = notice.kind === 'turn' ? words.turn : words[notice.kind](by);
   // A question goes in the notice itself, with the item's id in the title.
-  const question = notice.kind === 'ask' ? notice.text?.replace(/\s+/g, ' ').trim() : undefined;
+  const question =
+    notice.kind === 'ask' ? notice.text?.replace(/[\p{Cc}\p{Cf}\s]+/gu, ' ').trim() : undefined;
   const title = question ? `${said} · ${notice.item}` : said;
   return {
     title,

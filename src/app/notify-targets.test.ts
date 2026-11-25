@@ -80,6 +80,21 @@ describe('notify targets', () => {
     expect(listTargets(db)).toEqual([]);
   });
 
+  it('reads prefs stored before unheard and askText existed as on', () => {
+    saveSubscription(db, device, push(), 'es');
+    const { unheard: _u, askText: _a, ...legacy } = { ...DEFAULT_PREFS, turn: false };
+    db.prepare('UPDATE notify_targets SET prefs = ? WHERE device = ?').run(
+      JSON.stringify(legacy),
+      device,
+    );
+    expect(targetOfDevice(db, device)?.prefs).toEqual({
+      ...DEFAULT_PREFS,
+      turn: false,
+      unheard: true,
+      askText: true,
+    });
+  });
+
   it('keeps the desktop app’s prefs apart, with the defaults until they change', () => {
     expect(desktopTarget(db)).toEqual({
       id: DESKTOP,

@@ -208,6 +208,27 @@ describe('Planner', () => {
     ]);
   });
 
+  it('keeps the question’s words out of the notice when the person chose to hide them', () => {
+    const ask: Signal = {
+      key: 'turn:A:review::q1',
+      kind: 'ask',
+      item: 'A',
+      title: 'Title A',
+      by: 'kiln',
+      text: 'Is the discount stackable?',
+    };
+    planner.offer([ask], prefs, T0);
+    expect(planner.take(T0 + GATHER_MS, keys([ask]), prefs)).toEqual([
+      { kind: 'ask', item: 'A', title: 'Title A', by: 'kiln', text: 'Is the discount stackable?' },
+    ]);
+    const hidden = { ...prefs, askText: false };
+    const other = new Planner(minuteOfDay);
+    other.offer([ask], hidden, T0);
+    expect(other.take(T0 + GATHER_MS, keys([ask]), hidden)).toEqual([
+      { kind: 'ask', item: 'A', title: 'Title A', by: 'kiln' },
+    ]);
+  });
+
   it('tells nothing from a project the person muted, not even what waited', () => {
     const web = new Planner(minuteOfDay, 'web-1');
     web.offer([turn('A')], prefs, T0);
@@ -271,6 +292,7 @@ describe('Planner', () => {
       stuck: true,
       aside: false,
       unheard: true,
+      askText: true,
       quiet: null,
       muted: [],
     });

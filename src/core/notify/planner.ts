@@ -13,6 +13,8 @@ import type { NotifyKind, Signal } from './signals.ts';
 export type QuietHours = { from: string; to: string };
 
 export type NotifyPrefs = Record<NotifyKind, boolean> & {
+  // Whether a question's own words go in its notice, which a lock screen shows to anyone.
+  askText: boolean;
   quiet: QuietHours | null;
   // The projects (their ids) nothing is told from.
   muted: string[];
@@ -27,6 +29,7 @@ export const DEFAULT_PREFS: NotifyPrefs = {
   stuck: true,
   aside: false,
   unheard: true,
+  askText: true,
   quiet: null,
   muted: [],
 };
@@ -86,8 +89,9 @@ const RANK: Record<NotifyKind, number> = {
   aside: 5,
 };
 
-function noticeOf(signal: Signal): ItemNotice {
-  const { kind, item, title, by, text } = signal;
+function noticeOf(signal: Signal, prefs: NotifyPrefs): ItemNotice {
+  const { kind, item, title, by } = signal;
+  const text = prefs.askText ? signal.text : undefined;
   return {
     kind,
     item,
@@ -160,7 +164,7 @@ export class Planner {
     for (const { item } of ready) this.told.set(item, now);
     this.sentAt = now;
     const [only] = ready;
-    if (ready.length === 1 && only) return [noticeOf(only)];
+    if (ready.length === 1 && only) return [noticeOf(only, prefs)];
     const kinds = new Set(ready.map(({ kind }) => kind));
     const [same] = kinds;
     return [

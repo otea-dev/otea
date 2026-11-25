@@ -40,6 +40,8 @@ describe('noticeText', () => {
       body: '¿El descuento se acumula con el cupón?',
     });
     expect(noticeText(ask, 'en').title).toBe('kiln asks you · TASKS-7');
+    const messy = { ...ask, text: 'Drop\u0007 it\u001b[31m?‮ ​now\r\n\tplease' } as Notice;
+    expect(noticeText(messy, 'en').body).toBe('Drop it [31m? now please');
     const long = { ...ask, text: `line one\n${'word '.repeat(60)}` } as Notice;
     const body = noticeText(long, 'en').body;
     expect(body.length).toBeLessThanOrEqual(140);

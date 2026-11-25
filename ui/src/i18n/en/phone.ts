@@ -293,6 +293,8 @@ export const phone = {
   'notify.stuckHint': 'an agent lost signal holding it',
   'notify.ask': 'An agent asks you',
   'notify.aside': 'An agent set something aside for later',
+  'notify.askText': 'Show the question text',
+  'notify.askTextHint': 'a lock screen shows it to anyone who looks',
   'notify.unheard': 'Work waits for an agent and nobody is listening',
   'notify.unheardHint': 'no agent waits or is at work',
   'notify.projects': 'projects',

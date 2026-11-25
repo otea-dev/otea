@@ -65,6 +65,7 @@ function readPrefs(text: string): NotifyPrefs {
       NotifyKind,
       boolean
     >),
+    askText: typeof kept.askText === 'boolean' ? kept.askText : DEFAULT_PREFS.askText,
     quiet: isQuiet(kept.quiet) ? kept.quiet : DEFAULT_PREFS.quiet,
     muted,
   };
