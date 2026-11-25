@@ -1,5 +1,5 @@
 import type { Command, OptionSpec } from '../cli/command.ts';
-import { AGENT_COMMANDS, NO_PARAMETER, toolName } from './commands.ts';
+import { AGENT_COMMANDS, NO_PARAMETER, parameterName, toolName } from './commands.ts';
 
 // A token of a command line: a quoted value, or a run up to a space or the punctuation that ends a
 // sentence or a parenthesis.
@@ -61,7 +61,7 @@ function call(
       if (!spec || NO_PARAMETER.has(option)) break;
       at += space.length + token.length;
       // A tool's parameter has underscores where the option has hyphens (all-projects).
-      const key = option.replaceAll('-', '_');
+      const key = parameterName(name, option);
       if (spec.flag) {
         pairs.push(`${key}: true`);
         continue;

@@ -20,6 +20,7 @@ import {
   CLI_ONLY_COMMANDS,
   createMcpServer,
   OMITTED_OPTIONS,
+  parameterName,
   toolName,
 } from './server.ts';
 import { mcpWords } from './words.ts';
@@ -112,10 +113,11 @@ describe('mcp server', () => {
         const expected = [
           'as',
           ...(command?.args ?? []).map((arg) => arg.replace(/\?$/, '')),
-          // A parameter has underscores where the option has hyphens (topic_list's all_projects).
+          // A parameter has underscores where the option has hyphens (topic_list's all_projects);
+          // ask's --option and --recommend are options and recommended.
           ...Object.keys(command?.options ?? {})
             .filter((name) => !omitted.includes(name))
-            .map((name) => name.replaceAll('-', '_')),
+            .map((name) => parameterName(tool.name, name)),
         ];
         expect(Object.keys(tool.inputSchema.properties ?? {}).sort(), tool.name).toEqual(
           expected.sort(),

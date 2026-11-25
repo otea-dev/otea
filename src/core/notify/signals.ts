@@ -22,7 +22,7 @@ export type NotifyFacts = {
   round?: number;
   lease: Lease | null;
   expiredLease?: Lease;
-  asks?: { question: number; by: string };
+  asks?: { question: number; by: string; options?: string[] };
   notes?: { replied?: { note: number; by: string; at: string } };
   // Set aside for later by an agent, while nothing lifted it (app/set-aside.ts).
   setAside?: { by: string; at: string };
@@ -35,6 +35,8 @@ export type Signal = {
   title: string;
   // Who asks (a question), answered, went quiet or set it aside.
   by?: string;
+  // The options a question offers to pick.
+  options?: string[];
 };
 
 const active = (lease: Lease | null, now: number) =>
@@ -54,6 +56,7 @@ export function signalsOf(items: readonly NotifyFacts[], now: number): Signal[] 
               item,
               title,
               by: facts.asks.by,
+              ...(facts.asks.options ? { options: facts.asks.options } : {}),
             }
           : { key: base, kind: 'turn', item, title },
       );

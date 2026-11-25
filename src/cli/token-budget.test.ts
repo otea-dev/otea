@@ -68,7 +68,9 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // Raised to 830 with rule 3 listing the real order next offers in (what you hold, what the
   // person left you, sent-back, merges first, on top, approved, new) and --brief for repeat reads
   // (measured at 815 and 825).
-  'board index': { text: 830, json: 53, mcp: 840 },
+  // Raised to 870 and 865 for rule 10: ask with 2 to 4 options and the one you recommend, so the
+  // person taps instead of reading and typing (measured at 864 and 855).
+  'board index': { text: 870, json: 53, mcp: 865 },
   // The bug board's own words and each step's instructions, read once per session; show's Next:
   // block covers the step at hand. Raised when a preset collection read as a board kept its
   // playbook as the board's text: what agents read on the preset, as before.
@@ -120,7 +122,8 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // a call needs a name, an example item id and the relation kinds, the timeout typed as seconds or
   // a duration, the board JSON as board_draft's own argument (P8-F2), model and effort on next, and
   // every tool's `additionalProperties`, so a key it does not take is refused by name, not dropped.
-  tools: { mcp: 6100 },
+  // Raised to 6160 for ask's options and recommended (measured at 6143).
+  tools: { mcp: 6160 },
   // Otea's agent guide, the server's instructions: in every MCP agent's context from the start, so
   // it buys only what agents keep getting wrong. Measured at 203. Raised to 270 for the line on
   // declaring the profile every agent and subagent must keep current (measured at 246). Raised to
@@ -154,7 +157,8 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // Raised to 810 for rule 3: the real order next offers in, and --brief for repeat reads, which
   // a new session or a compacted agent would otherwise be handed without the step (measured at
   // 796).
-  instructions: { mcp: 810 },
+  // Raised to 840 for rule 10: ask always with options and a recommendation (measured at 834).
+  instructions: { mcp: 840 },
   // The AGENTS.md block, in the context of every agent whose harness reads AGENTS.md: it says where
   // the guide is and holds no copy of it, which the instructions or otea board's index give
   // (MCP-TOKENS: the guide was in context two or three times; measured at 874 with the copy, 107).

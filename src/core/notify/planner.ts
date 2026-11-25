@@ -43,6 +43,8 @@ export type ItemNotice = {
   item: string;
   title: string;
   by?: string;
+  // A question's options, to say them in the notice when they fit.
+  options?: string[];
 };
 
 export type GroupNotice = {
@@ -78,8 +80,14 @@ export const localMinuteOfDay = (ms: number): number => {
 const RANK: Record<NotifyKind, number> = { ask: 0, turn: 1, stuck: 2, replied: 3, aside: 4 };
 
 function noticeOf(signal: Signal): ItemNotice {
-  const { kind, item, title, by } = signal;
-  return { kind, item, title, ...(by === undefined ? {} : { by }) };
+  const { kind, item, title, by, options } = signal;
+  return {
+    kind,
+    item,
+    title,
+    ...(by === undefined ? {} : { by }),
+    ...(options === undefined ? {} : { options }),
+  };
 }
 
 export class Planner {

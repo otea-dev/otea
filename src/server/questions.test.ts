@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { askingItem } from '../app/asking.ts';
 import { createBoard, publishBoard, saveDraft } from '../app/boards.ts';
 import { pairDevice } from '../app/devices.ts';
 import { createItem } from '../app/items.ts';
@@ -99,6 +100,62 @@ describe('an agent’s question over the API', () => {
     expect(item.turn).toBe('agent');
     expect(item.asks).toBeUndefined();
     expect(item.board.questions[0]?.answer).toMatchObject({ text: 'Sí, mucho' });
+  });
+
+  it('gives the options on the list and the item, and takes the pick, the words or the delegation', async () => {
+    const answer = (body: unknown) =>
+      call('/items/CRI-1/answer', { method: 'POST', body }, 'phone').then((r) => r.json());
+    await answer({ text: 'Sí' });
+    askQuestion(project, {
+      id: 'CRI-1',
+      text: '¿Qué caparazón?',
+      options: ['Liso', 'Con musgo'],
+      recommended: 2,
+      actor: kiln,
+      channel: 'cli',
+    });
+    const [row] = (await (await call('/items')).json()) as Record<string, unknown>[];
+    expect(row).toMatchObject({ asks: { options: ['Liso', 'Con musgo'], recommended: 2 } });
+    const shown = (await (await call('/items/CRI-1')).json()) as {
+      board: { asking: unknown };
+    };
+    expect(shown.board.asking).toMatchObject({ options: ['Liso', 'Con musgo'], recommended: 2 });
+
+    const picked = (await answer({ option: 1 })) as {
+      turn: string;
+      board: { questions: { answer?: unknown }[] };
+    };
+    expect(picked.turn).toBe('agent');
+    expect(picked.board.questions[1]?.answer).toMatchObject({
+      mode: 'option',
+      option: 1,
+      text: 'Liso',
+    });
+
+    askQuestion(project, {
+      id: 'CRI-1',
+      text: '¿Y el color?',
+      options: ['Verde', 'Gris'],
+      actor: kiln,
+      channel: 'cli',
+    });
+    const left = (await answer({ delegate: true })) as {
+      board: { questions: { answer?: unknown }[] };
+    };
+    expect(left.board.questions[2]?.answer).toMatchObject({ mode: 'delegated' });
+  });
+
+  it('refuses an option the question lacks and a body that says two things', async () => {
+    const lacks = await call('/items/CRI-1/answer', { method: 'POST', body: { option: 1 } });
+    expect(await lacks.json()).toMatchObject({
+      error: { details: { kind: 'question', why: 'no_option' } },
+    });
+    const both = await call('/items/CRI-1/answer', {
+      method: 'POST',
+      body: { text: 'x', delegate: true },
+    });
+    expect(both.status).toBe(400);
+    expect(askingItem(project.db, 'CRI-1')).toBeDefined();
   });
 
   it('refuses a malformed answer, an empty one, and one with no question waiting', async () => {

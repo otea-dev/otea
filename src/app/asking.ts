@@ -9,7 +9,14 @@ import { type EventRecord, selectEvents, selectEventsOfTypes } from '../store/qu
 
 // What a reader sees of an item an agent asked the person about (otea ask): the question still
 // open, which hands the turn to the person until they answer it.
-export type Asks = { question: number; by: string; text: string; at: string };
+export type Asks = {
+  question: number;
+  by: string;
+  text: string;
+  at: string;
+  options?: string[];
+  recommended?: number;
+};
 
 // The open question of every item that has one, by item id, read in one query.
 export function askingItems(db: DatabaseSync): Map<string, ItemQuestion> {
@@ -39,7 +46,9 @@ export function withAsks<T extends { turn: string }>(
   open: ItemQuestion | undefined,
 ): T & { asks?: Asks } {
   if (!open || item.turn !== 'agent') return item;
-  const asks = { question: open.question, by: open.by, text: open.text, at: open.at };
+  const asks: Asks = { question: open.question, by: open.by, text: open.text, at: open.at };
+  if (open.options) asks.options = open.options;
+  if (open.recommended !== undefined) asks.recommended = open.recommended;
   return { ...item, turn: 'human', asks };
 }
 

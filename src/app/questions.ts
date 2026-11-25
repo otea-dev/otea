@@ -5,6 +5,8 @@ import { NOTE_LEFT } from '../core/board/notes.ts';
 import {
   askedText,
   chatAnswerText,
+  checkOptions,
+  DELEGATED,
   type ItemQuestion,
   QUESTION_ANSWERED,
   QUESTION_ASKED,
@@ -37,10 +39,18 @@ import { liftSetAside, SET_ASIDE_LIFTED } from './set-aside.ts';
 // round. Neither moves the item. The person's notes (notes.ts) are another thread, which changes
 // no turn: an agent's doubts go here.
 
-type Why = 'not_agent' | 'not_person' | 'empty' | 'not_working' | 'asking' | 'none_open';
+type Why =
+  | 'not_agent'
+  | 'not_person'
+  | 'empty'
+  | 'not_working'
+  | 'asking'
+  | 'none_open'
+  | 'options'
+  | 'no_option';
 
 function refuse(
-  code: 'forbidden' | 'reason_required' | 'invalid_transition',
+  code: 'forbidden' | 'reason_required' | 'invalid_transition' | 'invalid_fields',
   id: string,
   why: Why,
   message: string,
@@ -48,7 +58,16 @@ function refuse(
   throw new OteaError(code, message, { kind: 'question', item: id, why });
 }
 
-export type AskInput = { id: string; text: string; actor: Actor; channel: Channel };
+// `options`: 2 to 4 short answers the person picks with one tap; `recommended`: the number (from 1)
+// of the one the agent would choose.
+export type AskInput = {
+  id: string;
+  text: string;
+  options?: readonly string[];
+  recommended?: number;
+  actor: Actor;
+  channel: Channel;
+};
 
 export type AskResult = { question: ItemQuestion; text: string };
 
@@ -78,6 +97,9 @@ export function askQuestion(ctx: Context, input: AskInput, now = systemClock): A
     refuse('forbidden', id, 'not_agent', `Not asked: only an agent asks the person on ${id}`);
   const text = input.text.trim();
   if (text === '') refuse('reason_required', id, 'empty', `Not asked on ${id}: say your question`);
+  const checked = checkOptions(input.options, input.recommended);
+  if ('problem' in checked)
+    refuse('invalid_fields', id, 'options', `Not asked on ${id}: ${checked.problem}`);
   return transaction(ctx.db, () => {
     const item = requireWritableItem(ctx.db, id);
     const at = now();
@@ -104,6 +126,12 @@ export function askQuestion(ctx: Context, input: AskInput, now = systemClock): A
         stepName: stepById(board.def, step)?.name ?? step,
         round: on.round,
         channel: input.channel,
+        ...(checked.options.length === 0
+          ? {}
+          : {
+              options: checked.options,
+              ...(checked.recommended === undefined ? {} : { recommended: checked.recommended }),
+            }),
       },
     });
     const asked = questionsOf(selectEvents(ctx.db, item.id)).find(
@@ -116,14 +144,39 @@ export function askQuestion(ctx: Context, input: AskInput, now = systemClock): A
 
 export type AnswerInput = { id: string; text: string; actor: Actor; channel: Channel };
 
+// What the person gives: their own words, the number (from 1) of one of the question's options, or
+// the decision left to the agent. Exactly one.
+export type PersonAnswer = { id: string; actor: Actor; channel: Channel } & (
+  | { text: string; option?: never; delegate?: never }
+  | { option: number; text?: never; delegate?: never }
+  | { delegate: true; text?: never; option?: never }
+);
+
 // The person answers the question that waits: the turn goes back to the agent, in the same round.
-export function answerQuestion(ctx: Context, input: AnswerInput, now = systemClock): ItemQuestion {
+export function answerQuestion(ctx: Context, input: PersonAnswer, now = systemClock): ItemQuestion {
   const { id } = input;
   if (input.actor.kind !== 'human')
     refuse('forbidden', id, 'not_person', `Not answered: the person answers questions on ${id}`);
-  const text = input.text.trim();
+  const base = { id, actor: input.actor, channel: input.channel };
+  if (input.delegate)
+    return recordAnswer(ctx, { ...base, text: DELEGATED }, { mode: 'delegated' }, now).question;
+  if (input.option !== undefined) {
+    const { option } = input;
+    return recordAnswer(ctx, { ...base, text: '' }, { mode: 'option' }, now, (open) => {
+      const text = open.options?.[option - 1];
+      if (text === undefined)
+        refuse(
+          'invalid_fields',
+          id,
+          'no_option',
+          `Not answered on ${id}: the question has no option ${option}`,
+        );
+      return { text, option };
+    }).question;
+  }
+  const text = (input.text ?? '').trim();
   if (text === '') refuse('reason_required', id, 'empty', `Not answered on ${id}: say your answer`);
-  return recordAnswer(ctx, { ...input, text }, {}, now).question;
+  return recordAnswer(ctx, { ...base, text }, { mode: 'text' }, now).question;
 }
 
 export type ChatAnswerResult = { question: ItemQuestion; text: string };
@@ -166,8 +219,10 @@ function recordAnswer(
   input: AnswerInput,
   extra: Record<string, string>,
   now: () => string,
+  // An option's words and number, read off the question that waits.
+  pick?: (open: ItemQuestion) => { text: string; option: number },
 ): { question: ItemQuestion; gone: boolean } {
-  const { id, text } = input;
+  const { id } = input;
   return transaction(ctx.db, () => {
     const item = requireWritableItem(ctx.db, id);
     const board = liveBoardOf(ctx, item.collection);
@@ -179,12 +234,19 @@ function recordAnswer(
         'none_open',
         `${item.id}: no question waits for ${extra.via ? 'the person' : 'you'}`,
       );
+    const chosen = pick?.(open);
     appendEvent(ctx.db, {
       itemId: item.id,
       type: QUESTION_ANSWERED,
       actor: input.actor,
       at: now(),
-      data: { question: open.question, text, channel: input.channel, ...extra },
+      data: {
+        question: open.question,
+        text: chosen?.text ?? input.text,
+        channel: input.channel,
+        ...extra,
+        ...(chosen ? { option: chosen.option } : {}),
+      },
     });
     const answered = questionsOf(selectEvents(ctx.db, item.id)).find(
       (each) => each.question === open.question,

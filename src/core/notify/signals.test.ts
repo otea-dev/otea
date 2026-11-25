@@ -41,6 +41,11 @@ describe('signalsOf', () => {
     ]);
   });
 
+  it('carries the options a question offers', () => {
+    const asks = { question: 2, by: 'claude', options: ['A', 'B'] };
+    expect(signalsOf([item({ asks })], NOW)[0]).toMatchObject({ kind: 'ask', options: ['A', 'B'] });
+  });
+
   it('says an agent set an item aside for later, once per set-aside', () => {
     const aside = item({
       turn: 'agent',

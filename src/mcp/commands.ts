@@ -123,6 +123,17 @@ export const OMITTED_OPTIONS: Readonly<Record<string, readonly string[]>> = {
 // it. The other omitted options only appear in the tool descriptions, which read as parameters.
 export const NO_PARAMETER: ReadonlySet<string> = new Set(['field-file']);
 
+// A tool's parameter is named after its option, with underscores (all-projects is all_projects),
+// but for the few the tool names as what it takes: ask's repeated --option is `options`, and
+// --recommend is `recommended`.
+const PARAMETER_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  ask: { option: 'options', recommend: 'recommended' },
+};
+
+export function parameterName(command: string, option: string): string {
+  return PARAMETER_NAMES[command]?.[option] ?? option.replaceAll('-', '_');
+}
+
 // A tool is named after its command, with words joined by underscores (send-back is send_back).
 export function toolName(command: string): string {
   return command.replace(/[ -]/g, '_');

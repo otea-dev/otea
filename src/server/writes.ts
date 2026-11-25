@@ -427,6 +427,28 @@ export async function answerRequest(c: Context): Promise<{ text: string }> {
   return { text: parsed.data.text };
 }
 
+// What the person gives an agent's question: their words, one of its options by number, or the
+// decision left to the agent.
+const ChosenAnswerBody = z.union([
+  z.object({ text: z.string() }).strict(),
+  z.object({ option: z.number().int().positive() }).strict(),
+  z.object({ delegate: z.literal(true) }).strict(),
+]);
+
+export type ChosenAnswer = { text: string } | { option: number } | { delegate: true };
+
+export async function chosenAnswerRequest(c: Context): Promise<ChosenAnswer> {
+  const raw: unknown = await c.req.json().catch(() => undefined);
+  const parsed = ChosenAnswerBody.safeParse(raw);
+  if (!parsed.success)
+    throw new RejectedRequest(
+      400,
+      'invalid_body',
+      'Expected {"text": string}, {"option": number} or {"delegate": true}',
+    );
+  return parsed.data;
+}
+
 // A reason is a line or two: capped so a page cannot keep a wall of text on an item.
 const WaiveBody = z.object({ part: z.string().min(1), reason: z.string().max(500).optional() });
 

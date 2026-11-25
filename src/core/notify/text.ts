@@ -24,6 +24,14 @@ const MAX_BODY = 100;
 const short = (text: string, max = MAX_BODY) =>
   text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 
+// A question's options after the item, numbered as the desk shows them, only when all of them fit
+// in the body: a half-said list would mislead.
+function withOptions(head: string, options: readonly string[] | undefined): string {
+  if (!options || options.length === 0) return head;
+  const list = options.map((option, i) => `${i + 1}) ${option}`).join('  ');
+  return head.length + 1 + list.length <= MAX_BODY ? `${head}\n${list}` : head;
+}
+
 export const itemUrl = (id: string) => `/#/i/${encodeURIComponent(id)}`;
 
 const WORDS = {
@@ -86,9 +94,10 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
   }
   const by = notice.by ?? '';
   const title = notice.kind === 'turn' ? words.turn : words[notice.kind](by);
+  const head = short(`${notice.item} · ${notice.title}`);
   return {
     title,
-    body: short(`${notice.item} · ${notice.title}`),
+    body: notice.kind === 'ask' ? withOptions(head, notice.options) : head,
     tag: `otea-item-${notice.item}`,
     url: itemUrl(notice.item),
     item: notice.item,

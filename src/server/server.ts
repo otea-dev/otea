@@ -151,6 +151,7 @@ import {
   assertWritable,
   attachRequest,
   briefRequest,
+  chosenAnswerRequest,
   clientKeyOf,
   createRequest,
   HUMAN_IN_UI,
@@ -846,9 +847,9 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       // agent, in the same round.
       .post('/items/:id/answer', async (c) => {
         assertWritable(c, auth);
-        const { text } = await answerRequest(c);
+        const given = await chosenAnswerRequest(c);
         const id = c.req.param('id');
-        answerQuestion(project, { id, text, ...HUMAN_IN_UI });
+        answerQuestion(project, { id, ...given, ...HUMAN_IN_UI });
         feed.notify();
         return c.json(showItem(project, id, HUMAN_IN_UI));
       })

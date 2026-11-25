@@ -11,10 +11,26 @@ import { timeText } from '../time.ts';
 export const QUESTION_ASKED = 'question_asked';
 export const QUESTION_ANSWERED = 'question_answered';
 
+// How a question was answered: one of the options the agent gave (`option`, its 1-based number, and
+// `text` its words), the person's own words, or the person leaving the decision to the agent
+// (`text` is then 'delegated').
+export type AnswerMode = 'option' | 'text' | 'delegated';
+
+export const DELEGATED = 'delegated';
+
 // `via`: the agent that noted an answer the person gave in the chat (otea answer).
-export type QuestionAnswer = { text: string; at: string; by: string; via?: string };
+export type QuestionAnswer = {
+  text: string;
+  at: string;
+  by: string;
+  via?: string;
+  mode: AnswerMode;
+  option?: number;
+};
 
 // A question and the moment it was asked in: the step (by id and by name then) and its round.
+// `options`: what the agent offers to pick with one tap (2 to 4), `recommended` the 1-based number
+// of the one it would choose; a question with none is answered in words only.
 export type ItemQuestion = {
   question: number;
   text: string;
@@ -23,8 +39,41 @@ export type ItemQuestion = {
   step: string;
   stepName: string;
   round: number;
+  options?: string[];
+  recommended?: number;
   answer?: QuestionAnswer;
 };
+
+export const MIN_OPTIONS = 2;
+export const MAX_OPTIONS = 4;
+export const MAX_OPTION_LENGTH = 120;
+
+// The options an agent offers, trimmed, or what is wrong with them: a count outside 2 to 4, an
+// empty or long one, a repeat, a recommendation that is no option's number (or one with no options).
+export function checkOptions(
+  options: readonly string[] | undefined,
+  recommended: number | undefined,
+): { options: string[]; recommended?: number } | { problem: string } {
+  const given = (options ?? []).map((option) => option.trim());
+  if (given.length === 0)
+    return recommended === undefined
+      ? { options: [] }
+      : { problem: 'a recommendation needs options to point at: give 2 to 4 --option' };
+  if (given.length < MIN_OPTIONS || given.length > MAX_OPTIONS)
+    return { problem: `give ${MIN_OPTIONS} to ${MAX_OPTIONS} options, not ${given.length}` };
+  if (given.some((option) => option === '')) return { problem: 'an option is empty' };
+  const long = given.find((option) => option.length > MAX_OPTION_LENGTH);
+  if (long !== undefined)
+    return {
+      problem: `an option is over ${MAX_OPTION_LENGTH} characters ("${long.slice(0, 20)}…"): make it short`,
+    };
+  const keys = given.map((option) => option.toLowerCase());
+  if (new Set(keys).size !== keys.length) return { problem: 'two options are the same' };
+  if (recommended === undefined) return { options: given };
+  if (!Number.isInteger(recommended) || recommended < 1 || recommended > given.length)
+    return { problem: `the recommendation is a number from 1 to ${given.length}` };
+  return { options: given, recommended };
+}
 
 export type QuestionEvent = {
   id?: number;
@@ -56,6 +105,16 @@ function liveEvents(events: readonly QuestionEvent[]): readonly QuestionEvent[] 
   });
 }
 
+// The options a question was asked with, as its event kept them.
+function optionsOf(data: Record<string, unknown>): Pick<ItemQuestion, 'options' | 'recommended'> {
+  const options = Array.isArray(data.options)
+    ? data.options.filter((option): option is string => typeof option === 'string')
+    : [];
+  if (options.length === 0) return {};
+  const { recommended } = data;
+  return { options, ...(typeof recommended === 'number' ? { recommended } : {}) };
+}
+
 // The item's questions, oldest first, each with its answer once there is one.
 export function questionsOf(all: readonly QuestionEvent[]): ItemQuestion[] {
   const events = liveEvents(all);
@@ -71,14 +130,18 @@ export function questionsOf(all: readonly QuestionEvent[]): ItemQuestion[] {
         step: String(data.step ?? ''),
         stepName: String(data.stepName ?? data.step ?? ''),
         round: typeof data.round === 'number' ? data.round : 1,
+        ...optionsOf(data),
       });
     } else if (type === QUESTION_ANSWERED) {
       const asked = out.get(data.question);
       if (!asked || asked.answer) continue;
+      const mode = data.mode === 'option' || data.mode === 'delegated' ? data.mode : 'text';
       asked.answer = {
         text: String(data.text ?? ''),
         at,
         by: actor.name,
+        mode,
+        ...(mode === 'option' && typeof data.option === 'number' ? { option: data.option } : {}),
         ...(typeof data.via === 'string' ? { via: data.via } : {}),
       };
     }
@@ -132,22 +195,54 @@ export function waitingAnswerText(question: ItemQuestion, me?: string): string[]
   const who = question.by === me ? 'your' : `${question.by}'s`;
   return [
     ...quoted(`Waiting for the person to answer ${who} question: `, question.text, '  '),
+    ...optionsLine(question),
     `  The turn is theirs: do not hand it off yet; ${WAKE}.`,
   ];
+}
+
+// The options of a question that waits, numbered as the person sees them.
+function optionsLine(question: ItemQuestion): string[] {
+  const { options, recommended } = question;
+  if (options === undefined) return [];
+  const list = options.map(
+    (option, i) => `${i + 1}. ${option}${recommended === i + 1 ? ' (recommended)' : ''}`,
+  );
+  return [`  Options: ${list.join(' · ')}`];
+}
+
+// What the agent reads of the person's answer: the option they chose, their own words, or the
+// decision left to it, with the option it recommended when it gave one.
+function answerLines(question: ItemQuestion, answer: QuestionAnswer): string[] {
+  if (answer.mode === 'delegated') {
+    const { options, recommended } = question;
+    const pick = recommended === undefined ? undefined : options?.[recommended - 1];
+    return [
+      pick === undefined
+        ? 'The person left the decision to you (you recommended nothing): decide it yourself and say what you chose in your handoff.'
+        : `The person left the decision to you: go with your recommendation, option ${recommended} "${pick}", unless you know better, and say what you chose in your handoff.`,
+    ];
+  }
+  if (answer.mode === 'option')
+    return quoted(`The person chose option ${answer.option ?? ''}: `, answer.text, '  ');
+  const head =
+    question.options === undefined
+      ? 'The person answered: '
+      : 'The person answered in their own words: ';
+  return quoted(head, answer.text, '  ');
 }
 
 // next's and show's block for the round's answered questions, in the order they were asked (a
 // conversation reads forward): each question and the person's answer, which the agent addresses as
 // a send-back note.
 export function answersBlock(questions: readonly ItemQuestion[], me?: string): string[] {
-  const answered = questions.filter((each) => each.answer !== undefined);
-  return answered.flatMap(({ text, by, answer }) => {
+  return questions.flatMap((question) => {
+    const { text, by, answer } = question;
     if (!answer) return [];
     const who = by === me ? 'You' : by;
     return [
       '',
       ...quoted(`${who} asked the person: `, text, '  '),
-      ...quoted('The person answered: ', answer.text, '  '),
+      ...answerLines(question, answer),
       `  ${timeText(answer.at)}; address it in this round.`,
     ];
   });

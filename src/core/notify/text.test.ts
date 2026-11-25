@@ -16,6 +16,17 @@ describe('noticeText', () => {
     expect(noticeText(review, 'en').title).toBe('Your turn');
   });
 
+  it('lists the options of a question when they all fit, and leaves them out when they do not', () => {
+    const ask: Notice = { ...review, kind: 'ask', by: 'claude', options: ['Liso', 'Con musgo'] };
+    expect(noticeText(ask, 'es').body).toBe('TASKS-7 · Ship the login\n1) Liso  2) Con musgo');
+    const long = { ...ask, options: ['x'.repeat(60), 'y'.repeat(60)] } as Notice;
+    expect(noticeText(long, 'en').body).toBe('TASKS-7 · Ship the login');
+    // Only a question has options to say.
+    expect(noticeText({ ...ask, kind: 'turn' } as Notice, 'en').body).toBe(
+      'TASKS-7 · Ship the login',
+    );
+  });
+
   it.each([
     [{ kind: 'ask', by: 'claude' }, 'claude te pregunta', 'claude asks you'],
     [{ kind: 'aside', by: 'kiln' }, 'kiln lo dejó para después', 'kiln set it aside for later'],
