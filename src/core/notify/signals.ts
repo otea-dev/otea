@@ -107,6 +107,33 @@ export function signalsOf(items: readonly NotifyFacts[], now: number): Signal[] 
   return out;
 }
 
+// How long an item must stay unheard, without a break, before it is told: an agent between two
+// steps is back in otea wait well within it.
+export const UNHEARD_GRACE_MS = 2 * 60_000;
+
+// The key an item's unheard stretch is counted under: a new state or round starts it over.
+export const unheardKey = (facts: Pick<NotifyFacts, 'id' | 'state' | 'round'>): string =>
+  `${facts.id}:${facts.state}:${facts.round ?? ''}`;
+
+// Which of the items unheard now (`unheard`, by unheardKey) have been so for the grace. `since`
+// is the state kept between looks: when each stretch began. Those unheard at the first look
+// (`starting`) were there before the watching began and are never told, until heard again.
+export function settleUnheard(
+  since: Map<string, number | null>,
+  unheard: ReadonlySet<string>,
+  now: number,
+  starting: boolean,
+): Set<string> {
+  for (const key of since.keys()) if (!unheard.has(key)) since.delete(key);
+  const told = new Set<string>();
+  for (const key of unheard) {
+    if (!since.has(key)) since.set(key, starting ? null : now);
+    const began = since.get(key);
+    if (typeof began === 'number' && now - began >= UNHEARD_GRACE_MS) told.add(key);
+  }
+  return told;
+}
+
 // The signals that were not there the last time; the first look (`before` undefined) is where
 // watching starts, so a server that starts or a phone that subscribes is not told the past.
 export function freshSignals(

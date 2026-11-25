@@ -93,6 +93,10 @@ export function NotifyChoices({ prefs, projects, onChange }: NotifyChoicesProps)
           {hint ? <small>{t(hint)}</small> : null}
         </Toggle>
       ))}
+      <Toggle on={prefs.askText} onChange={(next) => onChange({ ...prefs, askText: next })}>
+        {t('notify.askText')}
+        <small>{t('notify.askTextHint')}</small>
+      </Toggle>
       <Toggle
         on={quiet !== null}
         onChange={(next) => onChange({ ...prefs, quiet: next ? DEFAULT_QUIET : null })}

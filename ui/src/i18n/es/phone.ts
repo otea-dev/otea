@@ -299,6 +299,8 @@ export const phone = {
   'notify.stuckHint': 'un agente dejó de dar señales con él',
   'notify.ask': 'Un agente te pregunta',
   'notify.aside': 'Un agente dejó algo para después',
+  'notify.askText': 'Mostrar el texto de la pregunta',
+  'notify.askTextHint': 'la pantalla bloqueada lo enseña a quien la mire',
   'notify.unheard': 'Hay trabajo para un agente y nadie escucha',
   'notify.unheardHint': 'ningún agente espera ni trabaja',
   'notify.projects': 'proyectos',

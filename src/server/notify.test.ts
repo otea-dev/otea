@@ -5,11 +5,13 @@ import { createItem, moveItem } from '../app/items.ts';
 import { claimItem, releaseItem } from '../app/leases.ts';
 import { listTargets } from '../app/notify-targets.ts';
 import { choosePhoneTransport } from '../app/phone.ts';
-import { waitBeat } from '../app/presence.ts';
+import { listAgents, seeAgent, waitBeat } from '../app/presence.ts';
 import type { Project } from '../app/project.ts';
 import { fakeTailscale, TAILNET_HOST } from '../app/tailscale-testing.ts';
+import { LISTEN_WINDOW_MS } from '../core/agent-status.ts';
 import type { Actor } from '../core/item.ts';
-import { DEFAULT_PREFS, GATHER_MS, SPACING_MS } from '../core/notify/planner.ts';
+import { DEFAULT_PREFS, GATHER_MS, ITEM_COOLDOWN_MS, SPACING_MS } from '../core/notify/planner.ts';
+import { UNHEARD_GRACE_MS } from '../core/notify/signals.ts';
 import { formatCode } from './lan.ts';
 import type { PushOutcome, PushSender, PushSubscriptionKeys } from './push.ts';
 import { createServer, type OteaServer } from './server.ts';
@@ -155,6 +157,7 @@ describe('notifications on the server', () => {
           stuck: true,
           aside: false,
           unheard: true,
+          askText: true,
           quiet: null,
           muted: [],
         },
@@ -507,6 +510,7 @@ describe('notifications on the server', () => {
       it('tells that new work waits for an agent and none listens, once', async () => {
         const id = second();
         await pass(1000);
+        await pass(UNHEARD_GRACE_MS);
         expect(sent).toEqual([]);
         await pass(GATHER_MS);
         expect(sent).toEqual([
@@ -525,8 +529,63 @@ describe('notifications on the server', () => {
         listen();
         second();
         await pass(1000);
+        await pass(UNHEARD_GRACE_MS);
         await pass(GATHER_MS);
         expect(sent).toEqual([]);
+      });
+
+      it('says nothing of an item heard again within the grace', async () => {
+        second();
+        await pass(1000);
+        await pass(60_000);
+        listen();
+        await pass(UNHEARD_GRACE_MS);
+        await pass(GATHER_MS);
+        expect(sent).toEqual([]);
+      });
+
+      it('says nothing of what was already waiting when the server began to watch', async () => {
+        await pass(1000);
+        await pass(3 * UNHEARD_GRACE_MS);
+        await pass(GATHER_MS);
+        expect(sent).toEqual([]);
+      });
+
+      it('is not silenced by an agent working on another item', async () => {
+        const busy = { agent: 'busy', channel: 'cli', call: true } as const;
+        const stamp = () => new Date(clock).toISOString();
+        seeAgent(project.db, busy, stamp);
+        claimItem(project, { id: first, actor: { kind: 'agent', name: 'busy' } }, at);
+        expect(listAgents(project.db, stamp).find(({ name }) => name === 'busy')?.status).toBe(
+          'working',
+        );
+        const id = second();
+        await pass(1000);
+        seeAgent(project.db, busy, stamp);
+        await pass(UNHEARD_GRACE_MS);
+        await pass(GATHER_MS);
+        expect(sent).toEqual([
+          expect.objectContaining({
+            payload: expect.objectContaining({ url: `/p/memory-aaaaaa/#/i/${id}` }),
+          }),
+        ]);
+      });
+
+      it('does not tell again when a listener lapses and returns within the cooldown', async () => {
+        const id = second();
+        await pass(1000);
+        await pass(UNHEARD_GRACE_MS);
+        await pass(GATHER_MS);
+        expect(sent.filter(({ payload }) => payload.item === id)).toHaveLength(1);
+        listen();
+        await pass(1000);
+        await pass(LISTEN_WINDOW_MS);
+        await pass(UNHEARD_GRACE_MS);
+        await pass(GATHER_MS);
+        // Still inside the item's cooldown, counted from the first notice (about 131 s in).
+        expect(clock - T0).toBeLessThan(131_000 + ITEM_COOLDOWN_MS);
+        // (The item that waited before watching began is told once it is unheard anew.)
+        expect(sent.filter(({ payload }) => payload.item === id)).toHaveLength(1);
       });
 
       it('says nothing to a phone that turned that kind off', async () => {
@@ -535,8 +594,24 @@ describe('notifications on the server', () => {
         await choose(cookie, { unheard: false });
         second();
         await pass(1000);
+        await pass(UNHEARD_GRACE_MS);
         await pass(GATHER_MS);
         expect(sent.map(({ subscription }) => subscription.endpoint)).toEqual([endpoint(1)]);
+      });
+
+      it('takes prefs from an older client that does not send the newer ones as on', async () => {
+        const { cookie } = await pair();
+        await subscribe(cookie, 2);
+        const { unheard: _u, askText: _a, ...older } = { ...DEFAULT_PREFS, turn: false };
+        const saved = await viaTailscale('/p/memory-aaaaaa/api/notify/prefs', {
+          method: 'POST',
+          cookie,
+          body: { prefs: older, lang: 'es' },
+        });
+        expect(saved.status).toBe(200);
+        expect(await saved.json()).toMatchObject({
+          prefs: { turn: false, unheard: true, askText: true },
+        });
       });
     });
 

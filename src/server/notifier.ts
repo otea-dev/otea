@@ -16,7 +16,13 @@ import { setAsideOf } from '../app/set-aside.ts';
 import { itemUnheard } from '../core/agent-status.ts';
 import { activeLease } from '../core/lease.ts';
 import { localMinuteOfDay, type Notice, Planner } from '../core/notify/planner.ts';
-import { freshSignals, type NotifyFacts, signalsOf } from '../core/notify/signals.ts';
+import {
+  freshSignals,
+  type NotifyFacts,
+  settleUnheard,
+  signalsOf,
+  unheardKey,
+} from '../core/notify/signals.ts';
 import { type NoticeLang, type NoticeText, noticeText } from '../core/notify/text.ts';
 import { selectEvents } from '../store/queries.ts';
 import type { ChangeFeed } from './changes.ts';
@@ -61,23 +67,19 @@ function factsOf(project: Project, now: number): NotifyFacts[] {
   const boards = liveBoards(project);
   const clock = () => new Date(now).toISOString();
   const agents = listAgents(project.db, clock);
-  // Nobody listening is told only when no agent is at work either: while one is, what is handed
-  // to an agent reaches it when it waits again, and the desk says so calmly (ui/src/listening.ts).
   const anyoneWaits = agents.some(({ status }) => status === 'listening');
-  const anyoneWorks = agents.some(({ status }) => status === 'working');
   return listItems(project, {}, clock).map((item) => {
     const setAside =
       item.turn === 'agent' ? setAsideOf(selectEvents(project.db, item.id)) : undefined;
     const lease = activeLease(item.lease, clock());
     const holder = lease ? agents.find(({ name }) => name === lease.holder) : undefined;
-    const unheard =
-      !anyoneWorks &&
-      itemUnheard({
-        turn: item.turn,
-        setAside: setAside !== undefined,
-        anyoneWaits,
-        holderWorking: holder?.status === 'working',
-      });
+    // Unheard now; scan() tells it only once it has stayed so for the grace (settleUnheard).
+    const unheard = itemUnheard({
+      turn: item.turn,
+      setAside: setAside !== undefined,
+      anyoneWaits,
+      holderWorking: holder?.status === 'working',
+    });
     const round = boardRoundOf(project, item, boards);
     const notes = notesSummary(project, item, boards);
     return {
@@ -113,6 +115,8 @@ export function createNotifier(
   const desktop = new Map<DesktopListener, { lang: NoticeLang; end?: () => void }>();
   const sending = new Set<Promise<void>>();
   let seen: Set<string> | undefined;
+  // When each item's unheard stretch began; null for one already there when watching began.
+  const unheardSince = new Map<string, number | null>();
   let stopFeed: (() => void) | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
 
@@ -146,7 +150,13 @@ export function createNotifier(
     const at = now();
     let signals: ReturnType<typeof signalsOf>;
     try {
-      signals = signalsOf(factsOf(project, at), at);
+      const facts = factsOf(project, at);
+      const unheard = new Set(facts.filter((f) => f.unheard).map(unheardKey));
+      const told = settleUnheard(unheardSince, unheard, at, seen === undefined);
+      signals = signalsOf(
+        facts.map((f) => ({ ...f, unheard: told.has(unheardKey(f)) })),
+        at,
+      );
     } catch {
       return;
     }
@@ -183,6 +193,7 @@ export function createNotifier(
     clearInterval(timer);
     timer = undefined;
     seen = undefined;
+    unheardSince.clear();
     planners.clear();
   };
 

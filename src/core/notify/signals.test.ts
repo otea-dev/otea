@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { freshSignals, type NotifyFacts, signalsOf } from './signals.ts';
+import {
+  freshSignals,
+  type NotifyFacts,
+  settleUnheard,
+  signalsOf,
+  UNHEARD_GRACE_MS,
+} from './signals.ts';
 
 const NOW = Date.parse('2026-11-14T10:00:00.000Z');
 const later = '2026-11-14T10:10:00.000Z';
@@ -122,6 +128,38 @@ describe('signalsOf', () => {
         by: 'claude',
       },
     ]);
+  });
+});
+
+describe('settleUnheard', () => {
+  const keyOf = (id: string) => `${id}:s:`;
+
+  it('tells an item only after it stayed unheard for the grace', () => {
+    const since = new Map<string, number | null>();
+    const one = new Set([keyOf('A')]);
+    expect(settleUnheard(since, one, NOW, false).size).toBe(0);
+    expect(settleUnheard(since, one, NOW + UNHEARD_GRACE_MS - 1, false).size).toBe(0);
+    expect([...settleUnheard(since, one, NOW + UNHEARD_GRACE_MS, false)]).toEqual([keyOf('A')]);
+  });
+
+  it('starts over when the item was heard in between', () => {
+    const since = new Map<string, number | null>();
+    const one = new Set([keyOf('A')]);
+    settleUnheard(since, one, NOW, false);
+    settleUnheard(since, new Set(), NOW + 60_000, false);
+    settleUnheard(since, one, NOW + 90_000, false);
+    expect(settleUnheard(since, one, NOW + UNHEARD_GRACE_MS + 1000, false).size).toBe(0);
+    expect(settleUnheard(since, one, NOW + 90_000 + UNHEARD_GRACE_MS, false).size).toBe(1);
+  });
+
+  it('never tells what was already unheard when watching began, until it is heard again', () => {
+    const since = new Map<string, number | null>();
+    const one = new Set([keyOf('A')]);
+    settleUnheard(since, one, NOW, true);
+    expect(settleUnheard(since, one, NOW + 10 * UNHEARD_GRACE_MS, false).size).toBe(0);
+    settleUnheard(since, new Set(), NOW + 11 * UNHEARD_GRACE_MS, false);
+    settleUnheard(since, one, NOW + 12 * UNHEARD_GRACE_MS, false);
+    expect(settleUnheard(since, one, NOW + 13 * UNHEARD_GRACE_MS, false).size).toBe(1);
   });
 });
 
