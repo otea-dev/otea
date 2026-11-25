@@ -19,6 +19,7 @@ import {
   type ListItemsFilter,
   listItems,
   moveItem,
+  requireItem,
   showItem,
   updateItem,
 } from '../app/items.ts';
@@ -29,6 +30,7 @@ import { boardRoundOf, liveBoards, rowFactsOf } from '../app/next.ts';
 import { editNote, leaveNote, notesSummary, notesView, withdrawNote } from '../app/notes.ts';
 import { listTargets } from '../app/notify-targets.ts';
 import { markOpened, openedFiles } from '../app/opened.ts';
+import { overlapsOf } from '../app/overlap.ts';
 import { performanceAcross, performanceOf } from '../app/performance.ts';
 import {
   adoptTailscale,
@@ -759,6 +761,11 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       // A round whose work holds the same files as the round it answers (P5-F2): the desk says so
       // before the person approves a change that did not happen.
       .get('/items/:id/round-same', (c) => c.json({ same: roundSame(project, c.req.param('id')) }))
+      // The other open items whose pushed branches change the files this one does: the one that
+      // lands second meets a conflict, so the desk says so in the review.
+      .get('/items/:id/overlaps', (c) =>
+        c.json({ overlaps: overlapsOf(project, requireItem(project.db, c.req.param('id'))) }),
+      )
       .get('/items/:id/opened', (c) =>
         c.json({ evidence: openedFiles(project, c.req.param('id')) }),
       )

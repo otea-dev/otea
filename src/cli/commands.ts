@@ -56,6 +56,7 @@ import {
   listItems,
   moveItem,
   oldestWaiting,
+  requireItem,
   showItem,
   systemClock,
   updateItem,
@@ -88,6 +89,7 @@ import {
   wokeLines,
 } from '../app/next.ts';
 import { agentNotes, noteWaiting, replyNote, roundNotesOf } from '../app/notes.ts';
+import { overlapsOf, overlapText } from '../app/overlap.ts';
 import { performanceOf } from '../app/performance.ts';
 import { lanOpen, type Probe, type TransportKind } from '../app/phone.ts';
 import {
@@ -1291,9 +1293,13 @@ const show: Command = {
       const notes = roundNotesOf(project, item.id);
       const data = itemData(project, item);
       const stray = baseStray(project, input.cwd, shown);
-      const heads = [mergedOutsideLine(project, input.cwd, shown), stray?.text].filter(
-        (line): line is string => line !== undefined,
-      );
+      // Other open items that change the files this one does (src/app/overlap.ts).
+      const sharing = overlapsOf(project, requireItem(project.db, shown.id));
+      const heads = [
+        mergedOutsideLine(project, input.cwd, shown),
+        stray?.text,
+        ...sharing.map((overlap) => overlapText(shown.id, overlap)),
+      ].filter((line): line is string => line !== undefined);
       const said =
         heads.length === 0
           ? text
@@ -1305,6 +1311,7 @@ ${text}`;
           ...data,
           ...(notes.length === 0 ? {} : { notes }),
           ...(stray ? { baseStray: stray } : {}),
+          ...(sharing.length === 0 ? {} : { overlaps: sharing }),
         },
         text: said,
       };
@@ -1973,7 +1980,15 @@ function handedBranch(
     tip && hands && forward && step?.reviewer !== 'none' && !unchanged
       ? repeatsLastRound(project, item.id, item.state, tip)
       : undefined;
+  // The files this branch shares with other open items' pushed branches: whichever lands second
+  // merges main with the other's change in it, and a conflict there is another review round, so the
+  // agent hears it now and the person in the review (src/app/overlap.ts).
+  const sharing =
+    tip && hands && forward && step?.reviewer !== 'none' && !unchanged && !unpushed
+      ? overlapsOf(project, requireItem(project.db, item.id))
+      : [];
   const notes = [
+    ...sharing.map((overlap) => `Note: ${overlapText(item.id, overlap)}`),
     ...(unpushed
       ? [
           `Note: ${branch} was never pushed to ${state.push}. If the person reviews it on the forge (a pull request), they cannot see it there: ${frozen}.`,
