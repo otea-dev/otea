@@ -162,6 +162,8 @@ export function historyOf(
       const text = relay
         ? t('sheet.h.answeredInChat', { via: relay.via })
         : t('sheet.h.youAnswered');
+      // Leaving the decision to the agent has no words to quote.
+      if (e.data.mode === 'delegated') return { ...base, text: t('sheet.qa.delegated') };
       return { ...base, text, quote: String(e.data.text ?? '') };
     }
     // The option you picked of a decision's, with your comment.

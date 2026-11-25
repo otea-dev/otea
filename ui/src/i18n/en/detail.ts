@@ -510,6 +510,8 @@ export const detail = {
   'sheet.qa.free': 'Or answer in your own words',
   'sheet.qa.placeholder': 'Write your answer…',
   'sheet.qa.send': 'Send answer',
+  'sheet.qa.delegate': 'You decide',
+  'sheet.qa.delegated': 'You left the decision to the agent',
   'sheet.qa.goesOn': '{agent} goes on with what you say',
   'sheet.qa.offline': 'No connection to your computer: you can answer once it is back.',
   'pick.label': 'Pick an option',

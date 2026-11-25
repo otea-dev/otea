@@ -156,7 +156,7 @@ export function bodySections(o: {
               // biome-ignore lint/suspicious/noArrayIndexKey: answers keep their order
               <div key={i}>
                 <dt>{a.question}</dt>
-                <dd>{a.answer}</dd>
+                <dd>{a.delegated ? t('sheet.qa.delegated') : a.answer}</dd>
               </div>
             ))}
           </dl>
@@ -189,7 +189,7 @@ export function bodySections(o: {
               ? `${agoOf(item, facts.answered.at, now)} · ${t('sheet.notedBy', { via: facts.answered.via })}`
               : agoOf(item, facts.answered.at, now)
           }
-          text={facts.answered.reason}
+          text={facts.answered.delegated ? t('sheet.qa.delegated') : facts.answered.reason}
         />
       ),
     });

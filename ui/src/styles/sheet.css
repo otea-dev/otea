@@ -565,6 +565,23 @@ section.evidence,
 .opt:hover {
   border-color: var(--ink-3);
 }
+/* An agent's question offers its options as full-width rows: the words may be long, and one tap
+   answers. */
+.opts.stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+.opts.stack .opt {
+  height: auto;
+  min-height: 36px;
+  padding: 8px 13px;
+  text-align: left;
+  line-height: 1.35;
+}
+.opt:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .opt.on {
   border-color: var(--you);
   color: var(--you-ink);
@@ -1051,7 +1068,8 @@ section.evidence,
 }
 /* Picking a decision's option as you approve: the options as buttons, the agent's recommendation
    said quietly, a comment, then the ways on side by side, of the same weight. */
-.pick .opt-rec {
+.pick .opt-rec,
+.qa .opt-rec {
   font-weight: 400;
   color: var(--ink-3);
 }

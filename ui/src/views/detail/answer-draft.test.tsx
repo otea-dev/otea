@@ -61,7 +61,7 @@ afterEach(() => {
 const app: App = testApp({
   collections: [errores],
   answer: async (_id, text) => {
-    answered.push(text);
+    answered.push(String(text));
   },
 });
 
