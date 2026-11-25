@@ -1,3 +1,4 @@
+import type { Overlap } from '../../src/app/overlap.ts';
 import type { MergedOutside } from '../../src/cli/merged-outside.ts';
 import { withoutUndone } from '../../src/core/board/history.ts';
 import type { PerformanceView } from '../../src/core/board/performance.ts';
@@ -340,6 +341,14 @@ export async function fetchRoundSame(id: string, signal: AbortSignal): Promise<R
   const url = `/api/items/${encodeURIComponent(id)}/round-same`;
   const body = (await (await get(url, signal)).json()) as { same: RoundSame | null };
   return body.same;
+}
+
+// The other open items whose pushed branches change the files this one does
+// (src/app/overlap.ts): none when no branch is shared.
+export async function fetchOverlaps(id: string, signal: AbortSignal): Promise<Overlap[]> {
+  const url = `/api/items/${encodeURIComponent(id)}/overlaps`;
+  const body = (await (await get(url, signal)).json()) as { overlaps: Overlap[] };
+  return body.overlaps;
 }
 
 export async function postOpened(id: string, evidence: number): Promise<void> {
