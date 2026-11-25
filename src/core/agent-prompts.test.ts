@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { agentPrompt, designPrompt, joinPrompt, startPrompt } from './agent-prompts.ts';
+import {
+  agentPrompt,
+  designPrompt,
+  isRole,
+  joinPrompt,
+  ROLES,
+  rolePrompt,
+  startPrompt,
+} from './agent-prompts.ts';
 
 describe('the start prompt', () => {
   for (const lang of ['en', 'es'] as const) {
@@ -221,4 +229,85 @@ describe('declaring the profile in the prompts', () => {
       }
     });
   }
+});
+
+// The interview names what the person needs, one question at a time, and ends in one of four
+// plain outcomes: a stock template as is, a template with changes, a board of its own, or no fit.
+describe('the start prompt interview', () => {
+  const OUTCOMES = {
+    en: ['fits as it is', 'fits with these changes', 'board of its own', 'not a good fit'],
+    es: ['encaja tal cual', 'encaja con estos cambios', 'tablero propio', 'no es una buena opción'],
+  } as const;
+
+  for (const lang of ['en', 'es'] as const) {
+    it(`ends in one of four outcomes, said plainly, and drafts only for the first three (${lang})`, () => {
+      for (const repo of [true, false]) {
+        const text = startPrompt(lang, repo);
+        for (const outcome of OUTCOMES[lang]) expect(text).toContain(outcome);
+        // Only the board outcomes draft: the fourth stops there.
+        const lines = text.split('\n');
+        const stop = lines.findIndex((line) => line.includes(OUTCOMES[lang][3]));
+        const draft = lines.findIndex((line) => line.includes('otea board draft --new'));
+        expect(stop).toBeGreaterThan(-1);
+        expect(draft).toBeGreaterThan(stop);
+        expect(lines[stop]).toMatch(lang === 'es' ? /no (hagas|crees)/i : /do not draft/i);
+      }
+    });
+  }
+});
+
+describe('the role prompts', () => {
+  it('knows its two roles', () => {
+    expect(ROLES).toEqual(['coordinator', 'worker']);
+    expect(isRole('worker')).toBe(true);
+    expect(isRole('boss')).toBe(false);
+  });
+
+  for (const lang of ['en', 'es'] as const) {
+    it(`gives the worker its board and name and the rules it works by (${lang})`, () => {
+      const text = rolePrompt('worker', lang, { board: 'Cambios', name: 'ana-cambios' });
+      expect(text).toContain('otea next --collection Cambios --claim --as ana-cambios');
+      expect(text).toContain(
+        `otea profile --model <id> --effort <${lang === 'es' ? 'nivel' : 'level'}> --as ana-cambios`,
+      );
+      expect(text).toContain('otea ask <id>');
+      expect(text).toContain('otea wait --turn agent --unclaimed --as ana-cambios');
+      // It lands with a merge of main, never a force push.
+      expect(text).toContain('git merge origin/main');
+      expect(text).toMatch(lang === 'es' ? /Nunca hagas force push/ : /Never force push/);
+      expect(text).not.toContain('<name>');
+    });
+
+    it(`asks a worker given no name to pick one with whoami, and quotes a board with spaces (${lang})`, () => {
+      const text = rolePrompt('worker', lang, { board: 'Bug reports' });
+      expect(text).toContain('otea whoami');
+      expect(text).toContain('--collection "Bug reports" --claim --as <');
+      expect(text).not.toContain('ana-cambios');
+    });
+
+    it(`keeps the coordinator from ever taking an item, and has it keep listening (${lang})`, () => {
+      const text = rolePrompt('coordinator', lang, {});
+      expect(text).toMatch(lang === 'es' ? /nunca haces un ítem/i : /never do an item yourself/i);
+      expect(text).toMatch(lang === 'es' ? /Nunca tomes, reclames/ : /Never take, claim/);
+      expect(text).toMatch(
+        lang === 'es' ? /nunca apruebes ni devuelvas/i : /never approve or send back/i,
+      );
+      expect(text).toContain('otea whoami');
+      expect(text).toContain('otea profile --model');
+      expect(text).toContain('otea create');
+      expect(text).toContain('otea wait');
+      expect(text).toContain(
+        `otea prompt --role worker --board <${lang === 'es' ? 'tablero' : 'board'}>`,
+      );
+      expect(text).toMatch(lang === 'es' ? /bucle de sondeo propio/ : /polling loop of your own/);
+    });
+  }
+
+  it('gives a coordinator its name when told, and is written in the language asked', () => {
+    const named = rolePrompt('coordinator', 'en', { name: 'ana' });
+    expect(named).toContain('your name is ana');
+    expect(named).not.toContain('otea whoami');
+    expect(rolePrompt('coordinator', 'es', {})).not.toBe(rolePrompt('coordinator', 'en', {}));
+    expect(rolePrompt('worker', 'es', { board: 'Cambios' })).toContain('Eres un worker');
+  });
 });

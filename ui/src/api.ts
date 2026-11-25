@@ -550,7 +550,7 @@ export async function fetchProjects(signal: AbortSignal): Promise<ProjectOvervie
 // moment (the first contact while it has no board of its own, then one more agent joining).
 // `first`: a join prompt for a project's first agent, which connects since nobody else works there.
 export type AgentPromptView = {
-  kind: 'start' | 'join' | 'design';
+  kind: 'start' | 'join' | 'design' | 'coordinator' | 'worker';
   prompt: string;
   first?: boolean;
   // For the plain words beside the prompt (core/agent-prompts.ts connectFacts): whether the work is
@@ -564,6 +564,19 @@ export async function fetchAgentPrompt(
   signal: AbortSignal,
 ): Promise<AgentPromptView> {
   const query = new URLSearchParams(kind ? { kind } : {});
+  return (await get(`/api/agent-prompt?${query}`, signal)).json();
+}
+
+// The canonical text of a role (a coordinator, or a worker of one board, under a name when it has
+// one): what a desk button copies, the same text `otea prompt --role` prints.
+export async function fetchRolePrompt(
+  role: 'coordinator' | 'worker',
+  options: { board?: string; name?: string },
+  signal: AbortSignal,
+): Promise<AgentPromptView> {
+  const query = new URLSearchParams({ role });
+  if (options.board) query.set('board', options.board);
+  if (options.name) query.set('as', options.name);
   return (await get(`/api/agent-prompt?${query}`, signal)).json();
 }
 

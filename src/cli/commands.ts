@@ -177,7 +177,15 @@ import { topicsEverywhere, topicsEverywhereText } from '../app/topics-everywhere
 import { validateProject } from '../app/validate.ts';
 import { watch } from '../app/watch.ts';
 import { agentGuideFor, TOPICS_REMINDER, TOPICS_RULE } from '../core/agent-guide.ts';
-import { agentPrompt, isPromptKind, PROMPT_KINDS, type PromptKind } from '../core/agent-prompts.ts';
+import {
+  agentPrompt,
+  isPromptKind,
+  isRole,
+  PROMPT_KINDS,
+  type PromptKind,
+  ROLES,
+  rolePrompt,
+} from '../core/agent-prompts.ts';
 import { isClosed, isLandStep, positionOf, waysOf } from '../core/board/engine.ts';
 import {
   type BoardDefinition,
@@ -1586,12 +1594,34 @@ function projectPrompt(cwd: string, kind: PromptKind | undefined, asked: Lang | 
   }
 }
 
+// The language a role's text is written in: the one asked, else the project's, else the one the
+// person uses where there is no project yet.
+function roleLanguage(cwd: string, asked: Lang | undefined): Lang {
+  if (asked !== undefined) return asked;
+  let project: Project;
+  try {
+    project = openProject(cwd);
+  } catch (error) {
+    if (error instanceof OteaError && error.code === 'not_found') return defaultLang();
+    throw error;
+  }
+  try {
+    return projectLanguage(project);
+  } finally {
+    project.db.close();
+  }
+}
+
 const promptCommand: Command = {
   name: 'prompt',
   summary:
-    "Print what to paste into an agent's chat: start (a new project: set up, connect, read the project, interview you one question at a time and draft its boards), join (one more agent working the boards there are, named from the project now) or design (one more board); without one, start until the project has boards of its own, then join. --lang en|es (default: the project's language, set when it was made; with no project yet, the one you use: the desk's, else this computer's, else English)",
+    "Print what to paste into an agent's chat: start (a new project: set up, connect, read the project, interview you to understand what you need, one question at a time, tell you plainly whether a template fits, fits with changes, needs a board of its own or Otea is not a good fit, and draft its boards), join (one more agent working the boards there are, named from the project now) or design (one more board); without one, start until the project has boards of its own, then join. Or --role coordinator (the chat you talk to: it puts your requests on boards and launches workers, never doing an item itself) or --role worker --board <name> [--as <name>] (what the coordinator gives each worker, or you paste into a new chat; without --as it tells the worker to pick a name with otea whoami). --lang en|es (default: the project's language, set when it was made; with no project yet, the one you use: the desk's, else this computer's, else English)",
   args: ['moment?'],
-  options: { lang: { placeholder: 'en|es' } },
+  options: {
+    lang: { placeholder: 'en|es' },
+    role: { placeholder: ROLES.join('|') },
+    board: { placeholder: 'name' },
+  },
   execute: (input) => {
     const [moment] = input.args;
     if (moment !== undefined && !isPromptKind(moment))
@@ -1599,7 +1629,30 @@ const promptCommand: Command = {
     const lang = input.option('lang');
     if (lang !== undefined && lang !== 'en' && lang !== 'es')
       throw new UsageError('--lang is en or es');
-    const text = projectPrompt(input.cwd, moment as PromptKind | undefined, lang);
+    const role = input.option('role');
+    const board = input.option('board');
+    const name = input.option('as');
+    if (role === undefined) {
+      if (board !== undefined || name !== undefined)
+        throw new UsageError(`--board and --as go with --role ${ROLES.join('|')}`);
+      const text = projectPrompt(input.cwd, moment as PromptKind | undefined, lang);
+      return { data: { prompt: text }, text };
+    }
+    if (!isRole(role)) throw new UsageError(`--role is one of ${ROLES.join(', ')}`);
+    if (moment !== undefined) throw new UsageError('Give a moment or a --role, not both');
+    if (role === 'worker' && board === undefined)
+      throw new UsageError('--role worker needs --board <name>: the board it works');
+    if (role === 'coordinator' && board !== undefined)
+      throw new UsageError(
+        '--role coordinator takes no --board: each worker it launches gets its own',
+      );
+    // Only a name given with --as fills the text: the session's own (OTEA_AGENT) is the printer's,
+    // never the worker's.
+    if (name !== undefined) assertAgentName(name);
+    const text = rolePrompt(role, roleLanguage(input.cwd, lang), {
+      ...(board === undefined ? {} : { board }),
+      ...(name === undefined ? {} : { name }),
+    });
     return { data: { prompt: text }, text };
   },
 };
