@@ -47,6 +47,7 @@ const Prefs = z.object({
   replied: z.boolean(),
   stuck: z.boolean(),
   aside: z.boolean(),
+  unheard: z.boolean(),
   quiet: z.object({ from: Time, to: Time }).nullable(),
   // The projects muted, by id.
   muted: z.array(z.string().min(1).max(200)).max(500),
@@ -179,7 +180,7 @@ export function notifyApi(
         const { prefs, lang } = await body(
           c,
           PrefsBody,
-          '{"prefs": {"turn", "ask", "replied", "stuck", "aside": boolean, "quiet": {"from": "HH:MM", "to": "HH:MM"} | null, "muted": [project id]}, "lang": "es" | "en"}',
+          '{"prefs": {"turn", "ask", "replied", "stuck", "aside", "unheard": boolean, "quiet": {"from": "HH:MM", "to": "HH:MM"} | null, "muted": [project id]}, "lang": "es" | "en"}',
         );
         const client = clientOf(c);
         if (client.kind === 'device') savePrefs(machine, client.device.id, prefs, lang);

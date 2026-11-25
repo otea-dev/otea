@@ -26,6 +26,7 @@ export const DEFAULT_PREFS: NotifyPrefs = {
   replied: true,
   stuck: true,
   aside: false,
+  unheard: true,
   quiet: null,
   muted: [],
 };
@@ -75,7 +76,14 @@ export const localMinuteOfDay = (ms: number): number => {
 };
 
 // Of an item's news, the one told: a question first, its turn, that it got stuck, then the rest.
-const RANK: Record<NotifyKind, number> = { ask: 0, turn: 1, stuck: 2, replied: 3, aside: 4 };
+const RANK: Record<NotifyKind, number> = {
+  ask: 0,
+  turn: 1,
+  stuck: 2,
+  unheard: 3,
+  replied: 4,
+  aside: 5,
+};
 
 function noticeOf(signal: Signal): ItemNotice {
   const { kind, item, title, by } = signal;

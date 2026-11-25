@@ -184,6 +184,30 @@ describe('Planner', () => {
     ]);
   });
 
+  it('tells that nobody listens unless the person turned that off, and after a question or a turn', () => {
+    const unheard: Signal = {
+      key: 'unheard:A:review:',
+      kind: 'unheard',
+      item: 'A',
+      title: 'Title A',
+    };
+    planner.offer([unheard], prefs, T0);
+    expect(planner.take(T0 + GATHER_MS, keys([unheard]), prefs)).toEqual([
+      { kind: 'unheard', item: 'A', title: 'Title A' },
+    ]);
+
+    const off = { ...prefs, unheard: false };
+    const quiet = new Planner(minuteOfDay);
+    quiet.offer([unheard], off, T0);
+    expect(quiet.hasPending()).toBe(false);
+
+    const both = new Planner(minuteOfDay);
+    both.offer([unheard, turn('A')], prefs, T0);
+    expect(both.take(T0 + GATHER_MS, keys([unheard, turn('A')]), prefs)).toEqual([
+      { kind: 'turn', item: 'A', title: 'Title A' },
+    ]);
+  });
+
   it('tells nothing from a project the person muted, not even what waited', () => {
     const web = new Planner(minuteOfDay, 'web-1');
     web.offer([turn('A')], prefs, T0);
@@ -246,6 +270,7 @@ describe('Planner', () => {
       replied: true,
       stuck: true,
       aside: false,
+      unheard: true,
       quiet: null,
       muted: [],
     });

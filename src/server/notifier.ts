@@ -10,8 +10,11 @@ import {
   listTargets,
   type NotifyTarget,
 } from '../app/notify-targets.ts';
+import { listAgents } from '../app/presence.ts';
 import type { Project } from '../app/project.ts';
 import { setAsideOf } from '../app/set-aside.ts';
+import { itemUnheard } from '../core/agent-status.ts';
+import { activeLease } from '../core/lease.ts';
 import { localMinuteOfDay, type Notice, Planner } from '../core/notify/planner.ts';
 import { freshSignals, type NotifyFacts, signalsOf } from '../core/notify/signals.ts';
 import { type NoticeLang, type NoticeText, noticeText } from '../core/notify/text.ts';
@@ -56,13 +59,30 @@ const TICK_MS = 5000;
 
 function factsOf(project: Project, now: number): NotifyFacts[] {
   const boards = liveBoards(project);
-  return listItems(project, {}, () => new Date(now).toISOString()).map((item) => {
-    const round = boardRoundOf(project, item, boards);
-    const notes = notesSummary(project, item, boards);
+  const clock = () => new Date(now).toISOString();
+  const agents = listAgents(project.db, clock);
+  // Nobody listening is told only when no agent is at work either: while one is, what is handed
+  // to an agent reaches it when it waits again, and the desk says so calmly (ui/src/listening.ts).
+  const anyoneWaits = agents.some(({ status }) => status === 'listening');
+  const anyoneWorks = agents.some(({ status }) => status === 'working');
+  return listItems(project, {}, clock).map((item) => {
     const setAside =
       item.turn === 'agent' ? setAsideOf(selectEvents(project.db, item.id)) : undefined;
+    const lease = activeLease(item.lease, clock());
+    const holder = lease ? agents.find(({ name }) => name === lease.holder) : undefined;
+    const unheard =
+      !anyoneWorks &&
+      itemUnheard({
+        turn: item.turn,
+        setAside: setAside !== undefined,
+        anyoneWaits,
+        holderWorking: holder?.status === 'working',
+      });
+    const round = boardRoundOf(project, item, boards);
+    const notes = notesSummary(project, item, boards);
     return {
       ...item,
+      ...(unheard ? { unheard } : {}),
       ...(round === undefined ? {} : { round }),
       ...(notes === undefined ? {} : { notes }),
       ...(setAside === undefined ? {} : { setAside }),

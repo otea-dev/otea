@@ -88,6 +88,21 @@ describe('signalsOf', () => {
     ]);
   });
 
+  it('says an item waits for an agent when nobody listens, once per state', () => {
+    const waiting = item({ turn: 'agent', lease: null, unheard: true });
+    expect(signalsOf([waiting], NOW)).toEqual([
+      {
+        key: 'unheard:TASKS-1:build__review:',
+        kind: 'unheard',
+        item: 'TASKS-1',
+        title: 'Ship the login',
+      },
+    ]);
+    const next = signalsOf([{ ...waiting, state: 'build__test', round: 2 }], NOW);
+    expect(next[0]?.key).not.toBe('unheard:TASKS-1:build__review:');
+    expect(kinds([item({ turn: 'agent', lease: null })])).toEqual([]);
+  });
+
   it('says an agent answered your note, once per answer', () => {
     const answered = item({
       turn: 'agent',
