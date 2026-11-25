@@ -11,7 +11,7 @@ import {
   type Submitted,
   submitAgentDraft,
 } from '../app/agent-draft.ts';
-import { promptFacts, promptKindOf } from '../app/agent-prompts.ts';
+import { promptFacts, promptKindOf, roleBoard } from '../app/agent-prompts.ts';
 import {
   type AgentsMdAction,
   assertPinned,
@@ -184,6 +184,8 @@ import {
   PROMPT_KINDS,
   type PromptKind,
   ROLES,
+  type Role,
+  type RoleFacts,
   rolePrompt,
 } from '../core/agent-prompts.ts';
 import { isClosed, isLandStep, positionOf, waysOf } from '../core/board/engine.ts';
@@ -1596,17 +1598,25 @@ function projectPrompt(cwd: string, kind: PromptKind | undefined, asked: Lang | 
 
 // The language a role's text is written in: the one asked, else the project's, else the one the
 // person uses where there is no project yet.
-function roleLanguage(cwd: string, asked: Lang | undefined): Lang {
-  if (asked !== undefined) return asked;
+// A worker's board must exist in the project (and is named as the project names it).
+function projectRolePrompt(
+  cwd: string,
+  role: Role,
+  asked: Lang | undefined,
+  facts: RoleFacts,
+): string {
   let project: Project;
   try {
     project = openProject(cwd);
   } catch (error) {
-    if (error instanceof OteaError && error.code === 'not_found') return defaultLang();
+    // No project: a coordinator's text needs none, a worker's board cannot exist.
+    if (error instanceof OteaError && error.code === 'not_found' && role === 'coordinator')
+      return rolePrompt(role, asked ?? defaultLang(), facts);
     throw error;
   }
   try {
-    return projectLanguage(project);
+    const board = facts.board === undefined ? {} : { board: roleBoard(project, facts.board) };
+    return rolePrompt(role, asked ?? projectLanguage(project), { ...facts, ...board });
   } finally {
     project.db.close();
   }
@@ -1649,7 +1659,7 @@ const promptCommand: Command = {
     // Only a name given with --as fills the text: the session's own (OTEA_AGENT) is the printer's,
     // never the worker's.
     if (name !== undefined) assertAgentName(name);
-    const text = rolePrompt(role, roleLanguage(input.cwd, lang), {
+    const text = projectRolePrompt(input.cwd, role, lang, {
       ...(board === undefined ? {} : { board }),
       ...(name === undefined ? {} : { name }),
     });

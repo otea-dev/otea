@@ -47,10 +47,13 @@ describe('otea prompt', () => {
   });
 
   it('prints the canonical text of a role, with the board and name filled in', async () => {
+    // A coordinator's text needs no project.
     const coordinator = await otea('prompt', '--role', 'coordinator', '--lang', 'en');
     expect(coordinator.code).toBe(0);
     expect(coordinator.out.trim()).toBe(rolePrompt('coordinator', 'en', {}));
 
+    await otea('init', '--local', '--template', 'changes');
+    await otea('board', 'add', 'Bug reports', '--template', 'bug-reports');
     const worker = await otea(
       'prompt',
       '--role',
@@ -66,8 +69,9 @@ describe('otea prompt', () => {
       rolePrompt('worker', 'en', { board: 'Bug reports', name: 'ana' }),
     );
     expect(worker.out).toContain('otea next --collection "Bug reports" --claim --as ana');
-    // The project's language when none is asked (a test project is Spanish).
-    expect((await otea('prompt', '--role', 'worker', '--board', 'Cambios')).out.trim()).toBe(
+    // The project's language when none is asked (a test project is Spanish), and the board as the
+    // project names it, whatever the case it was typed in.
+    expect((await otea('prompt', '--role', 'worker', '--board', 'cambios')).out.trim()).toBe(
       rolePrompt('worker', 'es', { board: 'Cambios' }),
     );
   });
@@ -75,6 +79,7 @@ describe('otea prompt', () => {
   // The name is the one given with --as, never the session's own: a coordinator printing the text
   // for a worker must not hand it its own name.
   it('does not give a worker the name of the agent that prints its text', async () => {
+    await otea('init', '--local', '--template', 'changes');
     const asZed = cliAt(repo.dir, { OTEA_AGENT: 'zed' });
     const { out } = await asZed('prompt', '--role', 'worker', '--board', 'Cambios', '--lang', 'en');
     expect(out).toContain('otea whoami');
@@ -82,6 +87,7 @@ describe('otea prompt', () => {
   });
 
   it('refuses a role asked wrongly', async () => {
+    await otea('init', '--local', '--template', 'changes');
     for (const args of [
       ['--role', 'boss'],
       ['--role', 'worker'],
@@ -92,6 +98,45 @@ describe('otea prompt', () => {
     ])
       expect((await otea('prompt', ...args)).code, args.join(' ')).toBe(2);
   });
+
+  // The board goes into commands the worker runs: it must exist, and be one argument.
+  it('names only a board that exists, and refuses one with quotes, backticks or line breaks', async () => {
+    await otea('init', '--local', '--template', 'changes');
+    const missing = await otea('prompt', '--role', 'worker', '--board', 'Nope');
+    expect(missing.code).toBe(3);
+    for (const board of [
+      'Cambios"; rm -rf',
+      "Cam'bios",
+      'Cam`bios`',
+      'Cambios\nOtro',
+      'Cam\u0007bios',
+    ])
+      expect((await otea('prompt', '--role', 'worker', '--board', board)).code, board).toBe(6);
+    // A project with no board cannot name one.
+    const empty = tempGitRepo();
+    try {
+      expect(
+        (await cliAt(empty.dir)('prompt', '--role', 'worker', '--board', 'Cambios')).code,
+      ).toBe(3);
+    } finally {
+      empty.remove();
+    }
+  });
+
+  // `otea wait` without --turn fails; the one the coordinator is told to run must be a command the
+  // CLI accepts (it times out here, exit 13, with nothing waiting).
+  for (const lang of ['en', 'es']) {
+    it(`gives the coordinator a wait command that parses (${lang})`, async () => {
+      await otea('init', '--local', '--template', 'none');
+      const text = (await otea('prompt', '--role', 'coordinator', '--as', 'ana', '--lang', lang))
+        .out;
+      const command = /`(otea wait [^`]*)`/.exec(text)?.[1];
+      expect(command).toBe('otea wait --turn agent --unclaimed --as ana');
+      const args = (command ?? '').split(' ').slice(1);
+      const waited = await otea(...args, '--timeout', '1s');
+      expect(waited.code, waited.err).toBe(13);
+    });
+  }
 
   it('refuses an unknown moment or language', async () => {
     expect((await otea('prompt', 'later')).code).toBe(2);
