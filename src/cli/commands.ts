@@ -67,6 +67,7 @@ import { type Launcher, oteaLauncher, runningRoot, withHome } from '../app/launc
 import type { BaseTips } from '../app/lease-take.ts';
 import { claimItem, heartbeatItem, releaseItem } from '../app/leases.ts';
 import { openMachine, rememberLocalProject, withMachine } from '../app/machine.ts';
+import { mergeOnlyOf, mergeOnlyText } from '../app/merge-only.ts';
 import { markMerged, reopenItem } from '../app/merged.ts';
 import { type MigrationReport, migrateToCommon } from '../app/migrate.ts';
 import {
@@ -1295,9 +1296,12 @@ const show: Command = {
       const stray = baseStray(project, input.cwd, shown);
       // Other open items that change the files this one does (src/app/overlap.ts).
       const sharing = overlapsOf(project, requireItem(project.db, shown.id));
+      // A round that only merges main into the approved work (src/app/merge-only.ts).
+      const mergeOnly = mergeOnlyOf(project, shown.id);
       const heads = [
         mergedOutsideLine(project, input.cwd, shown),
         stray?.text,
+        ...(mergeOnly ? [mergeOnlyText(shown.id, mergeOnly)] : []),
         ...sharing.map((overlap) => overlapText(shown.id, overlap)),
       ].filter((line): line is string => line !== undefined);
       const said =
@@ -1312,6 +1316,7 @@ ${text}`;
           ...(notes.length === 0 ? {} : { notes }),
           ...(stray ? { baseStray: stray } : {}),
           ...(sharing.length === 0 ? {} : { overlaps: sharing }),
+          ...(mergeOnly ? { mergeOnly } : {}),
         },
         text: said,
       };
@@ -2087,7 +2092,12 @@ const handoffCommand: Command = {
       refuseUnlandedCommit(project, input.cwd, move);
       warning = handed.warning;
       said = handed.said;
-      return handoffItem(project, { ...move, ...(handed.tip ? { tip: handed.tip } : {}) });
+      const done = handoffItem(project, { ...move, ...(handed.tip ? { tip: handed.tip } : {}) });
+      // A round that only merges main into the approved work is reviewed as that merge alone.
+      const only = mergeOnlyOf(project, move.id);
+      if (only)
+        warning = [warning, `Note: ${mergeOnlyText(move.id, only)}`].filter(Boolean).join('\n');
+      return done;
     });
     // An agent goes on to the next item, and waits when there is none: the reply ends with the
     // exact commands, so it neither stops after one nor says it waits with no wait running

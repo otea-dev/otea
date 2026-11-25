@@ -26,6 +26,7 @@ import {
 import { rememberLanguage, storedLanguage } from '../app/language.ts';
 import type { Launcher } from '../app/launcher.ts';
 import { memoryMachine } from '../app/machine.ts';
+import { mergeOnlyOf } from '../app/merge-only.ts';
 import { boardRoundOf, liveBoards, rowFactsOf } from '../app/next.ts';
 import { editNote, leaveNote, notesSummary, notesView, withdrawNote } from '../app/notes.ts';
 import { listTargets } from '../app/notify-targets.ts';
@@ -761,6 +762,11 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       // A round whose work holds the same files as the round it answers (P5-F2): the desk says so
       // before the person approves a change that did not happen.
       .get('/items/:id/round-same', (c) => c.json({ same: roundSame(project, c.req.param('id')) }))
+      // A round that only merges main into the work the person approved, with what the merge
+      // changed by hand: the review shows that alone (src/app/merge-only.ts).
+      .get('/items/:id/merge-only', (c) =>
+        c.json({ merge: mergeOnlyOf(project, c.req.param('id')) }),
+      )
       // The other open items whose pushed branches change the files this one does: the one that
       // lands second meets a conflict, so the desk says so in the review.
       .get('/items/:id/overlaps', (c) =>

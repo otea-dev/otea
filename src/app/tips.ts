@@ -83,6 +83,30 @@ export function repeatsLastRound(
   return sameAsEarlier(ctx, id, from, tip);
 }
 
+// The tip the person approved, when the review the item is in now answers a bounce from the land
+// step: it was approved, an agent met a conflict landing it and took it back to the step before
+// (otea handoff --way), and this handoff is that step's next round. `approved` is the tip of the
+// review that was approved, `now` the tip of this one, of the same branch. `lands` tells the state of
+// a step an agent lands in. Undefined for any other round: a send-back by the person with comments,
+// a first review, a round that never went through the land step.
+export function approvedBeforeBounce(
+  ctx: Context,
+  id: string,
+  lands: (state: string) => boolean,
+): { approved: Tip; now: Tip } | undefined {
+  const events = selectEvents(ctx.db, id).filter(({ type }) => type === 'transitioned');
+  const reviews = handoffs(ctx, id);
+  const [last, before] = [reviews.at(-1), reviews.at(-2)];
+  const [now, approved] = [last?.data.tip, before?.data.tip];
+  if (!last || !before || !isTip(now) || !isTip(approved) || now.branch !== approved.branch)
+    return undefined;
+  if (now.unchanged || approved.unchanged) return undefined;
+  const bounced = events
+    .filter(({ id: at }) => at > before.id && at < last.id)
+    .some(({ data }) => lands(String(data.from)) && !lands(String(data.to)));
+  return bounced ? { approved, now } : undefined;
+}
+
 // Whether the item was ever handed off into a review: from then on its branch on the remote holds
 // what a review read.
 export function handedOff(ctx: Context, id: string): boolean {

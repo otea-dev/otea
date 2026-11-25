@@ -783,6 +783,11 @@ export const detail = {
   'bi.branch.overlapOpen':
     '{item} toca los mismos archivos que {other} ({files}), que también está abierto: el que se integre segundo debe fusionar main primero y puede chocar.',
   'bi.branch.overlapMore': 'y {n} más',
+  'bi.branch.mergeOnly':
+    'Desde el commit que aprobaste ({since}), esta ronda solo fusiona main en {branch}, y la fusión cambió {files} a mano: eso es lo que queda por revisar. Aprobar toma {tip} tal como está; lo demás es lo que aprobaste, y lo que trajo main aterrizó con su propia revisión.',
+  'bi.branch.mergeOnlyClean':
+    'Desde el commit que aprobaste ({since}), esta ronda solo fusiona main en {branch}, y no se cambió nada a mano. Aprobar toma {tip} tal como está.',
+  'bi.branch.mergeOnlyDiff': 'Lo que la fusión cambió a mano',
   'bi.request.board': 'Tablero {name}',
   'bi.request.waiting': 'espera el esbozo',
   'bi.request.arrived': 'el esbozo llegó: revísalo y publícalo',
