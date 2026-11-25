@@ -76,11 +76,20 @@ import { undoMove } from '../app/undo.ts';
 import { waiveEvidence } from '../app/waive.ts';
 import { mergedOutside } from '../cli/merged-outside.ts';
 import { OTEA_VERSION } from '../cli/version.ts';
-import { agentPrompt, connectFacts, isPromptKind, PROMPT_KINDS } from '../core/agent-prompts.ts';
+import {
+  agentPrompt,
+  connectFacts,
+  isPromptKind,
+  isRole,
+  PROMPT_KINDS,
+  ROLES,
+  rolePrompt,
+} from '../core/agent-prompts.ts';
 import { PERIOD_HINT, parsePeriod } from '../core/board/performance.ts';
 import { LANGS, type Lang } from '../core/board/template-words.ts';
 import { OteaError } from '../core/errors.ts';
 import { MAX_EVIDENCE_MB } from '../core/evidence.ts';
+import { isAgentName } from '../core/item.ts';
 import { TURNS, type Turn } from '../core/workflow.ts';
 import {
   type EventFilter,
@@ -529,9 +538,29 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       // What to paste into an agent's chat (Conectar un agente, the empty project): the first contact,
       // one more agent joining, or one more board; without a kind, the project's moment.
       .get('/agent-prompt', (c) => {
-        const { kind } = c.req.query();
+        const { kind, role, board, as: name } = c.req.query();
         if (kind !== undefined && !isPromptKind(kind))
           throw new InvalidQuery(`kind must be one of ${PROMPT_KINDS.join(', ')}`);
+        // A role's text (the canonical way of working): the same one otea prompt --role prints, for
+        // the desk to copy. A worker's board is required; a coordinator has none.
+        if (role === undefined && (board !== undefined || name !== undefined))
+          throw new InvalidQuery(`board and as go with role (${ROLES.join(', ')})`);
+        if (role !== undefined) {
+          if (!isRole(role)) throw new InvalidQuery(`role must be one of ${ROLES.join(', ')}`);
+          if (kind !== undefined) throw new InvalidQuery('give a kind or a role, not both');
+          if (role === 'worker' && !board) throw new InvalidQuery('role worker needs a board');
+          if (role === 'coordinator' && board !== undefined)
+            throw new InvalidQuery('role coordinator takes no board');
+          if (name !== undefined && !isAgentName(name))
+            throw new InvalidQuery(`"${name}" cannot name an agent`);
+          return c.json({
+            kind: role,
+            prompt: rolePrompt(role, projectLanguage(project, env), {
+              ...(board ? { board } : {}),
+              ...(name ? { name } : {}),
+            }),
+          });
+        }
         const moment = kind ?? promptKindOf(project);
         // The pasted prompt and the list beside it name each board and step as the agent reads them
         // (`otea next`, `otea board`: each in the language it was made in), whatever the desk's

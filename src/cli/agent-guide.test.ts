@@ -48,6 +48,8 @@ describe("Otea's agent guide", () => {
       'to change a published board (a field, a step), --change <board> instead of --new',
       'the person publishes it',
       'asking the person one question at a time',
+      // The interview's four outcomes, the same ones the start prompt names.
+      'a template as it is, with changes, a board of its own, or Otea is not a fit (draft nothing)',
       '--template <key>',
       'Keep going until the person stops you',
       'otea wait --turn agent --unclaimed',

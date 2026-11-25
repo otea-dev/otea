@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { designPrompt, startPrompt } from '../core/agent-prompts.ts';
+import { designPrompt, rolePrompt, startPrompt } from '../core/agent-prompts.ts';
 import { type Cli, cliAt, tempGitRepo } from './testing.ts';
 
 // otea prompt prints what the person pastes into an agent's chat: the whole first contact on a
@@ -44,6 +44,53 @@ describe('otea prompt', () => {
     expect(join).toContain('- Cambios: Aclarar, Hacerlo, Integrar (1 espera a un agente ahora)');
     expect((await otea('prompt', 'design')).out.trim()).toBe(designPrompt('es'));
     expect((await otea('prompt', 'start')).out.trim()).toBe(startPrompt('es'));
+  });
+
+  it('prints the canonical text of a role, with the board and name filled in', async () => {
+    const coordinator = await otea('prompt', '--role', 'coordinator', '--lang', 'en');
+    expect(coordinator.code).toBe(0);
+    expect(coordinator.out.trim()).toBe(rolePrompt('coordinator', 'en', {}));
+
+    const worker = await otea(
+      'prompt',
+      '--role',
+      'worker',
+      '--board',
+      'Bug reports',
+      '--as',
+      'ana',
+      '--lang',
+      'en',
+    );
+    expect(worker.out.trim()).toBe(
+      rolePrompt('worker', 'en', { board: 'Bug reports', name: 'ana' }),
+    );
+    expect(worker.out).toContain('otea next --collection "Bug reports" --claim --as ana');
+    // The project's language when none is asked (a test project is Spanish).
+    expect((await otea('prompt', '--role', 'worker', '--board', 'Cambios')).out.trim()).toBe(
+      rolePrompt('worker', 'es', { board: 'Cambios' }),
+    );
+  });
+
+  // The name is the one given with --as, never the session's own: a coordinator printing the text
+  // for a worker must not hand it its own name.
+  it('does not give a worker the name of the agent that prints its text', async () => {
+    const asZed = cliAt(repo.dir, { OTEA_AGENT: 'zed' });
+    const { out } = await asZed('prompt', '--role', 'worker', '--board', 'Cambios', '--lang', 'en');
+    expect(out).toContain('otea whoami');
+    expect(out).not.toContain('zed');
+  });
+
+  it('refuses a role asked wrongly', async () => {
+    for (const args of [
+      ['--role', 'boss'],
+      ['--role', 'worker'],
+      ['--role', 'coordinator', '--board', 'Cambios'],
+      ['--role', 'worker', '--board', 'Cambios', 'design'],
+      ['--board', 'Cambios'],
+      ['--as', 'ana'],
+    ])
+      expect((await otea('prompt', ...args)).code, args.join(' ')).toBe(2);
   });
 
   it('refuses an unknown moment or language', async () => {

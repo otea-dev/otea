@@ -146,12 +146,38 @@ otea stats --since 30d                                     # per model family an
 otea stats --board Errores --json                          # one board, as JSON
 ```
 
+## The canonical way: a coordinator and two workers
+
+A chat coordinates, workers do the items, and you decide on the desk or the phone. Otea never launches an agent: your harness launches its own workers. What Otea does is show when nobody is listening on a board and tell you, and make review fast.
+
+The roles:
+
+1. **Coordinator**: the one chat you talk to. It turns what you ask into complete items (What I want and How I check it filled in, so they skip the clarifying step), keeps priorities, answers your side questions (topics), launches and relaunches workers, and keeps listening to the desk with `otea wait` after every reply. It never takes an item itself: doing work would block the chat you talk to.
+2. **Worker**: one per board, at most two on a code board. It has a fixed name and loops `otea next --collection <board> --claim`, does the step, hands off with the exact command and runs `otea next` again; with nothing left it runs `otea wait --turn agent --unclaimed`. It works in its own git worktree and lands approved work with a merge of main, never a force push. It never decides for you and never stops silently: it asks on the item with `otea ask`.
+3. **You**, on the desk or the phone: approve, send back with a note, answer questions, and add items with **Nuevo ítem** (a worker takes them directly, no chat needed). You never relay between agents.
+
+Each role has a text to paste, in the project's language (or `--lang`), the same one the desk serves from `GET /api/agent-prompt?role=<coordinator|worker>&board=<name>&as=<name>`:
+
+```sh
+otea prompt --role coordinator                                  # paste into the chat you talk to
+otea prompt --role worker --board Cambios --as ana-cambios      # one worker of the board Cambios
+otea prompt --role worker --board Cambios                       # without --as it tells the worker to pick its name with otea whoami
+```
+
+Launch the workers one of two ways:
+
+- **Background subagents**, where the harness has them (Claude Code, opencode, Cursor): paste the coordinator text into your chat. It launches each worker as a background subagent with the worker text as its instructions, and launches it again when the desk says nobody is listening on its board.
+- **One chat or terminal per role**, in any other harness: paste the coordinator text into one chat, and in a new chat or terminal for each worker paste the output of `otea prompt --role worker --board <name>`.
+
+First contact is not "design a board from scratch": the agent that sets up a project (`otea prompt start`) first asks what work you want agents to do, what "done" looks like, who reviews and where it lands, one question at a time, and then says plainly one of four things: a stock template fits as it is, a template fits with these changes, this needs a board of its own (drafted with `otea board draft`), or Otea is not a good fit (for example, one-off tiny tasks are faster in plain chat).
+
 ## What to paste into an agent's chat
 
 `otea prompt` prints what the person pastes into an agent's chat, the same text the UI copies (**Conectar un agente** and the empty project page), in the project's language (fixed when the project was made, in the language you used then; `otea projects lang` changes it) or with `--lang`:
 
-- `start`, the first contact on a new project: set it up (`otea init`, no template) and connect (`otea connect` with the agent's own name, model and effort), read the project (README, code, git history, CLAUDE.md or AGENTS.md, CI; in a folder that is no git repository, what is in it, with no git words), ask the person one question at a time how they want to work, draft the boards with `otea board draft --new … --why … --template <key>`, say where to review them and to try them with a first item, and then keep working.
+- `start`, the first contact on a new project: set it up (`otea init`, no template) and connect (`otea connect` with the agent's own name, model and effort), read the project (README, code, git history, CLAUDE.md or AGENTS.md, CI; in a folder that is no git repository, what is in it, with no git words), understand what the person needs one question at a time, say plainly which of four outcomes fits (a stock template as it is, a template with changes, a board of its own, or Otea is not a good fit, in which case it drafts nothing), draft the boards with `otea board draft --new … --why … --template <key>`, say where to review them and to try them with a first item, and then keep working.
+- `--role coordinator` and `--role worker --board <name> [--as <name>]`, instead of a moment: the canonical texts of [a coordinator and its workers](#the-canonical-way-a-coordinator-and-two-workers). A worker needs its board; only a name given with `--as` is filled in, never the session's own.
 - `join`, one more agent on a project that has boards: pick a name none of the listening agents has (they are named), connect (`otea connect`, which writes nothing that names it) and put the name on every command, declare its profile, read the guide and the boards, written from the project as it is now (each board's agent steps and how many items wait for an agent), and work the queue (`otea next --claim`, hand off, `otea wait`), never taking an item another agent holds and never designing boards.
 - `design`, one more board on a project that already has some.
 
-Without one, it gives `start` until the project has a board of its own (or where there is no project yet), then `join`. `GET /api/agent-prompt?kind=&lang=` answers the same for the UI.
+Without one, it gives `start` until the project has a board of its own (or where there is no project yet), then `join`. `GET /api/agent-prompt?kind=&lang=` answers the same for the UI, and `?role=` (with `board=` and `as=`) the role texts.

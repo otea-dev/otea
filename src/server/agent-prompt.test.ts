@@ -9,7 +9,7 @@ import { liveBoardOf } from '../app/next.ts';
 import { hearAgent } from '../app/presence.ts';
 import type { Project } from '../app/project.ts';
 import { setProjectLanguage } from '../app/project-language.ts';
-import { designPrompt, startPrompt } from '../core/agent-prompts.ts';
+import { designPrompt, rolePrompt, startPrompt } from '../core/agent-prompts.ts';
 import { insertProjectIdentity } from '../store/queries.ts';
 import { createServer, type OteaServer } from './server.ts';
 import { LOCAL_HOST, memoryProject, SESSION_COOKIE, TOKEN } from './testing.ts';
@@ -150,5 +150,30 @@ describe('GET /api/agent-prompt', () => {
 
   it('refuses a moment it does not know', async () => {
     expect((await get('?kind=later')).status).toBe(400);
+  });
+
+  // The same texts otea prompt --role prints, for the desk to copy.
+  it('gives the text of a role, with the board and name filled in', async () => {
+    expect((await get('?role=coordinator&lang=en')).body).toEqual({
+      kind: 'coordinator',
+      prompt: rolePrompt('coordinator', 'en', {}),
+    });
+    expect((await get('?role=worker&board=Bug%20reports&as=ana&lang=es')).body).toEqual({
+      kind: 'worker',
+      prompt: rolePrompt('worker', 'es', { board: 'Bug reports', name: 'ana' }),
+    });
+    expect((await get('?role=worker&board=Cambios&lang=en')).body.prompt).toContain('otea whoami');
+  });
+
+  it('refuses a role asked wrongly', async () => {
+    for (const query of [
+      '?role=boss',
+      '?role=worker',
+      '?role=coordinator&board=Cambios',
+      '?role=worker&board=Cambios&kind=join',
+      '?role=worker&board=Cambios&as=Not%20A%20Name',
+      '?board=Cambios',
+    ])
+      expect((await get(query)).status, query).toBe(400);
   });
 });
