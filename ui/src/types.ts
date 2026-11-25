@@ -56,6 +56,9 @@ export type Item = {
   // Held by an agent whose own question waits for your answer on another item (P7-R3-9): that
   // agent and the item; the desk says it waits there, not that it is on this one.
   holderAsks?: { by: string; item: string };
+  // Approved and waiting for another item to land in its base first (src/app/land-order.ts): that
+  // item, and the line that says why (the same files, what the other waits for, the way out).
+  landsAfter?: { first: string; text: string };
   // The item's relations, read from it, and a parent's children summary; absent when it has none.
   relations?: RelationRef[];
   children?: ChildrenSummary;

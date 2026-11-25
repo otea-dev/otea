@@ -127,10 +127,11 @@ import {
 } from './items.ts';
 import { type LandsFirst, landsFirst, landsFirstLine, landsFirstText } from './land-order.ts';
 import { assertMayWriteItem, type BaseTips, takeItem } from './lease-take.ts';
+import { scanned } from './overlap.ts';
 import { sessionAlive, sessionRuns } from './presence.ts';
 import { priorityOf } from './priority.ts';
 import { liftSetAside, retakeOf, retakeText, SET_ASIDE_LIFTED, setAsideOf } from './set-aside.ts';
-import { approvedTipOf } from './tips.ts';
+import { approvedTipOf, type Recorded } from './tips.ts';
 
 // What agents meet on a published board: the facts the step engine reads of an item, `next` (the
 // item to take and its text) and the three moves an agent makes on a board (handoff, approve and
@@ -1372,6 +1373,18 @@ function heldElsewhere(
   ];
 }
 
+// What the item waits for before it lands, as the desk row says it: the item that lands first and
+// the line that says why; undefined when it waits for none. Asked once per request, give it a
+// context from `scanned`.
+export function landWaitOf(
+  ctx: Context,
+  item: ItemRecord,
+  at: string,
+): { first: string; text: string } | undefined {
+  const first = landTurnFor(ctx, item, '', at);
+  return first ? { first: first.first, text: landsFirstLine(item.id, first) } : undefined;
+}
+
 // What next says of an item it offers without claiming it: for OFFER_MS no other agent is offered it.
 export function offeredLine(id: string): string {
   return `Offered to you for ${OFFER_MS / 60_000} min, not claimed: no other agent is offered ${id} meanwhile. Claim it to work it; otherwise leave it, and it is offered again after that.`;
@@ -1383,7 +1396,7 @@ export function offeredLine(id: string): string {
 // agent claims it in the same transaction, so no other agent can take it between the two. When
 // there is none: that, once, each board's words for idle time and its cap, and how to wait.
 export function nextFor(
-  ctx: Context,
+  given: Context,
   agent: string,
   options: {
     collection?: string;
@@ -1394,6 +1407,8 @@ export function nextFor(
   } = {},
   now = systemClock,
 ): NextAnswer {
+  // Git is asked about each branch once in this call, however many landings it weighs.
+  const ctx = scanned(given);
   const { collection } = options;
   const named = collection === undefined ? undefined : collectionNamed(ctx.db, collection);
   const boards = liveBoards(ctx).filter(
@@ -1544,6 +1559,10 @@ export type BoardMoveInput = {
   // `pushed: false`: never pushed though the repo has a remote, for the approval to warn (P7-8).
   // `unchanged`: the base itself, holding nothing the remote lacks: no code change (P2S-R3-3).
   tip?: { branch: string; commit: string; tree: string; pushed?: false; unchanged?: true };
+  // Recorded with the tip of a handoff into a review (app/tips.ts Recorded): that the round only
+  // merges main into what was approved, and the open items that change the files it does.
+  merge?: NonNullable<Recorded['merge']>;
+  overlaps?: NonNullable<Recorded['overlaps']>;
 };
 
 export type BoardMoveResult = { item: Item; text: string };
@@ -1713,6 +1732,8 @@ function land(
     ...(input.reason ? { reason: input.reason } : {}),
     ...(input.note?.trim() ? { note: input.note } : {}),
     ...(input.tip && reviewed ? { tip: input.tip } : {}),
+    ...(input.tip && reviewed && input.merge ? { merge: input.merge } : {}),
+    ...(input.tip && reviewed && input.overlaps ? { overlaps: input.overlaps } : {}),
     channel: input.channel,
   };
   return landMove(

@@ -10,25 +10,24 @@ import { t } from '../../i18n/i18n.ts';
 
 export type { MergeOnly };
 
+// Every file the merge changed is named, none left to "and more": the diff holds all of it.
 export function mergeOnlyText(merge: MergeOnly): string {
-  const files = merge.files.slice(0, 3).join(', ');
   const key = merge.files.length === 0 ? 'bi.branch.mergeOnlyClean' : 'bi.branch.mergeOnly';
   return t(key, {
     since: merge.since.slice(0, 7),
     tip: merge.tip.slice(0, 7),
     branch: merge.branch,
-    files: merge.files.length > 3 ? `${files} …` : files,
+    files: merge.files.map((file) => file.replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, '?')).join(', '),
   });
 }
 
 // The merge-only round of the item while `asking` (it waits for the person's review); null
-// otherwise, and while the PC has not answered. Asked again whenever the item changes (`at`).
-export function useMergeOnly(item: string, asking: boolean, at: string): MergeOnly | null {
+// otherwise, and while the PC has not answered. Asked once on entering the review.
+export function useMergeOnly(item: string, asking: boolean): MergeOnly | null {
   const [heard, setHeard] = useState<{ item: string; merge: MergeOnly | null }>({
     item,
     merge: null,
   });
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a change to the item asks again
   useEffect(() => {
     if (!asking) return;
     const abort = new AbortController();
@@ -37,6 +36,6 @@ export function useMergeOnly(item: string, asking: boolean, at: string): MergeOn
       () => undefined,
     );
     return () => abort.abort();
-  }, [item, asking, at]);
+  }, [item, asking]);
   return asking && heard.item === item ? heard.merge : null;
 }

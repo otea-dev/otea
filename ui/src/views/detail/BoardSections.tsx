@@ -349,6 +349,7 @@ export function BranchLine({
   item = '',
   overlaps = [],
   merge = null,
+  waits,
 }: {
   strip: BranchStrip | null;
   drift?: Drift | null;
@@ -359,6 +360,8 @@ export function BranchLine({
   item?: string;
   overlaps?: readonly Overlap[];
   merge?: MergeOnly | null;
+  // Why it waits to land after another item (src/app/land-order.ts), as the PC words it.
+  waits?: string | undefined;
 }) {
   if (!strip) return null;
   const said = branchSaid(strip, outside);
@@ -371,7 +374,7 @@ export function BranchLine({
       <span className="bsaid">{said}</span>
     </div>
   );
-  if (!drift && !off && !files && !same && !merge && overlaps.length === 0) return line;
+  if (!drift && !off && !files && !same && !merge && !waits && overlaps.length === 0) return line;
   return (
     <>
       {line}
@@ -397,6 +400,12 @@ export function BranchLine({
         <div className="bstrip drift" data-c role="status">
           <Icon name="warn" />
           <span>{roundSameText(same)}</span>
+        </div>
+      ) : null}
+      {waits ? (
+        <div className="bstrip drift" data-c role="status">
+          <Icon name="warn" />
+          <span>{waits}</span>
         </div>
       ) : null}
       {merge ? (

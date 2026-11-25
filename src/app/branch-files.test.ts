@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type TempRepo, tempGitRepo } from '../cli/testing.ts';
-import { filesChangedAt } from './branch-files.ts';
+import { filesChangedAt, stampAt } from './branch-files.ts';
 
 // The files a branch changes over its base, from what git has pushed and nothing fetched: the
 // ground of the warning that two items touch the same files.
@@ -51,6 +51,17 @@ describe('the files a branch changes over its base', () => {
     commit('src/later.ts');
 
     expect(filesChangedAt(repo.dir)('feat/x', 'main')).toEqual(['src/a.ts', 'src/b.ts']);
+  });
+
+  it('stamps where the branches stand, changing when one moves', () => {
+    git('update-ref', 'refs/remotes/origin/feat/x', 'feat/x');
+    const before = stampAt(repo.dir)(['feat/x'], 'main');
+    expect(stampAt(repo.dir)(['feat/x'], 'main')).toBe(before);
+
+    commit('src/later.ts');
+    git('update-ref', 'refs/remotes/origin/feat/x', 'feat/x');
+
+    expect(stampAt(repo.dir)(['feat/x'], 'main')).not.toBe(before);
   });
 
   it('says nothing of a branch that does not exist', () => {

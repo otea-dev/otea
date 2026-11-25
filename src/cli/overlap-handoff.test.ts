@@ -154,6 +154,16 @@ describe('a handoff of a branch that shares files with another open item', () =>
     expect(handed.out).not.toContain('touches the same files');
   });
 
+  // What the handoff recorded is read back until a branch moves; then it is worked out again.
+  it('reads the overlaps recorded with the round until a branch moves', async () => {
+    expect((await otea('handoff', 'CAM-1', '--note', 'regar')).code).toBe(0);
+    expect((await otea('show', 'CAM-1')).out).toContain(`${shared}, which is open too`);
+
+    gitAt(repo.dir)('update-ref', `refs/remotes/origin/${OTHER}`, 'main');
+
+    expect((await otea('show', 'CAM-1')).out).not.toContain('touches the same files');
+  });
+
   it('is said again by show, with the files as data', async () => {
     const shown = await otea('show', 'CAM-1');
     expect(shown.out).toContain(`${shared}, which is open too`);

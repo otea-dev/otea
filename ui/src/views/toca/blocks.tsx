@@ -98,6 +98,7 @@ export type SubKey =
   | 'toca.sub.waitsFor'
   | 'toca.sub.waitsAgent'
   | 'toca.sub.waitsKids'
+  | 'toca.sub.landsAfter'
   | 'toca.sub.setAside'
   | 'toca.sub.didIt'
   | 'toca.sub.closedBy'
@@ -183,6 +184,8 @@ export function rowCall(item: Item, sec: TocaSection, ctx: TocaContext): RowCall
       const silent = holder ? silentHolder(item, ctx.agents, events, now) : null;
       if (silent) return { act, sub: sub('toca.sub.silent', silent.agent) };
       if (holder) return { act, sub: sub('toca.sub.does', holder) };
+      // Approved, and another item lands in its base first (the line is on its page).
+      if (item.landsAfter) return { act, sub: sub('toca.sub.landsAfter', item.landsAfter.first) };
       if ((item.children?.open ?? 0) > 0) return { act, sub: sub('toca.sub.waitsKids') };
       const who = agentOf(item, feed);
       return { act, sub: who ? sub('toca.sub.waitsFor', who) : sub('toca.sub.waitsAgent') };
