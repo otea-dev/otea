@@ -28,6 +28,25 @@ describe('noticeText', () => {
     expect(noticeText(notice, 'en').title).toBe(en);
   });
 
+  it('puts the question itself in a single ask, trimmed, and keeps the item id in the title', () => {
+    const ask = {
+      ...review,
+      kind: 'ask',
+      by: 'kiln',
+      text: '¿El descuento se acumula con el cupón?',
+    } as Notice;
+    expect(noticeText(ask, 'es')).toMatchObject({
+      title: 'kiln te pregunta · TASKS-7',
+      body: '¿El descuento se acumula con el cupón?',
+    });
+    expect(noticeText(ask, 'en').title).toBe('kiln asks you · TASKS-7');
+    const long = { ...ask, text: `line one\n${'word '.repeat(60)}` } as Notice;
+    const body = noticeText(long, 'en').body;
+    expect(body.length).toBeLessThanOrEqual(140);
+    expect(body.startsWith('line one word')).toBe(true);
+    expect(body.endsWith('…')).toBe(true);
+  });
+
   it('counts a burst and opens Te toca', () => {
     const group: Notice = {
       kind: 'group',
