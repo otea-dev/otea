@@ -29,7 +29,10 @@ describe('signalsOf', () => {
   });
 
   it('says who asks when an agent’s question waits for you', () => {
-    const signals = signalsOf([item({ asks: { question: 2, by: 'claude' } })], NOW);
+    const signals = signalsOf(
+      [item({ asks: { question: 2, by: 'claude', text: 'Which port?' } })],
+      NOW,
+    );
     expect(signals).toEqual([
       {
         key: 'turn:TASKS-1:build__review::q2',
@@ -37,6 +40,7 @@ describe('signalsOf', () => {
         item: 'TASKS-1',
         title: 'Ship the login',
         by: 'claude',
+        text: 'Which port?',
       },
     ]);
   });

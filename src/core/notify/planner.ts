@@ -44,6 +44,7 @@ export type ItemNotice = {
   item: string;
   title: string;
   by?: string;
+  text?: string;
 };
 
 export type GroupNotice = {
@@ -86,8 +87,14 @@ const RANK: Record<NotifyKind, number> = {
 };
 
 function noticeOf(signal: Signal): ItemNotice {
-  const { kind, item, title, by } = signal;
-  return { kind, item, title, ...(by === undefined ? {} : { by }) };
+  const { kind, item, title, by, text } = signal;
+  return {
+    kind,
+    item,
+    title,
+    ...(by === undefined ? {} : { by }),
+    ...(text === undefined ? {} : { text }),
+  };
 }
 
 export class Planner {

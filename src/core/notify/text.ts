@@ -20,6 +20,7 @@ export const isNoticeLang = (value: unknown): value is NoticeLang =>
   value === 'es' || value === 'en';
 
 const MAX_BODY = 100;
+const MAX_QUESTION = 140;
 
 const short = (text: string, max = MAX_BODY) =>
   text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
@@ -89,10 +90,13 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
     };
   }
   const by = notice.by ?? '';
-  const title = notice.kind === 'turn' ? words.turn : words[notice.kind](by);
+  const said = notice.kind === 'turn' ? words.turn : words[notice.kind](by);
+  // A question goes in the notice itself, with the item's id in the title.
+  const question = notice.kind === 'ask' ? notice.text?.replace(/\s+/g, ' ').trim() : undefined;
+  const title = question ? `${said} · ${notice.item}` : said;
   return {
     title,
-    body: short(`${notice.item} · ${notice.title}`),
+    body: question ? short(question, MAX_QUESTION) : short(`${notice.item} · ${notice.title}`),
     tag: `otea-item-${notice.item}`,
     url: itemUrl(notice.item),
     item: notice.item,
