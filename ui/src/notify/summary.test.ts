@@ -17,11 +17,11 @@ describe('notifySummary', () => {
   it('names the kinds on, in the order Preferencias shows them', () => {
     setLanguage('es');
     expect(notifySummary(DEFAULT_PREFS)).toBe(
-      'Avisos: revisiones · preguntas · respuestas · atascos',
+      'Avisos: revisiones · preguntas · respuestas · atascos · nadie escucha',
     );
     setLanguage('en');
     expect(notifySummary({ ...DEFAULT_PREFS, replied: false, aside: true })).toBe(
-      'Notifications: reviews · questions · stuck items · set aside',
+      'Notifications: reviews · questions · stuck items · nobody listening · set aside',
     );
   });
 
@@ -32,6 +32,7 @@ describe('notifySummary', () => {
       ask: false,
       replied: false,
       stuck: false,
+      unheard: false,
       quiet: { from: '22:00', to: '08:00' },
       muted: ['a', 'b'],
     };
@@ -45,7 +46,14 @@ describe('notifySummary', () => {
   });
 
   it('says when every kind is off though notifications are on', () => {
-    const none = { ...DEFAULT_PREFS, turn: false, ask: false, replied: false, stuck: false };
+    const none = {
+      ...DEFAULT_PREFS,
+      turn: false,
+      ask: false,
+      replied: false,
+      stuck: false,
+      unheard: false,
+    };
     expect(notifySummary(none)).toBe('Notifications on, every kind off');
     setLanguage('es');
     expect(notifySummary(none)).toBe('Avisos activados, pero ningún tipo elegido');

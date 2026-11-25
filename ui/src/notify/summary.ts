@@ -10,6 +10,7 @@ const SHORT: readonly [NotifyKind, PlainKey][] = [
   ['ask', 'notify.short.ask'],
   ['replied', 'notify.short.replied'],
   ['stuck', 'notify.short.stuck'],
+  ['unheard', 'notify.short.unheard'],
   ['aside', 'notify.short.aside'],
 ];
 

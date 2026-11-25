@@ -5,6 +5,7 @@ import { createItem, moveItem } from '../app/items.ts';
 import { claimItem, releaseItem } from '../app/leases.ts';
 import { listTargets } from '../app/notify-targets.ts';
 import { choosePhoneTransport } from '../app/phone.ts';
+import { waitBeat } from '../app/presence.ts';
 import type { Project } from '../app/project.ts';
 import { fakeTailscale, TAILNET_HOST } from '../app/tailscale-testing.ts';
 import type { Actor } from '../core/item.ts';
@@ -153,6 +154,7 @@ describe('notifications on the server', () => {
           replied: true,
           stuck: true,
           aside: false,
+          unheard: true,
           quiet: null,
           muted: [],
         },
@@ -493,6 +495,49 @@ describe('notifications on the server', () => {
           payload: expect.objectContaining({ title: 'memory · claude lo dejó para después' }),
         }),
       ]);
+    });
+
+    describe('when nobody listens', () => {
+      const second = () => newTask('Write the docs');
+      const listen = () =>
+        waitBeat(project.db, { agent: 'claude', channel: 'cli', waiter: process.pid }, () =>
+          new Date(clock).toISOString(),
+        ).run();
+
+      it('tells that new work waits for an agent and none listens, once', async () => {
+        const id = second();
+        await pass(1000);
+        expect(sent).toEqual([]);
+        await pass(GATHER_MS);
+        expect(sent).toEqual([
+          expect.objectContaining({
+            payload: expect.objectContaining({
+              title: 'memory · Nadie escucha',
+              url: `/p/memory-aaaaaa/#/i/${id}`,
+            }),
+          }),
+        ]);
+        await pass(GATHER_MS);
+        expect(sent).toHaveLength(1);
+      });
+
+      it('says nothing while an agent waits in otea wait', async () => {
+        listen();
+        second();
+        await pass(1000);
+        await pass(GATHER_MS);
+        expect(sent).toEqual([]);
+      });
+
+      it('says nothing to a phone that turned that kind off', async () => {
+        const { cookie } = await pair();
+        await subscribe(cookie, 2);
+        await choose(cookie, { unheard: false });
+        second();
+        await pass(1000);
+        await pass(GATHER_MS);
+        expect(sent.map(({ subscription }) => subscription.endpoint)).toEqual([endpoint(1)]);
+      });
     });
 
     it('gathers what many agents hand over into one notice now and then, naming the project', async () => {

@@ -19,6 +19,7 @@ describe('noticeText', () => {
   it.each([
     [{ kind: 'ask', by: 'claude' }, 'claude te pregunta', 'claude asks you'],
     [{ kind: 'aside', by: 'kiln' }, 'kiln lo dejó para después', 'kiln set it aside for later'],
+    [{ kind: 'unheard' }, 'Nadie escucha', 'Nobody is listening'],
     [{ kind: 'replied', by: 'claude' }, 'claude contestó tu nota', 'claude answered your note'],
     [{ kind: 'stuck', by: 'codex' }, 'Se atascó · codex no responde', 'Stuck · codex went quiet'],
   ] as const)('says %j in Spanish and English', (what, es, en) => {
@@ -50,6 +51,9 @@ describe('noticeText', () => {
     expect(noticeText({ ...group, of: 'replied' }, 'en').title).toBe('3 notes answered');
     expect(noticeText({ ...group, of: 'ask' }, 'es').title).toBe('3 preguntas te esperan');
     expect(noticeText({ ...group, of: 'aside' }, 'en').title).toBe('3 things set aside');
+    expect(noticeText({ ...group, of: 'unheard' }, 'en').title).toBe(
+      '3 things wait for an agent, and nobody is listening',
+    );
   });
 
   it('names the project a burst comes from, and keeps one burst per project on screen', () => {

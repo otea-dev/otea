@@ -5,9 +5,11 @@
 // - ask: an agent asks you something (otea ask), the turn yours until you answer;
 // - replied: an agent answered one of your notes (otea reply);
 // - stuck: an agent's lease ran out with nobody releasing it or taking the item again;
-// - aside: an agent set the item aside for later (otea release --later).
+// - aside: an agent set the item aside for later (otea release --later);
+// - unheard: the item waits for an agent and none is listening or at work (the desk's «nadie está
+//   escuchando», core/agent-status.ts itemUnheard).
 
-export const NOTIFY_KINDS = ['turn', 'ask', 'replied', 'stuck', 'aside'] as const;
+export const NOTIFY_KINDS = ['turn', 'ask', 'replied', 'stuck', 'aside', 'unheard'] as const;
 
 export type NotifyKind = (typeof NOTIFY_KINDS)[number];
 
@@ -26,6 +28,8 @@ export type NotifyFacts = {
   notes?: { replied?: { note: number; by: string; at: string } };
   // Set aside for later by an agent, while nothing lifted it (app/set-aside.ts).
   setAside?: { by: string; at: string };
+  // Waits for an agent that nobody brings (the server works it out from the agents' statuses).
+  unheard?: boolean;
 };
 
 export type Signal = {
@@ -66,6 +70,14 @@ export function signalsOf(items: readonly NotifyFacts[], now: number): Signal[] 
         item,
         title,
         by: quiet.holder,
+      });
+    }
+    if (facts.turn === 'agent' && facts.unheard) {
+      out.push({
+        key: `unheard:${item}:${facts.state}:${facts.round ?? ''}`,
+        kind: 'unheard',
+        item,
+        title,
       });
     }
     const aside = facts.setAside;

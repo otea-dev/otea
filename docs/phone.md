@@ -117,6 +117,7 @@ Each paired phone chooses what it is told, and the server keeps that choice per 
 | An agent asks you (`otea ask`) | on |
 | An agent answered your note | on |
 | Something got stuck: an agent went quiet holding its lease | on |
+| Work waits for an agent and nobody is listening: no agent waits in `otea wait` or is at work (the desk's "nadie está escuchando") | on |
 | An agent set something aside for later (`otea release --later`) | off |
 
 So that many agents taking items never become a nonstop stream:
