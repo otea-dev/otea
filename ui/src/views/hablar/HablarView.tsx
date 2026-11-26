@@ -115,10 +115,19 @@ export function HablarView({
     const el = box?.querySelector<HTMLElement>(`#hb-turn-${target.root}`);
     if (!box || !el) return;
     const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+    // Leaving the foot on purpose: the page does not pull the person back to it while it settles,
+    // and once it has, where they stand says whether it follows the foot again.
+    near.current = false;
     scrollBox(box, top - 16);
     setFound(target.root);
+    const arrived = setTimeout(() => {
+      near.current = box.scrollHeight - box.scrollTop - box.clientHeight < NEAR_BOTTOM;
+    }, 1100);
     const timer = setTimeout(() => setFound(undefined), 2400);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(arrived);
+      clearTimeout(timer);
+    };
   }, [target]);
 
   // A link that asks for a turn (an item's backlink, a topic) is followed once the turn is read:
@@ -137,9 +146,15 @@ export function HablarView({
     if (at) {
       asked.current = wanted;
       goTo(at.root);
+      // The link has done its work: the address is the conversation's again, so the page follows
+      // its foot as before.
+      app.go({ view: 'hablar' });
     } else if (earlier && !loadingEarlier) loadEarlier?.();
-    else if (!earlier) asked.current = wanted;
-  }, [ready, wanted, turns, turn, topic, earlier, loadingEarlier, loadEarlier, goTo]);
+    else if (!earlier) {
+      asked.current = wanted;
+      app.go({ view: 'hablar' });
+    }
+  }, [ready, wanted, turns, turn, topic, earlier, loadingEarlier, loadEarlier, goTo, app.go]);
 
   // The newest message stays in sight as it arrives, unless the person scrolled up to read.
   const last = messages?.at(-1)?.id;
@@ -199,7 +214,7 @@ export function HablarView({
     if (convo.status !== 'ready') return;
     convo.corrected(each.root, kind);
     correctTurn(each.root, kind).then(convo.reload, (error: unknown) => {
-      if (each.kind) convo.corrected(each.root, each.kind);
+      convo.uncorrected(each.root);
       toast({
         msg: t('hablar.kind.failed', {
           message: error instanceof Error ? error.message : String(error),
@@ -299,7 +314,13 @@ export function HablarView({
             </div>
           )}
         </div>
-        <Composer onSent={convo.status === 'ready' ? convo.reload : () => undefined} />
+        <Composer
+          onSent={() => {
+            // What you just said is where you are now: the page follows it to the foot.
+            near.current = true;
+            if (convo.status === 'ready') convo.reload();
+          }}
+        />
       </section>
       <aside className="hb-side" aria-label={t('hablar.out')}>
         <Side

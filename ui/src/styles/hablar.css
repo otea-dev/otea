@@ -1083,7 +1083,20 @@ button.hb-kid:hover {
   color: var(--ink-3);
   font-size: 10.5px;
 }
+.hb-kid .hb-id {
+  flex: none;
+}
+/* the item's title beside its id: one line, cut with an ellipsis, the whole of it in the tooltip */
+.hb-kid .hb-kt {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
 .hb-kid .hb-kst {
+  flex: none;
   margin-left: auto;
   font: 500 10.5px / 1.2 var(--sans);
   color: var(--ink-3);

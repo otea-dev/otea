@@ -130,17 +130,21 @@ export type Piece =
   | { kind: 'url'; url: string };
 
 const WORDS = /(https?:\/\/[^\s<>"')\]]+)|(\b[A-Za-z][A-Za-z0-9]*-\d+\b)/g;
+const TRAILING = /[.,;:!?]+$/;
 
 export function piecesOf(text: string, known: ReadonlySet<string>): Piece[] {
   const out: Piece[] = [];
   let from = 0;
   for (const match of text.matchAll(WORDS)) {
     const at = match.index;
-    const [whole, url] = match;
-    const isItem = url === undefined && known.has(whole);
-    if (url === undefined && !isItem) continue;
+    const [found, address] = match;
+    const isItem = address === undefined && known.has(found);
+    if (address === undefined && !isItem) continue;
+    // A sentence's own punctuation after an address is not part of it.
+    const url = address?.replace(TRAILING, '');
+    const whole = url ?? found;
     if (at > from) out.push({ kind: 'text', text: text.slice(from, at) });
-    out.push(url === undefined ? { kind: 'item', id: whole } : { kind: 'url', url });
+    out.push(url === undefined ? { kind: 'item', id: found } : { kind: 'url', url });
     from = at + whole.length;
   }
   if (from < text.length) out.push({ kind: 'text', text: text.slice(from) });

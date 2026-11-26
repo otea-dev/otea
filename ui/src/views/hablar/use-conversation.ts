@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchConversation, fetchSecretary } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import {
@@ -26,9 +26,10 @@ export type ConversationState =
       loadingEarlier: boolean;
       loadEarlier: () => void;
       // Reads the conversation again now (after a send), and shows a turn as the person set it
-      // until the server says so too.
+      // until the server says so too (`uncorrected`: the server refused, the turn is as it was).
       reload: () => void;
       corrected: (root: number, kind: MessageKind) => void;
+      uncorrected: (root: number) => void;
     };
 
 // The conversation as the page reads it: the newest messages, kept fresh with the desk's live
@@ -46,16 +47,29 @@ export function useConversation(): ConversationState {
   const view = remote.status === 'ready' ? remote.value : undefined;
 
   const merged = useMemo(() => (view ? mergeMessages(older, view.messages) : []), [older, view]);
+  // A turn corrected shows as the person set it until the server says so too; from then on the
+  // server's word is the page's, so a later change of it is never hidden by the old tap.
   const messages = useMemo(
     () =>
       kinds.size === 0
         ? merged
         : merged.map((m) => {
             const kind = kinds.get(m.root);
-            return kind === undefined ? m : { ...m, kind };
+            return kind === undefined || kind === m.kind ? m : { ...m, kind };
           }),
     [merged, kinds],
   );
+  useEffect(() => {
+    if (kinds.size === 0) return;
+    const served = new Map(merged.map((m) => [m.root, m.kind]));
+    const matched = [...kinds].filter(([root, kind]) => served.get(root) === kind);
+    if (matched.length === 0) return;
+    setKinds((was) => {
+      const next = new Map(was);
+      for (const [root] of matched) next.delete(root);
+      return next;
+    });
+  }, [merged, kinds]);
   const first = merged[0]?.id;
   const loadEarlier = useCallback(() => {
     if (first === undefined || loadingEarlier) return;
@@ -84,6 +98,12 @@ export function useConversation(): ConversationState {
     loadEarlier,
     reload: () => setBump((n) => n + 1),
     corrected: (root, kind) => setKinds((was) => new Map(was).set(root, kind)),
+    uncorrected: (root) =>
+      setKinds((was) => {
+        const next = new Map(was);
+        next.delete(root);
+        return next;
+      }),
   };
 }
 

@@ -139,7 +139,20 @@ describe('plain words with ids and links', () => {
       { kind: 'text', text: 'See ' },
       { kind: 'item', id: 'CAM-12' },
       { kind: 'text', text: ' and ZZ-9 at ' },
-      { kind: 'url', url: 'https://otea.dev/x.' },
+      { kind: 'url', url: 'https://otea.dev/x' },
+      { kind: 'text', text: '.' },
+    ]);
+  });
+
+  it('leaves a sentence’s punctuation and a closing parenthesis out of an address', () => {
+    for (const end of ['.', ',', ';', ':', '!', '?', '.)', '?!']) {
+      const [, url, rest] = piecesOf(`(ver https://otea.dev/a?b=1${end}`, new Set());
+      expect(url).toEqual({ kind: 'url', url: 'https://otea.dev/a?b=1' });
+      expect(rest).toEqual({ kind: 'text', text: end });
+    }
+    // An address that ends in a word keeps all of it.
+    expect(piecesOf('https://otea.dev/a-b_c/', new Set())).toEqual([
+      { kind: 'url', url: 'https://otea.dev/a-b_c/' },
     ]);
   });
 });

@@ -89,13 +89,17 @@ export function Composer({ onSent }: { onSent: () => void }) {
     ]);
     if (attempt.current?.sig !== sig) attempt.current = { sig, key: newKey() };
     const { key } = attempt.current;
+    const sentText = text;
+    const sentKeys = new Set(drafts.map((draft) => draft.key));
     setBusy(true);
     setError(null);
     postMessage({ text: words, files: drafts.map(({ file }) => file) }, key).then(
       () => {
         attempt.current = null;
-        setText('');
-        setDrafts([]);
+        // Only what was sent goes: words or files added while it was on its way stay, and are
+        // the next send, under a key of their own.
+        setText((now) => (now === sentText ? '' : now));
+        setDrafts((now) => now.filter((draft) => !sentKeys.has(draft.key)));
         setBusy(false);
         onSent();
         field.current?.focus();
@@ -108,7 +112,10 @@ export function Composer({ onSent }: { onSent: () => void }) {
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+    // An Enter that confirms an IME candidate is not a send: Safari ends the composition before
+    // the key arrives, and marks it with keyCode 229.
+    if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)
+      return;
     // The phone's Enter is a new line (Enviar is its button); the desk's sends, Shift+Enter breaks.
     if (app.phone || event.shiftKey) return;
     event.preventDefault();

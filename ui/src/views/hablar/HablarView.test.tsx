@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { act, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type App, AppTestProvider } from '../../app/context.tsx';
 import type { ConversationView, Message } from '../../conversation.ts';
@@ -49,7 +50,8 @@ type Call = { method: string; url: string; headers: Record<string, string>; body
 
 // The server as the page reaches it: the conversation it reads, and every write it makes with the
 // headers it sent. `failures` is how many sends it refuses before it hears one.
-function server(view: ConversationView, o: { failures?: number } = {}) {
+// `hold`: a promise the server waits for before it answers a write (a send on its way).
+function server(view: ConversationView, o: { failures?: number; hold?: Promise<void> } = {}) {
   const calls: Call[] = [];
   let failures = o.failures ?? 0;
   vi.stubGlobal('fetch', async (input: RequestInfo | URL, init: RequestInit = {}) => {
@@ -74,6 +76,7 @@ function server(view: ConversationView, o: { failures?: number } = {}) {
       headers: (init.headers ?? {}) as Record<string, string>,
       body,
     });
+    await o.hold;
     if (failures > 0) {
       failures -= 1;
       return json({ error: { code: 'down' } }, 503);
@@ -459,8 +462,8 @@ describe('«Lo que salió»', () => {
     expect(text(cards[0])).toContain('¿Un tablero por cliente?');
     expect(text(cards[0])).toContain('Sí, si cada cliente revisa distinto.');
     expect(all(cards[1] as HTMLElement, '.hb-kid').map((kid) => text(kid))).toEqual([
-      'CAM-12woen curso',
-      'CAM-13en cola',
+      'CAM-12La barra fija tapa Aprobarwoen curso',
+      'CAM-13Test visual a 390 pxen cola',
     ]);
   });
 
@@ -522,5 +525,181 @@ describe('the way back from an item', () => {
   it('says nothing for an item that did not come from a conversation', () => {
     page = mount(<FromTurns turns={undefined} />);
     expect(page.root.textContent).toBe('');
+  });
+});
+
+// A page whose live feed the test drives: `bump` is a change of the project (the desk's stream),
+// `went` what the page asked the router for.
+type Live = { bump: () => void; went: unknown[] };
+
+function Live({ ctl, route, app }: { ctl: Live; route: { turn?: number }; app: Partial<App> }) {
+  const [version, setVersion] = useState(1);
+  const [at, setAt] = useState(route);
+  ctl.bump = () => setVersion((n) => n + 1);
+  return (
+    <AppTestProvider
+      value={testApp({
+        now: NOW,
+        version,
+        go: (to) => {
+          ctl.went.push(to);
+          setAt({});
+        },
+        ...app,
+      })}
+    >
+      <HablarView {...at} />
+    </AppTestProvider>
+  );
+}
+
+function mountLive(app: Partial<App> = {}, route: { turn?: number } = {}): Live {
+  const ctl: Live = { bump: () => undefined, went: [] };
+  page = mount(<Live ctl={ctl} route={route} app={app} />);
+  return ctl;
+}
+
+const change = async (ctl: { bump: () => void }) => {
+  await act(async () => ctl.bump());
+  await settle();
+};
+
+const enter = (field: Element | null | undefined, init: KeyboardEventInit, keyCode = 13) => {
+  const event = new KeyboardEvent('keydown', {
+    key: 'Enter',
+    bubbles: true,
+    cancelable: true,
+    ...init,
+  });
+  Object.defineProperty(event, 'keyCode', { value: keyCode });
+  return act(async () => {
+    field?.dispatchEvent(event);
+  });
+};
+
+describe('Enter in the composer', () => {
+  it('sends on the desk, but never an Enter that confirms an IME candidate', async () => {
+    const { root, calls } = await open(conversation());
+    const field = q<HTMLTextAreaElement>(root, '.hb-input textarea');
+    await typeInto(field, 'こんにちは');
+
+    // Mid-composition, and Safari's way of saying it (the composition ended, keyCode 229).
+    await enter(field, { isComposing: true });
+    await enter(field, { isComposing: false }, 229);
+    await settle();
+    expect(calls).toHaveLength(0);
+
+    await enter(field, { isComposing: false });
+    await settle();
+    expect(calls).toHaveLength(1);
+  });
+});
+
+describe('a send on its way', () => {
+  it('clears only what was sent: words typed meanwhile stay, and go under a key of their own', async () => {
+    let release: () => void = () => undefined;
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const calls = server(conversation(), { hold });
+    page = mount(
+      <AppTestProvider value={testApp({ now: NOW })}>
+        <HablarView />
+      </AppTestProvider>,
+    );
+    await settle();
+    const root = page.root;
+    const field = q<HTMLTextAreaElement>(root, '.hb-input textarea');
+    await typeInto(field, 'primero');
+    await press(q(root, '.hb-send'));
+    expect(calls).toHaveLength(1);
+
+    await typeInto(field, 'primero y algo más');
+    release();
+    await settle();
+
+    expect(field?.value).toBe('primero y algo más');
+    await press(q(root, '.hb-send'));
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.body).toEqual({ text: 'primero y algo más' });
+    expect(calls[1]?.headers['idempotency-key']).not.toBe(calls[0]?.headers['idempotency-key']);
+  });
+});
+
+describe('the kind you set, and the server’s word', () => {
+  it('goes back to what the turn was when the server refuses the change', async () => {
+    const calls = server(conversation({ messages: request() }), { failures: 1 });
+    page = mount(
+      <AppTestProvider value={testApp({ now: NOW })}>
+        <HablarView />
+      </AppTestProvider>,
+    );
+    await settle();
+    await press(q(page.root, '.hb-kind'));
+
+    expect(calls).toHaveLength(1);
+    expect(text(q(page.root, '.hb-kind'))).toBe('pedido');
+  });
+
+  it('stops overriding once the server says the same, so its later change shows', async () => {
+    const view = conversation({ messages: request() });
+    server(view);
+    const ctl = mountLive();
+    await settle();
+    await press(q(page?.root as HTMLElement, '.hb-kind'));
+    expect(text(q(page?.root as HTMLElement, '.hb-kind'))).toBe('consulta');
+
+    const setKind = (kind: 'request' | 'consultation') => {
+      for (const message of view.messages) message.kind = kind;
+    };
+    setKind('consultation');
+    await change(ctl);
+    expect(text(q(page?.root as HTMLElement, '.hb-kind'))).toBe('consulta');
+
+    // Someone else puts it back: the old tap no longer hides that.
+    setKind('request');
+    await change(ctl);
+    expect(text(q(page?.root as HTMLElement, '.hb-kind'))).toBe('pedido');
+  });
+});
+
+describe('following the foot after a link to a turn', () => {
+  it('takes the link once, gives the address back, and then goes to a new message', async () => {
+    window.localStorage.setItem('otea.motion', 'reduced');
+    const grow = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains('hb-chat') ? 500 : 0;
+      });
+    const room = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains('hb-chat') ? 500 : 0;
+      });
+    try {
+      const view = conversation({
+        messages: [
+          say({ id: 1, author: 'person' }),
+          say({ id: 2, author: 'secretary', root: 1, replyTo: 1 }),
+        ],
+      });
+      server(view);
+      const ctl = mountLive({}, { turn: 1 });
+      await settle();
+      expect(ctl.went).toEqual([{ view: 'hablar' }]);
+      expect(q(page?.root as HTMLElement, '#hb-turn-1')?.hasAttribute('data-found')).toBe(true);
+      const chat = q(page?.root as HTMLElement, '.hb-chat') as HTMLElement;
+      expect(chat.scrollTop).toBe(0);
+
+      // Once it has arrived the person is at the foot of a short talk: a new message follows.
+      await act(async () => new Promise((resolve) => setTimeout(resolve, 1200)));
+      view.messages.push(say({ id: 3, author: 'person' }));
+      await change(ctl);
+      expect(chat.scrollTop).toBe(500);
+    } finally {
+      grow.mockRestore();
+      room.mockRestore();
+      window.localStorage.removeItem('otea.motion');
+    }
   });
 });

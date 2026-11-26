@@ -19,6 +19,11 @@ function Kid({ chip }: { chip: Chip }) {
         <i className="hb-draft" aria-hidden="true" />
       )}
       <span className="hb-id">{chip.id}</span>
+      {chip.title ? (
+        <span className="hb-kt" data-tip={chip.title}>
+          {chip.title}
+        </span>
+      ) : null}
       <span className="hb-kst" data-state={chip.state}>
         {chip.agent ? <AgentMark name={chip.agent} decorative /> : null}
         {t(chip.state)}
