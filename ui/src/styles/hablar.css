@@ -138,6 +138,11 @@
 .hb-away .pj-cmd {
   flex: 1 1 100%;
   min-width: 0;
+  max-width: 100%;
+}
+/* the `.hb-away span` grow rule is for the sentence, not the prompt mark inside the command */
+.hb-away .pj-cmd span {
+  flex: none;
 }
 
 /* ───────── the conversation ───────── */
