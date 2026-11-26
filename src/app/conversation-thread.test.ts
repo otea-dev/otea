@@ -166,6 +166,15 @@ describe('the conversation as a thread', () => {
       expect(messages().every(({ kindNews }) => !kindNews)).toBe(true);
     });
 
+    // The times of the messages are UTC; what the secretary tells the person is in their time.
+    it("says what the person's clock reads, beside the times in UTC", () => {
+      const noon = Date.parse('2026-11-26T12:00:00Z');
+      post('what time did it start?', 3000);
+      expect(conversationText('sol', read(4000), noon, 'Europe/Madrid')).toContain(
+        "The person's clock now: 13:00 (UTC+1, Europe/Madrid). The times above are UTC: tell the person times as their clock reads.",
+      );
+    });
+
     it('is not news when the person sets back what it already was', () => {
       const asked = post('would export to Markdown be worth it?', 1000);
       read(1500);

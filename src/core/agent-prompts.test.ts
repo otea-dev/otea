@@ -383,6 +383,24 @@ describe('the role prompts', () => {
       expect(fallback).toMatch(lang === 'es' ? /un solo mensaje numerado/ : /one numbered message/);
       expect(fallback).toContain('otea prompt --role worker --board <');
       expect(fallback).toContain('otea prompt --role refiner');
+      // Each text goes in a fenced block under its number: the desk draws it with a Copy button.
+      expect(fallback).toMatch(lang === 'es' ? /bloque de código \(```\)/ : /fenced block \(```\)/);
+      expect(fallback).toMatch(
+        lang === 'es'
+          ? /la línea de arriba dice para qué es/
+          : /the line above says what it is for/,
+      );
+    });
+
+    // Field study 3: «lo tomó a las 06:19 UTC» (it was 07:19), «main está en su commit f4109ea»,
+    // «Done»: words of the tool in what the person reads.
+    it(`has the secretary speak in the person's time and in their words (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, {});
+      const words = text.split('\n').find((line) => /^7\. /.test(line)) ?? '';
+      expect(words).toMatch(
+        lang === 'es' ? /hora de la persona, nunca en UTC/ : /my local time, never UTC/,
+      );
+      expect(words).toMatch(lang === 'es' ? /ni ids de commit/ : /no commit ids/);
     });
 
     it(`has the refiner turn a Bandeja note into an item, asking on the entry with options (${lang})`, () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   asksOf,
   awayOf,
+  blocksOf,
   branchOf,
   cardCounts,
   cardsOf,
@@ -227,6 +228,42 @@ describe('the secretary thinking', () => {
     expect(awayOf(offline)).toEqual({ since: offline.since });
     expect(awayOf(listening)).toBeNull();
     expect(awayOf(null)).toBeNull();
+  });
+});
+
+// Field study 3 (S4): without background subagents the secretary pastes the text of each session to
+// open in its message; one block of plain text with no Copy, 2470 px on the phone. A fenced block
+// under its number is a text to copy.
+describe('texts to paste, in fenced blocks', () => {
+  const text = [
+    'Abre 2 sesiones más.',
+    '1. Trabajador de Cambios: pega esto en una sesión nueva.',
+    '```',
+    'Eres un trabajador del tablero Cambios.',
+    '1. Declara tu perfil: `otea profile`.',
+    '```',
+    '2. Refinador:',
+    '```text',
+    'Eres el refinador.',
+    '```',
+  ].join('\n');
+
+  it('takes each block out of the words, with the line above it as its caption', () => {
+    const { rest, blocks } = blocksOf(text);
+    expect(blocks).toEqual([
+      {
+        caption: '1. Trabajador de Cambios: pega esto en una sesión nueva.',
+        text: 'Eres un trabajador del tablero Cambios.\n1. Declara tu perfil: `otea profile`.',
+      },
+      { caption: '2. Refinador:', text: 'Eres el refinador.' },
+    ]);
+    expect(rest).toBe('Abre 2 sesiones más.');
+  });
+
+  it('leaves a text with no fence, or a fence that never closes, as it is', () => {
+    expect(blocksOf('Hola.\nOtra línea.')).toEqual({ rest: 'Hola.\nOtra línea.', blocks: [] });
+    const open = 'Hola.\n```\nsin cierre';
+    expect(blocksOf(open)).toEqual({ rest: open, blocks: [] });
   });
 });
 

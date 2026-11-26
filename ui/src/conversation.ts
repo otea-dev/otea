@@ -167,6 +167,43 @@ export function splitReply(text: string): Reply {
   return { lead: `${lead}${mark}`, rest, folds: lines > FOLD_LINES || rest.length > FOLD_CHARS };
 }
 
+// A text to copy inside a message: what the secretary pastes for another session to read (the
+// text of a worker or a refiner, when its harness cannot launch subagents). The secretary sets
+// each in a fenced block under its number (the secretary text says so); the page draws it apart,
+// with the line above as its caption and a button that copies it, and never folds it.
+export type TextBlock = { caption: string; text: string };
+
+export function blocksOf(text: string): { rest: string; blocks: TextBlock[] } {
+  const lines = text.split(/\r?\n/);
+  const rest: string[] = [];
+  const blocks: TextBlock[] = [];
+  // Lines of words since the last block: its caption comes from them, never from what stands
+  // above an earlier block.
+  let since = 0;
+  let at = 0;
+  while (at < lines.length) {
+    const line = lines[at] ?? '';
+    if (/^\s*```/.test(line)) {
+      const close = lines.findIndex((each, index) => index > at && /^\s*```\s*$/.test(each));
+      if (close > at) {
+        while (since > 0 && (rest[rest.length - 1] ?? '').trim() === '') {
+          rest.pop();
+          since -= 1;
+        }
+        const caption = since > 0 ? (rest.pop() ?? '').trim() : '';
+        blocks.push({ caption, text: lines.slice(at + 1, close).join('\n') });
+        since = 0;
+        at = close + 1;
+        continue;
+      }
+    }
+    rest.push(line);
+    since += 1;
+    at += 1;
+  }
+  return blocks.length === 0 ? { rest: text, blocks } : { rest: rest.join('\n').trim(), blocks };
+}
+
 // The text as pieces: item ids of this project (they link to the item), web addresses (they open),
 // and plain words. Messages are plain text; nothing is rendered as markup.
 export type Piece =

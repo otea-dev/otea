@@ -12,8 +12,11 @@ import {
 import type { AnswerWords } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import type { BandejaEntry } from '../../bandeja.ts';
+import { useCopy } from '../../components/AgentPrompt.tsx';
+import { CopyGlyph } from '../../components/CopyCommand.tsx';
 import {
   asksOf,
+  blocksOf,
   branchOf,
   type Message,
   type MessageKind,
@@ -21,6 +24,7 @@ import {
   otherKind,
   type Row as RowOf,
   splitReply,
+  type TextBlock,
   type Turn,
 } from '../../conversation.ts';
 import { t } from '../../i18n/i18n.ts';
@@ -338,7 +342,9 @@ function Reply({
   answers: Message | null;
   onGo: (root: number) => void;
 }) {
-  const reply = useMemo(() => splitReply(message.text), [message.text]);
+  // The texts to paste (fenced blocks) are drawn apart and never folded; the words are the reply.
+  const parts = useMemo(() => blocksOf(message.text), [message.text]);
+  const reply = useMemo(() => splitReply(parts.rest), [parts.rest]);
   const [open, setOpen] = useState(false);
   const id = `hb-more-${message.id}`;
   return (
@@ -383,8 +389,33 @@ function Reply({
           <Plain text={reply.rest} />
         </p>
       )}
+      {parts.blocks.map((block, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of a said message never move
+        <PasteBlock key={index} block={block} n={index + 1} />
+      ))}
       <Attachments files={message.attachments} />
     </>
+  );
+}
+
+// A text for another session to read, as the secretary pasted it: its caption, the text in a box
+// that scrolls on its own, and a button that copies all of it.
+function PasteBlock({ block, n }: { block: TextBlock; n: number }) {
+  const [copied, copy] = useCopy(block.text);
+  return (
+    <div className="hb-block">
+      <div className="hb-bhead">
+        <span className="hb-bn" aria-hidden="true">
+          {n}
+        </span>
+        <span className="hb-bcap">{block.caption || t('hablar.block', { n })}</span>
+        <button type="button" className="hb-bcopy" onClick={copy}>
+          <CopyGlyph />
+          {copied ? t('hablar.block.copied') : t('hablar.block.copy')}
+        </button>
+      </div>
+      <pre className="hb-bpre">{block.text}</pre>
+    </div>
   );
 }
 

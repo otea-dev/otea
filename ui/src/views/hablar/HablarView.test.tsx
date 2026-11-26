@@ -477,6 +477,51 @@ describe('a long reply', () => {
     expect(text(toggle)).toBe('ver menos');
   });
 
+  // Field study 3 (S4): no subagents, so the secretary pastes the text of each session to open. It
+  // was one plain text with no Copy; each is now a numbered block with its own button, in view.
+  it('draws a text to paste as a numbered block with a Copy button, never folded', async () => {
+    const written: string[] = [];
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText: async (words: string) => void written.push(words) },
+    });
+    const first = 'Eres un trabajador del tablero Cambios.\n1. Declara tu perfil.\n2. Trabaja.';
+    const { root } = await open(
+      conversation({
+        messages: [
+          say({ id: 1, author: 'person' }),
+          say({
+            id: 2,
+            author: 'secretary',
+            replyTo: 1,
+            root: 1,
+            text: [
+              'Abre 2 sesiones más.',
+              '1. Trabajador de Cambios: pégalo en una sesión nueva.',
+              '```',
+              first,
+              '```',
+              '2. Refinador:',
+              '```',
+              'Eres el refinador.',
+              '```',
+            ].join('\n'),
+          }),
+        ],
+      }),
+    );
+    expect(text(q(root, '.hb-bluf'))).toBe('Abre 2 sesiones más.');
+    const blocks = all(root, '.hb-block');
+    expect(blocks).toHaveLength(2);
+    expect(q(root, '.hb-fold')).toBeNull();
+    expect(text(q(blocks[0] as HTMLElement, '.hb-bcap'))).toBe(
+      '1. Trabajador de Cambios: pégalo en una sesión nueva.',
+    );
+    expect(blocks[0]?.querySelector('pre')?.textContent).toBe(first);
+    await press(buttonNamed(blocks[1] as HTMLElement, 'Copiar'));
+    expect(written).toEqual(['Eres el refinador.']);
+  });
+
   it('shows a short rest without folding it', async () => {
     const { root } = await open(
       conversation({

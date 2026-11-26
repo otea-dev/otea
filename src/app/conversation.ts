@@ -17,7 +17,7 @@ import { OteaError } from '../core/errors.ts';
 import { evidenceTypeOf, MAX_EVIDENCE_BYTES, MAX_EVIDENCE_MB } from '../core/evidence.ts';
 import type { Actor } from '../core/item.ts';
 import type { SecretaryStatus } from '../core/secretary.ts';
-import { timeText } from '../core/time.ts';
+import { clockText, timeText } from '../core/time.ts';
 import { selectEntryOfItem } from '../store/bandeja.ts';
 import {
   clearKindNews,
@@ -638,7 +638,12 @@ export function messagesText(
 }
 
 // What `otea conversation` prints: what is new, the talk before it, and how to answer.
-export function conversationText(agent: string, read: Read): string {
+export function conversationText(
+  agent: string,
+  read: Read,
+  now: number = Date.now(),
+  zone?: string,
+): string {
   const fresh = new Set(read.fresh);
   const last = read.messages.at(-1);
   const heading =
@@ -672,6 +677,12 @@ export function conversationText(agent: string, read: Read): string {
           `${read.problems.size} file(s) could not be made available at a path; they are still on the desk, and the person can send them again.`,
         ]),
     ...more,
+    // The messages' times are UTC, as every text's: what the person reads is their own clock.
+    ...(read.messages.length === 0
+      ? []
+      : [
+          `The person's clock now: ${clockText(now, zone)}. The times above are UTC: tell the person times as their clock reads.`,
+        ]),
     ...answer,
   ].join('\n');
 }
