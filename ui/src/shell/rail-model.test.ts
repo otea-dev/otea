@@ -15,7 +15,7 @@ describe('the rail’s current row', () => {
     expect(railKey({ view: 'modules' })).toBe('studio');
     expect(railKey({ view: 'settings' })).toBe('settings');
     expect(railKey({ view: 'performance' })).toBe('performance');
-    expect(railKey({ view: 'topics' })).toBe('topics');
+    expect(railKey({ view: 'hablar', turn: 4 })).toBe('hablar');
   });
 
   it('has none for the pages the rail does not list', () => {

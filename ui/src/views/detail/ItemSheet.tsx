@@ -32,6 +32,7 @@ import { roundsOf } from '../../rounds.ts';
 import { studioHash } from '../../selection.ts';
 import type { ItemView, RelatedItem } from '../../types.ts';
 import { useStudioBoard } from '../board/studio-board.tsx';
+import { FromTurns } from '../hablar/FromTurns.tsx';
 import { ItemTopics } from '../topics/ItemTopics.tsx';
 import { Acts, actsModeOf } from './Acts.tsx';
 import {
@@ -877,6 +878,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                   {proofSections.map(({ key, node }) => (
                     <div key={key}>{node}</div>
                   ))}
+                  <FromTurns turns={item.fromMessages} />
                   <ItemTopics item={item} canWrite={app.session.canWrite} />
                 </>
               }
@@ -1054,6 +1056,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                 {item.title}
               </h1>
               {links ? <PartOfLine parent={links.parent} /> : null}
+              <FromTurns turns={item.fromMessages} />
               <div data-c>
                 <Swap
                   k={`${stand.key}:${stand.agent ?? ''}:${stand.round ?? ''}:${stand.time ?? ''}:${silentHere}`}

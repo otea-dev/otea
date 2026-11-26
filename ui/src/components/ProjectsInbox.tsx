@@ -11,7 +11,7 @@ import { type LaneBlock, LaneList } from '../lanes/LaneList.tsx';
 import { lookOf } from '../lanes/looks.ts';
 import { keptStateWord, stateWord } from '../preset-words.ts';
 import { agentsAcross, inboxOf, itemHref, projectHref, whereOf } from '../projects.ts';
-import { topicsHash } from '../selection.ts';
+import { hablarHash } from '../selection.ts';
 import { capped } from '../topics.ts';
 import type { AnsweredTopic, Item, ProjectOverview } from '../types.ts';
 import { rowCall } from '../views/toca/blocks.tsx';
@@ -40,7 +40,8 @@ function action(
 
 // Where a topic row opens: the topic on its project's page (this one's, or another of this server).
 function topicHref(project: string | undefined, id?: string): string {
-  return project === undefined ? topicsHash(id) : projectPage(project, topicsHash(id));
+  const hash = hablarHash(id === undefined ? {} : { topic: id });
+  return project === undefined ? hash : projectPage(project, hash);
 }
 
 // A project's answered topics: yours to read, never work. A few rows, then how many more wait on

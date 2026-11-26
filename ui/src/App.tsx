@@ -39,8 +39,8 @@ import { Rail } from './shell/Rail.tsx';
 import { Topbar } from './shell/Topbar.tsx';
 import { BoardView } from './views/board/BoardView.tsx';
 import { DetailHost } from './views/detail/DetailHost.tsx';
+import { HablarView } from './views/hablar/HablarView.tsx';
 import { TocaView } from './views/toca/TocaView.tsx';
-import { TopicsView } from './views/topics/TopicsView.tsx';
 
 // The app (SPEC §11): AppProvider › the lanes' gradients, the toasts, the tooltip, then .app with
 // the topbar, the rail and .main, where the view host shows the route's view, the detail sits
@@ -110,8 +110,8 @@ function View({ route }: { route: Route }): ReactNode {
       return <ModelPerformance />;
     case 'preferences':
       return <PreferencesView />;
-    case 'topics':
-      return <TopicsView topic={route.topic} />;
+    case 'hablar':
+      return <HablarView turn={route.turn} topic={route.topic} />;
     case 'studio':
       return <BoardStudio page={route.page} canWrite={app.session.canConfigure} />;
     case 'modules':

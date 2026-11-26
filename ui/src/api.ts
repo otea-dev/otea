@@ -12,6 +12,7 @@ import type { RoundSame } from '../../src/server/round-same.ts';
 import type { FeedEvent } from './activity.ts';
 import { apiUrl } from './base.ts';
 import type { WrittenBrief } from './brief.ts';
+import type { ConversationView, Message, MessageKind, SecretaryStatus } from './conversation.ts';
 import { type Language, t } from './i18n/i18n.ts';
 import type { NotifyView } from './notify/offer.ts';
 import { noteRead, readOf } from './offline/sync-state.ts';
@@ -623,6 +624,57 @@ export async function relinkProjectPath(from: string, to: string, force: boolean
 
 export async function forgetProjectPath(path: string): Promise<void> {
   await post('/api/project/paths/forget', { path });
+}
+
+// The conversation with the project's secretary (Hablar): the newest page of messages, the page
+// before `before`, or what came after `since`; the secretary's state beside them.
+export async function fetchConversation(
+  query: { before?: number; since?: number; limit?: number } = {},
+  signal: AbortSignal,
+): Promise<ConversationView> {
+  const params = new URLSearchParams();
+  for (const [name, value] of Object.entries(query)) params.set(name, String(value));
+  const qs = params.toString();
+  return (await get(`/api/conversation${qs === '' ? '' : `?${qs}`}`, signal)).json();
+}
+
+// The project's secretary as the desk tells it: listening, connected or offline since when; null
+// while the project has none.
+export async function fetchSecretary(signal: AbortSignal): Promise<SecretaryStatus | null> {
+  const body = (await (await get('/api/secretary', signal)).json()) as {
+    secretary: SecretaryStatus | null;
+  };
+  return body.secretary;
+}
+
+// What the person says to the secretary: the text and the files, as a form when it has files. The
+// Idempotency-Key makes a send that is repeated (a phone that never heard back) one message.
+export function postMessage(
+  input: { text: string; files?: readonly File[]; replyTo?: number },
+  clientKey: string,
+): Promise<Message> {
+  const body = {
+    text: input.text,
+    ...(input.replyTo === undefined ? {} : { replyTo: input.replyTo }),
+  };
+  const key = { 'idempotency-key': clientKey };
+  const files = input.files ?? [];
+  if (files.length === 0) return post<Message>('/api/conversation/messages', body, key);
+  const form = new FormData();
+  form.append('message', JSON.stringify(body));
+  for (const file of files) form.append('file', file, file.name);
+  return post<Message>('/api/conversation/messages', form, key);
+}
+
+// The person's one-tap correction of what a turn is: a request or a consultation.
+export function correctTurn(message: number, kind: MessageKind): Promise<Message> {
+  return post<Message>(`/api/conversation/messages/${message}/kind`, { kind });
+}
+
+// A file of the conversation, served to a signed-in browser (an image opens inline, the rest
+// downloads).
+export function attachmentUrl(id: number): string {
+  return apiUrl(`/api/conversation/attachments/${id}`);
 }
 
 // Side topics (topics.ts): the list and whether the project keeps them; one topic's note, close

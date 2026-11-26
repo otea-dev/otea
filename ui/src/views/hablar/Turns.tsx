@@ -1,0 +1,589 @@
+import {
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { useApp } from '../../app/context.tsx';
+import {
+  asksOf,
+  branchOf,
+  type Message,
+  type MessageKind,
+  otherKind,
+  splitReply,
+  type Turn,
+} from '../../conversation.ts';
+import { t } from '../../i18n/i18n.ts';
+import { drawIn } from '../../lanes/draw-in.ts';
+import { lightMarkup } from '../../lanes/light.ts';
+import { NodeGlyph } from '../../lanes/NodeGlyph.tsx';
+import { C } from '../../motion/curves.ts';
+import { reduced } from '../../motion/reduced.ts';
+import type { Item } from '../../types.ts';
+import { noteTime } from '../detail/notes.ts';
+import { Attachments } from './Attachments.tsx';
+import { AskCard, Branch } from './Branch.tsx';
+import { Plain } from './Plain.tsx';
+import { SecretaryMark } from './SecretaryMark.tsx';
+
+// The conversation on the two lanes: the secretary's on the left (a ring in its own colour), yours
+// on the right (a blue disc). Each turn is what you said, what the secretary answered and, for a
+// request, the branch of items that came out of it. The lanes draw with ink when the view opens, a
+// new message unfolds from its node, and the secretary's lane carries light while it thinks.
+
+const X_SEC = 16.5;
+const X_YOU = 40.5;
+// The lanes start under their names (14 px of label and 8 of air).
+const HEAD = 22;
+
+// What was already on the page when it first drew: nothing in it is new. `fresh(key)` says whether a
+// message, a reply or a chip arrived since, so only that animates in.
+function useFresh(keys: readonly string[]): (key: string) => boolean {
+  const known = useRef<Set<string> | null>(null);
+  const was = known.current;
+  useEffect(() => {
+    known.current = new Set(keys);
+  });
+  return useCallback((key: string) => was !== null && !was.has(key), [was]);
+}
+
+// A message comes out of its node: its body unfolds from the lane, the node grows. Reduced motion:
+// a 160 ms crossfade in place.
+function unfold(body: HTMLElement | null, node: Element | null) {
+  if (!body) return;
+  if (reduced()) {
+    body.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: C.drift });
+    return;
+  }
+  body.animate(
+    [
+      { opacity: 0, transform: 'translateX(-12px) scale(0.97)', filter: 'blur(1px)' },
+      { opacity: 1, transform: 'none', filter: 'blur(0px)' },
+    ],
+    { duration: 480, delay: 140, easing: C.glide, fill: 'backwards' },
+  );
+  node?.animate(
+    [
+      { opacity: 0, transform: 'scale(0.3)' },
+      { opacity: 1, transform: 'none' },
+    ],
+    { duration: 440, easing: C.settle, fill: 'backwards' },
+  );
+}
+
+function SecNode({ busy }: { busy: boolean }) {
+  return (
+    <svg
+      className="nd secretary"
+      width="24"
+      height="24"
+      viewBox="-12 -12 24 24"
+      aria-hidden="true"
+      data-busy={busy ? '' : undefined}
+    >
+      <circle className="ko" r="6" />
+      <g className="lk">
+        <circle className="trk" r="8.2" fill="none" strokeWidth="1.25" />
+        <circle r="4.4" fill="var(--ground)" stroke="var(--sec)" strokeWidth="1.5" />
+        <circle
+          className="orb"
+          r="8.2"
+          fill="none"
+          strokeWidth="1.25"
+          strokeLinecap="round"
+          strokeDasharray="13.9 51.5"
+        />
+      </g>
+    </svg>
+  );
+}
+
+type RowProps = {
+  lane: 'secretary' | 'you';
+  // The body's identity: a new one is a new body (a thinking row becoming the reply).
+  bodyKey: string;
+  fresh: boolean;
+  busy?: boolean;
+  // On its way out: it folds away into its node's line, the way it came.
+  leaving?: boolean;
+  className?: string | undefined;
+  children: ReactNode;
+};
+
+// A row that goes folds shut over its own height, its words fading first; reduced motion: a 160 ms
+// crossfade, then it is gone.
+function fold(row: HTMLElement) {
+  if (reduced()) {
+    row.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 160,
+      easing: C.drift,
+      fill: 'forwards',
+    });
+    return;
+  }
+  const height = row.offsetHeight;
+  row.style.overflow = 'hidden';
+  row.animate(
+    [
+      { height: `${height}px`, opacity: 1 },
+      { height: '0px', opacity: 0, paddingTop: '0px', paddingBottom: '0px' },
+    ],
+    { duration: 460, easing: C.glide, fill: 'forwards' },
+  );
+}
+
+function Row({
+  lane,
+  bodyKey,
+  fresh,
+  busy = false,
+  leaving = false,
+  className,
+  children,
+}: RowProps) {
+  const row = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (leaving && row.current) fold(row.current);
+  }, [leaving]);
+  return (
+    <div
+      ref={row}
+      className={['hb-row', lane, className].filter(Boolean).join(' ')}
+      style={{ '--x': `${lane === 'secretary' ? X_SEC : X_YOU}px` } as CSSProperties}
+    >
+      {lane === 'secretary' ? <SecNode busy={busy} /> : <NodeGlyph look="yours" />}
+      <Body key={bodyKey} fresh={fresh}>
+        {children}
+      </Body>
+    </div>
+  );
+}
+
+function Body({ fresh, children }: { fresh: boolean; children: ReactNode }) {
+  const body = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when it first appears
+  useLayoutEffect(() => {
+    if (fresh) unfold(body.current, body.current?.parentElement?.querySelector('.nd') ?? null);
+  }, []);
+  return (
+    <div className="hb-body" ref={body}>
+      {children}
+    </div>
+  );
+}
+
+// What was there a moment ago and is gone now stays a little longer, then goes (`leaving`): the
+// question you just answered shows what you answered before it folds away, instead of vanishing
+// under your finger.
+function useLingering<T extends { id: string }>(
+  current: readonly T[],
+  stay = 1800,
+): { item: T; leaving: boolean }[] {
+  const seen = useRef(new Map<string, T>());
+  const [gone, setGone] = useState<ReadonlyMap<string, { item: T; leaving: boolean }>>(new Map());
+  const ids = current.map((item) => item.id).join('\n');
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the set of items changes
+  useEffect(() => {
+    const now = new Set(current.map((item) => item.id));
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (const [id, item] of seen.current) {
+      if (now.has(id)) continue;
+      seen.current.delete(id);
+      setGone((was) => new Map(was).set(id, { item, leaving: false }));
+      timers.push(
+        setTimeout(() => setGone((was) => new Map(was).set(id, { item, leaving: true })), stay),
+        setTimeout(
+          () =>
+            setGone((was) => {
+              const next = new Map(was);
+              next.delete(id);
+              return next;
+            }),
+          stay + 520,
+        ),
+      );
+    }
+    for (const item of current) seen.current.set(item.id, item);
+    // A timer is let run to its end: the held item must go even if the page re-renders meanwhile.
+    return undefined;
+  }, [ids]);
+  const live = current.map((item) => ({ item, leaving: false }));
+  const held = [...gone.values()].filter(
+    ({ item }) => !current.some((each) => each.id === item.id),
+  );
+  return [...live, ...held];
+}
+
+// The kind of a turn, as a label that is also the correction: one tap turns a request into a
+// consultation and back.
+function KindLabel({
+  turn,
+  onKind,
+}: {
+  turn: Turn;
+  onKind: (turn: Turn, kind: MessageKind) => void;
+}) {
+  if (turn.kind === null) return null;
+  const kind = turn.kind;
+  const other = otherKind(kind);
+  const word = (k: MessageKind) => t(`hablar.kind.${k}`);
+  return (
+    <button
+      type="button"
+      className="hb-kind"
+      data-kind={kind}
+      aria-label={t('hablar.kind.fix', { kind: word(kind), other: word(other) })}
+      onClick={() => onKind(turn, other)}
+    >
+      <span>{word(kind)}</span>
+      <svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true">
+        <path d="M2 3.5h6M6.2 1.7 8 3.5 6.2 5.3M8 6.5H2M3.8 4.7 2 6.5l1.8 1.8" />
+      </svg>
+    </button>
+  );
+}
+
+function PersonMessage({
+  message,
+  now,
+  extra,
+}: {
+  message: Message;
+  now: number;
+  extra?: ReactNode;
+}) {
+  return (
+    <>
+      <div className="hb-who">
+        <span className="mk you">{t('mark.you')}</span>
+        <time dateTime={message.at}>{noteTime(message.at, now)}</time>
+        {message.delivery === 'pending' ? (
+          <span className="hb-pend">{t('hablar.pending')}</span>
+        ) : null}
+        {extra}
+      </div>
+      <div className="hb-mine">
+        {message.text === '' ? null : <Plain text={message.text} />}
+        <Attachments files={message.attachments} />
+      </div>
+    </>
+  );
+}
+
+// The secretary's reply: a one-line conclusion in the voice's serif and, under it, the rest; a long
+// rest folds behind «ver más» (M4 sets how long the secretary may be; the page guards for when it
+// is longer).
+function Reply({ message, now, head }: { message: Message; now: number; head: ReactNode }) {
+  const reply = useMemo(() => splitReply(message.text), [message.text]);
+  const [open, setOpen] = useState(false);
+  const id = `hb-more-${message.id}`;
+  return (
+    <>
+      <div className="hb-who">
+        <SecretaryMark />
+        <span className="hb-name">
+          {message.author === 'secretary' ? t('hablar.secretary') : message.by}
+        </span>
+        <time dateTime={message.at}>{noteTime(message.at, now)}</time>
+        {head}
+      </div>
+      {reply.lead === '' ? null : (
+        <p className="hb-bluf">
+          <Plain text={reply.lead} />
+        </p>
+      )}
+      {reply.rest === '' ? null : reply.folds ? (
+        <>
+          <div className="hb-fold" data-open={open ? '' : undefined}>
+            <div id={id} className="hb-more" aria-hidden={open ? undefined : true} inert={!open}>
+              <Plain text={reply.rest} />
+            </div>
+          </div>
+          <button
+            type="button"
+            className="hb-toggle"
+            aria-expanded={open}
+            aria-controls={id}
+            onClick={() => setOpen(!open)}
+          >
+            {open ? t('hablar.less') : t('hablar.more')}
+          </button>
+        </>
+      ) : (
+        <p className="hb-more-open">
+          <Plain text={reply.rest} />
+        </p>
+      )}
+      <Attachments files={message.attachments} />
+    </>
+  );
+}
+
+function Thinking() {
+  return (
+    <>
+      <div className="hb-who">
+        <SecretaryMark />
+        <span className="hb-name">{t('hablar.secretary')}</span>
+      </div>
+      <div className="hb-thinking" role="status">
+        <span className="bar" aria-hidden="true" />
+        {t('hablar.thinking')}
+      </div>
+    </>
+  );
+}
+
+type TurnProps = {
+  turn: Turn;
+  thinking: boolean;
+  items: ReadonlyMap<string, Item>;
+  now: number;
+  fresh: (key: string) => boolean;
+  found: boolean;
+  onKind: (turn: Turn, kind: MessageKind) => void;
+};
+
+function TurnBlock({ turn, thinking, items, now, fresh, found, onKind }: TurnProps) {
+  const [first, ...later] = turn.replies;
+  const chips = branchOf(turn, items, now);
+  const asks = asksOf(turn, items);
+  const asked = useLingering(asks);
+  const label = <KindLabel turn={turn} onKind={onKind} />;
+  const rows: ReactNode[] = [];
+  turn.person.forEach((message, index) => {
+    rows.push(
+      <Row
+        key={`m${message.id}`}
+        lane="you"
+        bodyKey={`m${message.id}`}
+        fresh={fresh(`m${message.id}`)}
+      >
+        <PersonMessage
+          message={message}
+          now={now}
+          extra={index === 0 && !first && !thinking ? label : null}
+        />
+      </Row>,
+    );
+  });
+  const replies = first ? [first, ...later] : [];
+  // A reply's row is its slot in the turn: the thinking row holds the slot the reply then takes,
+  // so the node stays and only the body is new.
+  replies.forEach((message, position) => {
+    const slot = `s${position}`;
+    const head = position === 0;
+    rows.push(
+      <Row
+        key={slot}
+        lane="secretary"
+        bodyKey={`r${message.id}`}
+        fresh={fresh(`r${message.id}`)}
+        className={head && chips.length > 0 ? 'has-branch' : undefined}
+      >
+        <Reply message={message} now={now} head={head ? label : null} />
+        {head ? <Branch chips={chips} fresh={(id) => fresh(`c${turn.root}:${id}`)} /> : null}
+      </Row>,
+    );
+  });
+  if (thinking) {
+    rows.push(
+      <Row
+        key={`s${replies.length}`}
+        lane="secretary"
+        bodyKey={`t${turn.root}`}
+        fresh={fresh(`t${turn.root}`)}
+        busy
+      >
+        <Thinking />
+      </Row>,
+    );
+  }
+  for (const { item, leaving } of asked) {
+    rows.push(
+      <Row
+        key={`a${item.id}`}
+        lane="secretary"
+        bodyKey={`a${item.id}`}
+        fresh={fresh(`a${item.id}`)}
+        leaving={leaving}
+      >
+        <AskCard item={item} gone={!asks.some((each) => each.id === item.id)} />
+      </Row>,
+    );
+  }
+  return (
+    <section
+      className="hb-turn"
+      id={`hb-turn-${turn.root}`}
+      data-k={`turn:${turn.root}`}
+      data-found={found ? '' : undefined}
+      aria-label={t('hablar.conversation')}
+    >
+      {rows}
+    </section>
+  );
+}
+
+// Where the lanes' light and lines go, measured from the nodes on the page.
+type Geometry = { H: number; you: number | null; sec: number | null };
+
+function sameGeometry(a: Geometry, b: Geometry): boolean {
+  return a.H === b.H && a.you === b.you && a.sec === b.sec;
+}
+
+function useGeometry(list: RefObject<HTMLElement | null>): Geometry {
+  const [geometry, setGeometry] = useState<Geometry>({ H: 0, you: null, sec: null });
+  const measure = useCallback(() => {
+    const el = list.current;
+    if (!el) return;
+    const top = el.getBoundingClientRect().top;
+    const centre = (node: Element | undefined) =>
+      node ? Math.round(node.getBoundingClientRect().top - top + 12) : null;
+    const youNodes = el.querySelectorAll('.hb-row.you > .nd');
+    const next: Geometry = {
+      H: el.offsetHeight,
+      you: centre([...youNodes].at(-1)),
+      sec: centre(el.querySelector('.nd.secretary[data-busy]') ?? undefined),
+    };
+    setGeometry((was) => (sameGeometry(was, next) ? was : next));
+  }, [list]);
+  useLayoutEffect(measure);
+  useEffect(() => {
+    const el = list.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [list, measure]);
+  return geometry;
+}
+
+// The secretary's own light on its lane, as the agents' (30 px each way and a small halo), in its
+// colour.
+function secLight(y: number): string {
+  return `<g class="gl" transform="translate(${X_SEC} ${y})"><rect x="-2" y="-30" width="4" height="60" fill="url(#gS)" style="filter:blur(2.4px);opacity:var(--glow-lit)"/><rect x="-.75" y="-30" width="1.5" height="60" fill="url(#gS)"/><circle r="10" opacity=".26" style="filter:blur(4.5px)"/><circle r="6.5" opacity=".32" style="filter:blur(2px)"/></g>`;
+}
+
+function LaneInk({ geometry }: { geometry: Geometry }) {
+  const { H, you, sec } = geometry;
+  const light = useMemo(
+    () =>
+      lightMarkup({
+        H,
+        W: 58,
+        lastOpen: H,
+        fuseAt: H,
+        closed: false,
+        y0: you,
+        y1: you,
+        ys: you === null ? [] : [you],
+        ws: [],
+        as: [],
+        atasco: false,
+        pinches: [],
+      }).halos,
+    [H, you],
+  );
+  return (
+    <svg className="ink" width="58" height={Math.max(H, 1)} aria-hidden="true">
+      <g className="lines">
+        <path
+          className="ln lag"
+          d={`M${X_SEC} ${HEAD}V${H}`}
+          fill="none"
+          stroke="var(--lane)"
+          strokeWidth="1"
+        />
+        <path
+          className="ln lyou"
+          d={`M${X_YOU} ${HEAD}V${H}`}
+          fill="none"
+          stroke="var(--you)"
+          strokeWidth="1"
+        />
+      </g>
+      <g className="glow">
+        <g
+          className="secs"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: the light's markup, built from numbers
+          dangerouslySetInnerHTML={{ __html: sec === null ? '' : secLight(sec) }}
+        />
+        <g
+          className="halos"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: the light's markup, built from numbers
+          dangerouslySetInnerHTML={{ __html: light }}
+        />
+      </g>
+    </svg>
+  );
+}
+
+export type TurnsProps = {
+  turns: readonly Turn[];
+  thinking: number | undefined;
+  items: ReadonlyMap<string, Item>;
+  // The turn a link asked for, to find: it shows lit for a moment.
+  found: number | undefined;
+  onKind: (turn: Turn, kind: MessageKind) => void;
+  // The element that scrolls the conversation: the lanes draw in against it.
+  scroller: RefObject<HTMLElement | null>;
+  // Said when the turns are first there, just before the lanes draw in (the page scrolls to the
+  // newest turn first, so the lanes draw where the person looks).
+  onFirst?: () => void;
+};
+
+export function Turns({ turns, thinking, items, found, onKind, scroller, onFirst }: TurnsProps) {
+  const app = useApp();
+  const list = useRef<HTMLDivElement>(null);
+  const geometry = useGeometry(list);
+  const keys = useMemo(
+    () => [
+      ...turns.flatMap((turn) => [
+        ...turn.messages.map((m) => (m.author === 'person' ? `m${m.id}` : `r${m.id}`)),
+        ...turn.links.map((id) => `c${turn.root}:${id}`),
+        ...(turn.root === thinking ? [`t${turn.root}`] : []),
+        ...asksOf(turn, items).map((item) => `a${item.id}`),
+      ]),
+    ],
+    [turns, thinking, items],
+  );
+  const fresh = useFresh(keys);
+  // The lanes draw in once, when the first turns are there.
+  const drawn = useRef(false);
+  const first = useRef(onFirst);
+  first.current = onFirst;
+  useLayoutEffect(() => {
+    if (drawn.current || turns.length === 0 || geometry.H === 0) return;
+    drawn.current = true;
+    first.current?.();
+    drawIn(list.current, scroller.current ? { scope: scroller.current } : {});
+  }, [turns.length, geometry.H, scroller]);
+  return (
+    <div className="lanes hb-lanes" ref={list}>
+      <LaneInk geometry={geometry} />
+      <div className="lane-head hb-head" aria-hidden="true">
+        <span className="ag">sec</span>
+        <span className="you">{t('lanes.you')}</span>
+      </div>
+      {turns.map((turn) => (
+        <TurnBlock
+          key={turn.root}
+          turn={turn}
+          thinking={turn.root === thinking}
+          items={items}
+          now={app.now}
+          fresh={fresh}
+          found={turn.root === found}
+          onKind={onKind}
+        />
+      ))}
+    </div>
+  );
+}

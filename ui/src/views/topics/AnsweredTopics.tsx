@@ -1,5 +1,5 @@
 import { t } from '../../i18n/i18n.ts';
-import { topicsHash } from '../../selection.ts';
+import { hablarHash } from '../../selection.ts';
 import { answeredTopics, capped, conclusionOf } from '../../topics.ts';
 import { useTopics } from './use-topics.ts';
 
@@ -20,7 +20,7 @@ export function AnsweredTopics() {
       <ul>
         {shown.map((topic) => (
           <li key={topic.id}>
-            <a className="tp-row" href={topicsHash(topic.id)}>
+            <a className="tp-row" href={hablarHash({ topic: topic.id })}>
               <span className="tp-id">{topic.id}</span>
               <span className="tp-title">{topic.title}</span>
               {conclusionOf(topic) ? (
@@ -31,7 +31,7 @@ export function AnsweredTopics() {
         ))}
       </ul>
       {more > 0 ? (
-        <a className="tp-more" href={topicsHash()}>
+        <a className="tp-more" href={hablarHash()}>
           {t('topics.toca.more', { count: more })}
         </a>
       ) : null}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   boardHash,
   briefHash,
+  hablarHash,
   hashFor,
   hashOf,
   idFromHash,
@@ -129,6 +130,20 @@ describe('selection', () => {
     for (const page of pages)
       expect(routeFromHash(studioHash(page))).toEqual({ view: 'studio', page });
     expect(studioHash()).toBe('#/studio');
+  });
+
+  // Hablar opens at a turn (the number of the message that began it), or at the consultation a side
+  // topic became; the old Temas address is no route any more.
+  it('routes Hablar, at a turn or at a topic, and writes them back', () => {
+    expect(routeFromHash('#/hablar')).toEqual({ view: 'hablar' });
+    expect(routeFromHash('#/hablar/12')).toEqual({ view: 'hablar', turn: 12 });
+    expect(routeFromHash('#/hablar/TEM-3')).toEqual({ view: 'hablar', topic: 'TEM-3' });
+    expect(hablarHash()).toBe('#/hablar');
+    expect(hablarHash({ turn: 12 })).toBe('#/hablar/12');
+    expect(hablarHash({ topic: 'TEM-3' })).toBe('#/hablar/TEM-3');
+    for (const route of [{ view: 'hablar' }, { view: 'hablar', turn: 12 }] as const)
+      expect(routeFromHash(hashOf(route))).toEqual(route);
+    expect(routeFromHash('#/topics')).toEqual({ view: 'toca' });
   });
 
   it('reads the old Customize pages as Te toca', () => {

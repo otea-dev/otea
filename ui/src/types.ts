@@ -1,4 +1,5 @@
 import type { AgentStatus } from '../../src/core/agent-status.ts';
+import type { FromMessage } from '../../src/core/conversation.ts';
 import type { Layout } from '../../src/core/modules.ts';
 import type { NotifyPrefs } from '../../src/core/notify/planner.ts';
 import type { FieldRequirement, Labels } from '../../src/core/preset.ts';
@@ -165,6 +166,8 @@ export type ItemView = Omit<ItemWithEvents, 'relations'> & {
   // On an archived board (Studio's Archivados): read-only. The board by its name and hidden id, and
   // its collection, which no list holds, to read the item's words.
   archived?: { board: string; id: string; collection?: CollectionView };
+  // The turns of the conversation with the secretary it came out of (Hablar), when it came out of one.
+  fromMessages?: FromMessage[];
 };
 
 // canManageDevices: this computer's signed-in browser, the only one that pairs and revokes devices.

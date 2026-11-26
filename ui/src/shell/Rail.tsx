@@ -6,6 +6,7 @@ import type { BoardSummary } from '../board-studio/api.ts';
 import { useBoards } from '../board-studio/home/boards-store.ts';
 import { freshlyLive } from '../board-studio/home/home-model.ts';
 import { openNewBoard } from '../board-studio/home/studio-dialogs.ts';
+import type { SecretaryStatus } from '../conversation.ts';
 import { stuckCount, tocaCount } from '../derive/toca.ts';
 import { t } from '../i18n/i18n.ts';
 import { TypeIcon } from '../icons/TypeIcon.tsx';
@@ -16,20 +17,28 @@ import { C, F, lerp } from '../motion/curves.ts';
 import { type Drive, drive } from '../motion/drive.ts';
 import { reduced } from '../motion/reduced.ts';
 import { studioHash, type ViewRoute } from '../selection.ts';
-import { answeredTopics } from '../topics.ts';
-import { topicsShown, useTopics } from '../views/topics/use-topics.ts';
+import { SecretaryMark } from '../views/hablar/SecretaryMark.tsx';
+import { useSecretary } from '../views/hablar/use-conversation.ts';
 import { PrefsButton } from './Preferences.tsx';
 import { type BoardIcon, boardEntries, foldClip, type RailKey, railKey } from './rail-model.ts';
 import { useMedia } from './use-media.ts';
 
 // The rail (SPEC §7.2, mock:159-198, 1420-1458, 4038-4069): the head (fold, + Nuevo ítem, named so
-// it never reads as a new view, P7-14), vistas with Te toca, Atasco and Temas (what waits for you),
+// it never reads as a new view, P7-14), vistas with Hablar (the secretary's mark, lit while it
+// listens), Te toca and Atasco (what waits for you),
 // the boards with yours / open, Nuevo tablero, the project's Studio, settings and performance (set
 // up and reviewed now and then), one selection pill that slides to the row in view, and
 // Preferences at the foot. It folds to a 60 px strip of icons: the rail clips, the labels fade, badges come up, and the main
 // pane slides from where it was, so nothing reflows. Below 1024 px it is always folded.
 
 const NARROW = '(max-width: 1023px)';
+
+// The secretary's state on its row: a dot in its colour while it is there, a ring while it is away;
+// nothing while the project has none.
+export function SecretaryDot({ status }: { status: SecretaryStatus | null | undefined }) {
+  if (!status) return null;
+  return <i className="sec-dot" data-state={status.state} aria-hidden="true" />;
+}
 
 export function RowIcon({ icon }: { icon: BoardIcon }) {
   return icon.kind === 'mock' ? <Icon name={icon.name} /> : <TypeIcon name={icon.name} size={16} />;
@@ -194,9 +203,7 @@ export function Rail() {
   const yours = tocaCount(app.all, { now: app.now });
   const stuck = stuckCount(app.all, { now: app.now });
   const boards = boardEntries(app.collections, app.all);
-  // Side topics: listed while they are on or some were kept; the answered ones are yours.
-  const topics = useTopics();
-  const answered = answeredTopics(topics?.topics ?? []).length;
+  const secretary = useSecretary();
   const foldLabel = folded ? t('nav.show') : t('nav.hide');
 
   useSelPill(navs, key);
@@ -279,6 +286,14 @@ export function Rail() {
         <div className="rail-label first">{t('nav.views')}</div>
         <nav className="nav">
           <Row
+            k="hablar"
+            on={key === 'hablar'}
+            icon={<SecretaryMark />}
+            label={t('hablar.nav')}
+            to={{ view: 'hablar' }}
+            pair={<SecretaryDot status={secretary} />}
+          />
+          <Row
             k="toca"
             on={key === 'toca'}
             icon={<Icon name="toca" />}
@@ -296,20 +311,6 @@ export function Rail() {
             pair={<Count value={stuck} tone="warn" hold />}
             badge={{ n: stuck, warn: true }}
           />
-          {/* Temas wait for you to read or close them, as Te toca does; conversations, not lists
-              of items, so a small gap sets them apart (the phone's Panel lists them the same). */}
-          {topicsShown(topics) ? (
-            <Row
-              k="topics"
-              on={key === 'topics'}
-              icon={<TypeIcon name="chat-bubble" size={16} />}
-              label={t('nav.topics')}
-              to={{ view: 'topics' }}
-              pair={<Count value={answered} tone="you" hold />}
-              badge={{ n: answered }}
-              apart
-            />
-          ) : null}
         </nav>
         <div className="rail-label">{t('nav.boards')}</div>
         <nav className="nav boards">

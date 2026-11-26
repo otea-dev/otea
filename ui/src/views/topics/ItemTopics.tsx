@@ -4,7 +4,7 @@ import { useApp } from '../../app/context.tsx';
 import { useRemote } from '../../hooks.ts';
 import { t } from '../../i18n/i18n.ts';
 import { Button, GhostButton, toast } from '../../kit/index.ts';
-import { topicsHash } from '../../selection.ts';
+import { hablarHash } from '../../selection.ts';
 import { pendingTopics } from '../../topics.ts';
 import type { ItemView } from '../../types.ts';
 
@@ -50,7 +50,7 @@ export function ItemTopics({ item, canWrite }: { item: ItemView; canWrite: boole
           <ul className="tp-item-list">
             {linked.map((topic) => (
               <li key={topic.id}>
-                <a href={topicsHash(topic.id)}>
+                <a href={hablarHash({ topic: topic.id })}>
                   <span className="tp-id">{topic.id}</span> {topic.title}
                 </a>
                 {topic.pending ? (
