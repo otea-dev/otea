@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { AnswerWords } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
+import { ShortText } from '../../components/ShortText.tsx';
 import { Unheard } from '../../components/Unheard.tsx';
 import { mainPath } from '../../derive/path.ts';
 import { agoText, whenText } from '../../derive/when.ts';
@@ -430,7 +431,7 @@ export function Acts({
           <span>{ago}</span>
         </div>
         <div>
-          <p className="q">{facts.handed?.reason}</p>
+          <ShortText text={facts.handed?.reason ?? ''} leadClass="q" />
           {options.length > 0 ? (
             <div className="opts">
               {options.map((o) => {

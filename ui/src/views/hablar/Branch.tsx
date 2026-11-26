@@ -3,6 +3,7 @@ import type { AnswerWords } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import type { Chip } from '../../conversation.ts';
 import { t } from '../../i18n/i18n.ts';
+import { ShortText } from '../../components/ShortText.tsx';
 import { AgentMark, Button, Swap, toast } from '../../kit/index.ts';
 import { NodeGlyph } from '../../lanes/NodeGlyph.tsx';
 import { C } from '../../motion/curves.ts';
@@ -172,7 +173,7 @@ export function AskBody({
               {t('sheet.qa.asks', { agent: by })} · {about}
             </span>
           </div>
-          <p className="hb-q">{text}</p>
+          <ShortText text={text} leadClass="hb-q" />
         </>
       )}
       {said !== null || gone ? (

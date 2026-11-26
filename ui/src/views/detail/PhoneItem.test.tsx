@@ -195,6 +195,30 @@ describe('reviewing an item on the phone', () => {
     expect(html).toMatch(/class="p-more"[^>]*aria-expanded="false"/);
   });
 
+  // Field study 3: the handoff note was one long paragraph in the big serif, with the evidence
+  // far under it. It leads with its first sentence; the rest waits behind «ver más».
+  it('sets a long handoff note as a conclusion with the rest folded', () => {
+    setLanguage('es');
+    const long = [
+      'Ya cruzan: el lobo toma el puente de cuerda.',
+      'Cambié el pathfinding para que acepte aristas con peso.',
+      'Revisé los cuatro mapas viejos y ninguno se rompe con el cambio de pesos.',
+      'Dejé el commit 2fda019 en la rama de trabajo con las pruebas que corrí a mano.',
+      'Queda pendiente medir el costo en el mapa grande, que no pude probar en esta máquina.',
+    ].join(' ');
+    const last = review.events.length - 1;
+    const note: ItemView = {
+      ...review,
+      events: review.events.map((e, i) =>
+        i === last ? { ...e, data: { ...e.data, reason: long } } : e,
+      ),
+    };
+    const html = render(note);
+    expect(html).toContain('Ya cruzan: el lobo toma el puente de cuerda.');
+    expect(html).not.toContain('Queda pendiente medir');
+    expect(html).toContain('ver más');
+  });
+
   it('docks Devolver and Aprobar at the bottom, without Descartar', () => {
     setLanguage('es');
     const html = render();

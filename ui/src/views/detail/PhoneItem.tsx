@@ -20,6 +20,7 @@ import {
 import { pickableOn, type ReaderPick } from '../../components/evidence/reader-pick.ts';
 import { NoteText } from '../../components/NoteText.tsx';
 import { OptionTrade } from '../../components/OptionsModule.tsx';
+import { ShortText } from '../../components/ShortText.tsx';
 import { Unheard } from '../../components/Unheard.tsx';
 import { agoText } from '../../derive/when.ts';
 import { blindPartsOf } from '../../evidence.ts';
@@ -385,7 +386,7 @@ export function HandedList({
             </dd>
           ) : f.long ? (
             <dd>
-              <NoteText className="p-text" text={f.value} />
+              <ShortText markdown leadClass="p-text" text={f.value} />
             </dd>
           ) : (
             <dd>{f.value}</dd>
@@ -503,7 +504,7 @@ function RoundView({
         </Lab>
         {handed?.length ? <HandedList fields={handed} agent={r.by} /> : null}
         {r.note ? (
-          <NoteText className="p-text" text={r.note} />
+          <ShortText markdown leadClass="p-text" text={r.note} />
         ) : handed?.length ? null : (
           <p className="p-text none">{t('phone.r.noNote')}</p>
         )}
