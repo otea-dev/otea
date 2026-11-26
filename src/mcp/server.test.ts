@@ -159,6 +159,7 @@ describe('mcp server', () => {
         'board',
         'events',
         'list',
+        'pending',
         'show',
         'topic_list',
         'topic_show',

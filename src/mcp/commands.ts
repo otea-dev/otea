@@ -28,6 +28,10 @@ export const AGENT_COMMANDS = [
   // is no read-only tool. The person's side is the desk's alone.
   'conversation',
   'say',
+  // What waits for the person, counted by Otea (the secretary reads it), and what an agent tells
+  // the secretary to relay (a worker or a refiner).
+  'pending',
+  'escalate',
   // The refiner's side of the Bandeja: read the person's captures, take one, file it as an item
   // (create --from-bandeja) or ask what it lacks (ask B-n). The person's side is the desk's alone.
   'bandeja',
@@ -107,6 +111,7 @@ export const READ_ONLY = new Set([
   'show',
   'events',
   'wait',
+  'pending',
   'topic list',
   'topic show',
   'whoami',

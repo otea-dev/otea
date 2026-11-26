@@ -60,6 +60,7 @@ import {
 import { cropNote } from '../app/crop.ts';
 import { listDevices, revokeDevice } from '../app/devices.ts';
 import { handInText, openDraftsOf } from '../app/draft-request.ts';
+import { escalateToSecretary } from '../app/escalate.ts';
 import { listEvents } from '../app/events.ts';
 import { attachEvidence, detachEvidence, evidenceReadPath } from '../app/evidence.ts';
 import { type Brings, checkGate, type GateCheck, protectedBases, type Tip } from '../app/gates.ts';
@@ -123,6 +124,7 @@ import {
 } from '../app/next.ts';
 import { agentNotes, noteWaiting, replyNote, roundNotesOf } from '../app/notes.ts';
 import { overlapsOf, overlapsRecord, overlapText } from '../app/overlap.ts';
+import { pendingLine, pendingOf, pendingText } from '../app/pending.ts';
 import { performanceOf } from '../app/performance.ts';
 import { lanOpen, type Probe, type TransportKind } from '../app/phone.ts';
 import {
@@ -2767,9 +2769,13 @@ async function waitForSecretary(input: Input): Promise<Output> {
       await Promise.race([noted, delay(HARNESS_READ_MS, undefined, { ref: false })]);
     if (!('found' in waited)) return waited;
     const wake = waited.found;
+    // What waits for the person, counted now: the notice «ready for review» never rests on memory.
+    const waits = pendingLine(pendingOf(project));
     return {
       data: { secretary: me, ...wake },
-      text: [wake.text, secretaryWaitAgainLine(me, input.channel)].join('\n'),
+      text: [wake.text, ...(waits ? [waits] : []), secretaryWaitAgainLine(me, input.channel)].join(
+        '\n',
+      ),
     };
   });
   owner.release();
@@ -5120,6 +5126,7 @@ const conversation: Command = {
         ...(page === undefined ? {} : { limit: page }),
       });
       const { paths, problems, ...rest } = read;
+      const waits = pendingLine(pendingOf(project), actor.name);
       const messages = read.messages.map((message) => ({
         ...message,
         attachments: message.attachments.map((file) => {
@@ -5132,7 +5139,10 @@ const conversation: Command = {
           };
         }),
       }));
-      return { data: { ...rest, messages }, text: conversationText(actor.name, read) };
+      return {
+        data: { ...rest, messages },
+        text: [conversationText(actor.name, read), ...(waits ? [waits] : [])].join('\n'),
+      };
     });
   },
 };
@@ -5197,6 +5207,40 @@ const say: Command = {
       return {
         data: said,
         text: `Said as message ${message.id}${message.replyTo === null ? '' : `, answering ${message.replyTo}`}${files}${turn}.${kept}`,
+      };
+    });
+  },
+};
+
+// What waits for the person, as Otea counts it from the records: for the secretary to say «what
+// waits for you today» and to notice what became theirs, instead of remembering.
+const pending: Command = {
+  name: 'pending',
+  summary:
+    "What waits for the person now, counted by Otea: reviews, their own steps, questions (items, Bandeja notes, yours), stuck items, a review holding a board's queue. Say it as it is, never from memory",
+  args: [],
+  options: {},
+  execute: (input) =>
+    withReader(input, (project) => {
+      const waiting = pendingOf(project);
+      return { data: waiting, text: pendingText(waiting) };
+    }),
+};
+
+// An agent tells the secretary what the person must know, to relay it in Hablar.
+const escalate: Command = {
+  name: 'escalate',
+  summary:
+    'Tell the secretary what the person must know and is no question for them (a duplicate, a failed push, a block): it tells them in Hablar. A decision is otea ask. About an item or a Bandeja note (B-3)',
+  args: ['id', 'text'],
+  options: {},
+  execute: (input) => {
+    const [id = '', text = ''] = input.args;
+    return withAgent(input, (project) => {
+      const sent = escalateToSecretary(project, { agent: input.actor.name, about: id, text });
+      return {
+        data: sent,
+        text: `Told ${sent.secretary} about ${sent.about}: it tells the person in Hablar. Go on with what you can; ask them yourself (otea ask) only for a decision that is theirs.`,
       };
     });
   },
@@ -5322,6 +5366,8 @@ export const COMMANDS: readonly Command[] = [
   topicClose,
   conversation,
   say,
+  pending,
+  escalate,
   // The longer name first: a command is the first whose words all match.
   bandejaTake,
   bandeja,

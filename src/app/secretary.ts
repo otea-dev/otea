@@ -197,7 +197,7 @@ export const wakeText = (pending: SecretaryPending): string => {
     return `The person captured a note in the Bandeja${about}${said}. Read it (otea bandeja${ref ? ` ${ref}` : ''}), then refine it yourself or hand it to a refiner: take it first (otea bandeja take${ref ? ` ${ref}` : ' <id>'}), for the refiner with --for <its name> when it is one you launch.`;
   if (kind === 'kind_changed')
     return `The person changed how you sorted their message${about}${said}. Read it (otea conversation) and act on it: a request becomes items (otea create ... --from-message ${ref ?? '<id>'}, then say what you made), a consultation is answered; do not ask again what they just decided.`;
-  return `A question is escalated to you${ref ? ` on ${ref}` : ''}${said}. Answer it, or ask the person.`;
+  return `An agent escalates to you${ref ? ` on ${ref}` : ''}${said}. If the person must know it, tell them in Hablar now: a notice (otea say "<text>"${ref ? ` --links ${ref}` : ''}, no --reply-to), or with --option when they must decide; otherwise settle it yourself.`;
 };
 
 // One secretary wait as it runs: when it started (a signal returned to an earlier wait and not acked
