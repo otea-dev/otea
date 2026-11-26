@@ -24,6 +24,7 @@ import {
   handRows,
   holdApproval,
   linksOf,
+  localBehindSaid,
   ownStepOf,
   partsCount,
   railStep,
@@ -1244,6 +1245,31 @@ describe('branchSaid', () => {
     setLanguage('en');
     expect(branchSaid(landing, outside)).toBe(
       'in main already, merged outside Otea: an agent closes the Integrar step',
+    );
+  });
+
+  // Field study 3: an item was Done with its work on the remote's main while the person's local
+  // main never moved, and nothing said so. A Done item says it, with the way to catch up.
+  it('says the local base is behind what landed, and how to catch up', () => {
+    const behind = {
+      base: 'main',
+      remote: 'origin/main',
+      behind: 2,
+      checkout: 'D:\\work\\app',
+      state: 'ready',
+    } as const;
+    setLanguage('es');
+    expect(localBehindSaid(behind)).toBe(
+      'Subido a origin/main, pero tu main local va 2 commits atrasado: en D:\\work\\app ejecuta git pull --ff-only',
+    );
+    expect(localBehindSaid({ ...behind, behind: 1 })).toContain('va 1 commit atrasado');
+    expect(localBehindSaid({ ...behind, state: 'changes' })).toContain('tiene cambios tuyos');
+    expect(localBehindSaid({ ...behind, state: 'elsewhere', on: 'feat/x' })).toContain(
+      'está en feat/x',
+    );
+    setLanguage('en');
+    expect(localBehindSaid(behind)).toBe(
+      'Landed on origin/main, but your local main is 2 commits behind: run git pull --ff-only in D:\\work\\app',
     );
   });
 
