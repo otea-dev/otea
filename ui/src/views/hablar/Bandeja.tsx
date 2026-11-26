@@ -73,11 +73,13 @@ function Row({
   now,
   onAnswered,
   lit,
+  answerBelow,
 }: {
   entry: BandejaEntry;
   now: number;
   onAnswered: () => void;
   lit: boolean;
+  answerBelow: boolean;
 }) {
   const app = useApp();
   const asking = entry.asking;
@@ -113,7 +115,13 @@ function Row({
       </div>
       <p className="bn-title">{entryTitle(entry) || t('bandeja.onlyFiles')}</p>
       <Files entry={entry} />
-      {asking ? <BandejaAsk entry={entry} onAnswered={onAnswered} /> : null}
+      {asking ? (
+        answerBelow ? (
+          <p className="bn-below">{t('bandeja.below')}</p>
+        ) : (
+          <BandejaAsk entry={entry} onAnswered={onAnswered} />
+        )
+      ) : null}
     </li>
   );
 }
@@ -124,9 +132,12 @@ export type BandejaProps = {
   reload: () => void;
   // The note a link opened at (B-3): it lights for a moment.
   lit?: string | undefined;
+  // The conversation shows its foot, where a question is answered: the list only says where the
+  // question stands, so a question never has two forms.
+  answerBelow?: boolean | undefined;
 };
 
-export function Bandeja({ entries, reload, lit }: BandejaProps) {
+export function Bandeja({ entries, reload, lit, answerBelow = false }: BandejaProps) {
   const app = useApp();
   const [all, setAll] = useState(false);
   const sorted = useMemo(() => ordered(entries ?? []), [entries]);
@@ -149,6 +160,7 @@ export function Bandeja({ entries, reload, lit }: BandejaProps) {
             now={app.now}
             onAnswered={reload}
             lit={lit === entry.ref}
+            answerBelow={answerBelow}
           />
         ))}
       </ul>

@@ -309,6 +309,28 @@ describe('Hablar with the Bandeja', () => {
     expect(tabs).toEqual(['Conversación', 'Lo que salió · 1']);
   });
 
+  // F4 review round: one question, one place to answer it. The thread's foot is where you answer
+  // while the thread shows; the list beside it only says where the question stands.
+  it('answers a note’s question in the thread, and the list only points down to it', async () => {
+    server([asking]);
+    const root = await show(<HablarView />);
+
+    expect(all(root, '.hb-turn[data-k="note-asks"] .hb-opt')).toHaveLength(2);
+    expect(all(root, '.bn-row .hb-opt')).toHaveLength(0);
+    expect(text(q(root, '.bn-row'))).toContain('te pregunta');
+    expect(text(q(root, '.bn-row'))).toContain('responde abajo');
+  });
+
+  it('never has two forms for one question: with the thread hidden the list holds the form', async () => {
+    server([asking]);
+    const root = await show(<HablarView bandeja="B-3" />);
+
+    // Opened at the note (the narrow tab of what came out): the thread is not what shows.
+    expect(all(root, '.hb-turn[data-k="note-asks"]')).toHaveLength(0);
+    expect(all(root, '.bn-row .hb-opt')).toHaveLength(2);
+    expect(text(q(root, '.bn-row'))).not.toContain('responde abajo');
+  });
+
   it('opens at a note a notice linked to: the tab that holds it shows, and the note lights', async () => {
     server([entry({ id: 1 }), asking]);
     const root = await show(<HablarView bandeja="B-3" />);

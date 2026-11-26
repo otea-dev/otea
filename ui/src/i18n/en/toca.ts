@@ -77,6 +77,9 @@ export const toca = {
   'toca.off.bandeja': 'Inbox note',
   'toca.off.secretary': 'secretary',
   'toca.off.inHablar': 'in Talk',
+  'toca.off.report': 'Notice',
+  'toca.act.report': 'Read',
+  'toca.sub.reports': '{agent} reports',
 
   // The secretary is offline with things waiting for it
   'toca.secOff.title': '{name} is offline',

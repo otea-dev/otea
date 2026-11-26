@@ -660,6 +660,8 @@ export type TurnsProps = {
   // agent's question on an item does, and are answered there. Read again once one is.
   noteAsks?: readonly BandejaEntry[];
   onNoteAnswered?: () => void;
+  // The question «Te espera» sent you to: it lights for a moment.
+  litAsk?: string | undefined;
   // The element that scrolls the conversation: the lanes draw in against it.
   scroller: RefObject<HTMLElement | null>;
   // Said when the turns are first there, just before the lanes draw in (the page scrolls to the
@@ -678,6 +680,7 @@ export function Turns({
   onAnswer,
   noteAsks = [],
   onNoteAnswered,
+  litAsk,
   scroller,
   onFirst,
 }: TurnsProps) {
@@ -762,7 +765,9 @@ export function Turns({
               fresh={fresh(`a${item.id}`)}
               leaving={leaving}
             >
-              <AskCard item={item} gone={!asks.some((each) => each.id === item.id)} />
+              <div id={`hb-ask-${item.id}`} data-lit={litAsk === item.id || undefined}>
+                <AskCard item={item} gone={!asks.some((each) => each.id === item.id)} />
+              </div>
             </Row>
           ))}
         </section>
@@ -776,7 +781,9 @@ export function Turns({
               bodyKey={`n${entry.ref}`}
               fresh={fresh(`n${entry.ref}`)}
             >
-              <BandejaAsk entry={entry} onAnswered={() => onNoteAnswered?.()} />
+              <div id={`hb-ask-${entry.ref}`} data-lit={litAsk === entry.ref || undefined}>
+                <BandejaAsk entry={entry} onAnswered={() => onNoteAnswered?.()} />
+              </div>
             </Row>
           ))}
         </section>

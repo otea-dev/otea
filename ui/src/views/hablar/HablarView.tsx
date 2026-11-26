@@ -29,6 +29,8 @@ import { Button, toast } from '../../kit/index.ts';
 import { F, lerp } from '../../motion/curves.ts';
 import { drive } from '../../motion/drive.ts';
 import { reduced } from '../../motion/reduced.ts';
+import type { PendingEntry } from '../../pending.ts';
+import { useMedia } from '../../shell/use-media.ts';
 import type { Item } from '../../types.ts';
 import { useBandeja } from './Bandeja.tsx';
 import { Composer } from './Composer.tsx';
@@ -112,12 +114,19 @@ export function HablarView({
   const notes = useBandeja();
   // What needs you in the Bandeja counts beside what came out: a question waits for your tap.
   const asking = askingCount(notes.entries ?? []);
-  // The notes a refiner asked you about: their questions stand at the foot of the thread too.
-  const noteAsks = useMemo(
-    () => (notes.entries ?? []).filter(({ state }) => state === 'asking'),
-    [notes.entries],
-  );
   const [tab, setTab] = useState<'chat' | 'out'>(bandeja === undefined ? 'chat' : 'out');
+  // Where a question is answered: at the foot of the conversation, whenever it shows (always from
+  // 1240 px, on the phone's Conversación tab). The list of what came out then only says where each
+  // question stands; with the conversation hidden (the phone's other tab) the list holds the form.
+  // A question never has two forms.
+  const wide = useMedia('(min-width: 1240px)');
+  const threadShows = wide || tab === 'chat';
+  // The notes a refiner asked you about: their questions stand at the foot of the thread.
+  const noteAsks = useMemo(
+    () => (threadShows ? (notes.entries ?? []).filter(({ state }) => state === 'asking') : []),
+    [notes.entries, threadShows],
+  );
+  const [litAsk, setLitAsk] = useState<string | undefined>();
   const [litNote, setLitNote] = useState<string | undefined>();
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
@@ -151,21 +160,52 @@ export function HablarView({
     noteAsked.current = bandeja;
     setTab('out');
     setLitNote(bandeja);
-    const frame = requestAnimationFrame(() =>
-      document.getElementById(`bn-${bandeja}`)?.scrollIntoView({ block: 'center' }),
-    );
+    // With the conversation beside (from 1240 px) the question is answered at its foot: the page goes
+    // there; else the note's row scrolls into view.
+    const frame = requestAnimationFrame(() => {
+      if (wide && toAskRef.current(bandeja)) return;
+      document.getElementById(`bn-${bandeja}`)?.scrollIntoView({ block: 'center' });
+    });
     const timer = setTimeout(() => setLitNote(undefined), 2400);
     return () => {
       cancelAnimationFrame(frame);
       clearTimeout(timer);
     };
-  }, [bandeja, notesReady]);
+  }, [bandeja, notesReady, wide]);
 
   // Goes to a turn: the conversation shows, scrolls there and the turn lights for a moment.
   const goTo = useCallback((root: number) => {
     setTab('chat');
     setTarget((was) => ({ root, n: (was?.n ?? 0) + 1 }));
   }, []);
+
+  // Goes to the question at the foot of the conversation (an item's, or a note's), where it is
+  // answered. False when it is not there (the conversation does not hold it): the caller opens the
+  // item or the note instead.
+  const toAsk = useCallback((ref: string): boolean => {
+    const box = scroller.current;
+    const el = document.getElementById(`hb-ask-${ref}`);
+    if (!box || !el) return false;
+    const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+    near.current = false;
+    scrollBox(box, top - 16);
+    setLitAsk(ref);
+    setTimeout(() => setLitAsk(undefined), 2400);
+    return true;
+  }, []);
+
+  const toAskRef = useRef(toAsk);
+  toAskRef.current = toAsk;
+
+  // What «Te espera» points at: the question where it is answered, else the item, else the note.
+  const jump = (entry: PendingEntry) => {
+    if (entry.kind === 'secretary' && entry.turn !== undefined) return goTo(entry.turn);
+    if (entry.kind === 'question' || entry.kind === 'bandeja') {
+      if (toAsk(entry.ref)) return;
+    }
+    if (/^B-\d+$/i.test(entry.ref)) return app.go({ view: 'hablar', bandeja: entry.ref });
+    return app.openItem(entry.ref);
+  };
 
   useLayoutEffect(() => {
     if (!target) return;
@@ -363,11 +403,7 @@ export function HablarView({
             ) : null}
           </div>
         ) : null}
-        <TeEspera
-          pending={app.pending}
-          onNote={(ref) => app.go({ view: 'hablar', bandeja: ref })}
-          onTurn={goTo}
-        />
+        <TeEspera pending={app.pending} onJump={jump} />
         <div className="hb-chat" ref={scroller}>
           {convo.status === 'loading' ? (
             <p className="hb-pane">{t('hablar.loading')}</p>
@@ -375,7 +411,7 @@ export function HablarView({
             <p className="hb-pane action-error">{convo.message}</p>
           ) : (
             <div className="hb-flow" ref={flow} role="log" aria-label={t('hablar.conversation')}>
-              {turns.length === 0 ? (
+              {turns.length === 0 && noteAsks.length === 0 ? (
                 none ? null : (
                   <p className="hb-pane">{t('hablar.empty')}</p>
                 )
@@ -402,6 +438,7 @@ export function HablarView({
                     onAnswer={onAnswer}
                     noteAsks={noteAsks}
                     onNoteAnswered={notes.reload}
+                    litAsk={litAsk}
                     scroller={scroller}
                     onFirst={() => {
                       const box = scroller.current;
@@ -429,7 +466,7 @@ export function HablarView({
           onFilter={setFilter}
           onGo={goTo}
           now={app.now}
-          bandeja={{ ...notes, lit: litNote }}
+          bandeja={{ ...notes, lit: litNote, answerBelow: threadShows }}
           search={search}
           onSearch={setSearch}
         />

@@ -41,6 +41,20 @@ const agent = (name: string, o: Partial<Agent> = {}): Agent => ({
 describe('the project menu’s rows', () => {
   const here = { id: 'hm', name: 'Hollowmere', icon: null };
 
+  // F4 review round: a question on a note in another project is something waiting for you there.
+  it('counts what asks you in another project, though no item waits', () => {
+    setLanguage('es');
+    const ask = { kind: 'bandeja', ref: 'B-1', title: 'x', since: null } as const;
+    const { rows, total } = projectRows(
+      here,
+      [overview({ id: 'mirefall', asking: [ask] }), overview({ id: 'hm', current: true })],
+      0,
+    );
+
+    expect(rows.find(({ id }) => id === 'mirefall')).toMatchObject({ waiting: 1 });
+    expect(total).toBe(1);
+  });
+
   it('puts the project open now first, with your count, a tick and no address', () => {
     setLanguage('es');
     const { rows } = projectRows(

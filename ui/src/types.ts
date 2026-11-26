@@ -3,6 +3,7 @@ import type { FromBandeja } from '../../src/core/bandeja.ts';
 import type { FromMessage } from '../../src/core/conversation.ts';
 import type { Layout } from '../../src/core/modules.ts';
 import type { NotifyPrefs } from '../../src/core/notify/planner.ts';
+import type { PendingEntry } from '../../src/core/pending.ts';
 import type { FieldRequirement, Labels } from '../../src/core/preset.ts';
 import type { ChildrenSummary, RelationRef, RelationView } from '../../src/core/relations.ts';
 import type { AgentProfile } from './presence.ts';
@@ -352,6 +353,9 @@ export type ProjectOverview = {
   waiting: WaitingItem[];
   // Side topics an agent answered there: yours to read, never work (absent from an older server).
   topics?: AnsweredTopic[];
+  // What waits for you there that is no item: a question on a Bandeja note, the secretary's own,
+  // what agents escalated while it is away (absent from an older server).
+  asking?: PendingEntry[];
   withAgents: number;
   // The agents there that are not away, with the server's status for each (absent from an older
   // server).

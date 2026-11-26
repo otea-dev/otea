@@ -106,6 +106,10 @@ export function canCaptureNow({
 // At most one read of every project's state in this many ms, however fast the items change.
 export const PROJECTS_READ_MS = 5_000;
 
+// What waits for you is read at most this often as the project changes (the server also keeps the
+// answer while nothing changed).
+export const PENDING_READ_MS = 1_500;
+
 export function useAppData(): LoadedData {
   const { connection, version, presence, retry } = useLive();
   const beat = useBeat(30_000);
@@ -123,7 +127,9 @@ export function useAppData(): LoadedData {
   const projects = useRemote(fetchProjects, projectsVersion * 1000 + beat, connection);
   const agents = useAgents(version, presence, connection);
   // A secretary gone offline sends presence, not a change: both read it again (both only grow).
-  const pending = useRemote(fetchPending, version + presence, connection);
+  // A burst of changes (an agent at work writes often) reads it once per window, the last one.
+  const pendingKey = useThrottled(version + presence, PENDING_READ_MS);
+  const pending = useRemote(fetchPending, pendingKey, connection);
   const feed = useFeed(version);
   const studioChanged = useCallback(() => setStudioWrites((n) => n + 1), []);
   // The PC is back (the live stream reconnected): what was captured without it goes now.

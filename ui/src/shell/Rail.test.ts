@@ -94,6 +94,31 @@ describe('the rail', () => {
     expect(rail()).toMatch(/data-k="toca" data-tip="Te toca">/);
   });
 
+  // F4: a question on a note or the secretary's own waits for you as much as an item does.
+  it('counts in Te toca the questions of the Bandeja and the secretary, beside the items', () => {
+    const countOf = (html: string) => /data-k="toca"[\s\S]*?data-v="(\d+)"/.exec(html)?.[1];
+    const ask = (kind: 'bandeja' | 'secretary', ref: string) => ({
+      kind,
+      ref,
+      title: 'x',
+      since: ago(5),
+    });
+
+    expect(countOf(rail())).toBe('2');
+    expect(
+      countOf(
+        rail({
+          pending: {
+            count: 2,
+            entries: [ask('bandeja', 'B-1'), ask('secretary', '4')],
+            blocks: [],
+            secretary: null,
+          },
+        }),
+      ),
+    ).toBe('4');
+  });
+
   it('marks the row in view and slides one pill under it', () => {
     const html = rail({ route: { view: 'board', board: 'Criaturas' } });
     expect(html).toMatch(/class="nrow on"[^>]*aria-current="page"[^>]*data-k="board:Criaturas"/);

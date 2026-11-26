@@ -10,7 +10,7 @@ import { LaneHead } from '../lanes/LaneHead.tsx';
 import { type LaneBlock, LaneList } from '../lanes/LaneList.tsx';
 import { lookOf } from '../lanes/looks.ts';
 import { keptStateWord, stateWord } from '../preset-words.ts';
-import { agentsAcross, inboxOf, itemHref, projectHref, whereOf } from '../projects.ts';
+import { agentsAcross, inboxOf, itemHref, projectHref, waitingIn, whereOf } from '../projects.ts';
 import { hablarHash } from '../selection.ts';
 import { capped } from '../topics.ts';
 import type { AnsweredTopic, Item, ProjectOverview } from '../types.ts';
@@ -198,7 +198,7 @@ export function elsewhereBlocks(project: ProjectOverview): LaneBlock[] {
       kind: 'sec',
       key,
       title: project.name,
-      count: project.waiting.length + (project.topics?.length ?? 0),
+      count: waitingIn(project) + (project.topics?.length ?? 0),
       gloss: whereOf(project) ?? '',
     },
   ];
@@ -238,6 +238,38 @@ export function elsewhereBlocks(project: ProjectOverview): LaneBlock[] {
         </div>
       ),
     });
+  }
+  // What asks you that is no item: the row opens Hablar in that project, where it is answered.
+  if (project.unavailable === undefined) {
+    for (const entry of project.asking ?? []) {
+      blocks.push({
+        kind: 'row',
+        key: `${project.id}:ask:${entry.kind}:${entry.ref}`,
+        lane: 'you',
+        look: 'yours',
+        sec: key,
+        content: (
+          <div className="main-c">
+            <div className="t" data-leaf="" data-title="">
+              <span className="tt">{entry.text ?? entry.title}</span>
+            </div>
+            <div className="m" data-leaf="">
+              <span className="id">{entry.kind === 'secretary' ? '' : entry.ref}</span>
+              <span className="mpt">
+                <span className="sep">·</span>
+                <span className="pid">{project.name}</span>
+              </span>
+              <span className="mpt">
+                <span className="sep">·</span>
+                <span className="stp you">
+                  {t(`hablar.te.k.${entry.kind}`, { agent: entry.by ?? '' })}
+                </span>
+              </span>
+            </div>
+          </div>
+        ),
+      });
+    }
   }
   if (project.unavailable === undefined)
     blocks.push(
@@ -282,7 +314,7 @@ export function ProjectsInbox() {
   const projects = app.projects ?? [];
   const others = projects.filter((p) => !p.current);
   const shown = others.filter(
-    (p) => p.waiting.length > 0 || (p.topics?.length ?? 0) > 0 || p.unavailable !== undefined,
+    (p) => waitingIn(p) > 0 || (p.topics?.length ?? 0) > 0 || p.unavailable !== undefined,
   );
   const here = projects.find((p) => p.current)?.topics ?? [];
   const blocks = [...hereBlocks(app, name, here), ...shown.flatMap(elsewhereBlocks)];
@@ -294,6 +326,10 @@ export function ProjectsInbox() {
       return;
     }
     for (const p of others) {
+      if (key.startsWith(`${p.id}:ask:`)) {
+        window.location.assign(projectPage(p.id, hablarHash()));
+        return;
+      }
       const it = p.waiting.find((w) => `${p.id}:${w.id}` === key);
       const href = it ? itemHref(p, it) : undefined;
       if (href) {

@@ -207,7 +207,7 @@
   list-style: none;
   margin: 0;
   padding: 0 0 4px;
-  max-height: 32vh;
+  max-height: 22vh;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -226,7 +226,7 @@
   align-items: baseline;
   gap: 4px 10px;
   width: 100%;
-  padding: 7px 12px;
+  padding: 5px 12px;
   border: 0;
   background: transparent;
   font: inherit;
@@ -241,22 +241,15 @@
   font: 400 11.5px / 1.3 var(--mono);
   color: var(--ink-3);
 }
-.hb-te-main {
-  display: grid;
-  min-width: 0;
-}
 .hb-te-t {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.hb-te-q {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font: 400 italic 13.5px / 1.35 var(--serif);
-  color: var(--ink-2);
+/* the question «Te espera» sent you to, at the foot of the conversation: it lights for a moment */
+.hb-turn [id^="hb-ask-"][data-lit] .hb-ask {
+  box-shadow: 0 0 0 2px var(--you);
 }
 .hb-te-k {
   font: 400 12px / 1.3 var(--sans);
@@ -1527,7 +1520,7 @@ button.hb-kid:hover {
     display: none;
   }
   .hb-te-list {
-    max-height: 38vh;
+    max-height: 20vh;
   }
   .hb-nosec {
     padding: 12px 13px;

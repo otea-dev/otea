@@ -183,6 +183,12 @@
   color: var(--ink);
   overflow-wrap: anywhere;
 }
+/* a question the conversation answers at its foot: the row only says where */
+.bn-below {
+  margin: 4px 0 0;
+  font: 400 italic 13px / 1.4 var(--serif);
+  color: var(--you-ink);
+}
 .bn-files {
   list-style: none;
   display: flex;

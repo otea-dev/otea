@@ -82,6 +82,9 @@ export const toca = {
   'toca.off.bandeja': 'Nota de la Bandeja',
   'toca.off.secretary': 'secretario',
   'toca.off.inHablar': 'en Hablar',
+  'toca.off.report': 'Aviso',
+  'toca.act.report': 'Leer',
+  'toca.sub.reports': '{agent} avisa',
 
   // El secretario está desconectado y le esperan cosas
   'toca.secOff.title': '{name} está desconectado',

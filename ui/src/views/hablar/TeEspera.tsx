@@ -6,20 +6,31 @@ import { Icon } from '../../kit/Icon.tsx';
 import type { Pending, PendingEntry, PendingKind, QueueBlock } from '../../pending.ts';
 
 // «Te espera»: everything that waits for you, pinned over the conversation, computed by Otea
-// (GET /api/pending) and never by what the secretary remembers to say. A question that sat far up
-// the thread, off screen on the phone, and a review that waited an hour and a half unmentioned are
-// here from the moment they are yours. On the desk it is open; on the phone it is one line (what and
-// how many) that opens with a tap. Each row goes where it is answered.
+// (GET /api/pending) and never by what the secretary remembers to say. It is an index, never a
+// form: each row is one line that jumps to where the thing is dealt with (a question at the foot of
+// the conversation, an item's page, a turn). A question that sat far up the thread and a review that
+// waited an hour and a half unmentioned are here from the moment they are yours.
+//
+// Open when it holds something the conversation cannot answer (a review, a step of yours, a stuck
+// item, a notice from an agent); closed to one line when it only holds questions, which the
+// conversation's foot already shows with their buttons.
 
 const GROUPS: readonly {
   kinds: readonly PendingKind[];
-  key: 'q' | 'r' | 's' | 'x';
+  key: 'q' | 'e' | 'r' | 's' | 'x';
 }[] = [
   { kinds: ['question', 'bandeja', 'secretary'], key: 'q' },
+  { kinds: ['escalation'], key: 'e' },
   { kinds: ['review'], key: 'r' },
   { kinds: ['step'], key: 's' },
   { kinds: ['stuck'], key: 'x' },
 ];
+
+// What the conversation answers by itself: the questions. The rest is only here (and on Te toca).
+const ANSWERED_BELOW: readonly PendingKind[] = ['question', 'bandeja', 'secretary'];
+
+export const opensByDefault = (entries: readonly PendingEntry[]): boolean =>
+  entries.some(({ kind }) => !ANSWERED_BELOW.includes(kind));
 
 // «1 pregunta · 2 revisiones»: what waits, by kind.
 export function summaryOf(entries: readonly PendingEntry[]): string {
@@ -42,36 +53,26 @@ export function blockText(block: QueueBlock): string {
   });
 }
 
-function Kind({ entry }: { entry: PendingEntry }) {
-  const by = entry.by ?? '';
-  return <span className="hb-te-k">{t(`hablar.te.k.${entry.kind}`, { agent: by })}</span>;
-}
-
 export type TeEsperaProps = {
   pending: Pending | undefined;
-  // Goes to the Bandeja note (B-3) whose question waits.
-  onNote: (ref: string) => void;
-  // Goes to the turn of the secretary's question.
-  onTurn: (root: number) => void;
+  // Goes to where the thing is dealt with.
+  onJump: (entry: PendingEntry) => void;
 };
 
-export function TeEspera({ pending, onNote, onTurn }: TeEsperaProps) {
+export function TeEspera({ pending, onJump }: TeEsperaProps) {
   const app = useApp();
-  const [open, setOpen] = useState(!app.phone);
+  // What the person chose by tapping the head; until then it opens as the content asks.
+  const [chosen, setChosen] = useState<boolean | undefined>();
   if (!pending || (pending.count === 0 && pending.blocks.length === 0)) return null;
   const { entries, blocks } = pending;
-  const go = (entry: PendingEntry) => {
-    if (entry.kind === 'bandeja') onNote(entry.ref);
-    else if (entry.kind === 'secretary' && entry.turn !== undefined) onTurn(entry.turn);
-    else app.openItem(entry.ref);
-  };
+  const open = chosen ?? opensByDefault(entries);
   return (
     <section className="hb-te" data-enter="fade" aria-label={t('hablar.te.title')}>
       <button
         type="button"
         className="hb-te-head"
         aria-expanded={open}
-        onClick={() => setOpen((was) => !was)}
+        onClick={() => setChosen(!open)}
       >
         <span className="hb-te-n">{pending.count}</span>
         <span className="hb-te-title">{t('hablar.te.title')}</span>
@@ -91,16 +92,13 @@ export function TeEspera({ pending, onNote, onTurn }: TeEsperaProps) {
                 type="button"
                 className="hb-te-row"
                 data-kind={entry.kind}
-                onClick={() => go(entry)}
+                onClick={() => onJump(entry)}
               >
                 <span className="hb-te-ref">{entry.kind === 'secretary' ? '' : entry.ref}</span>
-                <span className="hb-te-main">
-                  <span className="hb-te-t">{entry.title}</span>
-                  {entry.text !== undefined && entry.text !== entry.title ? (
-                    <span className="hb-te-q">{entry.text}</span>
-                  ) : null}
+                <span className="hb-te-t">{entry.text ?? entry.title}</span>
+                <span className="hb-te-k">
+                  {t(`hablar.te.k.${entry.kind}`, { agent: entry.by ?? '' })}
                 </span>
-                <Kind entry={entry} />
                 <time className="hb-te-age" dateTime={entry.since ?? undefined}>
                   {waitedText(entry.since, app.now)}
                 </time>

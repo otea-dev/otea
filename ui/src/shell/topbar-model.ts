@@ -13,7 +13,7 @@ import {
   liveAgents,
   statusOf,
 } from '../presence.ts';
-import { projectHref, waitingElsewhere, whereOf } from '../projects.ts';
+import { projectHref, waitingElsewhere, waitingIn, whereOf } from '../projects.ts';
 import type { Item, ProjectOverview, ProjectView } from '../types.ts';
 import { agentState } from '../views/toca/trace.ts';
 
@@ -98,7 +98,7 @@ export function projectRows(
     // A folder that is gone is said with its path, in the line itself: a tooltip is nothing on the
     // phone. It outranks the rest of the state, which the badge's count still carries.
     const gone = each.paths.find((path) => path.missing)?.path;
-    const waits = each.waiting.length;
+    const waits = waitingIn(each);
     const state = href
       ? (stateLine(waits, each) ?? t('shell.nothingThere'))
       : t('shell.unavailable');
@@ -108,7 +108,7 @@ export function projectRows(
       current: false,
       line: gone !== undefined ? `${t('shell.pathMissing')} · ${gone}` : state,
       ...(where && !phone ? { where } : {}),
-      waiting: each.waiting.length,
+      waiting: waits,
       ...(href ? { href } : {}),
       inert: !href,
     };

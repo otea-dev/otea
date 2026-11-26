@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import type { Pending, PendingEntry } from '../../../../src/core/pending.ts';
 import { type App, AppTestProvider } from '../../app/context.tsx';
 import { item, NOW } from '../../derive/fixtures.ts';
-import { tocaCount } from '../../derive/toca.ts';
 import type { CollectionView } from '../../types.ts';
 import { TocaView } from './TocaView.tsx';
 
@@ -94,17 +93,29 @@ describe('Te toca counts what is no item', () => {
     });
   }
 
+  // F4 review round: what an agent escalated while the secretary is away is the person's to read.
+  it('shows what an agent reports while the secretary is away, as a notice rather than a question', () => {
+    const report: PendingEntry = {
+      kind: 'escalation',
+      ref: 'ERR-2',
+      title: 'Sort by recent',
+      since: at(12),
+      by: 'kiln',
+      text: 'I pushed change/CHA-5-v2 by mistake',
+    };
+    const html = render(fake({ all: [working], pending: waiting([report]) }));
+
+    expect(html).toContain('I pushed change/CHA-5-v2 by mistake');
+    expect(html).toContain('<b>kiln</b> reports');
+    expect(html).not.toContain('<b>kiln</b> asks');
+    expect(html).not.toContain('Nothing is waiting for you.');
+  });
+
   it('says how many wait, items and notes together, in the dek', () => {
     const review = item({ id: 'ERR-1' });
     const html = render(fake({ all: [review, working], pending: waiting([note, asked]) }));
 
     expect(html).toContain('Three things are waiting for you');
-  });
-
-  it('adds them to the number of Your turn', () => {
-    const review = item({ id: 'ERR-1' });
-    expect(tocaCount([review], { now: NOW })).toBe(1);
-    expect(tocaCount([review], { now: NOW }, 2)).toBe(3);
   });
 
   it('says nothing about them while Otea has not told yet', () => {

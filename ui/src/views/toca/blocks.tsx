@@ -245,26 +245,34 @@ type TocaApp = Pick<App, 'all' | 'now' | 'feed' | 'collectionOf' | 'route'> &
 // ti»: what it is about, who asks, since when. It opens Hablar, where its buttons are.
 function OffRow({ entry, now }: { entry: PendingEntry; now: number }) {
   const secretary = entry.kind === 'secretary';
+  const report = entry.kind === 'escalation';
   return (
     <>
       <div className="main-c">
         <div className="t" data-leaf="" data-title="">
-          <span className="tt">{secretary ? (entry.text ?? entry.title) : entry.title}</span>
+          <span className="tt">
+            {secretary || report ? (entry.text ?? entry.title) : entry.title}
+          </span>
         </div>
         <div className="m" data-leaf="">
           <span className="id">{secretary ? t('toca.off.secretary') : entry.ref}</span>
           <span className="bd">
-            <span className="bdc">{t(secretary ? 'toca.off.inHablar' : 'toca.off.bandeja')}</span>
-            {entry.text !== undefined && !secretary ? (
+            <span className="bdc">
+              {t(secretary ? 'toca.off.inHablar' : report ? 'toca.off.report' : 'toca.off.bandeja')}
+            </span>
+            {entry.text !== undefined && !secretary && !report ? (
               <span className="bds">› {entry.text}</span>
             ) : null}
+            {report ? <span className="bds">› {entry.title}</span> : null}
           </span>
         </div>
       </div>
       <div className="a" data-leaf="">
-        {t('toca.act.preguntas')}
+        {t(report ? 'toca.act.report' : 'toca.act.preguntas')}
         <small>
-          {entry.by ? tx('toca.sub.asks', { agent: <b>{entry.by}</b> }) : t('toca.sub.yourTurn')}
+          {entry.by
+            ? tx(report ? 'toca.sub.reports' : 'toca.sub.asks', { agent: <b>{entry.by}</b> })
+            : t('toca.sub.yourTurn')}
         </small>
       </div>
       <div className="age" data-leaf="">
