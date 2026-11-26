@@ -1,11 +1,11 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { postPersonMessage } from '../app/conversation.ts';
 import { processAlive } from '../app/presence.ts';
 import { openProject, type Project } from '../app/project.ts';
 import { secretaryStatus } from '../app/secretary.ts';
-import { selectListenerProcesses } from '../store/queries.ts';
+import { forgetHarness, selectListenerProcesses } from '../store/queries.ts';
 import {
   type Cli,
   cliAt,
@@ -35,6 +35,19 @@ describe('the secretary seen offline once its process is gone', () => {
     const declared = await otea('profile', '--role', 'secretary', '--as', 'sol');
     if (declared.code !== 0) throw new Error(declared.err);
   }, 60_000);
+
+  // Each test is its own session of the secretary. A harness noted by the test before (here the
+  // test's own worker, which runs on after the wait it started was killed, and which a fast
+  // process table reads before the kill on Linux and macOS) is a live process a later wait that
+  // wakes at once keeps as cached (it reads the table again only on a wait of five seconds or
+  // more), so the next test would see it instead of its own. CI saw exactly that: «expected
+  // <worker> to be <starter>».
+  beforeEach(() => {
+    lookAt((project) => {
+      const noted = selectListenerProcesses(project.db).get('sol')?.harness ?? null;
+      if (noted !== null) forgetHarness(project.db, 'sol', noted);
+    });
+  });
 
   afterEach(() => {
     for (const child of children.splice(0)) {
@@ -88,6 +101,10 @@ describe('the secretary seen offline once its process is gone', () => {
   it('reads offline within seconds of its wait process being killed, long before the 30-minute hold', async () => {
     const child = startWait();
     await until(() => stateNow() === 'listening', 30_000);
+    // On Linux and macOS the process table reads at once, so this wait has noted its harness (the
+    // test's own worker) before it is killed; on Windows it often has not. Either way is a state
+    // the next test must not inherit.
+    await until(() => typeof harnessNoted() === 'number', 30_000);
 
     const killedAt = Date.now();
     process.kill(child.pid as number);
