@@ -515,6 +515,49 @@ export const MIGRATIONS = [
   ALTER TABLE unheard_stretches ADD COLUMN acked_at TEXT;
   ALTER TABLE unheard_stretches ADD COLUMN seen_at INTEGER;
   `,
+  // The conversation (0.8): the messages between the person and the secretary, ordered by id; the
+  // files that came with them (stored once under evidence/, by hash); and the items each turn
+  // produced (message_id is the turn's first message, its root). A person's message has read_at
+  // null until the secretary read it. client_key lets a phone send again what it never heard back
+  // about without a second message.
+  `
+  CREATE TABLE conversation_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    author TEXT NOT NULL,
+    author_name TEXT NOT NULL,
+    text TEXT NOT NULL,
+    at TEXT NOT NULL,
+    reply_to INTEGER REFERENCES conversation_messages (id),
+    root INTEGER,
+    kind TEXT,
+    kind_by TEXT,
+    read_at TEXT,
+    topic TEXT,
+    client_key TEXT UNIQUE
+  );
+  CREATE INDEX conversation_unread ON conversation_messages (author, read_at);
+  CREATE INDEX conversation_topic ON conversation_messages (topic);
+  CREATE INDEX conversation_root ON conversation_messages (root);
+
+  CREATE TABLE conversation_attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL REFERENCES conversation_messages (id),
+    filename TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    sha256 TEXT NOT NULL
+  );
+  CREATE INDEX conversation_attachments_message ON conversation_attachments (message_id);
+
+  CREATE TABLE conversation_links (
+    message_id INTEGER NOT NULL REFERENCES conversation_messages (id),
+    item_id TEXT NOT NULL,
+    at TEXT NOT NULL,
+    PRIMARY KEY (message_id, item_id)
+  );
+  CREATE INDEX conversation_links_item ON conversation_links (item_id);
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {

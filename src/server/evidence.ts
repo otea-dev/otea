@@ -9,7 +9,10 @@ import type { EvidenceRecord } from '../store/queries.ts';
 // run there. Images and videos (the kinds exclude SVG) are shown inline with their type; diffs, diagrams and
 // logs as plain text; anything else only as a download. nosniff keeps the browser to the declared
 // type, and the sandbox policy denies scripts and the origin to a file opened on its own.
-function presentation({ kind, contentType }: EvidenceRecord): { type: string; inline: boolean } {
+// What serving a stored file needs of it: the conversation's attachments are served as evidence is.
+export type Stored = Pick<EvidenceRecord, 'kind' | 'contentType' | 'filename' | 'size' | 'sha256'>;
+
+function presentation({ kind, contentType }: Stored): { type: string; inline: boolean } {
   if (kind === 'image' || kind === 'video' || kind === 'audio')
     return { type: contentType, inline: true };
   if (kind === 'diff' || kind === 'log' || kind === 'diagram') {
@@ -61,6 +64,15 @@ function matches(header: string | undefined, etag: string): boolean {
 
 export function serveEvidence(c: Context, project: Project, id: string): Response {
   const { evidence, path } = evidenceToServe(project, id);
+  return serveStored(c, project, evidence, path);
+}
+
+export function serveStored(
+  c: Context,
+  project: Project,
+  evidence: Stored,
+  path: string,
+): Response {
   const { type, inline } = presentation(evidence);
   const etag = `"${project.identity.id}:${evidence.sha256}"`;
   const headers = {

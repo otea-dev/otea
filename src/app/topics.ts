@@ -10,6 +10,7 @@ import {
 import { transaction } from '../store/database.ts';
 import { type ItemRecord, selectItems } from '../store/queries.ts';
 import type { Context } from './context.ts';
+import { mirrorTopicTurn } from './conversation.ts';
 import { requireItem, systemClock } from './items.ts';
 
 // Side topics: questions the person asks an agent off the work at hand. Each is a short
@@ -207,6 +208,20 @@ function addTurn(
       turn.by.name,
       at,
     );
+  // A topic is a consultation now: each turn is also kept in the conversation (M2). The topics' own
+  // pages and commands go on reading topic_turns; M3 and M7 retire them.
+  if (turn.kind !== 'event') {
+    mirrorTopicTurn(
+      ctx,
+      {
+        topic: id,
+        kind: turn.kind === 'answer' ? 'answer' : 'question',
+        text: turn.full ?? turn.text,
+        actor: turn.by,
+      },
+      () => at,
+    );
+  }
 }
 
 function setState(ctx: Context, id: string, state: StoredState, at: string): void {
@@ -313,6 +328,17 @@ export function answerTopic(ctx: Context, input: AnswerTopicInput, now = systemC
       ctx.db
         .prepare("UPDATE topic_turns SET text = ?, full = ?, source = 'agent' WHERE id = ?")
         .run(summary || last.text, full ?? last.full, last.id);
+      mirrorTopicTurn(
+        ctx,
+        {
+          topic: row.id,
+          kind: 'answer',
+          text: full ?? last.full ?? summary ?? last.text,
+          actor: input.actor,
+          replace: true,
+        },
+        () => at,
+      );
     } else {
       if (!summary) refuse('invalid_fields', 'An answer needs its summary (--summary)');
       addTurn(

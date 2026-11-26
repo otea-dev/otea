@@ -127,7 +127,9 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // every tool's `additionalProperties`, so a key it does not take is refused by name, not dropped.
   // Raised to 6160 for ask's options and recommended (measured at 6143).
   // Raised to 6230 for the secretary: profile's role and wait's secretary (measured at 6215).
-  tools: { mcp: 6230 },
+  // Raised to 6620 for the secretary's conversation: two tools (conversation, say) and create's
+  // from_message (measured at 6577).
+  tools: { mcp: 6620 },
   // Otea's agent guide, the server's instructions: in every MCP agent's context from the start, so
   // it buys only what agents keep getting wrong. Measured at 203. Raised to 270 for the line on
   // declaring the profile every agent and subagent must keep current (measured at 246). Raised to

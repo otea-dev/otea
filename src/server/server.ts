@@ -9,6 +9,14 @@ import { askingItems, holderAsksOf } from '../app/asking.ts';
 import { syncBoardPresets } from '../app/boards.ts';
 import { briefFor } from '../app/brief.ts';
 import { listCollectionViews, listShownCollectionViews } from '../app/collections.ts';
+import {
+  attachmentToServe,
+  correctKind,
+  listConversation,
+  messageIdOf,
+  postPersonMessage,
+  turnsOfItem,
+} from '../app/conversation.ts';
 import { deviceByToken, listDevices, touchDevice } from '../app/devices.ts';
 import { listEvents } from '../app/events.ts';
 import { attachFiles, createItemWithEvidence } from '../app/intake.ts';
@@ -91,6 +99,7 @@ import {
 } from '../core/agent-prompts.ts';
 import { PERIOD_HINT, parsePeriod } from '../core/board/performance.ts';
 import { LANGS, type Lang } from '../core/board/template-words.ts';
+import { type FromMessage, isMessageKind, MESSAGE_KINDS } from '../core/conversation.ts';
 import { OteaError } from '../core/errors.ts';
 import { MAX_EVIDENCE_MB } from '../core/evidence.ts';
 import { isAgentName } from '../core/item.ts';
@@ -113,7 +122,7 @@ import {
   RejectedRequest,
   toErrorResponse,
 } from './errors.ts';
-import { serveEvidence } from './evidence.ts';
+import { serveEvidence, serveStored } from './evidence.ts';
 import { DEFAULT_PORT, isAllowedHost, isApiPath } from './hosts.ts';
 import { openProjects, type ProjectSource } from './hub.ts';
 import { AttemptLimiter, type Clock, isLoopback, PairingCodes, plainAddress } from './lan.ts';
@@ -168,9 +177,11 @@ import {
   clientKeyOf,
   createRequest,
   HUMAN_IN_UI,
+  kindRequest,
   linkRequest,
   MAX_CREATE_BYTES,
   MAX_INTAKE_FILES,
+  messageRequest,
   moveRequest,
   noteRequest,
   openedRequest,
@@ -703,6 +714,7 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         let item: ReturnType<typeof showItem> & {
           setAside?: { by: string; at: string };
           holderAsks?: { by: string; item: string };
+          fromMessages?: FromMessage[];
         };
         try {
           item = showItem(project, id, HUMAN_IN_UI);
@@ -717,6 +729,9 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         if (setAside) item = { ...item, setAside };
         const holderAsks = holderAsksOf(askingItems(project.db), item, new Date().toISOString());
         if (holderAsks) item = { ...item, holderAsks };
+        // The turns of the conversation it came from: the page links back to them.
+        const fromMessages = turnsOfItem(project, item.id);
+        if (fromMessages.length > 0) item = { ...item, fromMessages };
         if (!item.archived) return c.json(item);
         // An archived board's collection is in no list: the page reads the item's words from here.
         const collection = listCollectionViews(project, { archived: true }).find(
@@ -871,6 +886,66 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         });
         feed.notify();
         return c.json(topic);
+      })
+      // The conversation with the project's secretary (app/conversation.ts). The person writes only
+      // here, signed in, from the UI's own origin: no command or tool of an agent makes a message
+      // of the person's. Reading it marks nothing; the secretary's reading does.
+      .get('/conversation', (c) => {
+        const { since, before, limit, search, kind } = c.req.query();
+        if (kind !== undefined && !isMessageKind(kind)) {
+          throw new InvalidQuery(`kind must be one of ${MESSAGE_KINDS.join(', ')}`);
+        }
+        const from = wholeNumber('since', since, 0);
+        const to = wholeNumber('before', before, 1);
+        const page = wholeNumber('limit', limit, 1);
+        if (from !== undefined && to !== undefined) {
+          throw new InvalidQuery('since and before cannot be combined');
+        }
+        return c.json(
+          listConversation(project, {
+            ...(from === undefined ? {} : { since: from }),
+            ...(to === undefined ? {} : { before: to }),
+            ...(page === undefined ? {} : { limit: page }),
+            ...(search === undefined ? {} : { search }),
+            ...(kind === undefined ? {} : { kind }),
+          }),
+        );
+      })
+      .get('/conversation/attachments/:id', (c) => {
+        assertSignedIn(c, auth, 'open the conversation files');
+        const { file, path } = attachmentToServe(project, c.req.param('id'));
+        return serveStored(
+          c,
+          project,
+          { ...file, filename: file.name, contentType: file.contentType },
+          path,
+        );
+      })
+      .post(
+        '/conversation/messages',
+        bodyLimit({ maxSize: MAX_CREATE_BYTES, onError: tooLarge }),
+        async (c) => {
+          assertWritable(c, auth, true);
+          const clientKey = clientKeyOf(c);
+          const request = await messageRequest(c);
+          const { message, replayed } = postPersonMessage(project, {
+            ...request,
+            by: HUMAN_IN_UI.actor.name,
+            ...(clientKey === undefined ? {} : { clientKey }),
+          });
+          feed.notify();
+          // Sent again (a phone that never heard back): the message the first send made.
+          if (replayed) c.header('idempotent-replayed', 'true');
+          return c.json(message, replayed ? 200 : 201);
+        },
+      )
+      // The person's one-tap correction of what the secretary made of a turn.
+      .post('/conversation/messages/:id/kind', async (c) => {
+        assertWritable(c, auth);
+        const kind = await kindRequest(c);
+        const message = correctKind(project, messageIdOf(c.req.param('id')), kind);
+        feed.notify();
+        return c.json(message);
       })
       // An item's topics: those linked to it, and those it may have come from, for the person to
       // confirm or dismiss.

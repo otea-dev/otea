@@ -108,9 +108,14 @@ export function secretaryStatus(
   return { name, state: agent.attending ? 'listening' : 'connected', since: null, pending };
 }
 
-// `otea wait --secretary` is only for the project's secretary: another agent waiting that way would
-// take the person's messages from it.
-export function requireSecretary(db: DatabaseSync, agent: string): void {
+// `otea wait --secretary`, `otea conversation` and `otea say` are only for the project's secretary:
+// another agent waiting or reading that way would take the person's messages from it, and one
+// saying would speak for it. `does` finishes "Only the secretary ...".
+export function requireSecretary(
+  db: DatabaseSync,
+  agent: string,
+  does = 'waits with --secretary',
+): void {
   const secretary = secretaryName(db);
   if (secretary === agent) return;
   const declare = `otea profile --role secretary --as ${agent}`;
@@ -118,7 +123,7 @@ export function requireSecretary(db: DatabaseSync, agent: string): void {
     'forbidden',
     secretary === undefined
       ? `${agent} is not this project's secretary: the project has none yet. Declare the role first: ${declare}`
-      : `${agent} is not this project's secretary (${secretary} is). Only the secretary waits with --secretary`,
+      : `${agent} is not this project's secretary (${secretary} is). Only the secretary ${does}`,
   );
 }
 

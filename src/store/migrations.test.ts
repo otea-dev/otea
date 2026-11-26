@@ -51,16 +51,19 @@ describe('migrate', () => {
         'process_beats',
         'secretary_signals',
         'unheard_stretches',
+        'conversation_messages',
+        'conversation_attachments',
+        'conversation_links',
       ]),
     );
-    expect(userVersion(db)).toBe(44);
+    expect(userVersion(db)).toBe(45);
   });
 
   it('is idempotent', () => {
     migrate(db);
     migrate(db);
 
-    expect(userVersion(db)).toBe(44);
+    expect(userVersion(db)).toBe(45);
   });
 
   describe('from version 40, which kept a language on the project', () => {

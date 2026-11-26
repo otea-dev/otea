@@ -31,6 +31,18 @@ import {
   setCollectionIcon,
   typeOfItem,
 } from '../app/collections.ts';
+import {
+  attachmentPaths,
+  conversationText,
+  fromMessageLine,
+  linkMessageToItem,
+  messageFileAt,
+  messageIdOf,
+  readAsSecretary,
+  requireMessage,
+  sayAsSecretary,
+  turnsOfItem,
+} from '../app/conversation.ts';
 import { cropNote } from '../app/crop.ts';
 import { listDevices, revokeDevice } from '../app/devices.ts';
 import { handInText, openDraftsOf } from '../app/draft-request.ts';
@@ -1161,6 +1173,10 @@ const create: Command = {
     'field-file': FIELD_FILE,
     parent: { placeholder: 'id' },
     from: { placeholder: 'topic' },
+    'from-message': {
+      placeholder: 'id',
+      about: "secretary: the person's message this item answers",
+    },
   },
   execute: async (input) => {
     const collection = input.required('collection');
@@ -1168,11 +1184,18 @@ const create: Command = {
     const title = input.required('title');
     const parent = input.option('parent');
     const from = input.option('from');
+    const fromMessage = input.option('from-message');
     const fields = await fieldsFrom(input);
     const { actor, channel } = input;
     return withAgent(input, (project) => {
       // The topic the item comes from, checked before anything is made.
       const topic = from === undefined ? undefined : requireTopic(project, from);
+      // The message too, and that this agent may link it: only the secretary does.
+      const message = fromMessage === undefined ? undefined : messageIdOf(fromMessage);
+      if (message !== undefined) {
+        requireSecretary(project.db, actor.name, 'links the conversation to items');
+        requireMessage(project, message);
+      }
       const item = createItem(project, {
         collection,
         ...(type === undefined ? {} : { type }),
@@ -1184,6 +1207,7 @@ const create: Command = {
         ...(input.unnamedTerminal ? { via: 'terminal' as const } : {}),
       });
       if (topic) linkTopic(project, { id: topic.id, item: item.id, via: 'from' });
+      if (message !== undefined) linkMessageToItem(project, actor.name, message, item.id);
       // On a board: where it starts, and why when its first step was skipped or lacks something.
       return { data: itemData(project, item), text: createdTextOf(project, item) ?? item.id };
     });
@@ -1335,7 +1359,10 @@ const show: Command = {
       const sharing = overlapsOf(project, requireItem(project.db, shown.id));
       // A round that only merges main into the approved work (src/app/merge-only.ts).
       const mergeOnly = mergeOnlyOf(project, shown.id);
+      // The turn of the conversation it came from (the secretary's requests).
+      const fromMessages = turnsOfItem(project, shown.id);
       const heads = [
+        fromMessageLine(fromMessages),
         mergedOutsideLine(project, input.cwd, shown),
         stray?.text,
         ...(mergeOnly ? [mergeOnlyText(shown.id, mergeOnly)] : []),
@@ -1351,6 +1378,7 @@ ${text}`;
         data: {
           ...data,
           ...(notes.length === 0 ? {} : { notes }),
+          ...(fromMessages.length === 0 ? {} : { fromMessages }),
           ...(stray ? { baseStray: stray } : {}),
           ...(sharing.length === 0 ? {} : { overlaps: sharing }),
           ...(mergeOnly ? { mergeOnly } : {}),
@@ -1824,6 +1852,9 @@ const next: Command = {
       // Offered work in the shared main checkout says so before the agent starts (P6-R2-3).
       const shared = offered && sharedCheckoutLine(project, input, offered.id);
       const remote = remoteAddedNotice(project, input.cwd);
+      // The turn of the conversation the item came from, when it came from one.
+      const fromMessages = answer.item === null ? [] : turnsOfItem(project, answer.item);
+      const fromLine = fromMessageLine(fromMessages);
       // It always ends with the exact command to keep waiting: told only to wait, agents ended
       // their turn, and the person's answer on the desk went unheard.
       const text = [
@@ -1832,6 +1863,7 @@ const next: Command = {
         answer.item !== null && answer.offered
           ? `${answer.text}\n${offeredLine(answer.item)}`
           : answer.text,
+        ...(fromLine ? [fromLine] : []),
         ...(shared ? [shared] : []),
         ...(remote ? [remote] : []),
         ...topicLines(project, actor.name, answer.brief === true),
@@ -1839,7 +1871,15 @@ const next: Command = {
         ...(answer.brief ? [] : [profileReminder(profile, actor.name, channel)]),
         keepWaitingLine(actor.name, channel, { idle: answer.idle === true, collection }),
       ].join('\n\n');
-      return { data: { ...answer, text, profile: profileView(profile) }, text };
+      return {
+        data: {
+          ...answer,
+          text,
+          profile: profileView(profile),
+          ...(fromMessages.length === 0 ? {} : { fromMessages }),
+        },
+        text,
+      };
     });
   },
 };
@@ -2860,7 +2900,7 @@ function secretaryLines(project: Project, name: string | undefined | null): stri
       : secretary.state;
   if (secretary.name === name) {
     return [
-      `You are this project's secretary (${stands}). Listen for the person with ${secretaryWaitCommand(name)}.`,
+      `You are this project's secretary (${stands}). Listen for the person with ${secretaryWaitCommand(name)}; read what they wrote with otea conversation --as ${name}, answer with otea say.`,
     ];
   }
   return [`This project's secretary is ${secretary.name} (${stands}).`];
@@ -4873,6 +4913,100 @@ const topicClose: Command = {
   },
 };
 
+// The conversation with the person (0.8): the secretary alone reads it and answers. The person
+// writes only from the desk, so no command here ever makes a message of the person's.
+const conversation: Command = {
+  name: 'conversation',
+  summary:
+    "For the secretary: read the person's new messages (marked read), with some context before; --since <id> reads what follows that message, --limit <n> a page",
+  args: [],
+  options: {
+    since: { placeholder: 'id' },
+    limit: { placeholder: 'n' },
+  },
+  execute: (input) => {
+    const since = input.option('since');
+    const limit = input.option('limit');
+    const { actor } = input;
+    return withAgent(input, (project) => {
+      const from = countFrom('since', since, 0);
+      const page = countFrom('limit', limit, 1);
+      const read = readAsSecretary(project, {
+        agent: actor.name,
+        ...(from === undefined ? {} : { since: from }),
+        ...(page === undefined ? {} : { limit: page }),
+      });
+      const messages = read.messages.map((message) => ({
+        ...message,
+        attachments: message.attachments.map((file) => ({
+          ...file,
+          path: attachmentPaths(project, message).get(file.id),
+        })),
+      }));
+      return {
+        data: { ...read, messages },
+        text: conversationText(project, actor.name, read),
+      };
+    });
+  },
+};
+
+const say: Command = {
+  name: 'say',
+  summary:
+    'For the secretary: answer the person in plain text, short, the conclusion first (- reads stdin); --reply-to <id> picks the message it answers, --request with --links <item ids made> or --consultation classifies that turn',
+  args: ['text'],
+  options: {
+    file: { multiple: true, placeholder: 'path' },
+    'reply-to': { placeholder: 'id' },
+    request: { flag: true },
+    consultation: { flag: true },
+    links: { placeholder: 'ids', about: 'item ids, comma separated' },
+  },
+  execute: async (input) => {
+    const [given = ''] = input.args;
+    const { actor, cwd } = input;
+    const replyTo = input.option('reply-to');
+    if (input.flag('request') && input.flag('consultation')) {
+      throw new UsageError(
+        'A turn is a request or a consultation: give --request or --consultation',
+      );
+    }
+    const text = given === '-' ? await input.stdin() : given;
+    const links = (input.option('links') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter((id) => id !== '');
+    const kind = input.flag('request')
+      ? ('request' as const)
+      : input.flag('consultation')
+        ? ('consultation' as const)
+        : undefined;
+    return withAgent(input, (project) => {
+      const said = sayAsSecretary(project, {
+        agent: actor.name,
+        text,
+        files: input.options('file').map((path) => messageFileAt(resolve(cwd, path))),
+        ...(replyTo === undefined ? {} : { replyTo: messageIdOf(replyTo) }),
+        ...(kind === undefined ? {} : { kind }),
+        links,
+      });
+      const { message } = said;
+      const turn =
+        message.kind === null
+          ? ''
+          : ` as a ${message.kind}${message.links.length === 0 ? '' : ` -> ${message.links.join(', ')}`}`;
+      const kept = said.kept ? ` The person set this turn as ${message.kind}: that stays.` : '';
+      const files =
+        message.attachments.length === 0 ? '' : ` with ${message.attachments.length} file(s)`;
+      return {
+        data: said,
+        text: `Said as message ${message.id}${message.replyTo === null ? '' : `, answering ${message.replyTo}`}${files}${turn}.${kept}`,
+      };
+    });
+  },
+};
+
 export const COMMANDS: readonly Command[] = [
   init,
   projectsList,
@@ -4922,6 +5056,8 @@ export const COMMANDS: readonly Command[] = [
   topicShow,
   topicNote,
   topicClose,
+  conversation,
+  say,
   ask,
   answer,
   handoffCommand,

@@ -1,8 +1,10 @@
 import { basename } from 'node:path';
 import type { Context } from 'hono';
 import { z } from 'zod';
+import type { MessageFileInput } from '../app/conversation.ts';
 import type { EvidenceFile } from '../app/evidence.ts';
 import type { Performer } from '../core/authority.ts';
+import { MAX_MESSAGE_FILES, MESSAGE_KINDS, type MessageKind } from '../core/conversation.ts';
 import {
   EVIDENCE_ROLES,
   type EvidenceRole,
@@ -266,6 +268,68 @@ export async function attachRequest(c: Context): Promise<EvidenceFile[]> {
     places = parsed.data;
   }
   return Promise.all(files.map((one, at) => fileOf(one, places[at])));
+}
+
+const MessageBody = z.object({
+  text: z.string(),
+  replyTo: z.number().int().positive().optional(),
+});
+
+const MESSAGE_SHAPE = '{"text": string, "replyTo"?: number}';
+
+// What the person says in the conversation: the text and, when it answers one, the message it
+// follows; the files come with it.
+export type MessageRequest = { text: string; replyTo?: number; files: MessageFileInput[] };
+
+// The person's message as JSON, or as a form: its JSON in the `message` part and each file in a
+// `file` part (the way a new item comes with its files).
+export async function messageRequest(c: Context): Promise<MessageRequest> {
+  const invalid = (detail = '') =>
+    new RejectedRequest(400, 'invalid_body', `Expected ${MESSAGE_SHAPE}${detail}`);
+  let raw: unknown;
+  let parts: File[] = [];
+  if (mediaOf(c.req.header('content-type')) !== FORM_TYPE) {
+    raw = await c.req.json().catch(() => undefined);
+  } else {
+    const form = await c.req.parseBody({ all: true }).catch(() => {
+      throw invalid(' as the "message" part of the form');
+    });
+    const { message, file = [] } = form;
+    parts = (Array.isArray(file) ? file : [file]).filter((part) => part instanceof File);
+    if (typeof message !== 'string') throw invalid(' as the "message" part of the form');
+    try {
+      raw = JSON.parse(message);
+    } catch {
+      throw invalid(' as the "message" part of the form');
+    }
+  }
+  const parsed = MessageBody.safeParse(raw);
+  if (!parsed.success) throw invalid();
+  if (parts.length > MAX_MESSAGE_FILES) {
+    throw new RejectedRequest(400, 'invalid_body', `Send at most ${MAX_MESSAGE_FILES} files`);
+  }
+  const files = await Promise.all(parts.map((part) => fileOf(part)));
+  return {
+    text: parsed.data.text,
+    ...(parsed.data.replyTo === undefined ? {} : { replyTo: parsed.data.replyTo }),
+    files: files.map(({ filename, bytes }) => ({ filename, bytes })),
+  };
+}
+
+const KindBody = z.object({ kind: z.enum(MESSAGE_KINDS) });
+
+// The person's correction of a turn: one tap, `request` or `consultation`.
+export async function kindRequest(c: Context): Promise<MessageKind> {
+  const raw: unknown = await c.req.json().catch(() => undefined);
+  const parsed = KindBody.safeParse(raw);
+  if (!parsed.success) {
+    throw new RejectedRequest(
+      400,
+      'invalid_body',
+      `Expected {"kind": ${MESSAGE_KINDS.map((kind) => `"${kind}"`).join(' | ')}}`,
+    );
+  }
+  return parsed.data.kind;
 }
 
 const CLIENT_KEY = /^[A-Za-z0-9_-]{1,128}$/;

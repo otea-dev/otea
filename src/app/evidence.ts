@@ -66,10 +66,20 @@ export function evidenceReadPath(
   dataDir: string,
   evidence: Pick<EvidenceRecord, 'id' | 'sha256' | 'filename'>,
 ): string | undefined {
+  return namedReadPath(dataDir, String(evidence.id), evidence);
+}
+
+// The same for any stored file, under files/<folder>/ (the conversation's attachments keep their
+// own folders, `m<id>`, apart from the evidence numbers).
+export function namedReadPath(
+  dataDir: string,
+  folder: string,
+  evidence: Pick<EvidenceRecord, 'sha256' | 'filename'>,
+): string | undefined {
   const stored = evidenceFile(dataDir, evidence.sha256);
   if (!existsSync(stored)) return undefined;
   const name = basename(evidence.filename).replace(/[<>:"/\\|?*]/g, '_') || 'file';
-  const named = join(dataDir, 'files', String(evidence.id), name);
+  const named = join(dataDir, 'files', folder, name);
   if (existsSync(named)) return named;
   mkdirSync(dirname(named), { recursive: true });
   try {
@@ -92,7 +102,7 @@ export type AttachInput = {
   channel: Channel;
 };
 
-function readEvidence(path: string): Buffer {
+export function readEvidence(path: string): Buffer {
   const stats = statSync(path, { throwIfNoEntry: false });
   if (!stats) throw new OteaError('file_not_found', `File "${path}" not found`);
   if (!stats.isFile()) throw new OteaError('file_not_found', `"${path}" is not a file`);
@@ -106,7 +116,7 @@ function readEvidence(path: string): Buffer {
 }
 
 // Written aside and renamed into place, so a reader never sees a partial file.
-function store(dataDir: string, sha256: string, bytes: Buffer): void {
+export function storeFile(dataDir: string, sha256: string, bytes: Buffer): void {
   const target = evidenceFile(dataDir, sha256);
   if (existsSync(target)) return;
   mkdirSync(evidenceDir(dataDir), { recursive: true });
@@ -255,7 +265,7 @@ export function recordEvidence(
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   const { kind, contentType } = evidenceTypeOf(filename);
   const caption = file.caption?.trim() || null;
-  store(project.dataDir, sha256, bytes);
+  storeFile(project.dataDir, sha256, bytes);
   const entry = {
     itemId,
     role,

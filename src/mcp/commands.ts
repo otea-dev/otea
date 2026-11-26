@@ -23,6 +23,10 @@ export const AGENT_COMMANDS = [
   // Agents read the topics kept to answer what was said before.
   'topic list',
   'topic show',
+  // The secretary's side of the conversation with the person: reading marks what it reads, so it
+  // is no read-only tool. The person's side is the desk's alone.
+  'conversation',
+  'say',
   'ask',
   // The person's answer to a question, given in the chat (P4-R2-2).
   'answer',

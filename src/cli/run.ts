@@ -60,6 +60,8 @@ const GLOBAL_OPTIONS: ParseArgsOptionsConfig = {
   version: { type: 'boolean', short: 'v' },
 };
 
+// An option is parsed once for every command, by its name: one that any command takes more than once
+// (--file of say) is read as a list, and a command that takes it once reads the last (option).
 const PARSE_OPTIONS: ParseArgsOptionsConfig = Object.assign(
   {},
   GLOBAL_OPTIONS,
@@ -67,7 +69,10 @@ const PARSE_OPTIONS: ParseArgsOptionsConfig = Object.assign(
     Object.entries(command.options).map(([name, spec]) => ({
       [name]: spec.flag
         ? { type: 'boolean' }
-        : { type: 'string', multiple: spec.multiple ?? false },
+        : {
+            type: 'string',
+            multiple: COMMANDS.some((other) => other.options[name]?.multiple === true),
+          },
     })),
   ),
 );
@@ -166,7 +171,8 @@ export function undoGitBashPath(env: Io['env']): (value: string) => string {
 function inputFor(command: Command, values: Values, args: string[], io: Io, json: boolean): Input {
   const text = undoGitBashPath(io.env);
   const option = (name: string) => {
-    const value = values[name];
+    const given = values[name];
+    const value = Array.isArray(given) ? given.at(-1) : given;
     if (typeof value !== 'string') return undefined;
     return PATH_OPTIONS.has(name) ? value : text(value);
   };
