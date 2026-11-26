@@ -321,6 +321,7 @@ import {
   checkoutRoot,
   commitsOver,
   currentBranch,
+  fastForward,
   hasCommit,
   inMainCheckout,
   landedIn,
@@ -491,9 +492,16 @@ function seenWhile<T>(
   run: () => T,
   mode: 'write' | 'read' = 'write',
 ): T {
-  // An agent at work in another project is refused here, before it is noted or writes anything; a
-  // command that only reads goes on, with the agent not noted as seen in this project.
-  if (actor.kind === 'agent' && !holdAgentHome(project, actor.name, mode)) return run();
+  // An agent that works in another project is refused here, before it is noted or writes anything;
+  // a command that only reads goes on with a warning, the agent not noted as seen in this project.
+  if (actor.kind === 'agent') {
+    const launcher = input.channel === 'mcp' ? process.ppid : undefined;
+    const away = holdAgentHome(project, actor.name, mode, process.env, systemClock, launcher);
+    if (away !== undefined) {
+      input.warn(away);
+      return run();
+    }
+  }
   const fresh = actor.kind === 'agent' && !findAgent(project.db, actor.name);
   seen(project, input, actor);
   if (!fresh) return run();
@@ -553,7 +561,7 @@ function boardsText(boards: readonly InitBoard[]): string {
 // Which language a command with no desk in front of the person makes things in: the project's, fixed
 // when it was made (app/project-language.ts), by the rule of app/language.ts.
 const LANGUAGE_RULE =
-  "the project's language, set when the project was made: the one the desk last used then, else the first of the locale variables LC_ALL and LC_MESSAGES that is set (C and POSIX say nothing), else this computer's language, else LANG, else English; otea projects lang changes it";
+  "the project's language, set when the project was made: the one the desk last used then, else the first of the locale variables LC_ALL, LC_MESSAGES and LANG that is set (C and POSIX say nothing; on Windows a bare LANG ranks below the language Windows reports), else this computer's language, else English; otea projects lang changes it";
 
 // The templates the CLI takes, the same Studio's home offers, as its help lists them.
 const TEMPLATE_KEYS = LISTED_KEYS.join(', ');
@@ -1038,6 +1046,8 @@ const connect: Command = {
     const cliOnly = flag('cli') || flag('no-mcp');
     const { root, id } = withProject(cwd, (project) => {
       if (name !== undefined) {
+        // Connecting declares the agent here: refused when it works in another project.
+        holdAgentHome(project, name);
         // A model or an effort it is not given stays what the agent declared, else unknown: some
         // harnesses tell the agent neither, and it declares it itself in its first session (P8-F3).
         const known = findProfile(project.db, name);
@@ -2273,6 +2283,45 @@ function landedBase(
   const onto = remoteOf(cwd, base);
   return approved && landedIn(cwd, approved.commit, onto) ? onto : undefined;
 }
+
+const landSync: Command = {
+  name: 'land sync',
+  summary:
+    "After a Done item landed on the remote's base, bring the person's main checkout up to date: a fast-forward of its local base (the board's protected branch, to the remote it is pushed to), and only when that checkout is on the base with no change to a tracked file; otherwise it is left alone and the reply says why. The one step for it: never git pull or merge there yourself",
+  args: ['id'],
+  options: {},
+  execute: (input) => {
+    const [id = ''] = input.args;
+    return withAgent(input, (project) => {
+      const item = getItem(project, id);
+      const position = positionOf(item.state);
+      if (!isClosed(position) || position.closed !== DONE) {
+        throw new OteaError(
+          'invalid_transition',
+          `${id} is not Done: bring the person's checkout up to date once it landed`,
+        );
+      }
+      const behind = localBehindOf(project, id);
+      if (!behind) {
+        return {
+          data: { item: id, synced: false, behind: null },
+          text: `${id}: nothing to bring up to date: the local base already holds what landed, or there is no remote to compare it with.`,
+        };
+      }
+      if (fastForward(behind)) {
+        const commits = `${behind.behind} commit${behind.behind === 1 ? '' : 's'}`;
+        return {
+          data: { item: id, synced: true, localBehind: behind },
+          text: `${id}: your local ${behind.base} in ${behind.checkout} is up to date (fast-forwarded ${commits} to ${behind.remote}).`,
+        };
+      }
+      return {
+        data: { item: id, synced: false, localBehind: behind },
+        text: localBehindText(id, behind),
+      };
+    });
+  },
+};
 
 // Whether the item just handed off landed on the remote's base while the person's main checkout
 // stayed behind. A notice never fails a handoff: where git cannot tell, it says nothing.
@@ -4302,7 +4351,7 @@ function heardBy(
   try {
     withProject(cwd, (project) => {
       // An agent at work in another project is no one's to hear here (its calls are refused).
-      holdAgentHome(project, agent);
+      holdAgentHome(project, agent, 'write', process.env, systemClock, process.ppid);
       claimName(
         project.db,
         agent,
@@ -5260,6 +5309,7 @@ export const COMMANDS: readonly Command[] = [
   reply,
   crop,
   merged,
+  landSync,
   reopen,
   tick,
   topicOn,

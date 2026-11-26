@@ -39,7 +39,7 @@ export function localBehindText(id: string, behind: LocalBehind): string {
   const commits = `${behind.behind} commit${behind.behind === 1 ? '' : 's'}`;
   const how =
     behind.state === 'ready'
-      ? `run git pull --ff-only in ${behind.checkout} to bring it up to date`
+      ? `otea land sync ${id} brings it up to date (or git pull --ff-only in ${behind.checkout})`
       : behind.state === 'changes'
         ? `that checkout has changes of its own, so it was left alone: run git pull --ff-only there when you can`
         : `that checkout is on ${behind.on ?? 'another branch'}, so it was left alone: git switch ${behind.base} and git pull --ff-only when you can`;

@@ -547,6 +547,22 @@ export type LocalBehind = {
   on?: string;
 };
 
+// Brings the checkout's local base up to the remote's by a fast-forward and nothing else, and only
+// while the checkout is on that base with no change to a tracked file (asked again here: it may
+// have changed since it was read). Whether it moved.
+export function fastForward(behind: LocalBehind): boolean {
+  const { checkout, base, remote } = behind;
+  if (checkedOutBranch(checkout) !== base) return false;
+  if (git(checkout, '--no-optional-locks', 'status', '--porcelain', '--untracked-files=no') !== '')
+    return false;
+  try {
+    git(checkout, 'merge', '--ff-only', '--quiet', `refs/remotes/${remote}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Whether `commit` (what landed) is in the remote's `base`, as this repo last saw it, and not in
 // the local `base` of the checkout at `checkout`; undefined otherwise, and with no remote.
 export function localBehind(
@@ -565,7 +581,10 @@ export function localBehind(
   const behind = Number(git(checkout, 'rev-list', '--count', `${here}..${there}`));
   if (!(behind > 0)) return undefined;
   const on = checkedOutBranch(checkout);
-  const changed = git(checkout, 'status', '--porcelain', '--untracked-files=no') !== '';
+  // Asked without taking git's optional locks: it refreshes the index, which the person's own git
+  // (or their editor's) may be using at that moment.
+  const changed =
+    git(checkout, '--no-optional-locks', 'status', '--porcelain', '--untracked-files=no') !== '';
   const state = on !== base ? 'elsewhere' : changed ? 'changes' : 'ready';
   return {
     base,

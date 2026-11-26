@@ -426,7 +426,9 @@ describe('the role prompts', () => {
       expect(text).toContain('.otea/tmp/<');
       expect(text).toContain('MSYS_NO_PATHCONV=1');
       // After landing, the person's main checkout follows only when that is safe.
-      expect(text).toContain('merge --ff-only origin/main');
+      expect(text).toContain('otea land sync <');
+      expect(text).toContain('--as ana');
+      expect(text).not.toContain('merge --ff-only');
       const folder = lang === 'es' ? 'carpeta' : 'folder';
       expect(text).toContain(`D:/${folder}`);
       expect(text).toContain(`/d/${folder}`);

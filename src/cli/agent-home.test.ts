@@ -332,7 +332,7 @@ describe('an agent belongs to the project it works in', () => {
     try {
       const broken = { OTEA_HOME: join(a.dir, 'not-a-folder') };
       writeFileSync(broken.OTEA_HOME, 'a file where the Otea home should be');
-      expect(() => holdAgentHome(inA, me, 'write', broken)).toThrow(/try again/);
+      expect(() => holdAgentHome(inA, me, 'write', broken)).toThrow(/try again/i);
     } finally {
       inA.db.close();
     }

@@ -43,18 +43,27 @@ export function storedLanguageAt(env: Env = process.env): Lang | undefined {
   return withMachine(env, storedLanguage);
 }
 
-// This computer's language: the locale variables a person set on purpose (LC_ALL, then
-// LC_MESSAGES; C and POSIX, with or without an encoding, say nothing), else the one the runtime
-// reads from the system, else LANG.
-export function systemLanguage(env: Env = process.env, locale = system.locale): Lang {
+// This computer's language: the locale variables (LC_ALL, then LC_MESSAGES, then LANG; C and
+// POSIX, with or without an encoding, say nothing), else the one the runtime reads from the
+// system; on Windows a bare LANG ranks below the system's own language.
+export function systemLanguage(
+  env: Env = process.env,
+  locale = system.locale,
+  platform: string = process.platform,
+): Lang {
   const says = (value: string | undefined) =>
     value && !/^(C|POSIX)(\.|$)/.test(value) ? value : '';
-  // LC_ALL and LC_MESSAGES are choices; a bare LANG is a default that whatever started the shell
-  // may have set (an agent's harness on a Spanish computer carried LANG=en_US.UTF-8, and init made
-  // the project in English: field study 3). The language the system itself reports outranks it;
-  // where there is none, LANG says. On a POSIX system the system's locale is read from these same
-  // variables, so the order changes nothing there.
-  const named = says(env.LC_ALL) || says(env.LC_MESSAGES) || locale() || says(env.LANG);
+  // On POSIX the variables are the locale: LC_ALL, then LC_MESSAGES, then LANG (a C or POSIX one
+  // says nothing, so the next speaks), and only with none set the system's own report. On Windows
+  // there is no locale variable of the system's: LC_ALL and LC_MESSAGES are choices, but a bare
+  // LANG is whatever started the shell (an agent's harness on a Spanish computer carried
+  // LANG=en_US.UTF-8, and init made the project in English: field study 3), so the language
+  // Windows reports outranks it, and LANG speaks only where there is none.
+  const chosen = says(env.LC_ALL) || says(env.LC_MESSAGES);
+  const named =
+    platform === 'win32'
+      ? chosen || locale() || says(env.LANG)
+      : chosen || says(env.LANG) || locale();
   return /^es(?![a-z])/i.test(named) ? 'es' : 'en';
 }
 

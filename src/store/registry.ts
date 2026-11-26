@@ -39,6 +39,11 @@ const REGISTRY_MIGRATIONS = [
     at TEXT NOT NULL
   );
   `,
+  // The harness process a session runs under, when the call knew it (an MCP server's parent): a
+  // new one is a new session of the agent, which may take the name to another project.
+  `
+  ALTER TABLE agent_homes ADD COLUMN launcher INTEGER;
+  `,
 ];
 
 export function migrateRegistry(db: DatabaseSync): void {
@@ -126,12 +131,21 @@ export type AgentHome = {
   projectId: string;
   projectName: string;
   dataDir: string;
+  // When a write, a claim or a connect of it last kept the home.
   at: string;
+  launcher: number | null;
 };
 
 export function selectAgentHome(db: DatabaseSync, name: string): AgentHome | undefined {
   const row = db.prepare('SELECT * FROM agent_homes WHERE name = ?').get(name) as
-    | { name: string; project_id: string; project_name: string; data_dir: string; at: string }
+    | {
+        name: string;
+        project_id: string;
+        project_name: string;
+        data_dir: string;
+        at: string;
+        launcher: number | null;
+      }
     | undefined;
   return (
     row && {
@@ -140,16 +154,18 @@ export function selectAgentHome(db: DatabaseSync, name: string): AgentHome | und
       projectName: row.project_name,
       dataDir: row.data_dir,
       at: row.at,
+      launcher: row.launcher,
     }
   );
 }
 
 export function upsertAgentHome(db: DatabaseSync, home: AgentHome): void {
   db.prepare(
-    `INSERT INTO agent_homes (name, project_id, project_name, data_dir, at)
-    VALUES (:name, :projectId, :projectName, :dataDir, :at)
+    `INSERT INTO agent_homes (name, project_id, project_name, data_dir, at, launcher)
+    VALUES (:name, :projectId, :projectName, :dataDir, :at, :launcher)
     ON CONFLICT (name) DO UPDATE SET project_id = excluded.project_id,
-      project_name = excluded.project_name, data_dir = excluded.data_dir, at = excluded.at`,
+      project_name = excluded.project_name, data_dir = excluded.data_dir, at = excluded.at,
+      launcher = excluded.launcher`,
   ).run(home);
 }
 
