@@ -57,11 +57,11 @@ describe('a row on the phone', () => {
 });
 
 describe('the bottom buttons', () => {
-  it('draws the bottom bar on the screen’s foot, three tabs wide, clear of the home bar', () => {
+  it('draws the bottom bar on the screen’s foot, four tabs wide, clear of the home bar', () => {
     const bar = rules(phone, '.tabbar');
     expect(bar).toMatch(/position:\s*fixed/);
     expect(bar).toMatch(/bottom:\s*0/);
-    expect(bar).toMatch(/grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/);
+    expect(bar).toMatch(/grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
     expect(bar).toMatch(/env\(safe-area-inset-bottom/);
     expect(bar).toMatch(/border-top:\s*1px solid var\(--rule\)/);
     expect(rules(phoneCss, '.tabbar')).toMatch(/display:\s*none/);

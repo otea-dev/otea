@@ -73,6 +73,21 @@
   text-overflow: ellipsis;
   text-align: left;
 }
+/* what waits in other projects, on the phone's pill (the line beside it has no room there) */
+.pill .pelse {
+  position: absolute;
+  top: -5px;
+  right: 22px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--you);
+  color: var(--on-you);
+  font: 600 11px / 17px var(--sans);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 /* a tile holds a monogram or an icon, centred */
 .tile {
   display: inline-grid;

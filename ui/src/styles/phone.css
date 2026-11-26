@@ -559,12 +559,12 @@
     padding-bottom: calc(var(--tabbar-h) + 16px + var(--install-h, 0px));
   }
 
-  /* The bottom bar (mobile mock 1, 4): Te toca · Nuevo · Panel, solid on the screen's foot. One
+  /* The bottom bar (mobile mock 1, 4): Hablar · Te toca · Nuevo · Panel, solid on the screen's foot. One
      create button, nothing floating over content: every page ends above it. */
   .tabbar {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    /* The three labels share a line; Nuevo's round stands a little taller than the icons. */
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    /* The four labels share a line; Nuevo's round stands a little taller than the icons. */
     align-items: end;
     position: fixed;
     left: 0;

@@ -58,6 +58,34 @@ describe('the topbar', () => {
     );
   });
 
+  // Field study 3: «1 más te espera en 1 proyecto» was hidden on the phone, and a question of
+  // another project waited 20 minutes. The project pill carries the count there.
+  it('says on the phone, on the project pill, that something waits in another project', () => {
+    setLanguage('es');
+    const projects = [
+      overview({ id: 'hm', current: true }),
+      overview({ id: 'a', waiting: waiting(2) }),
+    ];
+    const html = topbar({ projects, phone: true });
+    expect(html).toMatch(/class="pelse"[^>]*>2</);
+    expect(html).toContain('2 más te esperan en 1 proyecto');
+    expect(
+      topbar({ projects: [overview({ id: 'hm', current: true })], phone: true }),
+    ).not.toContain('class="pelse"');
+  });
+
+  it('keeps you in Hablar when you switch project', () => {
+    const projects = [
+      overview({ id: 'hm', current: true }),
+      overview({ id: 'other', name: 'Other' }),
+    ];
+    const here = { id: 'hm', name: 'Hollowmere' } as Parameters<typeof projectRows>[0];
+    const stay = projectRows(here, projects, 0, true, '#/hablar').rows.find((r) => !r.current);
+    expect(stay?.href).toBe('/p/other/#/hablar');
+    const plain = projectRows(here, projects, 0, true).rows.find((r) => !r.current);
+    expect(plain?.href).toBe('/p/other/#/');
+  });
+
   it('fills the mark’s o while something is yours, and turns its orbit while an agent works', () => {
     const quiet = topbar({ all: [item({ id: 'A', turn: 'agent' })] });
     expect(quiet).toContain('class="brand"');

@@ -15,6 +15,7 @@ const props = (o: Partial<TabBarViewProps> = {}): TabBarViewProps => ({
   panelOpen: false,
   canCreate: true,
   onToca: () => {},
+  onHablar: () => {},
   onNew: () => {},
   onPanel: () => {},
   ...o,
@@ -46,22 +47,42 @@ describe('tabOn', () => {
     expect(tabOn({ view: 'board', board: 'Tareas' })).toBe('panel');
     expect(tabOn({ view: 'settings' })).toBeNull();
   });
+
+  // Field study 3: Hablar was Panel > Hablar, two taps, on the phone.
+  it('lights Hablar on the conversation, whatever turn or note it is open at', () => {
+    expect(tabOn({ view: 'hablar' })).toBe('hablar');
+    expect(tabOn({ view: 'hablar', turn: 4 })).toBe('hablar');
+    expect(tabOn({ view: 'hablar', bandeja: 'B-2' })).toBe('hablar');
+  });
 });
 
 describe('TabBarView', () => {
-  it('is three tabs in a row: Te toca with its count, Nuevo, Panel', () => {
+  it('is four tabs in a row: Hablar, Te toca with its count, Nuevo, Panel', () => {
     const html = render(props());
     expect(html).toMatch(/^<nav class="tabbar" aria-label="Navigation">/);
-    const order = ['data-tab="toca"', 'Your turn', 'data-tab="new"', 'New', 'data-tab="panel"'];
+    const order = [
+      'data-tab="hablar"',
+      'Talk',
+      'data-tab="toca"',
+      'Your turn',
+      'data-tab="new"',
+      'New',
+      'data-tab="panel"',
+    ];
     let at = -1;
     for (const w of order) {
       const i = html.indexOf(w, at + 1);
       expect(i, w).toBeGreaterThan(at);
       at = i;
     }
-    expect(html.match(/<button/g)).toHaveLength(3);
+    expect(html.match(/<button/g)).toHaveLength(4);
     expect(html).toMatch(/class="tbadge"[^>]*>2</);
-    expect(text(html)).toBe('2Your turnNewPanel');
+    expect(text(html)).toBe('Talk2Your turnNewPanel');
+  });
+
+  it('lights Hablar when the conversation is open', () => {
+    const html = render(props({ on: 'hablar' }));
+    expect(html).toMatch(/class="tab on"[^>]*data-tab="hablar"[^>]*aria-current="page"/);
   });
 
   it('marks where you are and that the panel opens a sheet', () => {
@@ -83,7 +104,7 @@ describe('TabBarView', () => {
     setLanguage('es');
     const html = render(props());
     expect(html).toContain('aria-label="Navegación"');
-    expect(text(html)).toBe('2Te tocaNuevoPanel');
+    expect(text(html)).toBe('Hablar2Te tocaNuevoPanel');
   });
 });
 

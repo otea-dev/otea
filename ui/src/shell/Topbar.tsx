@@ -16,6 +16,7 @@ import { useSync } from '../offline/sync-state.ts';
 import { offItemCount } from '../pending.ts';
 import { closeSearch, openSearch, useSearchOpen } from '../phone/search-open.ts';
 import { monogramOf } from '../place-icons.ts';
+import { waitingElsewhere } from '../projects.ts';
 import {
   type AgentRow,
   agentCounts,
@@ -189,8 +190,12 @@ function ProjectPill() {
         app.projects,
         tocaCount(app.all, { now: app.now }, offItemCount(app.pending)),
         app.phone,
+        app.route.view === 'hablar' ? '#/hablar' : undefined,
       )
     : { rows: [], total: 0 };
+  // On the phone the line «N más te esperan en M proyectos» has no room: the pill carries the count.
+  const elsewhere = app.phone ? waitingElsewhere(app.projects ?? []).count : 0;
+  const elsewhereText = elsewhere > 0 ? elsewhereLine(app.projects) : null;
   return (
     <>
       <button
@@ -204,6 +209,11 @@ function ProjectPill() {
       >
         <ProjectTile name={name} icon={project?.icon} />
         <span className="nm">{name}</span>
+        {elsewhereText ? (
+          <span className="pelse" title={elsewhereText} role="img" aria-label={elsewhereText}>
+            {elsewhere}
+          </span>
+        ) : null}
         <Chevron />
       </button>
       <Pop

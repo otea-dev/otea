@@ -83,9 +83,13 @@ export function itemHref(project: ProjectOverview, item: WaitingItem): string {
   return projectPage(project.id, hashFor(item.id));
 }
 
-export function projectHref(project: Pick<ProjectOverview, 'id' | 'current'>): string {
+// `stay`: the hash to open the other project at (Hablar stays Hablar when you switch).
+export function projectHref(
+  project: Pick<ProjectOverview, 'id' | 'current'>,
+  stay?: string,
+): string {
   if (project.current) return '#/';
-  return projectPage(project.id);
+  return projectPage(project.id, stay);
 }
 
 // The first path of a project that is still there, to name where it lives.

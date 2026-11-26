@@ -63,6 +63,9 @@ export function projectRows(
   yoursHere: number,
   // On the phone a project's folder means nothing: its line says what waits there instead.
   phone = false,
+  // The place of this project to open the others at, when it is one a project switch keeps
+  // (Hablar: the conversation of the other project, not its Te toca).
+  stay?: string,
 ): { rows: ProjectRow[]; total: number } {
   const listed: ProjectOverview[] = projects?.length
     ? [...projects.filter((p) => p.current), ...projects.filter((p) => !p.current)]
@@ -90,7 +93,7 @@ export function projectRows(
         inert: false,
       };
     }
-    const href = each.unavailable ? undefined : projectHref(each);
+    const href = each.unavailable ? undefined : projectHref(each, stay);
     const where = whereOf(each) ?? '';
     // A folder that is gone is said with its path, in the line itself: a tooltip is nothing on the
     // phone. It outranks the rest of the state, which the badge's count still carries.
