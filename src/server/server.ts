@@ -111,7 +111,12 @@ import {
 import { bandejaIdOf, type FromBandeja } from '../core/bandeja.ts';
 import { PERIOD_HINT, parsePeriod } from '../core/board/performance.ts';
 import { LANGS, type Lang } from '../core/board/template-words.ts';
-import { type FromMessage, isMessageKind, MESSAGE_KINDS } from '../core/conversation.ts';
+import {
+  type FromMessage,
+  isMessageKind,
+  MAX_MESSAGE_CHARS,
+  MESSAGE_KINDS,
+} from '../core/conversation.ts';
 import { OteaError } from '../core/errors.ts';
 import { MAX_EVIDENCE_MB } from '../core/evidence.ts';
 import { isAgentName } from '../core/item.ts';
@@ -344,6 +349,17 @@ function tooLarge(): never {
     413,
     'evidence_too_large',
     `Send at most ${MAX_INTAKE_FILES} files of ${MAX_EVIDENCE_MB} MB each`,
+  );
+}
+
+// A tap or a few words: 20 000 characters at four bytes each, and room for the JSON around them.
+const MAX_ANSWER_BYTES = MAX_MESSAGE_CHARS * 4 + 1024;
+
+function answerTooLarge(): never {
+  throw new RejectedRequest(
+    413,
+    'body_too_large',
+    `An answer takes at most ${MAX_MESSAGE_CHARS} characters`,
   );
 }
 
@@ -981,19 +997,24 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         return c.json(message);
       })
       // The person's tap on a question of the secretary's: their own message, in reply to it.
-      .post('/conversation/messages/:id/answer', async (c) => {
-        assertWritable(c, auth);
-        const given = await secretaryAnswerRequest(c);
-        const message = answerSecretaryQuestion(
-          project,
-          messageIdOf(c.req.param('id')),
-          given,
-          undefined,
-          HUMAN_IN_UI.actor.name,
-        );
-        feed.notify();
-        return c.json(message, 201);
-      })
+      .post(
+        '/conversation/messages/:id/answer',
+        // An answer is a few words: far past a message's limit is refused before it is read.
+        bodyLimit({ maxSize: MAX_ANSWER_BYTES, onError: answerTooLarge }),
+        async (c) => {
+          assertWritable(c, auth);
+          const given = await secretaryAnswerRequest(c);
+          const message = answerSecretaryQuestion(
+            project,
+            messageIdOf(c.req.param('id')),
+            given,
+            undefined,
+            HUMAN_IN_UI.actor.name,
+          );
+          feed.notify();
+          return c.json(message, 201);
+        },
+      )
       // The Bandeja (app/bandeja.ts): the person's rough captures. The person captures and answers
       // only here, signed in, from the UI's own origin: no command or tool of an agent makes an
       // entry or answers for the person.

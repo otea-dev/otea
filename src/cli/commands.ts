@@ -53,7 +53,7 @@ import {
   messageFileAt,
   messageIdOf,
   readAsSecretary,
-  requireMessage,
+  requireLinkableMessage,
   sayAsSecretary,
   turnsOfItem,
 } from '../app/conversation.ts';
@@ -1239,10 +1239,7 @@ const create: Command = {
       if (entry !== undefined) requireBandejaHold(project, entry, actor.name);
       // The message too, and that this agent may link it: only the secretary does.
       const message = fromMessage === undefined ? undefined : messageIdOf(fromMessage);
-      if (message !== undefined) {
-        requireSecretary(project.db, actor.name, 'links the conversation to items');
-        requireMessage(project, message);
-      }
+      if (message !== undefined) requireLinkableMessage(project, actor.name, message);
       const item = createItem(project, {
         collection,
         ...(type === undefined ? {} : { type }),

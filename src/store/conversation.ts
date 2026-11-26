@@ -144,10 +144,13 @@ export function setKind(
 }
 
 // The turns whose kind the person changed and the secretary has not read yet, oldest first: the root
-// and the words of the message that began each.
-export function selectKindNews(db: DatabaseSync): { root: number; text: string }[] {
+// and the words of the message that began each. `waking`: only those still worth a wake (not the
+// ones already brought back KIND_WAKES times); a read takes them all.
+export function selectKindNews(db: DatabaseSync, waking = false): { root: number; text: string }[] {
   return db
-    .prepare('SELECT id AS root, text FROM conversation_messages WHERE kind_news = 1 ORDER BY id')
+    .prepare(
+      `SELECT id AS root, text FROM conversation_messages WHERE kind_news BETWEEN 1 AND ${waking ? KIND_WAKES : 1_000_000} ORDER BY id`,
+    )
     .all() as { root: number; text: string }[];
 }
 
@@ -169,16 +172,27 @@ export function markHeard(db: DatabaseSync, at: string): number {
   );
 }
 
-// Whether the person has said anything since this message that is no mere trace of an answer given
-// to an agent: a question of the secretary's they spoke after is answered.
-export function answeredSince(db: DatabaseSync, id: number): boolean {
+// Whether the person has answered this question of the secretary's: a message of theirs that replies
+// to it. What else they say, or answer to other questions, leaves it open.
+export function isAnswered(db: DatabaseSync, id: number): boolean {
   return (
     db
       .prepare(
-        "SELECT 1 FROM conversation_messages WHERE author = 'person' AND id > ? AND about IS NULL LIMIT 1",
+        "SELECT 1 FROM conversation_messages WHERE author = 'person' AND reply_to = ? LIMIT 1",
       )
       .get(id) !== undefined
   );
+}
+
+// A wake for a changed kind is returned at most this many times when the secretary does nothing
+// about it (the counter kind_news runs 1, 2, then it is let go).
+export const KIND_WAKES = 2;
+
+// The wait returned this turn's changed kind: one delivery counted.
+export function bumpKindNews(db: DatabaseSync, root: number): void {
+  db.prepare(
+    'UPDATE conversation_messages SET kind_news = kind_news + 1 WHERE id = ? AND kind_news BETWEEN 1 AND ?',
+  ).run(root, KIND_WAKES);
 }
 
 // Every message of a turn, in order.
@@ -270,7 +284,7 @@ function hydrate(db: DatabaseSync, rows: readonly MessageRow[]): Message[] {
       recommended: row.recommended,
       choice: choiceOf(row),
       heardAt: row.heard_at,
-      kindNews: head?.kind_news === 1,
+      kindNews: (head?.kind_news ?? 0) > 0,
     };
   });
 }
@@ -415,14 +429,14 @@ export function selectDefaultTurn(db: DatabaseSync): {
   const latest = (
     db
       .prepare(
-        "SELECT MAX(id) AS id FROM conversation_messages WHERE author = 'person' AND topic IS NULL AND choice IS NULL AND read_at IS NOT NULL",
+        "SELECT MAX(id) AS id FROM conversation_messages WHERE author = 'person' AND topic IS NULL AND about IS NULL AND read_at IS NOT NULL",
       )
       .get() as { id: number | null }
   ).id;
   const unread = (
     db
       .prepare(
-        "SELECT COUNT(*) AS n FROM conversation_messages WHERE author = 'person' AND topic IS NULL AND choice IS NULL AND read_at IS NULL",
+        "SELECT COUNT(*) AS n FROM conversation_messages WHERE author = 'person' AND topic IS NULL AND about IS NULL AND read_at IS NULL",
       )
       .get() as { n: number }
   ).n;
@@ -430,7 +444,7 @@ export function selectDefaultTurn(db: DatabaseSync): {
     db
       .prepare(
         `SELECT COUNT(*) AS n FROM conversation_messages
-         WHERE author = 'person' AND topic IS NULL AND choice IS NULL AND read_at IS NOT NULL AND kind IS NULL AND id <> :latest`,
+         WHERE author = 'person' AND topic IS NULL AND about IS NULL AND read_at IS NOT NULL AND kind IS NULL AND id <> :latest`,
       )
       .get({ latest: latest ?? 0 }) as { n: number }
   ).n;

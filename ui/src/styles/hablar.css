@@ -665,6 +665,8 @@ button.hb-chip:hover {
 
 /* an agent's question on an item the turn produced */
 .hb-ask {
+  min-width: 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;

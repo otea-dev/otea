@@ -7,7 +7,7 @@ import {
   type SecretaryStatus,
   type SecretaryWakeKind,
 } from '../core/secretary.ts';
-import { markHeard } from '../store/conversation.ts';
+import { bumpKindNews, markHeard } from '../store/conversation.ts';
 import { transaction } from '../store/database.ts';
 import { selectEvents } from '../store/queries.ts';
 import {
@@ -337,6 +337,9 @@ export function secretaryWake(
   const woke = wakeOf(ctx, wait, now, processes);
   // The person's message reached the secretary: the desk can say so now, before it reads it.
   if (woke?.kind === 'person_message') markHeard(ctx.db, now());
+  // A changed kind is brought back to a wait the secretary did not act after, once more at most.
+  if (woke?.kind === 'kind_changed' && woke.ref !== undefined)
+    bumpKindNews(ctx.db, Number(woke.ref));
   return woke;
 }
 

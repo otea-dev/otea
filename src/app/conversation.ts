@@ -20,12 +20,12 @@ import type { SecretaryStatus } from '../core/secretary.ts';
 import { timeText } from '../core/time.ts';
 import { selectEntryOfItem } from '../store/bandeja.ts';
 import {
-  answeredSince,
   clearKindNews,
   countPending,
   insertAttachment,
   insertLink,
   insertMessage,
+  isAnswered,
   latestOfTopic,
   markRead,
   messageOfClientKey,
@@ -315,6 +315,8 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
     // and the next wait must not bring the same message back.
     if (replyTo !== undefined) markRead(project.db, [replyTo], at);
     const root = requireMessage(project, id).root;
+    // Answering into a turn is acting on it: a kind the person changed there is no news any more.
+    if (replyTo !== undefined) clearKindNews(project.db, [root]);
     // Items linked to a turn make it a request unless it is classified; a notice's links are its own.
     const wanted =
       input.kind ?? (replyTo !== undefined && links.length > 0 ? ('request' as const) : undefined);
@@ -335,14 +337,33 @@ export function linkMessageToItem(
   item: string,
   now: Clock = systemClock,
 ): Message {
-  requireSecretary(project.db, agent, 'links the conversation to items');
-  const message = requireMessage(project, messageId);
+  const message = requireLinkableMessage(project, agent, messageId);
   return transaction(project.db, () => {
     linkItems(project, message.root, [item], now());
     if (selectRootKind(project.db, message.root).kind === null)
       classify(project, message.root, 'request');
+    // Making an item out of a turn is acting on it, whether or not it was read.
+    clearKindNews(project.db, [message.root]);
     return requireMessage(project, messageId);
   });
+}
+
+// The message an item may be made from: the secretary's to ask, and a message of the person's turn
+// (a tap on a question included), never one of the secretary's own notices. Checked before the item
+// is made, so a refusal leaves nothing behind.
+export function requireLinkableMessage(
+  project: Project,
+  agent: string,
+  messageId: number,
+): Message {
+  requireSecretary(project.db, agent, 'links the conversation to items');
+  const message = requireMessage(project, messageId);
+  if (selectMessage(project.db, message.root)?.author === 'secretary') {
+    invalid(
+      `Message ${messageId} is your own notice, not something the person asked: make the item from the person's message (a tap on your question is one)`,
+    );
+  }
+  return message;
 }
 
 // The person corrects what the secretary made of a turn, with one tap: it keeps the correction, and
@@ -350,6 +371,9 @@ export function linkMessageToItem(
 // from the turn's own state) until it reads the turn.
 export function correctKind(project: Project, id: number, kind: MessageKind): Message {
   const message = requireMessage(project, id);
+  if (selectMessage(project.db, message.root)?.author === 'secretary') {
+    invalid(`Message ${id} is a notice of the secretary's: a notice has no kind to correct`);
+  }
   const changed = selectRootKind(project.db, message.root).kind !== kind;
   setKind(project.db, message.root, kind, 'person', changed);
   return requireMessage(project, id);
@@ -363,8 +387,9 @@ export type GivenAnswer =
   | { delegate: true; text?: never; option?: never };
 
 // The person's answer to a question of the secretary's (say --option): their own message, in reply
-// to it, that wakes the secretary like any message. Answered once: a person who has spoken since
-// has answered it. Only the desk's authenticated routes call this.
+// to it, that wakes the secretary like any message. Answered once: by a reply to that question;
+// other questions and what else the person says leave it open. Only the desk's authenticated routes
+// call this.
 export function answerSecretaryQuestion(
   project: Project,
   id: number,
@@ -391,10 +416,12 @@ export function answerSecretaryQuestion(
   } else {
     words = (given.text ?? '').trim();
     if (words === '') invalid('Say your answer');
+    if (words.length > MAX_MESSAGE_CHARS)
+      invalid(`An answer takes at most ${MAX_MESSAGE_CHARS} characters`);
     mode = 'text';
   }
   return transaction(project.db, () => {
-    if (answeredSince(project.db, id)) {
+    if (isAnswered(project.db, id)) {
       throw new OteaError('invalid_transition', `Message ${id} was already answered`);
     }
     const made = insertMessage(project.db, {
@@ -667,7 +694,7 @@ addSecretarySource((ctx) => {
 // A kind the person changed wakes the secretary from the turn's own state, as a message of theirs
 // does, until it reads the turn.
 addSecretarySource((ctx) => {
-  const [first] = selectKindNews(ctx.db);
+  const [first] = selectKindNews(ctx.db, true);
   if (first === undefined) return undefined;
   const kind = selectRootKind(ctx.db, first.root).kind;
   return {

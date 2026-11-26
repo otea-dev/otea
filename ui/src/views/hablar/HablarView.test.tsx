@@ -361,7 +361,8 @@ describe('a question of the secretary', () => {
   it('offers its buttons as a group named by the question, so a screen reader hears what they answer', async () => {
     const { root } = await open(conversation({ messages: question() }));
 
-    const group = q(root, '.hb-row.secretary [role="group"]') as HTMLElement;
+    // A fieldset is a group, named here by the question.
+    const group = q(root, '.hb-row.secretary fieldset') as HTMLElement;
     expect(group).not.toBeNull();
     expect(group.getAttribute('aria-label')).toContain('¿Qué hago con esto?');
     expect(all(group, '.hb-opt')).toHaveLength(2);

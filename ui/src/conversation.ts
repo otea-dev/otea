@@ -329,7 +329,7 @@ export type Row =
       head: boolean;
       // The older message it answers, when it is not the one right above it.
       answers: Message | null;
-      // A question with options to tap: open until the person has spoken after it.
+      // A question with options to tap: open until the person has replied to it.
       question: 'open' | 'answered' | null;
     }
   // What the person chose or answered: their own row.
@@ -358,9 +358,8 @@ export function rowsOf(messages: readonly Message[], turns: readonly Turn[]): Ro
       message.replyTo === null || above?.id === message.replyTo
         ? null
         : (byId.get(message.replyTo) ?? null);
-    const spoke = sorted.some(
-      (each) => each.author === 'person' && each.id > message.id && !isTrace(each),
-    );
+    // Answered by a reply to this very question; anything else the person says leaves it open.
+    const spoke = sorted.some((each) => each.author === 'person' && each.replyTo === message.id);
     return [
       {
         type: 'reply',

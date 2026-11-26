@@ -157,8 +157,10 @@ export function AskBody({
     );
   };
   return (
-    <div
+    // A fieldset is a group: its accessible name is the question the buttons answer.
+    <fieldset
       className="hb-ask"
+      aria-label={text}
       data-answered={said !== null ? '' : undefined}
       data-bare={bare ? '' : undefined}
     >
@@ -237,6 +239,6 @@ export function AskBody({
           )}
         </>
       )}
-    </div>
+    </fieldset>
   );
 }
