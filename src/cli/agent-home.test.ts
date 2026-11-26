@@ -14,6 +14,10 @@ type Repo = ReturnType<typeof tempGitRepo>;
 describe('an agent belongs to the project it works in', () => {
   let a: Repo;
   let b: Repo;
+  // A name of its own for each test: a project's data stays in the Otea home when its folder goes,
+  // and an agent that worked there a moment ago would still be at work in it.
+  let me = '';
+  let counter = 0;
 
   // Two projects in the one Otea home, each with its own TASKS-1.
   const person = (dir: string): Cli =>
@@ -30,6 +34,14 @@ describe('an agent belongs to the project it works in', () => {
     );
   const agent = (dir: string, name: string): Cli => cliAt(dir, { OTEA_AGENT: name });
 
+  const nameOf = (dir: string): string => {
+    const project = openProject(dir);
+    try {
+      return project.identity.name;
+    } finally {
+      project.db.close();
+    }
+  };
   const titleIn = (dir: string, id: string): string => {
     const project = openProject(dir);
     try {
@@ -67,6 +79,7 @@ describe('an agent belongs to the project it works in', () => {
   };
 
   beforeEach(async () => {
+    me = `worker-${++counter}`;
     a = tempGitRepo();
     b = tempGitRepo();
     for (const [dir, label] of [
@@ -75,7 +88,7 @@ describe('an agent belongs to the project it works in', () => {
     ] as const) {
       await cliAt(dir)('init');
       presetCollection(dir, 'tasks');
-      declareProfiles(dir, 'worker-a');
+      declareProfiles(dir, me);
       expect(
         (await person(dir)('create', '--collection', 'tasks', '--title', `${label} task`)).code,
       ).toBe(0);
@@ -88,30 +101,30 @@ describe('an agent belongs to the project it works in', () => {
   });
 
   it("refuses its command on the item of another project, from that project's folder", async () => {
-    expect((await agent(a.dir, 'worker-a')('claim', 'TASKS-1')).code).toBe(0);
+    expect((await agent(a.dir, me)('claim', 'TASKS-1')).code).toBe(0);
 
-    const refused = await agent(b.dir, 'worker-a')('update', 'TASKS-1', '--title', 'game branch');
+    const refused = await agent(b.dir, me)('update', 'TASKS-1', '--title', 'game branch');
 
     expect(refused.code).not.toBe(0);
-    expect(refused.err).toContain('worker-a');
-    expect(refused.err).toContain(openProject(a.dir).identity.name);
+    expect(refused.err).toContain(me);
+    expect(refused.err).toContain(nameOf(a.dir));
     expect(refused.err).toContain('nothing was written');
     expect(titleIn(b.dir, 'TASKS-1')).toBe('sets task');
     expect(titleIn(a.dir, 'TASKS-1')).toBe('game task');
   });
 
   it('refuses a claim and a read-with-a-name there too, and leaves no trace of the agent', async () => {
-    await agent(a.dir, 'worker-a')('claim', 'TASKS-1');
+    await agent(a.dir, me)('claim', 'TASKS-1');
 
-    expect((await agent(b.dir, 'worker-a')('claim', 'TASKS-1')).code).not.toBe(0);
-    expect((await agent(b.dir, 'worker-a')('show', 'TASKS-1')).code).not.toBe(0);
+    expect((await agent(b.dir, me)('claim', 'TASKS-1')).code).not.toBe(0);
+    expect((await agent(b.dir, me)('show', 'TASKS-1')).code).not.toBe(0);
 
     expect(holderIn(b.dir, 'TASKS-1')).toBeNull();
     const project = openProject(b.dir);
     try {
       const events = project.db
-        .prepare("SELECT count(*) AS n FROM events WHERE actor = 'worker-a'")
-        .get() as { n: number };
+        .prepare('SELECT count(*) AS n FROM events WHERE actor_name = ?')
+        .get(me) as { n: number };
       expect(events.n).toBe(0);
     } finally {
       project.db.close();
@@ -119,16 +132,17 @@ describe('an agent belongs to the project it works in', () => {
   });
 
   it('keeps working from its own project, and its own folder is not the only way in', async () => {
-    await agent(a.dir, 'worker-a')('claim', 'TASKS-1');
-    await agent(b.dir, 'worker-a')('update', 'TASKS-1', '--title', 'stray');
+    await agent(a.dir, me)('claim', 'TASKS-1');
+    await agent(b.dir, me)('update', 'TASKS-1', '--title', 'stray');
 
-    const own = await agent(a.dir, 'worker-a')('update', 'TASKS-1', '--title', 'game task, edited');
+    const own = await agent(a.dir, me)('update', 'TASKS-1', '--title', 'game task, edited');
 
+    expect(own.err).toBe('');
     expect(own.code).toBe(0);
     expect(titleIn(a.dir, 'TASKS-1')).toBe('game task, edited');
     // From a subfolder of its own project, as from the root.
     a.write('src/x.txt', '');
-    expect((await agent(`${a.dir}/src`, 'worker-a')('show', 'TASKS-1')).code).toBe(0);
+    expect((await agent(`${a.dir}/src`, me)('show', 'TASKS-1')).code).toBe(0);
   });
 
   it('refuses it over MCP from the folder of another project, and serves it in its own', async () => {
@@ -140,8 +154,8 @@ describe('an agent belongs to the project it works in', () => {
       await client.connect(clientSide);
       return client;
     };
-    const inA = await serve(a.dir, 'worker-a');
-    const inB = await serve(b.dir, 'worker-a');
+    const inA = await serve(a.dir, me);
+    const inB = await serve(b.dir, me);
     try {
       const own = (await inA.callTool({
         name: 'claim',
@@ -164,8 +178,8 @@ describe('an agent belongs to the project it works in', () => {
   });
 
   it("leaves the person alone in both projects, and each project's own agents too", async () => {
-    await agent(a.dir, 'worker-a')('claim', 'TASKS-1');
-    await agent(b.dir, 'worker-a')('update', 'TASKS-1', '--title', 'stray');
+    await agent(a.dir, me)('claim', 'TASKS-1');
+    await agent(b.dir, me)('update', 'TASKS-1', '--title', 'stray');
     // The person reads and writes in either project as before.
     expect((await person(b.dir)('show', 'TASKS-1')).code).toBe(0);
     expect(
@@ -180,16 +194,41 @@ describe('an agent belongs to the project it works in', () => {
   });
 
   it('lets the name go once the agent stopped, and takes it to its new project', async () => {
-    await agent(a.dir, 'worker-a')('claim', 'TASKS-1');
-    stopped(a.dir, 'worker-a');
+    await agent(a.dir, me)('claim', 'TASKS-1');
+    stopped(a.dir, me);
 
-    const there = await agent(b.dir, 'worker-a')('update', 'TASKS-1', '--title', 'new place');
+    const there = await agent(b.dir, me)('update', 'TASKS-1', '--title', 'new place');
 
     expect(there.code).toBe(0);
     expect(titleIn(b.dir, 'TASKS-1')).toBe('new place');
     // It is now at work in B: the same name does not reach A.
-    const back = await agent(a.dir, 'worker-a')('update', 'TASKS-1', '--title', 'stray');
+    const back = await agent(a.dir, me)('update', 'TASKS-1', '--title', 'stray');
     expect(back.code).not.toBe(0);
     expect(titleIn(a.dir, 'TASKS-1')).toBe('game task');
+  });
+
+  it('holds for projects that keep their data in their own folder too', async () => {
+    const c = tempGitRepo();
+    const d = tempGitRepo();
+    try {
+      for (const [dir, label] of [
+        [c.dir, 'local one'],
+        [d.dir, 'local two'],
+      ] as const) {
+        await cliAt(dir)('init', '--local');
+        presetCollection(dir, 'tasks');
+        declareProfiles(dir, me);
+        await person(dir)('create', '--collection', 'tasks', '--title', `${label} task`);
+      }
+      expect((await agent(c.dir, me)('claim', 'TASKS-1')).code).toBe(0);
+
+      const refused = await agent(d.dir, me)('update', 'TASKS-1', '--title', 'stray');
+
+      expect(refused.code).not.toBe(0);
+      expect(titleIn(d.dir, 'TASKS-1')).toBe('local two task');
+    } finally {
+      c.remove();
+      d.remove();
+    }
   });
 });

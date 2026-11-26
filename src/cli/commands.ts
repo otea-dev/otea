@@ -12,6 +12,7 @@ import {
   type Submitted,
   submitAgentDraft,
 } from '../app/agent-draft.ts';
+import { holdAgentHome } from '../app/agent-home.ts';
 import { promptFacts, promptKindOf, roleBoard } from '../app/agent-prompts.ts';
 import {
   type AgentsMdAction,
@@ -482,6 +483,8 @@ function seen(project: Project, input: Input, actor: Actor = input.actor): void 
 // was never seen before and the command fails (P2S-R2-3): a failed command is no agent at work, the
 // desk would list it «sin perfil», and whoami would hand its name out.
 function seenWhile<T>(project: Project, input: Input, actor: Actor, run: () => T): T {
+  // An agent at work in another project is refused here, before it is noted or writes anything.
+  if (actor.kind === 'agent') holdAgentHome(project, actor.name);
   const fresh = actor.kind === 'agent' && !findAgent(project.db, actor.name);
   seen(project, input, actor);
   if (!fresh) return run();
@@ -4250,6 +4253,8 @@ function heardBy(
 ) {
   try {
     withProject(cwd, (project) => {
+      // An agent at work in another project is no one's to hear here (its calls are refused).
+      holdAgentHome(project, agent);
       claimName(
         project.db,
         agent,
@@ -4274,6 +4279,7 @@ function heardBy(
   } catch (error) {
     if (error instanceof OteaError && error.code === 'not_found') return true;
     if (error instanceof OteaError && error.code === 'name_in_use') return false;
+    if (error instanceof OteaError && error.code === 'forbidden') return false;
     warn(`could not note ${agent} as seen: ${(error as Error).message}`);
     return true;
   }

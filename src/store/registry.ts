@@ -28,6 +28,17 @@ const REGISTRY_MIGRATIONS = [
   ALTER TABLE project_paths ADD COLUMN remote_url TEXT;
   ALTER TABLE project_paths ADD COLUMN root_commit TEXT;
   `,
+  // The project an agent name works in (app/agent-home.ts): ids repeat across projects, so what
+  // an agent may write is the project it is at work in, never the one its current folder is.
+  `
+  CREATE TABLE agent_homes (
+    name TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    project_name TEXT NOT NULL,
+    data_dir TEXT NOT NULL,
+    at TEXT NOT NULL
+  );
+  `,
 ];
 
 export function migrateRegistry(db: DatabaseSync): void {
@@ -105,7 +116,41 @@ export function deleteProjectPath(db: DatabaseSync, pathKey: string): void {
 
 export function deleteRegisteredProject(db: DatabaseSync, id: string): void {
   db.prepare('DELETE FROM project_paths WHERE project_id = ?').run(id);
+  db.prepare('DELETE FROM agent_homes WHERE project_id = ?').run(id);
   db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+}
+
+// The project an agent name was last at work in, and where that project's data is.
+export type AgentHome = {
+  name: string;
+  projectId: string;
+  projectName: string;
+  dataDir: string;
+  at: string;
+};
+
+export function selectAgentHome(db: DatabaseSync, name: string): AgentHome | undefined {
+  const row = db.prepare('SELECT * FROM agent_homes WHERE name = ?').get(name) as
+    | { name: string; project_id: string; project_name: string; data_dir: string; at: string }
+    | undefined;
+  return (
+    row && {
+      name: row.name,
+      projectId: row.project_id,
+      projectName: row.project_name,
+      dataDir: row.data_dir,
+      at: row.at,
+    }
+  );
+}
+
+export function upsertAgentHome(db: DatabaseSync, home: AgentHome): void {
+  db.prepare(
+    `INSERT INTO agent_homes (name, project_id, project_name, data_dir, at)
+    VALUES (:name, :projectId, :projectName, :dataDir, :at)
+    ON CONFLICT (name) DO UPDATE SET project_id = excluded.project_id,
+      project_name = excluded.project_name, data_dir = excluded.data_dir, at = excluded.at`,
+  ).run(home);
 }
 
 export function selectProjectPaths(db: DatabaseSync): ProjectPath[] {
