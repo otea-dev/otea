@@ -274,6 +274,9 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
       ...(replyTo === undefined ? {} : { replyTo }),
     });
     keepFiles(project, id, files);
+    // What it answers is read: it answered from what the wake showed, without `otea conversation`,
+    // and the next wait must not bring the same message back.
+    if (replyTo !== undefined) markRead(project.db, [replyTo], at);
     const root = requireMessage(project, id).root;
     // Items linked to a turn not classified yet make it a request.
     const unclassified = links.length > 0 && selectRootKind(project.db, root).kind === null;

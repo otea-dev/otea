@@ -60,6 +60,23 @@ describe('the conversation', () => {
     }).id;
 
   describe('from the person to the secretary', () => {
+    // F2 (field study 3): the secretary answers from the text the wake gave it, without running
+    // `otea conversation`, and its next wait returned the same message again, several times.
+    it('does not wake the secretary again for a message it answered, read or not', () => {
+      const first = post('is Tailscale or the relay better?', 1000);
+      const second = post('and the Aprobar button?', 1500);
+
+      sayAsSecretary(project, { agent: 'sol', text: 'Tailscale.', replyTo: first.id }, clock(2000));
+
+      const wake = secretaryWake(project, startSecretaryWait(clock(3000)), clock(3000));
+      // Only the one it did not answer comes back.
+      expect(wake).toMatchObject({ kind: 'person_message', ref: String(second.id) });
+
+      const answer = { agent: 'sol', text: 'Visible now.', replyTo: second.id };
+      sayAsSecretary(project, answer, clock(4000));
+      expect(secretaryWake(project, startSecretaryWait(clock(5000)), clock(5000))).toBeUndefined();
+    });
+
     it('is pending, wakes the secretary from its own state, and stops waking once read', () => {
       const sent = post('the Aprobar button is hidden on the phone');
       expect(sent).toMatchObject({ author: 'person', delivery: 'pending', readAt: null });
