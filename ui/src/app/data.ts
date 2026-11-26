@@ -5,6 +5,7 @@ import {
   fetchCollections,
   fetchEvents,
   fetchItems,
+  fetchPending,
   fetchPresets,
   fetchProject,
   fetchProjects,
@@ -14,6 +15,7 @@ import { currentProjectId } from '../base.ts';
 import { type Connection, useBeat, useLive, useRemote, useThrottled } from '../hooks.ts';
 import { flushQueue, queueAvailable } from '../offline/queue-store.ts';
 import { type SyncState, useSync } from '../offline/sync-state.ts';
+import type { Pending } from '../pending.ts';
 import type { Agent } from '../presence.ts';
 import type { Remote } from '../remote.ts';
 import type { CollectionView, Item, PresetView, ProjectOverview, ProjectView } from '../types.ts';
@@ -47,6 +49,8 @@ export type LoadedData = {
   presets: PresetView[];
   presetsRemote: Remote<PresetView[]>;
   agents: Agent[] | null | undefined;
+  // What waits for the person, as Otea counts it; undefined until the first answer.
+  pending: Pending | undefined;
   feed: FeedEvent[];
   studioWrites: number;
   studioChanged(): void;
@@ -118,6 +122,8 @@ export function useAppData(): LoadedData {
   const projectsVersion = useThrottled(version, PROJECTS_READ_MS);
   const projects = useRemote(fetchProjects, projectsVersion * 1000 + beat, connection);
   const agents = useAgents(version, presence, connection);
+  // A secretary gone offline sends presence, not a change: both read it again (both only grow).
+  const pending = useRemote(fetchPending, version + presence, connection);
   const feed = useFeed(version);
   const studioChanged = useCallback(() => setStudioWrites((n) => n + 1), []);
   // The PC is back (the live stream reconnected): what was captured without it goes now.
@@ -151,6 +157,7 @@ export function useAppData(): LoadedData {
     presets: ready(presets) ?? [],
     presetsRemote: presets,
     agents,
+    pending: ready(pending),
     feed,
     studioWrites,
     studioChanged,

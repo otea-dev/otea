@@ -11,6 +11,7 @@ import {
 } from 'react';
 import type { AnswerWords } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
+import type { BandejaEntry } from '../../bandeja.ts';
 import {
   asksOf,
   branchOf,
@@ -31,6 +32,7 @@ import { reduced } from '../../motion/reduced.ts';
 import type { Item } from '../../types.ts';
 import { noteTime } from '../detail/notes.ts';
 import { Attachments } from './Attachments.tsx';
+import { BandejaAsk } from './Bandeja.tsx';
 import { AskBody, AskCard, Branch } from './Branch.tsx';
 import { Plain } from './Plain.tsx';
 import { SecretaryMark } from './SecretaryMark.tsx';
@@ -600,6 +602,10 @@ export type TurnsProps = {
   onGo: (root: number) => void;
   // The person's tap on a question of the secretary's.
   onAnswer: (message: Message, given: AnswerWords) => Promise<void>;
+  // The notes of the Bandeja a refiner asked you about: their questions stand at the foot as an
+  // agent's question on an item does, and are answered there. Read again once one is.
+  noteAsks?: readonly BandejaEntry[];
+  onNoteAnswered?: () => void;
   // The element that scrolls the conversation: the lanes draw in against it.
   scroller: RefObject<HTMLElement | null>;
   // Said when the turns are first there, just before the lanes draw in (the page scrolls to the
@@ -616,6 +622,8 @@ export function Turns({
   onKind,
   onGo,
   onAnswer,
+  noteAsks = [],
+  onNoteAnswered,
   scroller,
   onFirst,
 }: TurnsProps) {
@@ -641,8 +649,9 @@ export function Turns({
       ...turns.flatMap((turn) => turn.links.map((id) => `c${turn.root}:${id}`)),
       ...(thinking === undefined ? [] : [`t${thinking}`]),
       ...asks.map((item) => `a${item.id}`),
+      ...noteAsks.map((entry) => `n${entry.ref}`),
     ],
-    [rows, turns, thinking, asks],
+    [rows, turns, thinking, asks, noteAsks],
   );
   const fresh = useFresh(keys);
   const begun = new Set<number>();
@@ -700,6 +709,20 @@ export function Turns({
               leaving={leaving}
             >
               <AskCard item={item} gone={!asks.some((each) => each.id === item.id)} />
+            </Row>
+          ))}
+        </section>
+      )}
+      {noteAsks.length === 0 ? null : (
+        <section className="hb-turn" data-k="note-asks">
+          {noteAsks.map((entry) => (
+            <Row
+              key={`n${entry.ref}`}
+              lane="secretary"
+              bodyKey={`n${entry.ref}`}
+              fresh={fresh(`n${entry.ref}`)}
+            >
+              <BandejaAsk entry={entry} onAnswered={() => onNoteAnswered?.()} />
             </Row>
           ))}
         </section>

@@ -41,6 +41,21 @@
 .bhead .display {
   margin-bottom: 10px;
 }
+/* a review that holds the board's queue: in your colour, since it waits for you */
+.bhold {
+  margin-top: 10px;
+  padding-left: 12px;
+  border-left: 2px solid var(--you);
+  max-width: 44em;
+}
+.bhold p {
+  margin: 0;
+  font: 400 italic 15px / 1.45 var(--serif);
+  color: var(--ink-2);
+}
+.bhold p + p {
+  margin-top: 4px;
+}
 .steps {
   display: flex;
   align-items: center;

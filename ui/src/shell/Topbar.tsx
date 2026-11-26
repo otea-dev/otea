@@ -13,6 +13,7 @@ import { Pop } from '../kit/pop/Pop.tsx';
 import { lookOf } from '../lanes/looks.ts';
 import { NodeGlyph } from '../lanes/NodeGlyph.tsx';
 import { useSync } from '../offline/sync-state.ts';
+import { offItemCount } from '../pending.ts';
 import { closeSearch, openSearch, useSearchOpen } from '../phone/search-open.ts';
 import { monogramOf } from '../place-icons.ts';
 import {
@@ -183,7 +184,12 @@ function ProjectPill() {
   const project = app.project;
   const name = project?.name ?? '';
   const menu = project
-    ? projectRows(project, app.projects, tocaCount(app.all, { now: app.now }), app.phone)
+    ? projectRows(
+        project,
+        app.projects,
+        tocaCount(app.all, { now: app.now }, offItemCount(app.pending)),
+        app.phone,
+      )
     : { rows: [], total: 0 };
   return (
     <>
@@ -634,7 +640,7 @@ function SearchButton() {
 
 export function Topbar() {
   const app = useApp();
-  const yours = tocaCount(app.all, { now: app.now }) > 0;
+  const yours = tocaCount(app.all, { now: app.now }, offItemCount(app.pending)) > 0;
   const working = app.all.some((it) => lookOf(it, app.now) === 'working');
   return (
     <header className="topbar">

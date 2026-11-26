@@ -27,6 +27,7 @@ import { useBandeja } from './Bandeja.tsx';
 import { Composer } from './Composer.tsx';
 import { SecretaryMark } from './SecretaryMark.tsx';
 import { Side } from './Side.tsx';
+import { TeEspera } from './TeEspera.tsx';
 import { Turns } from './Turns.tsx';
 import { useConversation } from './use-conversation.ts';
 
@@ -92,6 +93,11 @@ export function HablarView({
   const notes = useBandeja();
   // What needs you in the Bandeja counts beside what came out: a question waits for your tap.
   const asking = askingCount(notes.entries ?? []);
+  // The notes a refiner asked you about: their questions stand at the foot of the thread too.
+  const noteAsks = useMemo(
+    () => (notes.entries ?? []).filter(({ state }) => state === 'asking'),
+    [notes.entries],
+  );
   const [tab, setTab] = useState<'chat' | 'out'>(bandeja === undefined ? 'chat' : 'out');
   const [litNote, setLitNote] = useState<string | undefined>();
   const [filter, setFilter] = useState<Filter>('all');
@@ -337,6 +343,11 @@ export function HablarView({
             ) : null}
           </div>
         ) : null}
+        <TeEspera
+          pending={app.pending}
+          onNote={(ref) => app.go({ view: 'hablar', bandeja: ref })}
+          onTurn={goTo}
+        />
         <div className="hb-chat" ref={scroller}>
           {convo.status === 'loading' ? (
             <p className="hb-pane">{t('hablar.loading')}</p>
@@ -369,6 +380,8 @@ export function HablarView({
                     onKind={onKind}
                     onGo={goTo}
                     onAnswer={onAnswer}
+                    noteAsks={noteAsks}
+                    onNoteAnswered={notes.reload}
                     scroller={scroller}
                     onFirst={() => {
                       const box = scroller.current;

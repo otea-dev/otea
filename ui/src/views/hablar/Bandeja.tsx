@@ -47,6 +47,27 @@ function Files({ entry }: { entry: BandejaEntry }) {
   );
 }
 
+// A refiner's question on a note, with its options to tap, your own words, or the decision left to
+// the refiner: in the Bandeja's row, and at the foot of the conversation, where it is seen.
+export function BandejaAsk({ entry, onAnswered }: { entry: BandejaEntry; onAnswered: () => void }) {
+  const asking = entry.asking;
+  if (!asking) return null;
+  return (
+    <AskBody
+      by={asking.by}
+      about={entry.ref}
+      text={asking.text}
+      options={asking.options ?? []}
+      recommended={asking.recommended}
+      send={async (given) => {
+        await postBandejaAnswer(entry.id, { ...given, question: asking.question });
+        toast({ msg: t('hablar.ask.sent') });
+        onAnswered();
+      }}
+    />
+  );
+}
+
 function Row({
   entry,
   now,
@@ -92,20 +113,7 @@ function Row({
       </div>
       <p className="bn-title">{entryTitle(entry) || t('bandeja.onlyFiles')}</p>
       <Files entry={entry} />
-      {asking ? (
-        <AskBody
-          by={asking.by}
-          about={entry.ref}
-          text={asking.text}
-          options={asking.options ?? []}
-          recommended={asking.recommended}
-          send={async (given) => {
-            await postBandejaAnswer(entry.id, { ...given, question: asking.question });
-            toast({ msg: t('hablar.ask.sent') });
-            onAnswered();
-          }}
-        />
-      ) : null}
+      {asking ? <BandejaAsk entry={entry} onAnswered={onAnswered} /> : null}
     </li>
   );
 }

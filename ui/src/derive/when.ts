@@ -21,6 +21,12 @@ function age(minutes: number): string {
   return t('when.days', { count: Math.round(minutes / 1440) });
 }
 
+// How long something has waited, as the age column says it (12 min, 3 h, yesterday), for what is no
+// item (a question on a Bandeja note).
+export function waitedText(since: string | null, now: number): string {
+  return since === null ? '' : age((now - Date.parse(since)) / MIN);
+}
+
 // How long a live lease has left, «quedan 18 min»; null when it ran out.
 export function leaseLeftText(lease: Item['lease'], now: number): string | null {
   const live = activeLease(lease, now);

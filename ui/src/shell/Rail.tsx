@@ -16,6 +16,7 @@ import { Icon } from '../kit/Icon.tsx';
 import { C, F, lerp } from '../motion/curves.ts';
 import { type Drive, drive } from '../motion/drive.ts';
 import { reduced } from '../motion/reduced.ts';
+import { offItemCount } from '../pending.ts';
 import { studioHash, type ViewRoute } from '../selection.ts';
 import { SecretaryMark } from '../views/hablar/SecretaryMark.tsx';
 import { useSecretary } from '../views/hablar/use-conversation.ts';
@@ -200,7 +201,7 @@ export function Rail() {
   const navs = useRef<HTMLDivElement>(null);
   const key = railKey(app.route);
   const { canWrite, canConfigure } = app.session;
-  const yours = tocaCount(app.all, { now: app.now });
+  const yours = tocaCount(app.all, { now: app.now }, offItemCount(app.pending));
   const stuck = stuckCount(app.all, { now: app.now });
   const boards = boardEntries(app.collections, app.all);
   const secretary = useSecretary();

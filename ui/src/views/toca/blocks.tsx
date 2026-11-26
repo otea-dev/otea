@@ -15,7 +15,7 @@ import {
   type TocaSection,
   tocaSection,
 } from '../../derive/toca.ts';
-import { turnSince, whenText } from '../../derive/when.ts';
+import { turnSince, waitedText, whenText } from '../../derive/when.ts';
 import { language, type PlainKey, t, tx } from '../../i18n/i18n.ts';
 import { Icon } from '../../kit/Icon.tsx';
 import { AgentMark } from '../../kit/Marks.tsx';
@@ -30,6 +30,7 @@ import {
   unheard,
   workingAgents,
 } from '../../listening.ts';
+import { offItemEntries, type PendingEntry, rowKeyOf } from '../../pending.ts';
 import { actedWith } from '../../presence.ts';
 import { stateWord } from '../../preset-words.ts';
 import { roundsOf } from '../../rounds.ts';
@@ -238,7 +239,40 @@ export function notesMark(notes: NonNullable<Item['notes']>): string | null {
 }
 
 type TocaApp = Pick<App, 'all' | 'now' | 'feed' | 'collectionOf' | 'route'> &
-  Partial<Pick<App, 'agents'>>;
+  Partial<Pick<App, 'agents' | 'pending'>>;
+
+// A question that is no item (on a Bandeja note, or the secretary's own), as a row of «Preguntas para
+// ti»: what it is about, who asks, since when. It opens Hablar, where its buttons are.
+function OffRow({ entry, now }: { entry: PendingEntry; now: number }) {
+  const secretary = entry.kind === 'secretary';
+  return (
+    <>
+      <div className="main-c">
+        <div className="t" data-leaf="" data-title="">
+          <span className="tt">{secretary ? (entry.text ?? entry.title) : entry.title}</span>
+        </div>
+        <div className="m" data-leaf="">
+          <span className="id">{secretary ? t('toca.off.secretary') : entry.ref}</span>
+          <span className="bd">
+            <span className="bdc">{t(secretary ? 'toca.off.inHablar' : 'toca.off.bandeja')}</span>
+            {entry.text !== undefined && !secretary ? (
+              <span className="bds">› {entry.text}</span>
+            ) : null}
+          </span>
+        </div>
+      </div>
+      <div className="a" data-leaf="">
+        {t('toca.act.preguntas')}
+        <small>
+          {entry.by ? tx('toca.sub.asks', { agent: <b>{entry.by}</b> }) : t('toca.sub.yourTurn')}
+        </small>
+      </div>
+      <div className="age" data-leaf="">
+        {waitedText(entry.since, now)}
+      </div>
+    </>
+  );
+}
 
 function TocaRow({
   it,
@@ -413,6 +447,9 @@ export function tocaBlocks(
     const s = tocaSection(it, ctx);
     if (s) by.set(s, [...(by.get(s) ?? []), it]);
   }
+  // What Otea counts that is no item: the questions of the Bandeja and of the secretary. They are
+  // questions for you, so they join that section, beside the items that ask.
+  const off = atasco ? [] : offItemEntries(app.pending);
   const blocks: LaneBlock[] = [];
   const at = (it: Item) => turnSince(it);
   const quiet: TocaSection[] = [];
@@ -424,7 +461,8 @@ export function tocaBlocks(
   for (const sec of TOCA_SECTIONS) {
     if (atasco && sec !== 'atasco') continue;
     if (phone && sec === 'cerrados') continue;
-    if (phone && YOURS.includes(sec) && !by.get(sec)?.length) {
+    const asked = sec === 'preguntas' ? off : [];
+    if (phone && YOURS.includes(sec) && !by.get(sec)?.length && asked.length === 0) {
       quiet.push(sec);
       continue;
     }
@@ -443,7 +481,7 @@ export function tocaBlocks(
       kind: 'sec',
       key: `sec:${sec}`,
       title: t(`toca.sec.${sec}` as PlainKey),
-      count: rows.length,
+      count: rows.length + asked.length,
       ...(gloss ? { gloss: t(gloss) } : {}),
       ...(triage
         ? {
@@ -464,7 +502,7 @@ export function tocaBlocks(
           }
         : {}),
     });
-    if (!rows.length)
+    if (!rows.length && asked.length === 0)
       blocks.push({
         kind: 'empty',
         key: `empty:${sec}`,
@@ -478,6 +516,17 @@ export function tocaBlocks(
         content: <FoldLine rows={rows} ctx={ctx} o={phone} />,
       });
     const shown = phone && sec === 'encamino' && !phone.encamino ? [] : rows;
+    // The questions that are no item stand with the others, oldest first among them.
+    for (const entry of asked) {
+      blocks.push({
+        kind: 'row',
+        key: rowKeyOf(entry),
+        lane: 'you',
+        look: 'yours',
+        sec,
+        content: <OffRow entry={entry} now={app.now} />,
+      });
+    }
     for (const it of shown) {
       blocks.push({
         kind: 'row',

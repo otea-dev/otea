@@ -73,6 +73,19 @@ export const toca = {
   'toca.replied': '{agent} answered',
   'toca.round': 'round {n}',
 
+  // What waits for you that is no item: a question on an Inbox note, one of the secretary's
+  'toca.off.bandeja': 'Inbox note',
+  'toca.off.secretary': 'secretary',
+  'toca.off.inHablar': 'in Talk',
+
+  // The secretary is offline with things waiting for it
+  'toca.secOff.title': '{name} is offline',
+  'toca.secOff.waiting': {
+    one: '{count} message is waiting for it.',
+    other: '{count} messages are waiting for it.',
+  },
+  'toca.secOff.go': 'Open Talk to bring it back',
+
   // After the project's first finished item: what people usually do next (once, then it is gone)
   'next.label': 'What to do next',
   'next.title': 'Your first item is finished',

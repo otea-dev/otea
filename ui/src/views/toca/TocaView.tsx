@@ -13,6 +13,16 @@ import { LaneList } from '../../lanes/LaneList.tsx';
 import { noAgents } from '../../listening.ts';
 import { QueuedCaptures } from '../../offline/QueuedCaptures.tsx';
 import { discard, useQueue } from '../../offline/queue-store.ts';
+import {
+  entryRoute,
+  offItemCount,
+  offItemEntries,
+  offlineWithWaiting,
+  oldestOffItem,
+  type PendingSecretary,
+  rowKeyOf,
+} from '../../pending.ts';
+import { hablarHash } from '../../selection.ts';
 import type { Item } from '../../types.ts';
 import { AnsweredTopics } from '../topics/AnsweredTopics.tsx';
 import { dayLine, tocaBlocks, universeOf } from './blocks.tsx';
@@ -92,14 +102,44 @@ function NoAgents({
   );
 }
 
+// The secretary is offline and things wait for it: Te toca says so (it never reads «nothing waits»
+// while the person's messages and notes sit unread), with how many and the way to Hablar, where
+// the way to bring it back is.
+function SecretaryAway({ secretary }: { secretary: PendingSecretary }) {
+  return (
+    <div className="secoff" role="status" data-leaf="">
+      <i aria-hidden="true" />
+      <div>
+        <h4>{t('toca.secOff.title', { name: secretary.name })}</h4>
+        <p>{t('toca.secOff.waiting', { count: secretary.waiting.count })}</p>
+        <a className="secoff-go" href={hablarHash()}>
+          {t('toca.secOff.go')}
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export function TocaView({ atasco = false }: { atasco?: boolean }) {
   const app = useApp();
   const types = (it: Item) => typeOfItem(it, app.collectionOf);
   const ctx = { now: app.now, items: app.all, types };
   const today = todayCounts(app.feed, ctx);
-  const open = (id: string) => (app.route.item === id ? app.closeItem() : app.openItem(id));
+  // A row that is no item (a question on a Bandeja note, the secretary's own) opens Hablar.
+  const off = new Map(offItemEntries(app.pending).map((entry) => [rowKeyOf(entry), entry]));
+  const open = (id: string) => {
+    const entry = off.get(id);
+    if (entry) return app.go(entryRoute(entry));
+    return app.route.item === id ? app.closeItem() : app.openItem(id);
+  };
+  const away = atasco ? null : offlineWithWaiting(app.pending);
   // No item on any board (every project has Pedidos, so never no board): the project's own page.
-  const empty = app.items.status === 'ready' && !atasco && app.all.length === 0;
+  const empty =
+    app.items.status === 'ready' &&
+    !atasco &&
+    app.all.length === 0 &&
+    off.size === 0 &&
+    away === null;
   // On the phone En camino comes folded in one line.
   const [encamino, setEncamino] = useState(false);
   // Before the first load nothing is known yet: it says so, never that nothing waits (P5-R3-6),
@@ -134,7 +174,10 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
       </>
     );
   } else {
-    const d = tocaDek(app.all, today.handed, app.now);
+    const d = tocaDek(app.all, today.handed, app.now, {
+      count: offItemCount(app.pending),
+      since: oldestOffItem(app.pending),
+    });
     dekKey = d.lead;
     dek = d.lead;
   }
@@ -163,6 +206,7 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
           <EmptyProject />
         ) : (
           <>
+            {away ? <SecretaryAway secretary={away} /> : null}
             {lonely ? <NoAgents items={app.all} now={app.now} onConnect={app.openConnect} /> : null}
             <LaneHead />
             <LaneList

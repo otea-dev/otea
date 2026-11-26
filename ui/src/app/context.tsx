@@ -33,6 +33,7 @@ import { toast } from '../kit/pop/toast.tsx';
 import { rowOf } from '../lanes/dom.ts';
 import { landed } from '../motion/bus.ts';
 import type { SyncState } from '../offline/sync-state.ts';
+import type { Pending } from '../pending.ts';
 import type { Agent } from '../presence.ts';
 import { linkRequestOf, unlinkRequestOf } from '../relations.ts';
 import type { Remote } from '../remote.ts';
@@ -78,6 +79,9 @@ export type AppData = {
   presetsRemote: Remote<PresetView[]>;
   studioWrites: number;
   agents: Agent[] | null | undefined;
+  // What waits for the person, as Otea counts it (questions of the Bandeja and of the secretary
+  // beside the items): undefined until the first answer.
+  pending?: Pending | undefined;
   // The latest 200 project events, merged live.
   feed: FeedEvent[];
   route: Route;
@@ -301,6 +305,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     presetsRemote: data.presetsRemote,
     studioWrites: data.studioWrites,
     agents: data.agents,
+    pending: data.pending,
     feed: data.feed,
     route,
     phone,

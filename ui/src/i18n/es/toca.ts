@@ -78,6 +78,19 @@ export const toca = {
   'toca.replied': '{agent} contestó',
   'toca.round': 'ronda {n}',
 
+  // Lo que te espera y no es un ítem: una pregunta en una nota de la Bandeja, una del secretario
+  'toca.off.bandeja': 'Nota de la Bandeja',
+  'toca.off.secretary': 'secretario',
+  'toca.off.inHablar': 'en Hablar',
+
+  // El secretario está desconectado y le esperan cosas
+  'toca.secOff.title': '{name} está desconectado',
+  'toca.secOff.waiting': {
+    one: 'Lo espera {count} mensaje.',
+    other: 'Lo esperan {count} mensajes.',
+  },
+  'toca.secOff.go': 'Abrir Hablar para traerlo de vuelta',
+
   // Tras el primer ítem terminado del proyecto: lo que suele venir después (una vez, y se va)
   'next.label': 'Qué hacer ahora',
   'next.title': 'Tu primer ítem está terminado',

@@ -18,6 +18,7 @@ import type { ConversationView, Message, MessageKind, SecretaryStatus } from './
 import { type Language, t } from './i18n/i18n.ts';
 import type { NotifyView } from './notify/offer.ts';
 import { noteRead, readOf } from './offline/sync-state.ts';
+import type { Pending } from './pending.ts';
 import { type Agent, parseAgents } from './presence.ts';
 import type { LinkRequest } from './relations.ts';
 import { serverMessage, unreachable } from './remote.ts';
@@ -658,6 +659,12 @@ export async function fetchSecretary(signal: AbortSignal): Promise<SecretaryStat
     secretary: SecretaryStatus | null;
   };
   return body.secretary;
+}
+
+// What waits for the person, as Otea counts it (src/app/pending.ts): Te toca, the numbers beside
+// it and Hablar's «Te espera» strip read this.
+export async function fetchPending(signal: AbortSignal): Promise<Pending> {
+  return (await get('/api/pending', signal)).json();
 }
 
 // What the person says to the secretary: the text and the files, as a form when it has files. The

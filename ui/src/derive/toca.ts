@@ -138,9 +138,14 @@ export function tocaSection(item: Item, ctx: TocaContext): TocaSection | null {
   return 'revisiones';
 }
 
-// What waits for you: your turn, and what got stuck (the rail, the mark, the title).
-export function tocaCount(items: readonly Item[], ctx: Pick<TocaContext, 'now'>): number {
-  return items.filter((item) => item.turn === 'human' || isStuck(item, ctx.now)).length;
+// What waits for you: your turn, and what got stuck (the rail, the mark, the title), and what is no
+// item (`extra`: the questions on a Bandeja note and of the secretary, which Otea counts).
+export function tocaCount(
+  items: readonly Item[],
+  ctx: Pick<TocaContext, 'now'>,
+  extra = 0,
+): number {
+  return items.filter((item) => item.turn === 'human' || isStuck(item, ctx.now)).length + extra;
 }
 
 export function stuckCount(items: readonly Item[], ctx: Pick<TocaContext, 'now'>): number {

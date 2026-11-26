@@ -80,6 +80,50 @@
 .view.narrow .noagents {
   display: none;
 }
+/* the secretary is offline with things waiting for it: on the lanes' reading edge, in warn (not
+   in your colour: it is the system, not you), with the way to Hablar. Phone too. */
+.secoff {
+  margin: 4px 0 18px 72px;
+  padding: 14px 18px;
+  max-width: 720px;
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  border-radius: 12px;
+  background: var(--sheet);
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--warn) 42%, var(--rule-2));
+}
+.secoff i {
+  width: 7px;
+  height: 7px;
+  margin-top: 9px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+.secoff h4 {
+  font: 450 18px / 1.25 var(--serif);
+  margin: 0;
+}
+.secoff p {
+  font: 400 italic 15px / 1.45 var(--serif);
+  color: var(--ink-2);
+  margin: 2px 0 0;
+}
+.secoff-go {
+  display: inline-block;
+  margin-top: 8px;
+  font: 500 13px / 1.2 var(--sans);
+  color: var(--you-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 720px) {
+  .secoff {
+    margin: 0 0 14px;
+    padding: 12px 14px;
+  }
+}
 /* after the project's first finished item: what usually comes next, once. It rests on the lanes'
    reading edge like the card above, with a line of your colour: it is yours to answer or put away. */
 .nextstep {

@@ -6,6 +6,7 @@ import { t } from '../i18n/i18n.ts';
 import { Count } from '../kit/Count.tsx';
 import { Icon } from '../kit/Icon.tsx';
 import { Buddy } from '../kit/Marks.tsx';
+import { offItemCount } from '../pending.ts';
 import type { Route, ViewRoute } from '../selection.ts';
 import { RowIcon, SecretaryDot } from '../shell/Rail.tsx';
 import { type BoardEntry, boardEntries } from '../shell/rail-model.ts';
@@ -175,7 +176,7 @@ export function NavSheet() {
     >
       <NavBody
         route={app.route}
-        toca={tocaCount(app.all, { now: app.now })}
+        toca={tocaCount(app.all, { now: app.now }, offItemCount(app.pending))}
         secretary={secretary}
         boards={boardEntries(app.collections, app.all)}
         onGo={(to) => {

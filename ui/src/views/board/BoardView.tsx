@@ -58,6 +58,7 @@ import {
 } from './model.ts';
 import { columnRects, type MorphJob, morph } from './morph-run.ts';
 import { Pasos } from './Pasos.tsx';
+import { QueueHold } from './QueueHold.tsx';
 import { listaBlocks, type RowCtx, tablaBlocks } from './rows.tsx';
 import {
   BoardActs,
@@ -798,6 +799,7 @@ function Head({
             {dek}
           </p>
         ) : null}
+        <QueueHold ids={items.map(({ id }) => id)} />
       </div>
       {/* A Studio board's steps are its list's sections, as the mock draws it: no strip. */}
       {studio ? null : (
