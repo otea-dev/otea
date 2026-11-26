@@ -43,17 +43,19 @@ export function storedLanguageAt(env: Env = process.env): Lang | undefined {
   return withMachine(env, storedLanguage);
 }
 
-// This computer's language: the locale variables a person set (LC_ALL, then LC_MESSAGES, then LANG;
-// C and POSIX, with or without an encoding, say nothing), else the one the runtime reads from the
-// system.
+// This computer's language: the locale variables a person set on purpose (LC_ALL, then
+// LC_MESSAGES; C and POSIX, with or without an encoding, say nothing), else the one the runtime
+// reads from the system, else LANG.
 export function systemLanguage(env: Env = process.env, locale = system.locale): Lang {
-  // Git for Windows does not set a false LANG: its profile (lang.sh) derives it from the Windows
-  // locale when none is set, so a Spanish Windows gives es_ES.UTF-8 in a fresh Git Bash. An English
-  // LANG seen there was chosen, or inherited from the program that started the shell.
-  const set = [env.LC_ALL, env.LC_MESSAGES, env.LANG].find(
-    (value) => value && !/^(C|POSIX)(\.|$)/.test(value),
-  );
-  return /^es(?![a-z])/i.test(set ?? locale()) ? 'es' : 'en';
+  const says = (value: string | undefined) =>
+    value && !/^(C|POSIX)(\.|$)/.test(value) ? value : '';
+  // LC_ALL and LC_MESSAGES are choices; a bare LANG is a default that whatever started the shell
+  // may have set (an agent's harness on a Spanish computer carried LANG=en_US.UTF-8, and init made
+  // the project in English: field study 3). The language the system itself reports outranks it;
+  // where there is none, LANG says. On a POSIX system the system's locale is read from these same
+  // variables, so the order changes nothing there.
+  const named = says(env.LC_ALL) || says(env.LC_MESSAGES) || locale() || says(env.LANG);
+  return /^es(?![a-z])/i.test(named) ? 'es' : 'en';
 }
 
 // The one resolver: the stored desk language, else the system's, else English.
