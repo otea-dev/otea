@@ -44,7 +44,11 @@ function Thumb({ file }: { file: File }) {
   }, [file, image]);
   return (
     <span className="hb-dthumb" aria-hidden="true">
-      {url ? <img src={url} alt="" /> : <span>{extensionOf(file.name) || '·'}</span>}
+      {url?.startsWith('blob:') ? (
+        <img src={url} alt="" />
+      ) : (
+        <span>{extensionOf(file.name) || '·'}</span>
+      )}
     </span>
   );
 }
