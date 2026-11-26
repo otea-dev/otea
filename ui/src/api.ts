@@ -647,7 +647,7 @@ export async function fetchConversation(
     before?: number;
     since?: number;
     limit?: number;
-    // Words the messages mention, any of them (the search of the phone and Hablar).
+    // Words a turn mentions, all of them, wherever they stand in it (the search of the phone and Hablar).
     search?: string;
   } = {},
   signal: AbortSignal,

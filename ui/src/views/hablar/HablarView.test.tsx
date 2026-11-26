@@ -73,13 +73,20 @@ function server(view: ConversationView, o: { failures?: number; hold?: Promise<v
       if (path.endsWith('/conversation')) {
         const search = new URL(url, 'http://127.0.0.1').searchParams.get('search');
         if (search === null) return json(view);
+        // As the server does (store/conversation.ts): a turn holds all the words, in any of its messages.
         const words = search.toLowerCase().split(/\s+/);
-        return json({
-          ...view,
-          messages: view.messages.filter((m) =>
-            words.some((word) => m.text.toLowerCase().includes(word)),
-          ),
-        });
+        const turns = new Set(
+          view.messages
+            .filter((m) =>
+              words.every((word) =>
+                view.messages.some(
+                  (other) => other.root === m.root && other.text.toLowerCase().includes(word),
+                ),
+              ),
+            )
+            .map((m) => m.root),
+        );
+        return json({ ...view, messages: view.messages.filter((m) => turns.has(m.root)) });
       }
       if (path.endsWith('/secretary')) return json({ secretary: view.secretary });
       if (path.endsWith('/agent-prompt'))
@@ -888,7 +895,7 @@ describe('«Lo que salió»', () => {
   // Field study 3: consultations were hard to find again; the search looked only at items.
   it('searches what was said, consultations included, and takes you to the turn', async () => {
     const { root } = await open(conversation({ messages }), { all: [working, queued] });
-    await typeInto(q(root, '.hb-search input'), 'cliente');
+    await typeInto(q(root, '.hb-search input'), 'tablero cliente');
     await vi.waitFor(() => expect(all(root, '.hb-hit').length).toBeGreaterThan(0));
     expect(all(root, '.hb-card')).toHaveLength(0);
     const hits = all(root, '.hb-hit');

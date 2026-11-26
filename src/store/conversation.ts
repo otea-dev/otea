@@ -351,13 +351,17 @@ export function selectMessages(
     where.push('m.root IN (SELECT id FROM conversation_messages WHERE kind = :kind)');
     params.kind = page.kind;
   }
-  const words = (page.search ?? '').trim();
-  if (words !== '') {
-    where.push(
-      "m.root IN (SELECT root FROM conversation_messages WHERE text LIKE :words ESCAPE '\\')",
-    );
-    params.words = `%${words.replace(/[\\%_]/g, '\\$&')}%`;
-  }
+  // Every word of a search must be in the turn (in any of its messages), wherever it stands; a % or
+  // _ typed in one is only that character.
+  (page.search ?? '')
+    .split(/\s+/)
+    .filter((word) => word !== '')
+    .forEach((word, at) => {
+      where.push(
+        `m.root IN (SELECT root FROM conversation_messages WHERE text LIKE :w${at} ESCAPE '\\')`,
+      );
+      params[`w${at}`] = `%${word.replace(/[\\%_]/g, '\\$&')}%`;
+    });
   const ascending = page.since !== undefined;
   const sql = `SELECT ${COLUMNS} FROM conversation_messages m
     ${where.length === 0 ? '' : `WHERE ${where.join(' AND ')}`}

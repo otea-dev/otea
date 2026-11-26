@@ -540,6 +540,30 @@ describe('the conversation', () => {
       ).toEqual([q.id, a.message.id]);
     });
 
+    // Field study 3 review: a search is all of its words, wherever they stand in the turn, and a
+    // wildcard typed in it is only a character.
+    it('searches for all the words, apart or in different messages, and takes % as a character', () => {
+      const asked = postPersonMessage(
+        project,
+        { text: 'Should the dark theme use a mode switch?' },
+        clock(5000),
+      ).message;
+      readAsSecretary(project, { agent: 'sol' }, clock(5100));
+      const answer = sayAsSecretary(
+        project,
+        { agent: 'sol', text: 'Yes, one toggle.', replyTo: asked.id, kind: 'consultation' },
+        clock(5200),
+      ).message;
+      const found = (search: string) =>
+        listConversation(project, { search }).messages.map(({ id }) => id);
+      expect(found('dark mode')).toEqual([asked.id, answer.id]);
+      expect(found('mode dark')).toEqual([asked.id, answer.id]);
+      // One word in the question, the other in the answer of the same turn.
+      expect(found('dark toggle')).toEqual([asked.id, answer.id]);
+      expect(found('dark zzzz')).toEqual([]);
+      expect(found('100%')).toEqual([]);
+    });
+
     it('are what a new topic is: the question and the answer of otea topic', () => {
       const agent = { kind: 'agent' as const, name: 'kiln' };
       const topic = addTopic(
