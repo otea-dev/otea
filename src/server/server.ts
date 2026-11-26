@@ -6,6 +6,13 @@ import { z } from 'zod';
 import { agentDetail } from '../app/agent-detail.ts';
 import { promptFacts, promptKindOf, roleBoard } from '../app/agent-prompts.ts';
 import { askingItems, holderAsksOf } from '../app/asking.ts';
+import {
+  answerBandeja,
+  bandejaFileToServe,
+  bandejaOfItem,
+  captureToBandeja,
+  listBandeja,
+} from '../app/bandeja.ts';
 import { syncBoardPresets } from '../app/boards.ts';
 import { briefFor } from '../app/brief.ts';
 import { listCollectionViews, listShownCollectionViews } from '../app/collections.ts';
@@ -97,6 +104,7 @@ import {
   ROLES,
   rolePrompt,
 } from '../core/agent-prompts.ts';
+import { bandejaIdOf, type FromBandeja } from '../core/bandeja.ts';
 import { PERIOD_HINT, parsePeriod } from '../core/board/performance.ts';
 import { LANGS, type Lang } from '../core/board/template-words.ts';
 import { type FromMessage, isMessageKind, MESSAGE_KINDS } from '../core/conversation.ts';
@@ -173,6 +181,7 @@ import {
   assertWritable,
   attachRequest,
   briefRequest,
+  captureRequest,
   chosenAnswerRequest,
   clientKeyOf,
   createRequest,
@@ -716,6 +725,7 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
           setAside?: { by: string; at: string };
           holderAsks?: { by: string; item: string };
           fromMessages?: FromMessage[];
+          fromBandeja?: FromBandeja;
         };
         try {
           item = showItem(project, id, HUMAN_IN_UI);
@@ -733,6 +743,9 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         // The turns of the conversation it came from: the page links back to them.
         const fromMessages = turnsOfItem(project, item.id);
         if (fromMessages.length > 0) item = { ...item, fromMessages };
+        // The Bandeja entry it was refined from, the same way.
+        const fromBandeja = bandejaOfItem(project, item.id);
+        if (fromBandeja) item = { ...item, fromBandeja };
         if (!item.archived) return c.json(item);
         // An archived board's collection is in no list: the page reads the item's words from here.
         const collection = listCollectionViews(project, { archived: true }).find(
@@ -950,6 +963,53 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         const message = correctKind(project, messageIdOf(c.req.param('id')), kind);
         feed.notify();
         return c.json(message);
+      })
+      // The Bandeja (app/bandeja.ts): the person's rough captures. The person captures and answers
+      // only here, signed in, from the UI's own origin: no command or tool of an agent makes an
+      // entry or answers for the person.
+      .get('/bandeja', (c) => {
+        const filed = wholeNumber('filed', c.req.query('filed'), 0);
+        return c.json({ entries: listBandeja(project, { filed: filed ?? 30 }) });
+      })
+      .get('/bandeja/attachments/:id', (c) => {
+        assertSignedIn(c, auth, 'open the Bandeja files');
+        const { file, path } = bandejaFileToServe(project, c.req.param('id'));
+        return serveStored(
+          c,
+          project,
+          { ...file, filename: file.name, contentType: file.contentType },
+          path,
+        );
+      })
+      .post('/bandeja', bodyLimit({ maxSize: MAX_CREATE_BYTES, onError: tooLarge }), async (c) => {
+        assertWritable(c, auth, true);
+        const clientKey = clientKeyOf(c);
+        const request = await captureRequest(c);
+        const { entry, replayed } = captureToBandeja(project, {
+          ...request,
+          by: HUMAN_IN_UI.actor.name,
+          // Each device keeps its own keys; the desk's browser is one more client.
+          ...(clientKey === undefined
+            ? {}
+            : { clientKey: { scope: keyScopeOf(c), key: clientKey } }),
+        });
+        feed.notify();
+        // Sent again (a phone that never heard back): the entry the first send made.
+        if (replayed) c.header('idempotent-replayed', 'true');
+        return c.json(entry, replayed ? 200 : 201);
+      })
+      // The person's answer to a question a refiner asked on an entry, from the phone too.
+      .post('/bandeja/:id/answer', async (c) => {
+        assertWritable(c, auth);
+        const given = await chosenAnswerRequest(c);
+        const { question, ...words } = given;
+        const entry = answerBandeja(project, {
+          id: bandejaIdOf(c.req.param('id')),
+          question,
+          ...words,
+        });
+        feed.notify();
+        return c.json(entry);
       })
       // An item's topics: those linked to it, and those it may have come from, for the person to
       // confirm or dismiss.

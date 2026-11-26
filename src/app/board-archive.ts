@@ -6,6 +6,7 @@ import { readDefinition } from '../core/board/schema.ts';
 import { OteaError } from '../core/errors.ts';
 import type { Actor } from '../core/item.ts';
 import { activeLease } from '../core/lease.ts';
+import { entryFileKept } from '../store/bandeja.ts';
 import {
   type BoardRow,
   deleteBoard,
@@ -320,6 +321,7 @@ export function deleteBoardForever(
     if (db.prepare('SELECT 1 FROM evidence WHERE sha256 = ? LIMIT 1').get(sha)) continue;
     if (db.prepare('SELECT 1 FROM conversation_attachments WHERE sha256 = ? LIMIT 1').get(sha))
       continue;
+    if (entryFileKept(db, String(sha))) continue;
     rmSync(evidenceFile(project.dataDir, sha), { force: true });
   }
   syncBoardPresets(project);

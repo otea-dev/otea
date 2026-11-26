@@ -21,6 +21,19 @@ import {
   oldMcpEntry,
   writeAgentsMd,
 } from '../app/agents.ts';
+import {
+  askOnBandeja,
+  bandejaOfItem,
+  bandejaPaths,
+  entryText,
+  fileBandeja,
+  keepHeldEntries,
+  listBandeja,
+  listText,
+  requireBandejaHold,
+  requireEntry,
+  takeBandeja,
+} from '../app/bandeja.ts';
 import { addBoard, addBoardSet, type BoardRecord, syncBoardPresets } from '../app/boards.ts';
 import { branchNamedFirst } from '../app/branch-owner.ts';
 import { briefFor } from '../app/brief.ts';
@@ -216,6 +229,7 @@ import {
   type RoleFacts,
   rolePrompt,
 } from '../core/agent-prompts.ts';
+import { bandejaIdOf, isBandejaRef } from '../core/bandeja.ts';
 import { isClosed, isLandStep, positionOf, waysOf } from '../core/board/engine.ts';
 import {
   type BoardDefinition,
@@ -450,6 +464,7 @@ function seen(project: Project, input: Input, actor: Actor = input.actor): void 
   });
   // Any call of it keeps what it holds (P1-R3-6).
   renewLeases(project.db, actor.name);
+  keepHeldEntries(project, actor.name);
   // The secretary acting on what its wait returned: any command but another secretary wait.
   if (input.command !== undefined && !(input.command === 'wait' && input.flag('secretary'))) {
     ackSecretaryReturns(project.db, actor.name);
@@ -1176,6 +1191,11 @@ const create: Command = {
       placeholder: 'id',
       about: "secretary: the person's message this item answers",
     },
+    'from-bandeja': {
+      placeholder: 'B-n',
+      about:
+        'refiner: the Bandeja entry you hold (B-3) this item refines; it is filed under the item',
+    },
   },
   execute: async (input) => {
     const collection = input.required('collection');
@@ -1184,11 +1204,15 @@ const create: Command = {
     const parent = input.option('parent');
     const from = input.option('from');
     const fromMessage = input.option('from-message');
+    const fromBandeja = input.option('from-bandeja');
     const fields = await fieldsFrom(input);
     const { actor, channel } = input;
     return withAgent(input, (project) => {
       // The topic the item comes from, checked before anything is made.
       const topic = from === undefined ? undefined : requireTopic(project, from);
+      // The Bandeja entry too: held by this agent, checked before anything is made.
+      const entry = fromBandeja === undefined ? undefined : bandejaIdOf(fromBandeja);
+      if (entry !== undefined) requireBandejaHold(project, entry, actor.name);
       // The message too, and that this agent may link it: only the secretary does.
       const message = fromMessage === undefined ? undefined : messageIdOf(fromMessage);
       if (message !== undefined) {
@@ -1207,8 +1231,17 @@ const create: Command = {
       });
       if (topic) linkTopic(project, { id: topic.id, item: item.id, via: 'from' });
       if (message !== undefined) linkMessageToItem(project, actor.name, message, item.id);
+      // The entry is filed under the item it became: its wait ends.
+      const filed =
+        entry === undefined
+          ? undefined
+          : fileBandeja(project, { id: entry, agent: actor.name, item: item.id });
       // On a board: where it starts, and why when its first step was skipped or lacks something.
-      return { data: itemData(project, item), text: createdTextOf(project, item) ?? item.id };
+      const started = createdTextOf(project, item) ?? item.id;
+      return {
+        data: { ...itemData(project, item), ...(filed ? { bandeja: filed.ref } : {}) },
+        text: filed ? `${started}\nFiled ${filed.ref} under ${item.id}.` : started,
+      };
     });
   },
 };
@@ -1360,8 +1393,13 @@ const show: Command = {
       const mergeOnly = mergeOnlyOf(project, shown.id);
       // The turn of the conversation it came from (the secretary's requests).
       const fromMessages = turnsOfItem(project, shown.id);
+      // The Bandeja entry it was refined from.
+      const fromBandeja = bandejaOfItem(project, shown.id);
       const heads = [
         fromMessageLine(fromMessages),
+        fromBandeja === undefined
+          ? undefined
+          : `Refined from the Bandeja, ${fromBandeja.ref}: "${fromBandeja.snippet}". Read the whole note with otea bandeja ${fromBandeja.ref}.`,
         mergedOutsideLine(project, input.cwd, shown),
         stray?.text,
         ...(mergeOnly ? [mergeOnlyText(shown.id, mergeOnly)] : []),
@@ -1378,6 +1416,7 @@ ${text}`;
           ...data,
           ...(notes.length === 0 ? {} : { notes }),
           ...(fromMessages.length === 0 ? {} : { fromMessages }),
+          ...(fromBandeja ? { fromBandeja } : {}),
           ...(stray ? { baseStray: stray } : {}),
           ...(sharing.length === 0 ? {} : { overlaps: sharing }),
           ...(mergeOnly ? { mergeOnly } : {}),
@@ -3270,7 +3309,7 @@ const tick: Command = {
 const ask: Command = {
   name: 'ask',
   summary:
-    'Ask the person a question while you do a step: the turn is theirs until they answer (the step, round and lease stay); wait wakes on the answer, and next and show give it. Offer 2 to 4 short --option answers to tap, and --recommend the one you would choose',
+    'Ask the person a question while you do a step: the turn is theirs until they answer (the step, round and lease stay); wait wakes on the answer, and next and show give it. Offer 2 to 4 short --option answers to tap, and --recommend the one you would choose. On a Bandeja entry you hold (B-3 for the id) it asks what the note lacks',
   args: ['id', 'question'],
   options: {
     option: { multiple: true, placeholder: 'text', about: '2 to 4 answers to tap' },
@@ -3285,6 +3324,20 @@ const ask: Command = {
     if (recommended !== undefined && !Number.isInteger(recommended))
       throw new UsageError('--recommend is the number of an option, from 1');
     return withAgent(input, (project) => {
+      // A question on a Bandeja entry the refiner holds (B-3), not on an item.
+      if (isBandejaRef(id)) {
+        const { entry, question: asked } = askOnBandeja(project, {
+          id: bandejaIdOf(id),
+          agent: actor.name,
+          text: question,
+          ...(options.length === 0 ? {} : { options }),
+          ...(recommended === undefined ? {} : { recommended }),
+        });
+        return {
+          data: { entry, question: asked },
+          text: `Asked the person on ${entry.ref}: it waits for their answer, and your hold on it ends. They tap or write it on the desk (Hablar, the Bandeja). The secretary's wait returns ${entry.ref} once they answer; take it again then (otea bandeja take ${entry.ref} --as ${actor.name}) and read the answer: otea bandeja ${entry.ref} --as ${actor.name}.`,
+        };
+      }
       const asked = askQuestion(project, {
         id,
         text: question,
@@ -5009,6 +5062,74 @@ const say: Command = {
   },
 };
 
+// The Bandeja (0.8): the person's rough captures, which a refiner turns into items. The person
+// captures only from the desk, so no command here makes an entry.
+const bandeja: Command = {
+  name: 'bandeja',
+  summary:
+    "Read the Bandeja, the person's rough captures: the entries not filed yet (--all adds filed ones), or one (B-3) whole, with file paths and the questions and answers. Refine: bandeja take, then create --from-bandeja, or ask B-3",
+  args: ['id?'],
+  options: { all: { flag: true } },
+  execute: (input) => {
+    const [given] = input.args;
+    const all = input.flag('all');
+    const { reader } = input;
+    return withReader(input, (project) => {
+      const as = reader.kind === 'agent' ? reader.name : undefined;
+      if (given !== undefined) {
+        const entry = requireEntry(project, bandejaIdOf(given));
+        const { paths, problems } = bandejaPaths(project, [entry]);
+        const files = entry.attachments.map((file) => {
+          const path = paths.get(file.id);
+          const problem = problems.get(file.id);
+          return {
+            ...file,
+            ...(path === undefined ? {} : { path }),
+            ...(problem === undefined ? {} : { pathProblem: problem }),
+          };
+        });
+        return {
+          data: { ...entry, attachments: files },
+          text: entryText(entry, paths, problems, as),
+        };
+      }
+      const entries = listBandeja(project, { filed: all ? 10 : 0 });
+      return { data: { entries }, text: listText(entries, as) };
+    });
+  },
+};
+
+// A refiner holds an entry while it works on it, so two never take the same one.
+const bandejaTake: Command = {
+  name: 'bandeja take',
+  summary:
+    'Take a Bandeja entry (B-3) to refine it: held 30 minutes (acting on it renews), no other refiner takes it. The secretary takes one for the refiner it launches with --for',
+  args: ['id'],
+  options: { for: { placeholder: 'refiner' } },
+  execute: (input) => {
+    const [id = ''] = input.args;
+    const { actor } = input;
+    const on = input.option('for');
+    return withAgent(input, (project) => {
+      const { entry, renewed } = takeBandeja(project, {
+        id: bandejaIdOf(id),
+        agent: actor.name,
+        ...(on === undefined ? {} : { on }),
+      });
+      const { paths, problems } = bandejaPaths(project, [entry]);
+      const who = on ?? actor.name;
+      const head =
+        on !== undefined && on !== actor.name
+          ? `Took ${entry.ref} for ${on}: it holds it until ${timeText(entry.claimUntil ?? entry.at)}; it takes it itself with otea bandeja take ${entry.ref} --as ${on}.`
+          : `${renewed ? 'Still holding' : 'Took'} ${entry.ref} until ${timeText(entry.claimUntil ?? entry.at)}.`;
+      return {
+        data: { entry, held: who },
+        text: `${head}\n${entryText(entry, paths, problems, actor.name)}`,
+      };
+    });
+  },
+};
+
 export const COMMANDS: readonly Command[] = [
   init,
   projectsList,
@@ -5060,6 +5181,9 @@ export const COMMANDS: readonly Command[] = [
   topicClose,
   conversation,
   say,
+  // The longer name first: a command is the first whose words all match.
+  bandejaTake,
+  bandeja,
   ask,
   answer,
   handoffCommand,

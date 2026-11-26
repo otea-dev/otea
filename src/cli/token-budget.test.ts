@@ -129,7 +129,9 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // Raised to 6230 for the secretary: profile's role and wait's secretary (measured at 6215).
   // Raised to 6620 for the secretary's conversation: two tools (conversation, say) and create's
   // from_message (measured at 6577).
-  tools: { mcp: 6620 },
+  // Raised to 6930 for the Bandeja's refiner: two tools (bandeja, bandeja_take), create's
+  // from_bandeja and ask on an entry (measured at 6924).
+  tools: { mcp: 6930 },
   // Otea's agent guide, the server's instructions: in every MCP agent's context from the start, so
   // it buys only what agents keep getting wrong. Measured at 203. Raised to 270 for the line on
   // declaring the profile every agent and subagent must keep current (measured at 246). Raised to

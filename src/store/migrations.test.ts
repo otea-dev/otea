@@ -54,16 +54,19 @@ describe('migrate', () => {
         'conversation_messages',
         'conversation_attachments',
         'conversation_links',
+        'bandeja_entries',
+        'bandeja_attachments',
+        'bandeja_questions',
       ]),
     );
-    expect(userVersion(db)).toBe(45);
+    expect(userVersion(db)).toBe(46);
   });
 
   it('is idempotent', () => {
     migrate(db);
     migrate(db);
 
-    expect(userVersion(db)).toBe(45);
+    expect(userVersion(db)).toBe(46);
   });
 
   describe('from version 40, which kept a language on the project', () => {

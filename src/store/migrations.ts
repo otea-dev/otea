@@ -562,6 +562,58 @@ export const MIGRATIONS = [
   );
   CREATE INDEX conversation_links_item ON conversation_links (item_id);
   `,
+  // The Bandeja (0.8): rough notes the person captured (text and files, no board form) that wait
+  // for a refiner to turn them into items. An entry is held by one refiner at a time (claimed_by
+  // until claim_until, a lease), may carry questions the refiner asked the person with options
+  // (bandeja_questions, answered from the desk), and ends filed under the item it became (item_id).
+  // Files are stored once by hash under evidence/, as the conversation's are. client_key works as
+  // the conversation's: a phone sending again what it never heard back makes one entry.
+  `
+  CREATE TABLE bandeja_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    author_name TEXT NOT NULL,
+    text TEXT NOT NULL,
+    at TEXT NOT NULL,
+    claimed_by TEXT,
+    claimed_at TEXT,
+    claim_until TEXT,
+    item_id TEXT,
+    filed_by TEXT,
+    filed_at TEXT,
+    client_scope TEXT,
+    client_key TEXT,
+    client_digest TEXT,
+    UNIQUE (client_scope, client_key)
+  );
+  CREATE INDEX bandeja_open ON bandeja_entries (filed_at, claimed_by);
+  CREATE INDEX bandeja_item ON bandeja_entries (item_id);
+
+  CREATE TABLE bandeja_attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_id INTEGER NOT NULL REFERENCES bandeja_entries (id),
+    filename TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    sha256 TEXT NOT NULL
+  );
+  CREATE INDEX bandeja_attachments_entry ON bandeja_attachments (entry_id);
+
+  CREATE TABLE bandeja_questions (
+    entry_id INTEGER NOT NULL REFERENCES bandeja_entries (id),
+    n INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    options TEXT,
+    recommended INTEGER,
+    asked_by TEXT NOT NULL,
+    at TEXT NOT NULL,
+    answer_text TEXT,
+    answer_mode TEXT,
+    answer_option INTEGER,
+    answered_at TEXT,
+    PRIMARY KEY (entry_id, n)
+  );
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {

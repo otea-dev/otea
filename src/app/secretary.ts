@@ -166,7 +166,8 @@ export type SecretaryWake = {
 // What a source of wake-ups that keeps its own state tells the wait while something is pending.
 export type SecretaryPending = { kind: SecretarySignalKind; ref?: string; text?: string };
 
-export type SecretarySource = (ctx: Context) => SecretaryPending | undefined;
+// `now` is the clock of the wait asking: a source that reads time (a lease running out) uses it.
+export type SecretarySource = (ctx: Context, now: Clock) => SecretaryPending | undefined;
 
 const sources: SecretarySource[] = [];
 
@@ -189,7 +190,7 @@ export const wakeText = (pending: SecretaryPending): string => {
   if (kind === 'person_message')
     return `The person wrote to you${about}${said}. Read the conversation and answer.`;
   if (kind === 'bandeja_item')
-    return `The person captured a note in the Bandeja${about}${said}. Refine it, or hand it to a refiner.`;
+    return `The person captured a note in the Bandeja${about}${said}. Read it (otea bandeja${ref ? ` ${ref}` : ''}), then refine it yourself or hand it to a refiner: take it first (otea bandeja take${ref ? ` ${ref}` : ' <id>'}), for the refiner with --for <its name> when it is one you launch.`;
   return `A question is escalated to you${ref ? ` on ${ref}` : ''}${said}. Answer it, or ask the person.`;
 };
 
@@ -328,7 +329,7 @@ export function secretaryWake(
   const signal = signalWake(ctx, wait, now);
   if (signal) return signal;
   for (const source of sources) {
-    const pending = source(ctx);
+    const pending = source(ctx, now);
     if (pending) {
       const { kind, ref } = pending;
       return { kind, ...(ref === undefined ? {} : { ref }), text: wakeText(pending) };

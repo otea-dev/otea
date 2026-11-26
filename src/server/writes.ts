@@ -316,6 +316,44 @@ export async function messageRequest(c: Context): Promise<MessageRequest> {
   };
 }
 
+const CaptureBody = z.object({ text: z.string() }).strict();
+
+const CAPTURE_SHAPE = '{"text": string}';
+
+// What the person captures in the Bandeja: the text and the files that come with it, as JSON or as
+// a form (its JSON in the `message` part, each file in a `file` part), as a message comes.
+export async function captureRequest(c: Context): Promise<MessageRequest> {
+  const invalid = (detail = '') =>
+    new RejectedRequest(400, 'invalid_body', `Expected ${CAPTURE_SHAPE}${detail}`);
+  let raw: unknown;
+  let parts: File[] = [];
+  if (mediaOf(c.req.header('content-type')) !== FORM_TYPE) {
+    raw = await c.req.json().catch(() => undefined);
+  } else {
+    const form = await c.req.parseBody({ all: true }).catch(() => {
+      throw invalid(' as the "message" part of the form');
+    });
+    const { message, file = [] } = form;
+    parts = (Array.isArray(file) ? file : [file]).filter((part) => part instanceof File);
+    if (typeof message !== 'string') throw invalid(' as the "message" part of the form');
+    try {
+      raw = JSON.parse(message);
+    } catch {
+      throw invalid(' as the "message" part of the form');
+    }
+  }
+  const parsed = CaptureBody.safeParse(raw);
+  if (!parsed.success) throw invalid();
+  if (parts.length > MAX_MESSAGE_FILES) {
+    throw new RejectedRequest(400, 'invalid_body', `Send at most ${MAX_MESSAGE_FILES} files`);
+  }
+  const files = await Promise.all(parts.map((part) => fileOf(part)));
+  return {
+    text: parsed.data.text,
+    files: files.map(({ filename, bytes }) => ({ filename, bytes })),
+  };
+}
+
 const KindBody = z.object({ kind: z.enum(MESSAGE_KINDS) });
 
 // The person's correction of a turn: one tap, `request` or `consultation`.

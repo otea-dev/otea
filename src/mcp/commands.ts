@@ -27,6 +27,10 @@ export const AGENT_COMMANDS = [
   // is no read-only tool. The person's side is the desk's alone.
   'conversation',
   'say',
+  // The refiner's side of the Bandeja: read the person's captures, take one, file it as an item
+  // (create --from-bandeja) or ask what it lacks (ask B-n). The person's side is the desk's alone.
+  'bandeja',
+  'bandeja take',
   'ask',
   // The person's answer to a question, given in the chat (P4-R2-2).
   'answer',
