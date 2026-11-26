@@ -242,17 +242,30 @@ export function HablarView({
     return () => observer.disconnect();
   }, [wanted, ready]);
 
-  const onKind = (each: Turn, kind: MessageKind) => {
+  const onKind = (each: Turn, kind: MessageKind, quiet = false) => {
     if (convo.status !== 'ready') return;
+    const was = each.kind;
     convo.corrected(each.root, kind);
-    correctTurn(each.root, kind).then(convo.reload, (error: unknown) => {
-      convo.uncorrected(each.root);
-      toast({
-        msg: t('hablar.kind.failed', {
-          message: error instanceof Error ? error.message : String(error),
-        }),
-      });
-    });
+    correctTurn(each.root, kind).then(
+      () => {
+        convo.reload();
+        // What the tap did, and the way back: the secretary is woken by it.
+        if (!quiet) {
+          toast({
+            msg: t('hablar.kind.done', { kind: t(`hablar.kind.${kind}`) }),
+            ...(was === null ? {} : { undo: () => onKind(each, was, true) }),
+          });
+        }
+      },
+      (error: unknown) => {
+        convo.uncorrected(each.root);
+        toast({
+          msg: t('hablar.kind.failed', {
+            message: error instanceof Error ? error.message : String(error),
+          }),
+        });
+      },
+    );
   };
 
   // A tap on a question of the secretary's goes back to it as your own message; the page reads the

@@ -241,7 +241,11 @@ function KindLabel({
       type="button"
       className="hb-kind"
       data-kind={kind}
-      aria-label={t('hablar.kind.fix', { kind: word(kind), other: word(other) })}
+      aria-label={t('hablar.kind.fix', {
+        kind: word(kind),
+        snippet: messageSnippet(turn.person[0]?.text ?? turn.messages[0]?.text ?? '', 50),
+        other: word(other),
+      })}
       onClick={() => onKind(turn, other)}
     >
       <span>{word(kind)}</span>

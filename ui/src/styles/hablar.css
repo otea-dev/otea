@@ -419,7 +419,7 @@
 }
 /* what you chose: your own row, a line, never a headline */
 .hb-chose {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 2px 10px;

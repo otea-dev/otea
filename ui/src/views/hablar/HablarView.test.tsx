@@ -5,6 +5,7 @@ import { type App, AppTestProvider } from '../../app/context.tsx';
 import type { ConversationView, Message } from '../../conversation.ts';
 import { ago, item, NOW } from '../../derive/fixtures.ts';
 import { setLanguage } from '../../i18n/i18n.ts';
+import { seenAtMount } from '../../kit/pop/toast.tsx';
 import { testApp } from '../../shell/test-app.ts';
 import { type Mounted, mount, press, settle, typeInto } from '../../test-dom.tsx';
 import { FromTurns } from './FromTurns.tsx';
@@ -651,6 +652,35 @@ describe('correcting what a turn is', () => {
     ]);
     // It shows as the person set it at once, before the server says so too.
     expect(text(q(root, '.hb-kind'))).toBe('consulta');
+  });
+
+  // Several turns can be marked at once: each label says which message it is for, and a tap says
+  // what happens next, with a way back.
+  it('names the message each label is for, and says what a tap does, with a way back', async () => {
+    const messages = [
+      ...request(),
+      say({ id: 3, author: 'person', text: '¿Un tablero por cliente?', kind: 'consultation' }),
+      say({
+        id: 4,
+        author: 'secretary',
+        replyTo: 3,
+        root: 3,
+        kind: 'consultation',
+        text: 'Sí.',
+      }),
+    ];
+    const { root } = await open(conversation({ messages }));
+
+    const labels = all(root, '.hb-row .hb-kind');
+    expect(labels.map((label) => label.getAttribute('aria-label'))).toEqual([
+      'Marcado como pedido · «El botón Aprobar queda tapado en el celu». Toca para hacerlo consulta.',
+      'Marcado como consulta · «¿Un tablero por cliente?». Toca para hacerlo pedido.',
+    ]);
+    const before = seenAtMount();
+
+    await press(labels[1]);
+
+    expect(seenAtMount()).toBeGreaterThan(before);
   });
 });
 

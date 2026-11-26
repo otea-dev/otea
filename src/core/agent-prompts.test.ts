@@ -302,7 +302,31 @@ describe('the role prompts', () => {
       expect(text).toMatch(lang === 'es' ? /bucle de sondeo propio/ : /polling loop of your own/);
       expect(text).toContain('otea conversation --as <');
       expect(text).toContain('otea say "<');
-      expect(text).toMatch(lang === 'es' ? /da siempre --reply-to/ : /always give --reply-to/);
+      expect(text).toContain('--reply-to <');
+    });
+
+    // Field study 3: a secretary told to always reply to a message put its news under old messages
+    // and changed the kind of the person's turns. News is a message of its own.
+    it(`says its own news as a message with no --reply-to, and acts at once on a kind the person changed (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, {});
+      expect(text).not.toMatch(lang === 'es' ? /da siempre --reply-to/ : /always give --reply-to/);
+      expect(text).toContain('otea say "<');
+      expect(text).toMatch(
+        lang === 'es'
+          ? /sin --reply-to: `otea say "<texto>" --links/
+          : /no --reply-to: `otea say "<text>" --links/,
+      );
+      expect(text).toMatch(
+        lang === 'es'
+          ? /nunca uses --reply-to, --request ni --links sobre un mensaje mío antiguo/
+          : /never use --reply-to, --request or --links on an old message of mine/,
+      );
+      expect(text).toContain('kind_changed');
+      expect(text).toMatch(
+        lang === 'es'
+          ? /nunca me preguntes de nuevo lo que ya decidí/
+          : /never ask me again what I decided/,
+      );
     });
 
     it(`sorts each message into a request with items from it or a consultation (${lang})`, () => {
@@ -335,9 +359,11 @@ describe('the role prompts', () => {
       expect(text).toContain('`--file <');
       expect(text).toMatch(
         lang === 'es'
-          ? /pregunta para mí siempre trae de 2 a 4 opciones, todas en una línea, y dice cuál recomiendas/
-          : /question to me always has 2 to 4 options, all on one line, and says which one you recommend/,
+          ? /pregunta para mí siempre trae de 2 a 4 opciones y dice cuál recomiendas/
+          : /question to me always has 2 to 4 options and says which one you recommend/,
       );
+      // It asks with buttons, never as a list typed in the words.
+      expect(text).toContain('--option "<a>" --option "<b>" --recommend <n>');
     });
 
     // M7: a harness with no background subagents does not do their work in the person's chat.
