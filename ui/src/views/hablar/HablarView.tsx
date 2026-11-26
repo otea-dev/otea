@@ -32,20 +32,20 @@ import { useConversation } from './use-conversation.ts';
 
 const NEAR_BOTTOM = 160;
 
-// Until when the page itself is moving a box: its scroll events are the page's own, not the
-// person's, and what the page does about its height waits for it.
+// Until when a box is settling to a place: what the page does about its height waits for it.
 const settling = new WeakMap<HTMLElement, number>();
 
 // Puts a box at a place at once (the page's own move).
 function putBox(box: HTMLElement, top: number) {
-  settling.set(box, performance.now() + 140);
   box.scrollTop = top;
 }
 
-// Scrolls a box to a place the way the app moves things: it settles, never jumps.
-function scrollBox(box: HTMLElement, top: number) {
+// Scrolls a box to a place the way the app moves things: it settles, never jumps. The foot is
+// followed as it moves: the page can grow under the newest message while it settles.
+function scrollBox(box: HTMLElement, top: number | 'foot') {
   const from = box.scrollTop;
-  const to = Math.max(0, top);
+  const place = () => Math.max(0, top === 'foot' ? box.scrollHeight : top);
+  const to = place();
   if (reduced() || Math.abs(to - from) < 8) {
     putBox(box, to);
     return;
@@ -53,15 +53,19 @@ function scrollBox(box: HTMLElement, top: number) {
   const duration = Math.min(900, 360 + 36 * Math.sqrt(Math.abs(to - from)));
   settling.set(box, performance.now() + duration + 60);
   drive(duration, (k) => {
-    box.scrollTop = lerp(from, to, F.settle(k));
+    box.scrollTop = lerp(from, place(), F.settle(k));
   });
 }
 
+// The project has no secretary: what to ask of an agent, and the one command it runs. It stays in
+// sight above the conversation, whatever has been written, since nothing answers until there is one.
 function NoSecretary() {
   return (
-    <div className="hb-nosec">
-      <SecretaryMark />
-      <h2 className="hb-h">{t('hablar.none.title')}</h2>
+    <div className="hb-nosec" data-enter="fade">
+      <div className="hb-nohead">
+        <SecretaryMark />
+        <h2 className="hb-h">{t('hablar.none.title')}</h2>
+      </div>
       <p>{t('hablar.none.text')}</p>
       <CopyCommand command="otea profile --role secretary" />
       <p className="hb-after">{t('hablar.none.after')}</p>
@@ -139,12 +143,38 @@ export function HablarView({
 
   // The newest message stays in sight as it arrives, unless the person scrolled up to read.
   const last = messages?.at(-1)?.id;
+  const lastSeen = useRef<number | undefined>(undefined);
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when a message arrives or the secretary starts thinking
   useLayoutEffect(() => {
     const box = scroller.current;
-    if (!box || !near.current || wanted !== undefined) return;
-    scrollBox(box, box.scrollHeight);
+    // The first read of the conversation is placed at its foot at once (the lanes draw there).
+    const first = lastSeen.current === undefined;
+    lastSeen.current = last;
+    if (!box || first || !near.current || wanted !== undefined) return;
+    scrollBox(box, 'foot');
   }, [last, thinking]);
+
+  // Whether the person is at the foot, read from their own scrolling only: the page growing under
+  // them (a picture loads, a fold opens) moves the scroll too, and says nothing about where they are.
+  useEffect(() => {
+    const box = scroller.current;
+    if (!box) return;
+    let touched = Number.NEGATIVE_INFINITY;
+    const touch = () => {
+      touched = performance.now();
+    };
+    const scrolled = () => {
+      if (performance.now() - touched > 1200) return;
+      near.current = box.scrollHeight - box.scrollTop - box.clientHeight < NEAR_BOTTOM;
+    };
+    const inputs = ['wheel', 'touchstart', 'touchmove', 'pointerdown', 'keydown'] as const;
+    for (const name of inputs) box.addEventListener(name, touch, { passive: true });
+    box.addEventListener('scroll', scrolled, { passive: true });
+    return () => {
+      for (const name of inputs) box.removeEventListener(name, touch);
+      box.removeEventListener('scroll', scrolled);
+    };
+  }, []);
 
   // The page grows under the newest message as it settles (a picture, a font, a fold): while the
   // person is at the foot, the foot stays in sight.
@@ -160,6 +190,8 @@ export function HablarView({
       putBox(box, box.scrollHeight);
     });
     observer.observe(inner);
+    // The box itself too: the composer growing under it takes room from the foot.
+    observer.observe(box);
     return () => observer.disconnect();
   }, [wanted, ready]);
 
@@ -213,6 +245,7 @@ export function HablarView({
             {t('hablar.out.count', { count: counts.all })}
           </button>
         </div>
+        {none ? <NoSecretary /> : null}
         {away ? (
           <div className="hb-away" role="status" data-enter="fade">
             <i aria-hidden="true" />
@@ -226,23 +259,13 @@ export function HablarView({
             ) : null}
           </div>
         ) : null}
-        <div
-          className="hb-chat"
-          ref={scroller}
-          onScroll={(event) => {
-            const box = event.currentTarget;
-            // Only the person's own scrolling says whether they are reading above the foot.
-            if (performance.now() < (settling.get(box) ?? 0)) return;
-            near.current = box.scrollHeight - box.scrollTop - box.clientHeight < NEAR_BOTTOM;
-          }}
-        >
+        <div className="hb-chat" ref={scroller}>
           {convo.status === 'loading' ? (
             <p className="hb-pane">{t('hablar.loading')}</p>
           ) : convo.status === 'failed' ? (
             <p className="hb-pane action-error">{convo.message}</p>
           ) : (
-            <div className="hb-flow" ref={flow}>
-              {none ? <NoSecretary /> : null}
+            <div className="hb-flow" ref={flow} role="log" aria-label={t('hablar.conversation')}>
               {turns.length === 0 ? (
                 none ? null : (
                   <p className="hb-pane">{t('hablar.empty')}</p>

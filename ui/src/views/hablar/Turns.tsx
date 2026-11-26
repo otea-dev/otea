@@ -424,7 +424,6 @@ function TurnBlock({ turn, thinking, items, now, fresh, found, onKind }: TurnPro
       id={`hb-turn-${turn.root}`}
       data-k={`turn:${turn.root}`}
       data-found={found ? '' : undefined}
-      aria-label={t('hablar.conversation')}
     >
       {rows}
     </section>

@@ -184,7 +184,7 @@ export function Composer({ onSent }: { onSent: () => void }) {
           type="button"
           className="hb-attach"
           aria-label={t('hablar.attach')}
-          data-tip={t('hablar.attach')}
+          data-tip={app.phone ? undefined : t('hablar.attach')}
           disabled={!canWrite || drafts.length >= MAX_FILES}
           onClick={() => picker.current?.click()}
         >

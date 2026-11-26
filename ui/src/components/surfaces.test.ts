@@ -333,7 +333,8 @@ describe('Te espera', () => {
       createElement('div', null, (more as { content: ReactNode }).content),
     );
     expect(html).toContain('Y 2 temas respondidos más');
-    expect(html).toContain('/p/salinas/#/topics');
+    // The rest wait in Hablar's consultations.
+    expect(html).toContain('/p/salinas/#/hablar');
 
     const here = hereBlocks(fakeApp({ all: [] }), 'Hollowmere', [answered(7)]);
     expect(here[0]).toMatchObject({ kind: 'sec', count: 1 });
