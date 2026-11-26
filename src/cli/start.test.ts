@@ -118,6 +118,8 @@ describe('otea start', () => {
     expect(text.out).toContain('Boards: already has');
     expect(text.out).toContain('was not added');
     expect(text.out).toContain('Desk: already running');
+    // Hablar's conversation is the secretary's: start says where its text is (field study 3).
+    expect(text.out).toContain('otea prompt --role secretary');
   }, 120_000);
 
   it('makes no board unless one is named, and leaves the boards to the agent', async () => {

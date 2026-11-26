@@ -4186,6 +4186,8 @@ const start: Command = {
       "Next, paste this into your agent's chat (otea prompt prints it again):",
       ...prompt.split('\n').map((line) => `  ${line}`),
       '',
+      "To talk with your agents from the desk (Hablar) and have them work for you, paste this into one session's chat instead: otea prompt --role secretary",
+      '',
       `Your agent adds Otea's MCP server to its own config when it connects (the text above tells it; otea connect prints the details): ${JSON.stringify({ [MCP_SERVER]: entry })}`,
     ];
     return {
