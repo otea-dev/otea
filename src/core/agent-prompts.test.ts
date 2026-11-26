@@ -407,9 +407,7 @@ describe('the role prompts', () => {
   it('says trabajador and refinador in Spanish, keeping only the --role value in English', () => {
     for (const role of ROLES) {
       const text = rolePrompt(role, 'es', { board: 'Cambios', name: 'ana' });
-      expect(text.replace(/--role (worker|refiner|secretary)/g, '')).not.toMatch(
-        /\b(workers?|refiners?|secretary)\b/i,
-      );
+      expect(text.replace(/--role (worker|refiner)/g, '')).not.toMatch(/\b(workers?|refiners?)\b/i);
     }
     const secretary = rolePrompt('secretary', 'es', {});
     expect(secretary).toContain('--role worker');

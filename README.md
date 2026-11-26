@@ -256,7 +256,7 @@ Then [give your agent the text](#give-your-agent-the-text).
 
 Both paths meet here. Paste the text into your agent's chat (Claude Code, OpenCode, Codex or any other with a shell or MCP); `otea prompt` prints the same text in a terminal. The agent connects itself, reads the project, asks you one question at a time how you work and drafts its boards. You try them and publish them in Studio. From then on each request goes through a board, and what waits for you shows in **Your turn**.
 
-For daily work there is a canonical setup: one chat coordinates and never does an item, and a worker per board does them (`otea prompt --role coordinator`, `otea prompt --role worker --board <name>`). [The canonical way](docs/working-with-agents.md#the-canonical-way-a-coordinator-and-two-workers) says how to launch them.
+For daily work there is a canonical setup: one chat, the secretary, talks with you in Hablar, turns your requests into items and keeps the work running without ever doing an item; a worker per board does them and a refiner turns your rough notes into items (`otea prompt --role secretary`, `otea prompt --role worker --board <name>`, `otea prompt --role refiner`). [The canonical way](docs/working-with-agents.md#the-canonical-way-a-secretary-workers-and-a-refiner) says how to launch them, with or without background subagents.
 
 ### MCP config for your harness
 
