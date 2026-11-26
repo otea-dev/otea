@@ -32,6 +32,7 @@ import { roundsOf } from '../../rounds.ts';
 import { studioHash } from '../../selection.ts';
 import type { ItemView, RelatedItem } from '../../types.ts';
 import { useStudioBoard } from '../board/studio-board.tsx';
+import { FromBandeja } from '../hablar/FromBandeja.tsx';
 import { FromTurns } from '../hablar/FromTurns.tsx';
 import { ItemTopics } from '../topics/ItemTopics.tsx';
 import { Acts, actsModeOf } from './Acts.tsx';
@@ -879,6 +880,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                     <div key={key}>{node}</div>
                   ))}
                   <FromTurns turns={item.fromMessages} />
+                  <FromBandeja from={item.fromBandeja} />
                   <ItemTopics item={item} canWrite={app.session.canWrite} />
                 </>
               }
@@ -1057,6 +1059,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
               </h1>
               {links ? <PartOfLine parent={links.parent} /> : null}
               <FromTurns turns={item.fromMessages} />
+              <FromBandeja from={item.fromBandeja} />
               <div data-c>
                 <Swap
                   k={`${stand.key}:${stand.agent ?? ''}:${stand.round ?? ''}:${stand.time ?? ''}:${silentHere}`}

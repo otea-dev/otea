@@ -16,6 +16,7 @@ import { evidenceTypeOf, MAX_EVIDENCE_BYTES, MAX_EVIDENCE_MB } from '../core/evi
 import { timeText } from '../core/time.ts';
 import {
   answerQuestionRow,
+  countWaitingEntries,
   type EntryRow,
   entryOfClientKey,
   fileEntry,
@@ -38,6 +39,7 @@ import { evidenceFile, namedReadPath, storeFile } from './evidence.ts';
 import { type Clock, requireItem, systemClock } from './items.ts';
 import type { Project } from './project.ts';
 import { addSecretarySource, secretaryName } from './secretary.ts';
+import { addWaitingSource } from './secretary-waiting.ts';
 
 // The Bandeja (core/bandeja.ts): the person's rough captures, and the way a refiner turns each into
 // an item. Who may do what is decided here, not by the callers: an entry is made only by
@@ -411,6 +413,10 @@ export function bandejaOfItem(ctx: Context, item: string): FromBandeja | undefin
 // signal that can be lost): not held by a refiner, not filed, no question waiting for the person.
 // It stops when the entry is taken (otea bandeja take), and returns once its lease runs out or the
 // person answers.
+// The captures nobody took count among what waits for an absent secretary (the notice «te esperan
+// N»), beside the person's unread messages.
+addWaitingSource((db) => countWaitingEntries(db, systemClock()));
+
 addSecretarySource((ctx, now) => {
   const waiting = hydrate(ctx, selectEntryRows(ctx.db, 0), now()).filter(
     ({ state }) => state === 'waiting',

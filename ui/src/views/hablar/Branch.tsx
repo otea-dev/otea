@@ -101,14 +101,51 @@ function Leaf({ chip, position, fresh }: { chip: Chip; position: number; fresh: 
 export function AskCard({ item, gone = false }: { item: Item; gone?: boolean }) {
   const app = useApp();
   const asks = item.asks;
+  if (!asks) return null;
+  return (
+    <AskBody
+      by={asks.by}
+      about={item.id}
+      text={asks.text}
+      options={asks.options ?? []}
+      recommended={asks.recommended}
+      gone={gone}
+      send={(given) =>
+        app.answer(item.id, { ...given, question: asks.question }, t('hablar.ask.sent'))
+      }
+    />
+  );
+}
+
+// A question to you with its options to tap, your own words, or the decision left to whoever asked:
+// what an item's question and a Bandeja entry's question both look like. `send` records the answer
+// (the item's or the entry's own write); the card says what you answered until its question goes.
+export function AskBody({
+  by,
+  about,
+  text,
+  options,
+  recommended,
+  gone = false,
+  send,
+}: {
+  by: string;
+  // What it is about: the item's id, the entry's.
+  about: string;
+  text: string;
+  options: readonly string[];
+  recommended: number | undefined;
+  gone?: boolean;
+  send: (given: AnswerWords) => Promise<void>;
+}) {
+  const app = useApp();
   const [free, setFree] = useState<string | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  if (!asks) return null;
   const blocked = busy || gone || app.sync.offline || !app.session.canWrite;
   const answer = (given: AnswerWords, shown: string) => {
     setBusy(true);
-    app.answer(item.id, { ...given, question: asks.question }, t('hablar.ask.sent')).then(
+    send(given).then(
       () => setSaid(shown),
       (error: unknown) => {
         setBusy(false);
@@ -116,16 +153,15 @@ export function AskCard({ item, gone = false }: { item: Item; gone?: boolean }) 
       },
     );
   };
-  const options = asks.options ?? [];
   return (
     <div className="hb-ask" data-answered={said !== null ? '' : undefined}>
       <div className="hb-who">
-        <AgentMark name={asks.by} decorative />
+        <AgentMark name={by} decorative />
         <span>
-          {t('sheet.qa.asks', { agent: asks.by })} · {item.id}
+          {t('sheet.qa.asks', { agent: by })} · {about}
         </span>
       </div>
-      <p className="hb-q">{asks.text}</p>
+      <p className="hb-q">{text}</p>
       {said !== null || gone ? (
         <p className="hb-said">{said ?? t('hablar.ask.gone')}</p>
       ) : (
@@ -137,12 +173,12 @@ export function AskCard({ item, gone = false }: { item: Item; gone?: boolean }) 
                   key={text}
                   type="button"
                   className="hb-opt"
-                  data-rec={asks.recommended === index + 1 ? '' : undefined}
+                  data-rec={recommended === index + 1 ? '' : undefined}
                   disabled={blocked}
                   onClick={() => answer({ option: index + 1 }, t('hablar.ask.answered', { text }))}
                 >
                   <span>{text}</span>
-                  {asks.recommended === index + 1 ? (
+                  {recommended === index + 1 ? (
                     <span className="hb-rec">{t('pick.recommended')}</span>
                   ) : null}
                 </button>

@@ -22,7 +22,7 @@ import {
 } from '../intake.ts';
 import { type FileDraft, firstRole, rolesFor, tooLarge, withFiles } from '../intake-files.ts';
 import { intakeSlots, intakeTypes, slotData, typeOf } from '../item-types.ts';
-import { Button, ChipButton, GhostButton, Icon, Swap, toast } from '../kit/index.ts';
+import { Button, ChipButton, GhostButton, Icon, Seg, Swap, toast } from '../kit/index.ts';
 import { fieldWord, stateWord, typeWord, valueWord } from '../preset-words.ts';
 import type { CollectionView, EvidenceRole, TypeView } from '../types.ts';
 import { useStudioBoard } from '../views/board/studio-board.tsx';
@@ -30,6 +30,7 @@ import { FieldControl } from './FieldControl.tsx';
 import { IntakeFiles } from './IntakeFiles.tsx';
 import { landNewRow } from './intake-flight.ts';
 import { LandsAs } from './LandsAs.tsx';
+import { NoteCapture } from './NoteCapture.tsx';
 
 // Nuevo ítem (SPEC §10.5, mock:672-688, 3899-3993): the board as chips, the type when there are
 // several, the title and what is going on, each intake field (a few values as chips), files; under
@@ -438,6 +439,12 @@ export function NewItemForm({ board, parent, onCancel, onCreated }: NewItemFormP
     onScreen: app.route.view === 'board' ? app.route.board : undefined,
     builtins: new Set(summaries.flatMap((b) => (b.builtin && b.collection ? [b.collection] : []))),
   });
+  // Two ways in: a note in your own words that lands in the Bandeja (the phone's default), or the
+  // board's form. A child of an item, or a board asked for, is the form's.
+  const [mode, setMode] = useState<'note' | 'board'>(
+    app.phone && parent === undefined && board === undefined ? 'note' : 'board',
+  );
+  const canNote = parent === undefined;
   return (
     <div className="nform">
       <div className="sheet-bar" data-c="">
@@ -450,7 +457,27 @@ export function NewItemForm({ board, parent, onCancel, onCreated }: NewItemFormP
         </div>
       </div>
       <h1 data-c="">{t('app.newItem')}</h1>
-      {first ? (
+      {canNote ? (
+        <Seg
+          className="bn-mode"
+          label={t('bandeja.mode')}
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'note', label: t('bandeja.mode.note') },
+            { value: 'board', label: t('bandeja.mode.board') },
+          ]}
+        />
+      ) : null}
+      {canNote && mode === 'note' ? (
+        <NoteCapture
+          autoFocus
+          onSent={() => {
+            toast({ msg: t('bandeja.saved') });
+            onCancel();
+          }}
+        />
+      ) : first ? (
         <IntakeForm
           collections={collections}
           first={first}

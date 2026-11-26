@@ -10,6 +10,7 @@ import type { DiffOffTip } from '../../src/server/diff-tip.ts';
 import type { Drift } from '../../src/server/drift.ts';
 import type { RoundSame } from '../../src/server/round-same.ts';
 import type { FeedEvent } from './activity.ts';
+import type { BandejaEntry, BandejaView } from './bandeja.ts';
 import { apiUrl } from './base.ts';
 import type { WrittenBrief } from './brief.ts';
 import type { ConversationView, Message, MessageKind, SecretaryStatus } from './conversation.ts';
@@ -669,6 +670,37 @@ export function postMessage(
 // The person's one-tap correction of what a turn is: a request or a consultation.
 export function correctTurn(message: number, kind: MessageKind): Promise<Message> {
   return post<Message>(`/api/conversation/messages/${message}/kind`, { kind });
+}
+
+// The Bandeja: the entries not filed yet, and the latest filed ones.
+export async function fetchBandeja(signal: AbortSignal): Promise<BandejaView> {
+  return (await get('/api/bandeja', signal)).json();
+}
+
+// What the person captures: free text and files, no board form. The Idempotency-Key makes a
+// capture that is sent again (a phone that never heard back) one entry.
+export function postCapture(
+  input: { text: string; files?: readonly File[] },
+  clientKey: string,
+): Promise<BandejaEntry> {
+  const key = { 'idempotency-key': clientKey };
+  const files = input.files ?? [];
+  if (files.length === 0) return post<BandejaEntry>('/api/bandeja', { text: input.text }, key);
+  const form = new FormData();
+  form.append('message', JSON.stringify({ text: input.text }));
+  for (const file of files) form.append('file', file, file.name);
+  return post<BandejaEntry>('/api/bandeja', form, key);
+}
+
+// The person's answer to a question a refiner asked on an entry: their words, one of its options
+// (by number, from 1) or the decision left to the refiner.
+export function postBandejaAnswer(id: number, given: AnswerGiven): Promise<BandejaEntry> {
+  return post<BandejaEntry>(`/api/bandeja/${id}/answer`, given);
+}
+
+// A file captured in the Bandeja, served to a signed-in browser.
+export function bandejaFileUrl(id: number): string {
+  return apiUrl(`/api/bandeja/attachments/${id}`);
 }
 
 // A file of the conversation, served to a signed-in browser (an image opens inline, the rest

@@ -13,16 +13,19 @@ import { flushSync } from 'react-dom';
 import { createItem, Unheard } from '../api.ts';
 import { useApp } from '../app/context.tsx';
 import { boardOfCollection, boardsOf, useBoards } from '../board-studio/home/boards-store.ts';
+import { NoteCapture } from '../components/NoteCapture.tsx';
 import { t } from '../i18n/i18n.ts';
 import { MAX_FILE_MB, sizeLabel, tooLarge } from '../intake-files.ts';
 import { Icon } from '../kit/Icon.tsx';
 import { toast } from '../kit/pop/toast.tsx';
+import { Seg } from '../kit/Seg.tsx';
 import { captureId, QUEUE_MAX_MB, type QueuedCapture } from '../offline/capture-queue.ts';
 import { enqueue, queueAvailable } from '../offline/queue-store.ts';
 import { BottomSheet } from './BottomSheet.tsx';
 import {
   type BoardPick,
   type CaptureBoard,
+  type CaptureMode,
   captureBoards,
   capturePayload,
   clearDraft,
@@ -39,6 +42,7 @@ import {
   readDraft,
   rememberBoard,
   samePlace,
+  startMode,
   useCapture,
 } from './capture.ts';
 
@@ -336,6 +340,7 @@ export function CaptureSheet() {
   );
 
   const [seq, setSeq] = useState(-1);
+  const [mode, setMode] = useState<CaptureMode>('note');
   const [chosen, setChosen] = useState<string>();
   const [picking, setPicking] = useState(false);
   const [title, setTitle] = useState('');
@@ -355,6 +360,7 @@ export function CaptureSheet() {
   // Each opening starts blank.
   if (cap.open && cap.seq !== seq) {
     setSeq(cap.seq);
+    setMode(startMode(cap.o));
     setChosen(undefined);
     setPicking(false);
     setTitle('');
@@ -388,6 +394,14 @@ export function CaptureSheet() {
   useLayoutEffect(() => {
     if (cap.open) titleRef.current?.focus({ preventScroll: true });
   }, [cap.open, cap.seq]);
+
+  // The same for a note: the box takes the focus when the sheet shows it or the person asks for it.
+  const noteBox = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on each opening and each change of way
+  useLayoutEffect(() => {
+    if (cap.open && mode === 'note')
+      noteBox.current?.querySelector('textarea')?.focus({ preventScroll: true });
+  }, [cap.open, cap.seq, mode]);
 
   // Off the phone, or going somewhere else, it is put away: the sheet belongs to the route.
   const place = `${app.route.view}:${'board' in app.route ? app.route.board : ''}:${app.route.item ?? ''}`;
@@ -502,36 +516,58 @@ export function CaptureSheet() {
         if (q) toast({ msg: t('offline.queuedToast', q), at: 'top' });
       }}
     >
-      <CaptureBody
-        boards={boards}
-        board={board}
-        why={chosen === undefined ? pick.why : 'chosen'}
-        skipped={chosen === undefined ? pick.skipped : undefined}
-        picking={picking}
-        title={title}
-        note={note}
-        photo={photo}
-        places={board?.type && photo ? photoPlaces(board.type, photo.name) : []}
-        place={photoPlace}
-        onPlace={setPhotoPlace}
-        posting={posting}
-        queues={app.sync.offline && queueAvailable()}
-        error={error}
-        titleRef={titleRef}
-        onPick={() => setPicking((v) => !v)}
-        onChoose={(name) => {
-          // Back to the title in the same press, so the keyboard stays.
-          flushSync(() => {
-            setChosen(name);
-            setPicking(false);
-          });
-          titleRef.current?.focus({ preventScroll: true });
-        }}
-        onTitle={setTitle}
-        onNote={setNote}
-        onPhoto={onPhoto}
-        onSave={() => void onSave()}
+      <Seg
+        className="bn-mode"
+        label={t('bandeja.mode')}
+        value={mode}
+        onChange={setMode}
+        options={[
+          { value: 'note', label: t('bandeja.mode.note') },
+          { value: 'board', label: t('bandeja.mode.board') },
+        ]}
       />
+      {mode === 'note' ? (
+        <div ref={noteBox}>
+          <NoteCapture
+            key={cap.seq}
+            onSent={() => {
+              toast({ msg: t('bandeja.saved'), at: 'top' });
+              closeCapture();
+            }}
+          />
+        </div>
+      ) : (
+        <CaptureBody
+          boards={boards}
+          board={board}
+          why={chosen === undefined ? pick.why : 'chosen'}
+          skipped={chosen === undefined ? pick.skipped : undefined}
+          picking={picking}
+          title={title}
+          note={note}
+          photo={photo}
+          places={board?.type && photo ? photoPlaces(board.type, photo.name) : []}
+          place={photoPlace}
+          onPlace={setPhotoPlace}
+          posting={posting}
+          queues={app.sync.offline && queueAvailable()}
+          error={error}
+          titleRef={titleRef}
+          onPick={() => setPicking((v) => !v)}
+          onChoose={(name) => {
+            // Back to the title in the same press, so the keyboard stays.
+            flushSync(() => {
+              setChosen(name);
+              setPicking(false);
+            });
+            titleRef.current?.focus({ preventScroll: true });
+          }}
+          onTitle={setTitle}
+          onNote={setNote}
+          onPhoto={onPhoto}
+          onSave={() => void onSave()}
+        />
+      )}
     </BottomSheet>
   );
 }

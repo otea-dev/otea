@@ -18,9 +18,11 @@ import {
   takeBandeja,
 } from './bandeja.ts';
 import { addCollection } from './collections.ts';
+import { postPersonMessage } from './conversation.ts';
 import { createItem } from './items.ts';
 import type { Project } from './project.ts';
 import { declareSecretary, secretaryWake, startSecretaryWait } from './secretary.ts';
+import { secretaryWaiting } from './secretary-waiting.ts';
 import { memoryContext, projectOf } from './testing.ts';
 
 const T0 = Date.parse('2026-11-26T10:00:00.000Z');
@@ -128,6 +130,41 @@ describe('the Bandeja', () => {
       expect(() =>
         captureToBandeja(project, { text: 'another', clientKey: key }, clock(5000)),
       ).toThrow(/already sent another capture/);
+    });
+  });
+
+  describe('while the secretary is away', () => {
+    it('counts the captures nobody took among what waits for it, beside the person’s messages', () => {
+      // Real time: the notifier asks at the moment it looks.
+      const first = captureToBandeja(project, { text: 'one' }).entry;
+      captureToBandeja(project, { text: 'two' });
+      postPersonMessage(project, { text: 'hello' });
+      expect(secretaryWaiting(project.db)).toEqual({ count: 3, since: expect.any(String) });
+      // The oldest of what waits.
+      expect(secretaryWaiting(project.db).since).toBe(first.at);
+
+      // A refiner holds one: the secretary has nothing to do with it.
+      takeBandeja(project, { id: 1, agent: 'lia' });
+      expect(secretaryWaiting(project.db).count).toBe(2);
+
+      // Asked and unanswered: the person's turn. Answered: the secretary's again.
+      askOnBandeja(project, { id: 1, agent: 'lia', text: 'Which?', options: ['a', 'b'] });
+      expect(secretaryWaiting(project.db).count).toBe(2);
+      answerBandeja(project, { id: 1, option: 1 });
+      expect(secretaryWaiting(project.db).count).toBe(3);
+
+      takeBandeja(project, { id: 1, agent: 'lia' });
+      fileBandeja(project, {
+        id: 1,
+        agent: 'lia',
+        item: createItem(project, {
+          collection: 'tasks',
+          title: 'One',
+          fields: { description: 'Now' },
+          actor: { kind: 'agent', name: 'lia' },
+        }).id,
+      });
+      expect(secretaryWaiting(project.db).count).toBe(2);
     });
   });
 

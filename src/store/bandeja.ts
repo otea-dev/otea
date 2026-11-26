@@ -215,6 +215,22 @@ export function holdEntry(
   return Number(db.prepare(sql).run({ id, agent, at, until }).changes) === 1;
 }
 
+// How many entries wait for the secretary at `at` (nobody holds them, none is filed, no question
+// waits for the person), and since when the oldest does.
+export function countWaitingEntries(
+  db: DatabaseSync,
+  at: string,
+): { count: number; since: string | null } {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n, MIN(e.at) AS since FROM bandeja_entries e
+       WHERE e.filed_at IS NULL AND (e.claimed_by IS NULL OR e.claim_until <= :at)
+         AND NOT EXISTS (SELECT 1 FROM bandeja_questions q WHERE q.entry_id = e.id AND q.answered_at IS NULL)`,
+    )
+    .get({ at }) as { n: number; since: string | null };
+  return { count: Number(row.n), since: row.since };
+}
+
 // Any call of a refiner keeps the entries it holds (as it keeps its items' leases): their lease
 // starts over. Only those still held at `at`; one that ran out is not taken back.
 export function renewEntries(db: DatabaseSync, agent: string, at: string, until: string): void {
