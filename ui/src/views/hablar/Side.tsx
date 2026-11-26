@@ -1,5 +1,6 @@
 import { useApp } from '../../app/context.tsx';
 import type { Card, Chip, Filter } from '../../conversation.ts';
+import { useConversationHits } from '../../conversation-search.ts';
 import { t } from '../../i18n/i18n.ts';
 import { AgentMark, Seg } from '../../kit/index.ts';
 import { NodeGlyph } from '../../lanes/NodeGlyph.tsx';
@@ -78,6 +79,8 @@ export function Side({
   onGo,
   now,
   bandeja,
+  search,
+  onSearch,
 }: {
   cards: readonly Card[];
   counts: Record<Filter, number>;
@@ -87,35 +90,80 @@ export function Side({
   now: number;
   // The Bandeja's notes as the page read them, and the one lit by a link.
   bandeja: BandejaProps;
+  // The words searched in what was said (a consultation too), and what it is typed in.
+  search: string;
+  onSearch: (search: string) => void;
 }) {
+  const hits = useConversationHits(search);
+  const searching = search.trim() !== '';
   return (
     <div className="hb-out">
       <h2 className="hb-h">{t('hablar.out')}</h2>
       <p className="hb-hdek">{t('hablar.out.dek')}</p>
       <Bandeja {...bandeja} />
-      <Seg
-        className="hb-filter"
-        label={t('hablar.filter')}
-        value={filter}
-        onChange={onFilter}
-        options={(['all', 'request', 'consultation'] as const).map((value) => ({
-          value,
-          label: (
-            <>
-              {t(`hablar.filter.${value}`)}
-              <small>{counts[value]}</small>
-            </>
-          ),
-        }))}
-      />
-      {cards.length === 0 ? (
-        <p className="hb-none">{t(filter === 'all' ? 'hablar.out.empty' : 'hablar.out.none')}</p>
-      ) : (
-        <div className="hb-cards">
-          {cards.map((card) => (
-            <CardView key={card.root} card={card} now={now} onGo={onGo} />
-          ))}
-        </div>
+      <label className="hb-search">
+        <input
+          type="search"
+          value={search}
+          placeholder={t('hablar.search')}
+          aria-label={t('hablar.search')}
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(event) => onSearch(event.target.value)}
+        />
+      </label>
+      {searching ? (
+        hits.length === 0 ? (
+          <p className="hb-none">{t('hablar.search.none', { search: search.trim() })}</p>
+        ) : (
+          <ul className="hb-hits">
+            {hits.map((hit) => (
+              <li key={hit.root} className="hb-hit">
+                <button type="button" onClick={() => onGo(hit.root)}>
+                  <span className="hb-meta">
+                    {hit.kind ? (
+                      <span className="hb-kind static" data-kind={hit.kind}>
+                        {t(`hablar.kind.${hit.kind}`)}
+                      </span>
+                    ) : null}
+                    <time dateTime={hit.at}>{noteTime(hit.at, now)}</time>
+                  </span>
+                  <span className="hb-hit-text">{hit.text}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : null}
+      {searching ? null : (
+        <>
+          <Seg
+            className="hb-filter"
+            label={t('hablar.filter')}
+            value={filter}
+            onChange={onFilter}
+            options={(['all', 'request', 'consultation'] as const).map((value) => ({
+              value,
+              label: (
+                <>
+                  {t(`hablar.filter.${value}`)}
+                  <small>{counts[value]}</small>
+                </>
+              ),
+            }))}
+          />
+          {cards.length === 0 ? (
+            <p className="hb-none">
+              {t(filter === 'all' ? 'hablar.out.empty' : 'hablar.out.none')}
+            </p>
+          ) : (
+            <div className="hb-cards">
+              {cards.map((card) => (
+                <CardView key={card.root} card={card} now={now} onGo={onGo} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

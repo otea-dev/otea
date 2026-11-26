@@ -643,7 +643,13 @@ export async function forgetProjectPath(path: string): Promise<void> {
 // The conversation with the project's secretary (Hablar): the newest page of messages, the page
 // before `before`, or what came after `since`; the secretary's state beside them.
 export async function fetchConversation(
-  query: { before?: number; since?: number; limit?: number } = {},
+  query: {
+    before?: number;
+    since?: number;
+    limit?: number;
+    // Words the messages mention, any of them (the search of the phone and Hablar).
+    search?: string;
+  } = {},
   signal: AbortSignal,
 ): Promise<ConversationView> {
   const params = new URLSearchParams();

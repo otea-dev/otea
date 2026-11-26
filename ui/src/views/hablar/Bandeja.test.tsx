@@ -194,7 +194,8 @@ describe('the quick note', () => {
     await press(q(root, '.bn-save'));
 
     expect(calls).toHaveLength(1);
-    expect(sent).toHaveBeenCalledWith('sent');
+    // With the note's own id, for the toast that says where it went.
+    expect(sent).toHaveBeenCalledWith('sent', 'B-9');
     expect(q<HTMLTextAreaElement>(root, '.bn-text')?.value).toBe('');
     expect(q<HTMLButtonElement>(root, '.bn-save')?.getAttribute('aria-busy')).not.toBe('true');
   });

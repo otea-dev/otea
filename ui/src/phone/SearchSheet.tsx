@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react';
 import { useApp } from '../app/context.tsx';
+import { type Hit, useConversationHits } from '../conversation-search.ts';
 import { t } from '../i18n/i18n.ts';
 import { Icon } from '../kit/Icon.tsx';
 import { NodeMark, nodeLabel } from '../kit/Node.tsx';
@@ -46,6 +47,9 @@ export type SearchBodyProps = {
   inputRef?: Ref<HTMLInputElement>;
   onSearch: (value: string) => void;
   onOpen: (id: string) => void;
+  // What was said in Hablar that the words match (a consultation included), and where one opens.
+  talk?: readonly Hit[];
+  onTalk?: (root: number) => void;
 };
 
 export function SearchBody({
@@ -57,6 +61,8 @@ export function SearchBody({
   inputRef,
   onSearch,
   onOpen,
+  talk = [],
+  onTalk,
 }: SearchBodyProps) {
   const typed = asked.trim() !== '';
   return (
@@ -81,15 +87,17 @@ export function SearchBody({
         <p className="srch-note" data-i="">
           {t('phone.search.hint')}
         </p>
-      ) : found.length === 0 ? (
+      ) : found.length === 0 && talk.length === 0 ? (
         <p className="srch-note" role="status" data-i="">
           {t('phone.search.none', { search: asked.trim() })}
         </p>
       ) : (
         <>
-          <p className="srch-count t-cap" role="status" data-i="">
-            {t('phone.search.count', { count: found.length })}
-          </p>
+          {found.length > 0 ? (
+            <p className="srch-count t-cap" role="status" data-i="">
+              {t('phone.search.count', { count: found.length })}
+            </p>
+          ) : null}
           <ul className="srch-list">
             {found.map((item) => {
               const collection = collectionOf(item.collection);
@@ -110,6 +118,22 @@ export function SearchBody({
                 </li>
               );
             })}
+            {talk.length > 0 ? (
+              <li className="srch-head t-cap" role="presentation">
+                {t('phone.search.talk')}
+              </li>
+            ) : null}
+            {talk.map((hit) => (
+              <li key={`t${hit.root}`}>
+                <button type="button" className="srow talk" onClick={() => onTalk?.(hit.root)}>
+                  <span className="srow-title">{hit.text}</span>
+                  <span className="srow-meta">
+                    {hit.kind ? `${t(`hablar.kind.${hit.kind}`)} · ` : ''}
+                    {t('hablar.nav')}
+                  </span>
+                </button>
+              </li>
+            ))}
           </ul>
         </>
       )}
@@ -131,6 +155,7 @@ export function SearchSheet() {
   const index = useMemo(() => indexItems(app.all), [app.all]);
   const asked = useDeferredValue(search);
   const found = useMemo(() => findItems(index, asked), [index, asked]);
+  const talk = useConversationHits(asked);
 
   // Each opening starts blank.
   if (open && seq !== seen) {
@@ -180,6 +205,12 @@ export function SearchSheet() {
           setNow(true);
           closeSearch();
           app.openItem(id);
+        }}
+        talk={talk}
+        onTalk={(root) => {
+          setNow(true);
+          closeSearch();
+          app.go({ view: 'hablar', turn: root });
         }}
       />
     </BottomSheet>

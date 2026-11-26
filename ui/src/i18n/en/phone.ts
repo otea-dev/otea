@@ -14,7 +14,9 @@ export const phone = {
   'phone.search': 'Search',
   'phone.search.field': 'Search items',
   'phone.search.placeholder': 'A title, an id or a word',
-  'phone.search.hint': 'Searches the titles, the ids and what each item’s fields say.',
+  'phone.search.hint':
+    'Searches the titles, the ids and what each item’s fields say, and what was said in Talk.',
+  'phone.search.talk': 'In Talk',
   'phone.search.none': 'No item says “{search}”.',
   'phone.search.count': { one: '{count} item', other: '{count} items' },
   // Quick capture (mock screen 3)

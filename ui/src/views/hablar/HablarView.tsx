@@ -120,6 +120,7 @@ export function HablarView({
   const [tab, setTab] = useState<'chat' | 'out'>(bandeja === undefined ? 'chat' : 'out');
   const [litNote, setLitNote] = useState<string | undefined>();
   const [filter, setFilter] = useState<Filter>('all');
+  const [search, setSearch] = useState('');
   const [found, setFound] = useState<number | undefined>();
   const [target, setTarget] = useState<{ root: number; n: number } | undefined>();
   const scroller = useRef<HTMLDivElement>(null);
@@ -429,6 +430,8 @@ export function HablarView({
           onGo={goTo}
           now={app.now}
           bandeja={{ ...notes, lit: litNote }}
+          search={search}
+          onSearch={setSearch}
         />
       </aside>
     </div>

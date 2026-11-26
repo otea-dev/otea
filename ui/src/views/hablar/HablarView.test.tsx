@@ -70,7 +70,17 @@ function server(view: ConversationView, o: { failures?: number; hold?: Promise<v
       });
     const path = new URL(url, 'http://127.0.0.1').pathname;
     if (method === 'GET') {
-      if (path.endsWith('/conversation')) return json(view);
+      if (path.endsWith('/conversation')) {
+        const search = new URL(url, 'http://127.0.0.1').searchParams.get('search');
+        if (search === null) return json(view);
+        const words = search.toLowerCase().split(/\s+/);
+        return json({
+          ...view,
+          messages: view.messages.filter((m) =>
+            words.some((word) => m.text.toLowerCase().includes(word)),
+          ),
+        });
+      }
       if (path.endsWith('/secretary')) return json({ secretary: view.secretary });
       if (path.endsWith('/agent-prompt'))
         return json({ kind: 'secretary', prompt: 'Eres el secretario de este proyecto.' });
@@ -773,6 +783,24 @@ describe('«Lo que salió»', () => {
     await press(filters[1]);
     expect(all(root, '.hb-card').map((card) => card.dataset.kind)).toEqual(['request']);
     await press(filters[0]);
+    expect(all(root, '.hb-card')).toHaveLength(2);
+  });
+
+  // Field study 3: consultations were hard to find again; the search looked only at items.
+  it('searches what was said, consultations included, and takes you to the turn', async () => {
+    const { root } = await open(conversation({ messages }), { all: [working, queued] });
+    await typeInto(q(root, '.hb-search input'), 'cliente');
+    await vi.waitFor(() => expect(all(root, '.hb-hit').length).toBeGreaterThan(0));
+    expect(all(root, '.hb-card')).toHaveLength(0);
+    const hits = all(root, '.hb-hit');
+    expect(hits.map((hit) => text(hit))).toEqual([
+      expect.stringContaining('Un tablero por cliente'),
+    ]);
+    expect(text(hits[0])).toContain('consulta');
+    await press(q(hits[0] as HTMLElement, 'button'));
+    expect(q(root, '#hb-turn-3')?.hasAttribute('data-found')).toBe(true);
+    // Cleared, the cards are back.
+    await typeInto(q(root, '.hb-search input'), '');
     expect(all(root, '.hb-card')).toHaveLength(2);
   });
 

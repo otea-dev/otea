@@ -84,6 +84,8 @@ export const hablar = {
   'hablar.out.go': 'Ir a este momento de la conversación',
   'hablar.tabs': 'Conversación o lo que salió',
   'hablar.tab.chat': 'Conversación',
+  'hablar.search': 'Buscar en lo que se dijo',
+  'hablar.search.none': 'Nada de lo dicho menciona «{search}».',
   'hablar.filter': 'Mostrar',
   'hablar.filter.all': 'Todo',
   'hablar.filter.request': 'Pedidos',

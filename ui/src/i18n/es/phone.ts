@@ -16,7 +16,9 @@ export const phone = {
   'phone.search': 'Buscar',
   'phone.search.field': 'Buscar ítems',
   'phone.search.placeholder': 'Un título, un id o una palabra',
-  'phone.search.hint': 'Busca en los títulos, los ids y lo que dicen los campos de cada ítem.',
+  'phone.search.hint':
+    'Busca en los títulos, los ids y lo que dicen los campos de cada ítem, y en lo que se dijo en Hablar.',
+  'phone.search.talk': 'En Hablar',
   'phone.search.none': 'Ningún ítem dice «{search}».',
   'phone.search.count': { one: '{count} ítem', other: '{count} ítems' },
   // Captura rápida (mock, pantalla 3)

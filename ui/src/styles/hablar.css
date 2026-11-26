@@ -1185,6 +1185,49 @@ button.hb-chip:hover {
 .hb-filter {
   align-self: stretch;
 }
+/* search in what was said: the words, and the turns that hold them in place of the cards */
+.hb-search {
+  display: block;
+}
+.hb-search input {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--rule-2);
+  border-radius: 10px;
+  background: var(--sheet);
+  font: 400 14px / 1.2 var(--sans);
+  color: var(--ink);
+}
+.hb-hits {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hb-hit button {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--sheet);
+  text-align: left;
+}
+.hb-hit .hb-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hb-hit-text {
+  font: 400 14px / 1.4 var(--sans);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
 .hb-filter button small {
   margin-left: 6px;
   font: 500 10.5px / 1 var(--mono);
