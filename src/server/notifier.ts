@@ -12,12 +12,14 @@ import {
 } from '../app/notify-targets.ts';
 import { listAgents } from '../app/presence.ts';
 import type { Project } from '../app/project.ts';
+import { secretaryFacts } from '../app/secretary-waiting.ts';
 import { setAsideOf } from '../app/set-aside.ts';
 import { unheardOf } from '../app/unheard.ts';
 import { localMinuteOfDay, type Notice, Planner } from '../core/notify/planner.ts';
 import {
   freshSignals,
   type NotifyFacts,
+  secretarySignalsOf,
   settleUnheard,
   signalsOf,
   unheardKey,
@@ -144,10 +146,16 @@ export function createNotifier(
       const facts = factsOf(project, at);
       const unheard = new Set(facts.filter((f) => f.unheard).map(unheardKey));
       const told = settleUnheard(unheardSince, unheard, at, seen === undefined);
-      signals = signalsOf(
-        facts.map((f) => ({ ...f, unheard: told.has(unheardKey(f)) })),
-        at,
-      );
+      signals = [
+        ...signalsOf(
+          facts.map((f) => ({ ...f, unheard: told.has(unheardKey(f)) })),
+          at,
+        ),
+        ...secretarySignalsOf(
+          secretaryFacts(project.db, () => new Date(at).toISOString()),
+          at,
+        ),
+      ];
     } catch {
       return;
     }

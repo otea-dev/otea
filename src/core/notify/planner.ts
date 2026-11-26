@@ -13,7 +13,8 @@ import type { NotifyKind, Signal } from './signals.ts';
 export type QuietHours = { from: string; to: string };
 
 export type NotifyPrefs = Record<NotifyKind, boolean> & {
-  // Whether a question's own words go in its notice, which a lock screen shows to anyone.
+  // Whether the words of what is told go in its notice (a question, the secretary's reply), which
+  // a lock screen shows to anyone.
   askText: boolean;
   quiet: QuietHours | null;
   // The projects (their ids) nothing is told from.
@@ -29,6 +30,8 @@ export const DEFAULT_PREFS: NotifyPrefs = {
   stuck: true,
   aside: false,
   unheard: true,
+  secretary_reply: true,
+  secretary_offline: true,
   askText: true,
   quiet: null,
   muted: [],
@@ -50,6 +53,9 @@ export type ItemNotice = {
   text?: string;
   // A question's options, said after its text when they fit.
   options?: string[];
+  // The turn of Hablar a secretary reply opens; how many messages wait for an offline secretary.
+  turn?: number;
+  count?: number;
 };
 
 export type GroupNotice = {
@@ -86,9 +92,11 @@ const RANK: Record<NotifyKind, number> = {
   ask: 0,
   turn: 1,
   stuck: 2,
-  unheard: 3,
-  replied: 4,
-  aside: 5,
+  secretary_offline: 3,
+  unheard: 4,
+  secretary_reply: 5,
+  replied: 6,
+  aside: 7,
 };
 
 function noticeOf(signal: Signal, prefs: NotifyPrefs): ItemNotice {
@@ -103,6 +111,8 @@ function noticeOf(signal: Signal, prefs: NotifyPrefs): ItemNotice {
     ...(by === undefined ? {} : { by }),
     ...(text === undefined ? {} : { text }),
     ...(options === undefined ? {} : { options }),
+    ...(signal.turn === undefined ? {} : { turn: signal.turn }),
+    ...(signal.count === undefined ? {} : { count: signal.count }),
   };
 }
 

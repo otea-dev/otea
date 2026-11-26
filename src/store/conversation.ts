@@ -255,6 +255,23 @@ export function selectPending(db: DatabaseSync): { id: number; text: string }[] 
     .all() as { id: number; text: string }[];
 }
 
+// The secretary's messages said in a turn the person began, from `since` (an ISO time), oldest first.
+// What a notice about a reply reads; never the topics' records.
+export function selectRepliesSince(
+  db: DatabaseSync,
+  since: string,
+): { id: number; root: number; by: string; text: string }[] {
+  const rows = db
+    .prepare(
+      `SELECT m.id, m.root, m.author_name, m.text FROM conversation_messages m
+       JOIN conversation_messages r ON r.id = m.root
+       WHERE m.author = 'secretary' AND r.author = 'person' AND m.topic IS NULL AND m.at >= ?
+       ORDER BY m.id`,
+    )
+    .all(since) as { id: number; root: number; author_name: string; text: string }[];
+  return rows.map((row) => ({ id: row.id, root: row.root, by: row.author_name, text: row.text }));
+}
+
 export function countPending(db: DatabaseSync): { count: number; since: string | null } {
   const row = db
     .prepare(

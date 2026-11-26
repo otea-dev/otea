@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   freshSignals,
   type NotifyFacts,
+  SECRETARY_WAIT_MS,
+  type SecretaryFacts,
+  secretarySignalsOf,
   settleUnheard,
   signalsOf,
   UNHEARD_GRACE_MS,
@@ -165,6 +168,54 @@ describe('settleUnheard', () => {
     settleUnheard(since, new Set(), NOW + 11 * UNHEARD_GRACE_MS, false);
     settleUnheard(since, one, NOW + 12 * UNHEARD_GRACE_MS, false);
     expect(settleUnheard(since, one, NOW + 13 * UNHEARD_GRACE_MS, false).size).toBe(1);
+  });
+});
+
+describe('secretarySignalsOf', () => {
+  const facts = (over: Partial<SecretaryFacts> = {}): SecretaryFacts => ({
+    name: 'sage',
+    state: 'offline',
+    since: earlier,
+    replies: [],
+    waiting: { count: 2, since: '2026-11-14T09:45:00.000Z' },
+    ...over,
+  });
+
+  it('says nothing while the project has no secretary', () => {
+    expect(secretarySignalsOf(undefined, NOW)).toEqual([]);
+  });
+
+  it('tells each reply under its own key, at the turn it answered', () => {
+    const replies = [{ id: 9, turn: 4, by: 'sage', text: 'Listo' }];
+    expect(secretarySignalsOf(facts({ state: 'listening', replies }), NOW)).toEqual([
+      {
+        key: 'secretary_reply:9',
+        kind: 'secretary_reply',
+        item: 'hablar:4',
+        title: '',
+        by: 'sage',
+        turn: 4,
+        text: 'Listo',
+      },
+    ]);
+  });
+
+  it('tells an offline secretary only once messages have waited the threshold', () => {
+    const waiting = (since: string) => ({ count: 2, since });
+    const kindsAt = (since: string, state: SecretaryFacts['state'] = 'offline') =>
+      secretarySignalsOf(facts({ state, waiting: waiting(since) }), NOW).map(({ kind }) => kind);
+    expect(kindsAt(new Date(NOW - SECRETARY_WAIT_MS + 1000).toISOString())).toEqual([]);
+    expect(kindsAt(new Date(NOW - SECRETARY_WAIT_MS).toISOString())).toEqual(['secretary_offline']);
+    expect(kindsAt(new Date(NOW - 2 * SECRETARY_WAIT_MS).toISOString(), 'connected')).toEqual([]);
+    expect(secretarySignalsOf(facts({ waiting: { count: 0, since: null } }), NOW)).toEqual([]);
+  });
+
+  it('keys the offline notice to the stretch, not to what waits', () => {
+    const key = (over: Partial<SecretaryFacts>) => secretarySignalsOf(facts(over), NOW)[0]?.key;
+    expect(key({ waiting: { count: 5, since: '2026-11-14T09:45:00.000Z' } })).toBe(
+      key({ waiting: { count: 2, since: '2026-11-14T09:30:00.000Z' } }),
+    );
+    expect(key({ since: '2026-11-14T09:55:00.000Z' })).not.toBe(key({}));
   });
 });
 

@@ -7,9 +7,20 @@
 // - stuck: an agent's lease ran out with nobody releasing it or taking the item again;
 // - aside: an agent set the item aside for later (otea release --later);
 // - unheard: the item waits for an agent and none is listening or at work (the desk's «nadie está
-//   escuchando», core/agent-status.ts itemUnheard).
+//   escuchando», core/agent-status.ts itemUnheard);
+// - secretary_reply: the secretary answered the person in Hablar (secretarySignalsOf);
+// - secretary_offline: the secretary is offline and the person's messages have waited long.
 
-export const NOTIFY_KINDS = ['turn', 'ask', 'replied', 'stuck', 'aside', 'unheard'] as const;
+export const NOTIFY_KINDS = [
+  'turn',
+  'ask',
+  'replied',
+  'stuck',
+  'aside',
+  'unheard',
+  'secretary_reply',
+  'secretary_offline',
+] as const;
 
 export type NotifyKind = (typeof NOTIFY_KINDS)[number];
 
@@ -42,7 +53,63 @@ export type Signal = {
   // The question, for an ask, and the options it offers to pick.
   text?: string;
   options?: string[];
+  // secretary_reply: the turn in Hablar the notice opens. secretary_offline: how many messages wait.
+  turn?: number;
+  count?: number;
 };
+
+// How long the person's messages must wait for an offline secretary before it is told.
+export const SECRETARY_WAIT_MS = 10 * 60_000;
+
+// How long after it was said a secretary's reply may still be told: a reply held back by the
+// spacing or an item's cooldown goes if it still holds, but never hours later.
+export const REPLY_WINDOW_MS = 15 * 60_000;
+
+// What the secretary and the conversation say, as the notifier reads it.
+export type SecretaryFacts = {
+  name: string;
+  state: 'listening' | 'connected' | 'offline';
+  // When it was last heard, while offline.
+  since: string | null;
+  // The secretary's replies to the person from the last REPLY_WINDOW_MS: `turn` is the person's
+  // message that began the turn, `text` the reply's first line.
+  replies: { id: number; turn: number; by: string; text: string }[];
+  // What waits for the secretary unattended: the person's messages not read yet (and, with the
+  // Bandeja, the captures not taken), and the oldest one's time.
+  waiting: { count: number; since: string | null };
+};
+
+export function secretarySignalsOf(facts: SecretaryFacts | undefined, now: number): Signal[] {
+  if (!facts) return [];
+  const out: Signal[] = facts.replies.map(({ id, turn, by, text }) => ({
+    key: `secretary_reply:${id}`,
+    kind: 'secretary_reply',
+    item: `hablar:${turn}`,
+    title: '',
+    by,
+    turn,
+    ...(text === '' ? {} : { text }),
+  }));
+  const { waiting } = facts;
+  // The key holds the time it was last heard: once it is back and goes offline again it is a new
+  // stretch, and told anew; within one stretch it is told once.
+  if (
+    facts.state === 'offline' &&
+    waiting.count > 0 &&
+    waiting.since !== null &&
+    now - Date.parse(waiting.since) >= SECRETARY_WAIT_MS
+  ) {
+    out.push({
+      key: `secretary_offline:${facts.name}:${facts.since ?? ''}`,
+      kind: 'secretary_offline',
+      item: 'hablar:offline',
+      title: '',
+      by: facts.name,
+      count: waiting.count,
+    });
+  }
+  return out;
+}
 
 const active = (lease: Lease | null, now: number) =>
   lease !== null && Date.parse(lease.expiresAt) > now;

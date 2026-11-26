@@ -1,6 +1,7 @@
 import { createECDH, randomBytes } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addCollection } from '../app/collections.ts';
+import { postPersonMessage, readAsSecretary, sayAsSecretary } from '../app/conversation.ts';
 import { createItem, moveItem } from '../app/items.ts';
 import { claimItem, releaseItem } from '../app/leases.ts';
 import { listTargets } from '../app/notify-targets.ts';
@@ -158,6 +159,8 @@ describe('notifications on the server', () => {
           stuck: true,
           aside: false,
           unheard: true,
+          secretary_reply: true,
+          secretary_offline: true,
           askText: true,
           quiet: null,
           muted: [],
@@ -499,6 +502,149 @@ describe('notifications on the server', () => {
           payload: expect.objectContaining({ title: 'memory · claude lo dejó para después' }),
         }),
       ]);
+    });
+
+    describe('the secretary', () => {
+      const stamp = () => new Date(clock).toISOString();
+      const hear = () => seeAgent(project.db, { agent: 'sage', channel: 'cli' }, stamp);
+      const person = (text: string) => postPersonMessage(project, { text }, stamp).message;
+      const say = (text: string, replyTo: number) =>
+        sayAsSecretary(project, { agent: 'sage', text, replyTo }, stamp).message;
+      // The first look of a server that watches is its starting point: the secretary is there
+      // before the phone looks, and what follows is news.
+      const watching = async () => {
+        declareSecretary(project.db, 'sage', stamp);
+        hear();
+        await pass(1000);
+      };
+
+      it('tells a reply once, with its first line, and opens Hablar at that turn', async () => {
+        await watching();
+        const asked = person('¿Cómo va CAM-12?');
+        const reply = say('Va bien, lo reviso hoy.\nY mañana el resto.', asked.id);
+        expect(reply.root).toBe(asked.id);
+        await pass(1000);
+        expect(sent).toEqual([]);
+        await pass(GATHER_MS);
+        expect(sent).toEqual([
+          {
+            subscription: expect.objectContaining({ endpoint: endpoint() }),
+            payload: {
+              title: 'memory · sage te respondió',
+              body: 'Va bien, lo reviso hoy.',
+              tag: 'otea-hablar-reply',
+              url: `/p/memory-aaaaaa/#/hablar/${asked.id}`,
+              item: null,
+            },
+          },
+        ]);
+        await pass(GATHER_MS);
+        await pass(SPACING_MS);
+        expect(sent).toHaveLength(1);
+      });
+
+      it('keeps the reply out of the notice when the person hid the text', async () => {
+        const { cookie } = await pair();
+        await subscribe(cookie, 2);
+        await choose(cookie, { askText: false });
+        await watching();
+        say('Esto es privado', person('hola').id);
+        await pass(1000);
+        await pass(GATHER_MS);
+        const hidden = sent.find(({ subscription }) => subscription.endpoint === endpoint(2));
+        const shown = sent.find(({ subscription }) => subscription.endpoint === endpoint(1));
+        expect(shown?.payload.body).toBe('Esto es privado');
+        expect(hidden?.payload.title).toBe('memory · sage te respondió');
+        expect(JSON.stringify(hidden?.payload)).not.toContain('privado');
+      });
+
+      it('says nothing of a reply to a phone that turned replies off', async () => {
+        const { cookie } = await pair();
+        await subscribe(cookie, 2);
+        await choose(cookie, { secretary_reply: false });
+        await watching();
+        say('Listo', person('hola').id);
+        await pass(1000);
+        await pass(GATHER_MS);
+        expect(sent.map(({ subscription }) => subscription.endpoint)).toEqual([endpoint(1)]);
+      });
+
+      describe('when it is offline with messages waiting', () => {
+        const OFFLINE_AFTER_MS = 31 * 60_000;
+
+        it('tells once, after the threshold, with how many wait', async () => {
+          await watching();
+          person('uno');
+          person('dos');
+          await pass(OFFLINE_AFTER_MS);
+          await pass(GATHER_MS);
+          expect(sent).toEqual([
+            expect.objectContaining({
+              payload: {
+                title: 'memory · Tu secretario está desconectado',
+                body: 'Te esperan 2 mensajes',
+                tag: 'otea-hablar-offline',
+                url: '/p/memory-aaaaaa/#/hablar',
+                item: null,
+              },
+            }),
+          ]);
+          await pass(ITEM_COOLDOWN_MS * 2);
+          await pass(GATHER_MS);
+          expect(sent).toHaveLength(1);
+        });
+
+        it('tells nothing while the secretary is connected, however long they wait', async () => {
+          await watching();
+          person('uno');
+          for (let i = 0; i < 6; i++) {
+            await pass(10 * 60_000);
+            hear();
+          }
+          await pass(GATHER_MS);
+          expect(sent).toEqual([]);
+        });
+
+        it('tells nothing before the messages have waited the threshold', async () => {
+          await watching();
+          await pass(OFFLINE_AFTER_MS);
+          person('uno');
+          await pass(9 * 60_000);
+          await pass(GATHER_MS);
+          expect(sent).toEqual([]);
+          await pass(2 * 60_000);
+          await pass(GATHER_MS);
+          expect(sent).toHaveLength(1);
+        });
+
+        it('tells again only after it came back and went offline with new messages', async () => {
+          await watching();
+          person('uno');
+          await pass(OFFLINE_AFTER_MS);
+          await pass(GATHER_MS);
+          expect(sent).toHaveLength(1);
+          // It returns and reads what waited.
+          hear();
+          readAsSecretary(project, { agent: 'sage' }, stamp);
+          await pass(1000);
+          person('dos');
+          await pass(OFFLINE_AFTER_MS);
+          await pass(GATHER_MS);
+          await pass(ITEM_COOLDOWN_MS);
+          expect(sent).toHaveLength(2);
+        });
+
+        it('says nothing to a phone that turned it off', async () => {
+          const { cookie } = await pair();
+          await subscribe(cookie, 2);
+          await choose(cookie, { secretary_offline: false });
+          await watching();
+          person('uno');
+          await pass(OFFLINE_AFTER_MS);
+          await pass(GATHER_MS);
+          expect(sent.map(({ subscription }) => subscription.endpoint)).toEqual([endpoint(1)]);
+        });
+      });
     });
 
     describe('when nobody listens', () => {

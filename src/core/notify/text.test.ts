@@ -142,6 +142,48 @@ describe('noticeText', () => {
     );
   });
 
+  describe('the secretary', () => {
+    const reply: Notice = {
+      kind: 'secretary_reply',
+      item: 'hablar:4',
+      title: '',
+      by: 'sage',
+      turn: 4,
+      text: 'Listo\u0007 el  pedido',
+    };
+
+    it('says it replied, with the first line cleaned, and opens Hablar at the turn', () => {
+      expect(noticeText(reply, 'es')).toEqual({
+        title: 'sage te respondió',
+        body: 'Listo el pedido',
+        tag: 'otea-hablar-reply',
+        url: '/#/hablar/4',
+        item: null,
+      });
+      expect(noticeText(reply, 'en').title).toBe('sage replied');
+    });
+
+    it('keeps the words out when the text was hidden', () => {
+      const { text: _hidden, ...bare } = reply as Notice & { text?: string };
+      expect(noticeText(bare as Notice, 'es').body).toBe('Abre Hablar para leerlo');
+    });
+
+    it('counts what waits for an offline secretary, in both languages', () => {
+      const offline: Notice = {
+        kind: 'secretary_offline',
+        item: 'hablar:offline',
+        title: '',
+        count: 3,
+      };
+      expect(noticeText(offline, 'es')).toMatchObject({
+        title: 'Tu secretario está desconectado',
+        body: 'Te esperan 3 mensajes',
+        url: '/#/hablar',
+      });
+      expect(noticeText({ ...offline, count: 1 }, 'en').body).toBe('1 message waits for you');
+    });
+  });
+
   it('keeps a long title short', () => {
     const long = noticeText({ ...review, title: 'x'.repeat(300) }, 'en');
     expect(long.body.length).toBeLessThanOrEqual(100);

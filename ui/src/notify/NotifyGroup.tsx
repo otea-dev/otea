@@ -38,6 +38,12 @@ const KINDS: {
   { kind: 'replied', label: 'notify.replied' },
   { kind: 'stuck', label: 'notify.stuck', hint: 'notify.stuckHint' },
   { kind: 'unheard', label: 'notify.unheard', hint: 'notify.unheardHint' },
+  { kind: 'secretary_reply', label: 'notify.secretaryReply', hint: 'notify.secretaryReplyHint' },
+  {
+    kind: 'secretary_offline',
+    label: 'notify.secretaryOffline',
+    hint: 'notify.secretaryOfflineHint',
+  },
   { kind: 'aside', label: 'notify.aside' },
 ];
 
