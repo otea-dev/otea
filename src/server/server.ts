@@ -40,6 +40,7 @@ import {
 } from '../app/items.ts';
 import { rememberLanguage, storedLanguage } from '../app/language.ts';
 import type { Launcher } from '../app/launcher.ts';
+import { livenessSignature } from '../app/liveness.ts';
 import { memoryMachine } from '../app/machine.ts';
 import { mergeOnlyOf } from '../app/merge-only.ts';
 import { boardRoundOf, landWaitOf, liveBoards, rowFactsOf } from '../app/next.ts';
@@ -229,8 +230,14 @@ export type OteaServer = {
   close(): void;
 };
 
+// How often an open desk's server looks at what a process ending or a window running out changes
+// (app/liveness.ts): the secretary's «conectado» is told false within this.
+const LIVENESS_EVERY_MS = 2000;
+
 export type ServerOptions = {
   pollIntervalMs?: number;
+  // How often liveness is looked at (default LIVENESS_EVERY_MS).
+  livenessEveryMs?: number;
   uiDir?: string;
   token?: string;
   // Takes a single-use sign-in link a command printed in place of `token` (see signin-links.ts).
@@ -1323,8 +1330,16 @@ export function createServer(
 
   const open = (project: Project): Host => {
     const { id } = project.identity;
-    const feed = createChangeFeed(project.db, options.pollIntervalMs);
-    const streams = liveStreams(feed, () => presenceSignature(project.db));
+    // A process that ended writes nothing: the feed looks at liveness on a timer, and a change in
+    // it reaches every open desk as a change and a presence.
+    const feed = createChangeFeed(project.db, options.pollIntervalMs, {
+      signature: () => livenessSignature(project.db),
+      everyMs: options.livenessEveryMs ?? LIVENESS_EVERY_MS,
+    });
+    const streams = liveStreams(
+      feed,
+      () => `${presenceSignature(project.db)}${livenessSignature(project.db)}`,
+    );
     const notifier = createNotifier(project, feed, {
       sender,
       targets: machine,

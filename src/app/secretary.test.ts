@@ -153,7 +153,7 @@ describe('the secretary', () => {
         it('stops holding it after the held window even while the session lives', () => {
           const later = T0 + SECRETARY_HELD_MS + 1000;
 
-          expect(secretaryStatus(ctx.db, stamp(later), only(harness)).state).toBe('offline');
+          expect(secretaryStatus(ctx.db, stamp(later), only(harness))?.state).toBe('offline');
         });
 
         it('is a new session once it speaks again after that one is gone', () => {

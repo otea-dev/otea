@@ -758,7 +758,8 @@ export function isSubagent(name: string, names: readonly string[]): boolean {
 }
 
 // What changes when an agent's presence does, leaving out `live`, which only time changes: the
-// stream tells the UI to read the agents again when it differs.
+// stream tells the UI to read the agents again when it differs. What time alone changes is
+// livenessSignature's.
 export function presenceSignature(db: DatabaseSync, now: Clock = systemClock): string {
   const agents = listAgents(db, now).sort((a, b) => a.name.localeCompare(b.name));
   return JSON.stringify(
