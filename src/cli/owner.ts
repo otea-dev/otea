@@ -42,6 +42,48 @@ export function ownerChain(
   return chain;
 }
 
+// The programs that run another one for a moment and end with it (`timeout 600 otea wait`, `nohup`,
+// npm's launcher): never the session, however far up they stand.
+const WRAPPERS = new Set([
+  'timeout',
+  'nohup',
+  'env',
+  'time',
+  'setsid',
+  'stdbuf',
+  'nice',
+  'ionice',
+  'sudo',
+  'doas',
+  'xargs',
+  'npx',
+  'npm',
+  'pnpm',
+  'yarn',
+  'winpty',
+]);
+
+const programOf = (name: string) =>
+  basename(name.replaceAll('\\', '/'))
+    .toLowerCase()
+    .replace(/\.(exe|cmd|bat)$/, '');
+
+// The harness session a command started by `start` runs under: the first process above it that is
+// no shell and no wrapper, and so lasts as long as the session does. Undefined when the table does
+// not reach one (a parent it does not list).
+export function harnessOf(rows: readonly ProcessRow[], start: number): number | undefined {
+  const byPid = new Map(rows.map((row) => [row.pid, row]));
+  const seen = new Set<number>();
+  let row = byPid.get(start);
+  while (row && !seen.has(row.pid)) {
+    seen.add(row.pid);
+    const program = programOf(row.name);
+    if (!SHELLS.has(program) && !WRAPPERS.has(program)) return row.pid;
+    row = byPid.get(row.parent);
+  }
+  return undefined;
+}
+
 // Lines of "pid parent name", as both listings below print them; on Windows a tab and the program's
 // file follow, when Windows says it.
 export function readProcessTable(text: string): ProcessRow[] {
@@ -162,6 +204,11 @@ export type OwnerWatch = {
   orphaned: () => boolean;
   stop: () => void;
   started: number;
+  // The harness session it runs under (harnessOf), once the processes were listed; undefined when
+  // they could not be, or the watch stopped first.
+  harness: Promise<number | undefined>;
+  // Ends an early listing still running (a watch started with `early` leaves it to its caller).
+  release: () => void;
 };
 
 // Aborts `signal` once the session that started this process is gone (ownerGone), on `parent` (the
@@ -174,10 +221,14 @@ export function watchOwner(
     list = listProcesses,
     alive = processAlive,
     everyMs = OWNER_CHECK_MS,
+    early = false,
   }: {
     list?: (signal: AbortSignal) => Promise<ProcessTable | undefined>;
     alive?: (pid: number) => boolean;
     everyMs?: number;
+    // List the processes at once, not on the first check: for a command that must know its
+    // session soon (the secretary's wait), at the cost of one listing even when it ends at once.
+    early?: boolean;
   } = {},
 ): OwnerWatch {
   // The parent the process started under, not the one it has when this runs: a shell that ended
@@ -190,25 +241,44 @@ export function watchOwner(
   let orphaned = false;
   const onAbort = () => controller.abort();
   parent.addEventListener('abort', onAbort, { once: true });
+  const harness = Promise.withResolvers<number | undefined>();
+  const look = () => {
+    if (listed) return;
+    listed = true;
+    void list(listing.signal).then((table) => {
+      if (table) chain = ownerChain(table.rows, start, table.complete);
+      harness.resolve(table ? harnessOf(table.rows, start) : undefined);
+    });
+  };
   const timer = setInterval(() => {
     if (ownerGone(start, process.ppid, alive, chain)) {
       orphaned = true;
       controller.abort();
       return;
     }
-    if (listed) return;
-    listed = true;
-    void list(listing.signal).then((table) => {
-      if (table) chain = ownerChain(table.rows, start, table.complete);
-    });
+    look();
   }, everyMs);
   timer.unref();
+  // Lets the listing go: nothing waits for the harness any more.
+  const release = () => {
+    listing.abort();
+    harness.resolve(undefined);
+  };
   const stop = () => {
     clearInterval(timer);
-    listing.abort();
     parent.removeEventListener('abort', onAbort);
+    // A listing started early outlives the watch until its caller has what it needs (release).
+    if (!early || listed === false) release();
   };
   // Once stopped for any reason it lists nothing more, so a listing never keeps the process alive.
   controller.signal.addEventListener('abort', stop, { once: true });
-  return { signal: controller.signal, orphaned: () => orphaned, stop, started: start };
+  if (early) look();
+  return {
+    signal: controller.signal,
+    orphaned: () => orphaned,
+    stop,
+    started: start,
+    harness: harness.promise,
+    release,
+  };
 }

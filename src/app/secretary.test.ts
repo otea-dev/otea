@@ -5,7 +5,15 @@ import { selectStretches } from '../store/secretary.ts';
 import { addCollection } from './collections.ts';
 import type { Context } from './context.ts';
 import { createItem } from './items.ts';
-import { endProcess, endWaiter, endWaiting, listAgents, waitBeat } from './presence.ts';
+import {
+  endProcess,
+  endWaiter,
+  endWaiting,
+  forgetGoneHarness,
+  listAgents,
+  noteHarness,
+  waitBeat,
+} from './presence.ts';
 import {
   ackSecretaryReturns,
   addSecretarySource,
@@ -118,6 +126,43 @@ describe('the secretary', () => {
           since: iso(T0),
         });
         expect(declareSecretary(ctx.db, 'luna', stamp(later), gone).replaced).toBe('sol');
+      });
+
+      // Its harness session (noted by its wait) is the one process left to ask about.
+      describe('with the harness session it runs under noted', () => {
+        const harness = 4242;
+        beforeEach(() => noteHarness(ctx.db, 'sol', harness));
+        const only = (pid: number) => (other: number) => other === pid;
+
+        it('holds while that session lives', () => {
+          const later = T0 + 10 * 60_000;
+
+          expect(secretaryStatus(ctx.db, stamp(later), only(harness))).toMatchObject({
+            state: 'connected',
+          });
+        });
+
+        it('reads offline at once when that session is gone, with no window to wait for', () => {
+          expect(secretaryStatus(ctx.db, stamp(T0 + 3000), gone)).toMatchObject({
+            state: 'offline',
+            since: iso(T0),
+          });
+          expect(declareSecretary(ctx.db, 'luna', stamp(T0 + 3000), gone).replaced).toBe('sol');
+        });
+
+        it('stops holding it after the held window even while the session lives', () => {
+          const later = T0 + SECRETARY_HELD_MS + 1000;
+
+          expect(secretaryStatus(ctx.db, stamp(later), only(harness)).state).toBe('offline');
+        });
+
+        it('is a new session once it speaks again after that one is gone', () => {
+          forgetGoneHarness(ctx.db, 'sol', gone);
+
+          expect(secretaryStatus(ctx.db, stamp(T0 + 3000), gone)).toMatchObject({
+            state: 'connected',
+          });
+        });
       });
     });
 

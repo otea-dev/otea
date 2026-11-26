@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
+import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { renderUnicodeCompact } from 'uqr';
 import {
@@ -130,6 +131,7 @@ import {
   endProcess,
   endWaiter,
   endWaiting,
+  forgetGoneHarness,
   type Harness,
   harnessKey,
   hearAgent,
@@ -139,6 +141,7 @@ import {
   type NameAdvice,
   nameFor,
   noteCall,
+  noteHarness,
   offerName,
   quietVoices,
   renewLeases,
@@ -464,6 +467,8 @@ function seen(project: Project, input: Input, actor: Actor = input.actor): void 
     ...(newSession ? { newSession } : {}),
     call: true,
   });
+  // A command-line agent speaking after the harness session noted for it ended is another session.
+  if (channel === 'cli') forgetGoneHarness(project.db, actor.name);
   // Any call of it keeps what it holds (P1-R3-6).
   renewLeases(project.db, actor.name);
   keepHeldEntries(project, actor.name);
@@ -2556,6 +2561,10 @@ const LEASE_RECHECK_MS = 1000;
 // write announces: it checks again on this timer.
 const SECRETARY_RECHECK_MS = 5000;
 
+// How long a secretary wait that already has its answer waits for the process table, to note the
+// harness session it runs under.
+const HARNESS_READ_MS = 8000;
+
 // Runs `look` as a wait: the agent is heard as it waits, so it counts as connected and its profile
 // stays confirmed, from the start and on every beat; a wait that ends (it found something, was
 // stopped or its session ended) stops its agent waiting at once, and one that timed out leaves it,
@@ -2627,7 +2636,9 @@ async function waitForSecretary(input: Input): Promise<Output> {
   const timeout = option('timeout');
   const timeoutMs = durationFrom('timeout', timeout);
   const me = input.actor.name;
-  const owner = watchOwner(input.signal);
+  // Its harness session is noted as soon as the processes are read: that is the one process that
+  // says the secretary's session ended once no wait of it runs (it works between two waits).
+  const owner = watchOwner(input.signal, { early: input.channel === 'cli' });
   const options = {
     signal: owner.signal,
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
@@ -2635,6 +2646,14 @@ async function waitForSecretary(input: Input): Promise<Output> {
   };
   const result = await withAgentWhile(input, async (project) => {
     requireSecretary(project.db, me);
+    const noted = owner.harness.then((pid) => {
+      if (pid === undefined || pid === process.pid) return;
+      try {
+        noteHarness(project.db, me, pid);
+      } catch {
+        // The wait ended and closed the project first: nothing left to note it for.
+      }
+    });
     // A board the person publishes while it waits joins the catalog before the check reads its items.
     const secretaryWait = startSecretaryWait();
     const look = () => {
@@ -2642,6 +2661,10 @@ async function waitForSecretary(input: Input): Promise<Output> {
       return secretaryWake(project, secretaryWait);
     };
     const waited = await listenWhile(project, input, owner, look, options);
+    // A wake in the first seconds comes before the processes are read: it gives them a moment, as
+    // the harness noted is what tells its session ended once this process is gone.
+    if (!owner.orphaned())
+      await Promise.race([noted, delay(HARNESS_READ_MS, undefined, { ref: false })]);
     if (!('found' in waited)) return waited;
     const wake = waited.found;
     return {
@@ -2649,6 +2672,7 @@ async function waitForSecretary(input: Input): Promise<Output> {
       text: [wake.text, secretaryWaitAgainLine(me, input.channel)].join('\n'),
     };
   });
+  owner.release();
   if ('data' in result) return result;
   if (result.stopped === 'timeout') {
     const within = /^\d+$/.test(timeout ?? '') ? `${timeout}s` : timeout;

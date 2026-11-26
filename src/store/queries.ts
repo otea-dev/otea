@@ -796,18 +796,56 @@ export function selectListening(db: DatabaseSync): Map<string, string> {
   return new Map(rows.map((row) => [row.name, row.listening_at]));
 }
 
-// The processes each agent was last heard listening through: its MCP server, its running wait.
-export function selectListenerProcesses(
-  db: DatabaseSync,
-): Map<string, { session: number | null; waiter: number | null }> {
+// The harness session a command-line agent runs under (the process above the shells that run its
+// otea commands), noted by its wait, which reads the process table. Kept after the wait ends: it is
+// the one process that says the agent's session is over while no otea process runs. An agent heard
+// through an MCP server has its harness noted by that server (`listening_harness` is its launcher).
+export function saveHarness(db: DatabaseSync, agent: string, pid: number): void {
+  db.prepare(
+    'UPDATE agents SET listening_harness = :pid WHERE name = :agent AND listening_session IS NULL',
+  ).run({ agent, pid });
+}
+
+// Forgets a harness noted for the command line once it is gone: the agent speaking again is another
+// session of it (a restart under the same name), which notes its own with its next wait.
+export function forgetHarness(db: DatabaseSync, agent: string, pid: number): void {
+  db.prepare(
+    `UPDATE agents SET listening_harness = NULL
+      WHERE name = :agent AND listening_session IS NULL AND listening_harness = :pid`,
+  ).run({ agent, pid });
+}
+
+export type ListenerProcesses = {
+  session: number | null;
+  waiter: number | null;
+  // Only a command-line agent's: see saveHarness.
+  harness: number | null;
+};
+
+// The processes each agent was last heard listening through: its MCP server, its running wait, and
+// the harness session its waits ran under.
+export function selectListenerProcesses(db: DatabaseSync): Map<string, ListenerProcesses> {
   const rows = db
     .prepare(
-      `SELECT name, listening_session, listening_waiter FROM agents
-        WHERE listening_session IS NOT NULL OR listening_waiter IS NOT NULL`,
+      `SELECT name, listening_session, listening_waiter, listening_harness FROM agents
+        WHERE listening_session IS NOT NULL OR listening_waiter IS NOT NULL
+          OR listening_harness IS NOT NULL`,
     )
-    .all() as { name: string; listening_session: number | null; listening_waiter: number | null }[];
+    .all() as {
+    name: string;
+    listening_session: number | null;
+    listening_waiter: number | null;
+    listening_harness: number | null;
+  }[];
   return new Map(
-    rows.map((row) => [row.name, { session: row.listening_session, waiter: row.listening_waiter }]),
+    rows.map((row) => [
+      row.name,
+      {
+        session: row.listening_session,
+        waiter: row.listening_waiter,
+        harness: row.listening_session === null ? row.listening_harness : null,
+      },
+    ]),
   );
 }
 

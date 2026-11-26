@@ -13,11 +13,14 @@ import {
   deleteProcessBeat,
   findAgent,
   findProfile,
+  forgetHarness,
+  type ListenerProcesses,
   markListening,
   markWaiting,
   type NameOffer,
   type ProfileView,
   profileView,
+  saveHarness,
   saveMcpLoad,
   saveNameOffer,
   saveProcessBeat,
@@ -205,6 +208,26 @@ export function hearAgent(db: DatabaseSync, sighting: Sighting, now: Clock = sys
   return at;
 }
 
+// The harness session a command-line agent's wait runs under (its process, above the shells that
+// run its commands), for as long as that session lives: when it is gone the agent's session is over
+// though no process of Otea's runs, which is what a secretary between two waits looks like.
+export function noteHarness(db: DatabaseSync, agent: string, pid: number): void {
+  saveHarness(db, agent, pid);
+}
+
+// An agent speaks again after the harness noted for it ended: that is another session of it (the
+// same name after a restart), so the old one no longer counts against it; its next wait notes its
+// own.
+export function forgetGoneHarness(
+  db: DatabaseSync,
+  agent: string,
+  alive: (pid: number) => boolean = processAlive,
+): void {
+  const harness = selectListenerProcesses(db).get(agent)?.harness ?? null;
+  if (harness === null || alive(harness)) return;
+  forgetHarness(db, agent, harness);
+}
+
 // A listener that ends (an MCP server whose client closed it, a wait whose session ended) stops
 // counting its agent as listening at once, not a listening window later: unless another one heard
 // the agent after its last beat (`heardAt`, what hearAgent returned). An MCP server that ends
@@ -378,7 +401,11 @@ export function sessionEnded(
   now: Clock = systemClock,
   alive: (pid: number) => boolean = processAlive,
 ): boolean {
-  return listenersEnded(selectListenerProcesses(db).get(agent), runningProcesses(db, now, alive));
+  return listenersEnded(
+    selectListenerProcesses(db).get(agent),
+    runningProcesses(db, now, alive),
+    alive,
+  );
 }
 
 // Whether the agent's session runs now: some process it was heard listening through (its MCP
@@ -393,7 +420,7 @@ export function sessionRuns(
 ): boolean {
   const processes = selectListenerProcesses(db).get(agent);
   if (!processes) return false;
-  return !listenersEnded(processes, runningProcesses(db, now, alive));
+  return !listenersEnded(processes, runningProcesses(db, now, alive), alive);
 }
 
 // Whether the agent's session is alive now (P7-R3-11): a process it listens through (its MCP
@@ -435,10 +462,16 @@ export function renewLeases(db: DatabaseSync, agent: string, now: Clock = system
 // Whether every process an agent was heard listening through (its MCP server, its wait) has ended;
 // never for one heard through none.
 function listenersEnded(
-  processes: { session: number | null; waiter: number | null } | undefined,
+  processes: ListenerProcesses | undefined,
   alive: (pid: number) => boolean,
+  // The system's word on a process, with no beat asked of it: the harness session is no Otea
+  // process, nothing of Otea beats for it. Without it the harness is not looked at.
+  exists?: (pid: number) => boolean,
 ): boolean {
-  const { session = null, waiter = null } = processes ?? {};
+  const { session = null, waiter = null, harness = null } = processes ?? {};
+  // The harness session its waits ran under is gone, and every process of the session with it,
+  // whether a wait runs now or not.
+  if (harness !== null && exists && !exists(harness)) return true;
   if (session === null && waiter === null) return false;
   return !(session !== null && alive(session)) && !(waiter !== null && alive(waiter));
 }
@@ -592,7 +625,12 @@ export function listAgents(
     last !== undefined && Date.parse(at) - Date.parse(last) <= window;
   const within = (last: string | undefined) => since(last, LISTEN_WINDOW_MS);
   // Every listener process it was heard through has ended.
-  const silenced = (name: string) => listenersEnded(listeners.get(name), alive);
+  const silenced = (name: string) => listenersEnded(listeners.get(name), alive, processes);
+  // The harness session it was heard through is gone: nothing of it can still be acting.
+  const harnessGone = (name: string) => {
+    const harness = listeners.get(name)?.harness ?? null;
+    return harness !== null && !processes(harness);
+  };
   const records = selectAgents(db);
   const released = selectLastReleases(db);
   // Whoever has a question of its own waiting for the person: it waits for the answer, not at work.
@@ -647,12 +685,16 @@ export function listAgents(
     const held = holding.get(name) ?? [];
     const heardAt = heard.get(name);
     const done = finished(record, held);
-    const gone = done || (heardAt !== undefined && silenced(name));
+    const orphan = harnessGone(name);
+    const gone = done || orphan || (heardAt !== undefined && silenced(name));
     const listening = within(heardAt) && !gone;
     // Its session ended: it was last heard through a listener now gone, and did nothing since; or
-    // it is a subagent that finished.
+    // it is a subagent that finished; or the harness session it ran under is gone, which no later
+    // command of its own undoes (a new session notes its own, forgetHarness).
     const ended =
-      done || (gone && heardAt !== undefined && Date.parse(lastSeen) <= Date.parse(heardAt));
+      done ||
+      orphan ||
+      (gone && heardAt !== undefined && Date.parse(lastSeen) <= Date.parse(heardAt));
     // It was seen lately (a command-line agent between its commands); a profile given for it by
     // the person, with no sighting of its own, is no act.
     const active = connectedAt !== null && since(lastSeen, ACTIVE_WINDOW_MS);
@@ -822,7 +864,8 @@ export function nameFor(
   // Its session ended: every process it was heard listening through is gone (P4-R3-2). Its
   // lease is then the returning session's to carry on, and its last acts no other terminal's.
   const listeners = selectListenerProcesses(db);
-  const ended = (agent: AgentPresence) => listenersEnded(listeners.get(agent.name), alive);
+  const ended = (agent: AgentPresence) =>
+    listenersEnded(listeners.get(agent.name), alive, processes);
   // A lease keeps a name busy only while its session is alive: one heard through nothing that
   // runs, quiet past the listening window, left it to whoever comes back under it (P7-R3-11).
   const holds = (agent: AgentPresence) =>

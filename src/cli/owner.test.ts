@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  harnessOf,
   ownerChain,
   readPosixTable,
   readProcessTable,
@@ -30,6 +31,25 @@ describe('the processes that own a command', () => {
 
   it('stops at its parent when that is no shell', () => {
     expect(ownerChain(windows, 700)).toEqual([700]);
+  });
+
+  // The harness session is the process that lasts as long as the session: a shell, or a program
+  // that only runs another for a moment (`timeout 600 otea wait`), is never it.
+  it('names the harness above the shells and the wrappers of a command, never one of those', () => {
+    expect(harnessOf(windows, 500)).toBe(700);
+    const wrapped = [
+      { pid: 700, parent: 1, name: 'claude' },
+      { pid: 600, parent: 700, name: 'bash' },
+      { pid: 500, parent: 600, name: 'timeout' },
+    ];
+    expect(harnessOf(wrapped, 500)).toBe(700);
+    // A command run by the harness itself.
+    expect(harnessOf(windows, 700)).toBe(700);
+  });
+
+  it('names no harness when the table does not reach one', () => {
+    expect(harnessOf([{ pid: 500, parent: 600, name: 'sh' }], 500)).toBeUndefined();
+    expect(harnessOf([], 500)).toBeUndefined();
   });
 
   it('keeps what it found when a parent is no longer listed', () => {
