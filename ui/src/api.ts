@@ -730,6 +730,11 @@ export function postBandejaAnswer(id: number, given: AnswerGiven): Promise<Bande
   return post<BandejaEntry>(`/api/bandeja/${id}/answer`, given);
 }
 
+// A note the secretary or its refiner closed, opened again by the person.
+export function postBandejaReopen(id: number): Promise<BandejaEntry> {
+  return post<BandejaEntry>(`/api/bandeja/${id}/reopen`, {});
+}
+
 // A file captured in the Bandeja, served to a signed-in browser.
 export function bandejaFileUrl(id: number): string {
   return apiUrl(`/api/bandeja/attachments/${id}`);

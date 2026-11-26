@@ -36,6 +36,7 @@ export const AGENT_COMMANDS = [
   // (create --from-bandeja) or ask what it lacks (ask B-n). The person's side is the desk's alone.
   'bandeja',
   'bandeja take',
+  'bandeja close',
   'ask',
   // The person's answer to a question, given in the chat (P4-R2-2).
   'answer',

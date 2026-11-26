@@ -180,6 +180,27 @@ describe('a remote added after init, said before the push', () => {
     expect((await otea('repos', 'list')).out).toContain(`${name}  root:`);
   });
 
+  // Field study 3, S1: each project's worker asked the person to run `otea repos add --name ...`
+  // with full paths. The notice now carries the question itself, in plain words with options to
+  // tap, and the one command to run on the yes.
+  it('hands the agent the question to ask the person: plain words, options to tap, no command in it', async () => {
+    git('remote', 'add', 'origin', 'https://user:secret@github.com/acme/keys.git');
+    const name = (await otea('repos', 'list')).out.trim().split(/\s+/)[0] ?? '';
+
+    const claim = await otea('claim', 'TOD-1');
+
+    const asked = claim.out.match(/otea ask TOD-1 "([^"]+)"((?: --option "[^"]+")+)/);
+    expect(asked, claim.out).not.toBeNull();
+    const [, question = '', options = ''] = asked ?? [];
+    expect(question).toContain('github.com/acme/keys');
+    expect(options.match(/--option/g)).toHaveLength(2);
+    // A person's question carries no command, path or secret.
+    expect(question).not.toMatch(/otea |repos add|--name|@/);
+    expect(claim.out).not.toContain(':secret@');
+    // The command comes after the yes, for the agent.
+    expect(claim.out).toContain(`otea repos add --name "${name}"`);
+  });
+
   it('keeps it in the data a program reads, not only in the text', async () => {
     git('remote', 'add', 'origin', 'https://github.com/acme/keys.git');
 

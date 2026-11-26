@@ -140,6 +140,8 @@ export const hablar = {
   'bandeja.st.refining': 'puliendo · {agent}',
   'bandeja.st.asking': 'te pregunta',
   'bandeja.st.filed': 'archivado en {item}',
+  'bandeja.st.closed': 'cerrada: {reason}',
+  'bandeja.reopen': 'Reabrir',
   'bandeja.more': { one: 'Ver {count} archivado más', other: 'Ver {count} archivados más' },
   'bandeja.fewer': 'Ver menos',
   'bandeja.from': 'salió de la Bandeja · «{snippet}»',

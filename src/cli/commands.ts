@@ -27,14 +27,17 @@ import {
   askOnBandeja,
   bandejaOfItem,
   bandejaPaths,
+  closeBandeja,
   entryText,
   fileBandeja,
+  type Held,
   keepHeldEntries,
   listBandeja,
   listText,
   requireBandejaHold,
   requireEntry,
   takeBandeja,
+  takeNextBandeja,
 } from '../app/bandeja.ts';
 import { addBoard, addBoardSet, type BoardRecord, syncBoardPresets } from '../app/boards.ts';
 import { branchNamedFirst } from '../app/branch-owner.ts';
@@ -1924,7 +1927,11 @@ const next: Command = {
       const outside = offered && mergedOutsideLine(project, input.cwd, offered);
       // Offered work in the shared main checkout says so before the agent starts (P6-R2-3).
       const shared = offered && sharedCheckoutLine(project, input, offered.id);
-      const remote = remoteAddedNotice(project, input.cwd);
+      const remote = remoteAddedNotice(
+        project,
+        input.cwd,
+        offered ? { item: offered.id, as: actor.name } : undefined,
+      );
       // The turn of the conversation the item came from, when it came from one.
       const fromMessages = answer.item === null ? [] : turnsOfItem(project, answer.item);
       const fromLine = fromMessageLine(fromMessages);
@@ -2673,6 +2680,7 @@ async function listenWhile<T>(
   owner: ReturnType<typeof watchOwner>,
   look: () => T | undefined,
   options: Omit<WatchOptions, 'beat'>,
+  boards = true,
 ): Promise<Watched<T>> {
   const me = input.actor.name;
   // When it was last heard: a wait whose session ended stops its agent listening at once.
@@ -2682,12 +2690,17 @@ async function listenWhile<T>(
   const waiter = input.channel === 'cli' ? { waiter: process.pid } : {};
   const heard =
     input.actor.kind === 'agent'
-      ? waitBeat(project.db, {
-          agent: me,
-          channel: input.channel,
-          harness: input.harness,
-          ...waiter,
-        })
+      ? waitBeat(
+          project.db,
+          {
+            agent: me,
+            channel: input.channel,
+            harness: input.harness,
+            ...waiter,
+          },
+          undefined,
+          boards,
+        )
       : undefined;
   const beat = heard
     ? {
@@ -2922,9 +2935,13 @@ const wait: Command = {
 // The notice an agent reads on next and claim when the checkout it works in had a remote added
 // after Otea saw it: its pushes are refused until the person says it is that repo (P3-F1). Never
 // breaks the command it rides on.
-function remoteAddedNotice(project: Project, cwd: string): string | undefined {
+function remoteAddedNotice(
+  project: Project,
+  cwd: string,
+  ask?: { item: string; as: string },
+): string | undefined {
   try {
-    return remoteAddedLine(project, cwd);
+    return remoteAddedLine(project, cwd, process.env, ask);
   } catch {
     return undefined;
   }
@@ -3016,7 +3033,7 @@ const claim: Command = {
         ? `Took ${item.id} over from ${item.tookOver}: its session ended (no MCP server or wait of it runs), so its lease was yours to take.`
         : undefined;
       const shared = sharedCheckoutLine(project, input, id);
-      const remote = remoteAddedNotice(project, input.cwd);
+      const remote = remoteAddedNotice(project, input.cwd, { item: item.id, as: actor.name });
       const lines = [claimed.text, over, shared, remote].filter((line) => line !== undefined);
       const text = lines.join('\n');
       // The notices ride in data.text, as next's do, so they survive --json (a program reads data).
@@ -3469,7 +3486,7 @@ const ask: Command = {
         });
         return {
           data: { entry, question: asked },
-          text: `Asked the person on ${entry.ref}: it waits for their answer, and your hold on it ends. They tap or write it on the desk (Hablar, the Bandeja). The secretary's wait returns ${entry.ref} once they answer; take it again then (otea bandeja take ${entry.ref} --as ${actor.name}) and read the answer: otea bandeja ${entry.ref} --as ${actor.name}.`,
+          text: `Asked the person on ${entry.ref}: it waits for their answer, and your hold on it ends. They tap or write it on the desk (Hablar, the Bandeja). Once they answer, ${entry.ref} waits again: the refiner that takes the notes in turn gets it with otea bandeja take --next --wait --as ${actor.name} (or take it yourself: otea bandeja take ${entry.ref} --as ${actor.name}) and reads the answer: otea bandeja ${entry.ref} --as ${actor.name}.`,
         };
       }
       const asked = askQuestion(project, {
@@ -5291,31 +5308,124 @@ const bandeja: Command = {
 };
 
 // A refiner holds an entry while it works on it, so two never take the same one.
+// How often a refiner waiting for a note looks again without a commit to wake it: a lease running
+// out, or a note whose question was answered, comes back with no write that says so.
+const BANDEJA_RECHECK_MS = 5000;
+
 const bandejaTake: Command = {
   name: 'bandeja take',
   summary:
-    'Take a Bandeja entry (B-3) to refine it: held 30 minutes (acting on it renews), no other refiner takes it. The secretary takes one for the refiner it launches with --for',
-  args: ['id'],
-  options: { for: { placeholder: 'refiner' } },
-  execute: (input) => {
-    const [id = ''] = input.args;
+    'Take a Bandeja entry (B-3) to refine it: held 30 minutes (acting on it renews), no other refiner takes it. --next takes the next free one (yours first), --wait waits for it. The secretary takes one for a refiner it launches with --for',
+  args: ['id?'],
+  options: {
+    for: { placeholder: 'refiner' },
+    next: { flag: true },
+    wait: { flag: true },
+    timeout: { placeholder: 'duration' },
+  },
+  execute: async (input) => {
+    const [id] = input.args;
     const { actor } = input;
     const on = input.option('for');
-    return withAgent(input, (project) => {
-      const { entry, renewed } = takeBandeja(project, {
-        id: bandejaIdOf(id),
-        agent: actor.name,
-        ...(on === undefined ? {} : { on }),
-      });
+    const next = input.flag('next');
+    const waits = input.flag('wait');
+    if (next && id !== undefined)
+      throw new UsageError('--next takes no id: it takes the next note');
+    if (!next && id === undefined)
+      throw new UsageError(
+        'Say which note: otea bandeja take B-3, or --next for the next one nobody holds',
+      );
+    if (waits && !next) throw new UsageError('--wait goes with --next');
+    if (next && on !== undefined)
+      throw new UsageError('--next takes the note for yourself: no --for');
+    const show = (project: Project, held: Held, who: string, handover: boolean) => {
+      const { entry, renewed } = held;
       const { paths, problems } = bandejaPaths(project, [entry]);
-      const who = on ?? actor.name;
-      const head =
-        on !== undefined && on !== actor.name
-          ? `Took ${entry.ref} for ${on}: it holds it until ${timeText(entry.claimUntil ?? entry.at)}; it takes it itself with otea bandeja take ${entry.ref} --as ${on}.`
-          : `${renewed ? 'Still holding' : 'Took'} ${entry.ref} until ${timeText(entry.claimUntil ?? entry.at)}.`;
+      const until = timeText(entry.claimUntil ?? entry.at);
+      const head = handover
+        ? `Took ${entry.ref} for ${who}: it holds it until ${until} (it has to call otea before then: that makes it the whole lease); it takes it itself with otea bandeja take ${entry.ref} --as ${who}.`
+        : `${renewed ? 'Still holding' : 'Took'} ${entry.ref} until ${until}.`;
       return {
         data: { entry, held: who },
         text: `${head}\n${entryText(entry, paths, problems, actor.name)}`,
+      };
+    };
+    if (!next) {
+      return withAgent(input, (project) => {
+        const held = takeBandeja(project, {
+          id: bandejaIdOf(id ?? ''),
+          agent: actor.name,
+          ...(on === undefined ? {} : { on }),
+        });
+        return show(project, held, on ?? actor.name, on !== undefined && on !== actor.name);
+      });
+    }
+    const again = bandejaTakeNextCommand(actor.name);
+    if (!waits) {
+      return withAgent(input, (project) => {
+        const held = takeNextBandeja(project, { agent: actor.name });
+        if (held === undefined) {
+          return {
+            data: { entry: null, held: actor.name },
+            text: `No note waits for a refiner (none is free: every one is filed, closed, held by another refiner or waiting for the person's answer). Wait for the next with ${again}.`,
+          };
+        }
+        return show(project, held, actor.name, false);
+      });
+    }
+    // The wait of the project's one refiner: it hears the agent, but is no listener on the boards.
+    const timeout = input.option('timeout');
+    const timeoutMs = durationFrom('timeout', timeout);
+    const owner = watchOwner(input.signal);
+    const result = await withAgentWhile(input, async (project) => {
+      const waited = await listenWhile(
+        project,
+        input,
+        owner,
+        () => takeNextBandeja(project, { agent: actor.name }),
+        {
+          signal: owner.signal,
+          ...(timeoutMs === undefined ? {} : { timeoutMs }),
+          recheckMs: BANDEJA_RECHECK_MS,
+        },
+        false,
+      );
+      if (!('found' in waited)) return waited;
+      return show(project, waited.found, actor.name, false);
+    });
+    owner.release();
+    if ('data' in result) return result;
+    if (result.stopped === 'timeout') {
+      const within = /^\d+$/.test(timeout ?? '') ? `${timeout}s` : timeout;
+      throw new CommandFailure(
+        'timeout',
+        `No note reached the refiner within ${within}; a timeout is no failure, keep waiting: ${again}`,
+      );
+    }
+    if (owner.orphaned()) throw new CommandFailure('interrupted', WAIT_ORPHANED);
+    throw new CommandFailure('interrupted', 'Interrupted while waiting');
+  },
+};
+
+const bandejaTakeNextCommand = (agent: string): string =>
+  `otea bandeja take --next --wait --as ${agent}`;
+
+// The secretary, or the refiner that holds an entry, closes one that needs no item.
+const bandejaClose: Command = {
+  name: 'bandeja close',
+  summary:
+    'Close a Bandeja entry (B-3) that needs no item (a duplicate), with the --reason the person reads and may reopen. The secretary, or the refiner holding it',
+  args: ['id'],
+  options: { reason: { required: true } },
+  execute: (input) => {
+    const [id = ''] = input.args;
+    const { actor } = input;
+    const reason = input.required('reason');
+    return withAgent(input, (project) => {
+      const entry = closeBandeja(project, { id: bandejaIdOf(id), agent: actor.name, reason });
+      return {
+        data: { entry },
+        text: `Closed ${entry.ref}: "${entry.closeReason ?? reason}". The person sees the reason on the desk (Hablar, the Bandeja) and may reopen it; nothing waits for you on it.`,
       };
     });
   },
@@ -5377,6 +5487,7 @@ export const COMMANDS: readonly Command[] = [
   escalate,
   // The longer name first: a command is the first whose words all match.
   bandejaTake,
+  bandejaClose,
   bandeja,
   ask,
   answer,

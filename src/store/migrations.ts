@@ -630,6 +630,13 @@ export const MIGRATIONS = [
   ALTER TABLE conversation_messages ADD COLUMN heard_at TEXT;
   ALTER TABLE conversation_messages ADD COLUMN kind_news INTEGER NOT NULL DEFAULT 0;
   `,
+  // A Bandeja entry the secretary or its refiner closed with a reason (a duplicate, nothing to
+  // do): it waits for nobody, shows as closed, and the person may reopen it.
+  `
+  ALTER TABLE bandeja_entries ADD COLUMN closed_at TEXT;
+  ALTER TABLE bandeja_entries ADD COLUMN closed_by TEXT;
+  ALTER TABLE bandeja_entries ADD COLUMN close_reason TEXT;
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {

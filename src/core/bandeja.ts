@@ -12,12 +12,20 @@ import { OteaError } from './errors.ts';
 // it keeps the hold by acting (take again, ask, file); past it another refiner may take the entry.
 export const BANDEJA_LEASE_MS = 30 * 60_000;
 
+// How long an entry the secretary takes for a refiner it launches (`take --for`) stays held while
+// that refiner has not called otea: its first call makes it the whole lease. A refiner that never
+// shows (a harness with no subagents, one that did not start) leaves the entry waiting for the
+// secretary again within this, not after the whole lease (field study 3, S4).
+export const BANDEJA_HANDOVER_MS = 3 * 60_000;
+
 // Where an entry stands:
 //   waiting   nobody has it: the secretary is told
 //   refining  a refiner holds it (`claimedBy`)
 //   asking    a refiner asked the person something and waits for the answer
 //   filed     it became an item (`item`)
-export const BANDEJA_STATES = ['waiting', 'refining', 'asking', 'filed'] as const;
+//   closed    the secretary or its refiner closed it with a reason (`closeReason`); it waits for
+//             nobody, and the person may reopen it
+export const BANDEJA_STATES = ['waiting', 'refining', 'asking', 'filed', 'closed'] as const;
 
 export type BandejaState = (typeof BANDEJA_STATES)[number];
 
@@ -58,6 +66,10 @@ export type BandejaEntry = {
   item: string | null;
   filedBy: string | null;
   filedAt: string | null;
+  // Who closed it, when and why, while it is closed.
+  closedBy: string | null;
+  closedAt: string | null;
+  closeReason: string | null;
 };
 
 // The id prefix of an entry. No board may have it (prefixFor in core/item.ts refuses), so B-3 is

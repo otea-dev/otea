@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { basename } from 'node:path';
 import {
+  BANDEJA_HANDOVER_MS,
   BANDEJA_LEASE_MS,
   type BandejaEntry,
   type BandejaQuestion,
@@ -18,6 +19,7 @@ import type { BandejaAskFacts } from '../core/notify/signals.ts';
 import { timeText } from '../core/time.ts';
 import {
   answerQuestionRow,
+  closeEntry,
   countWaitingEntries,
   type EntryRow,
   entryOfClientKey,
@@ -30,6 +32,7 @@ import {
   questionsOfEntries,
   releaseEntry,
   renewEntries,
+  reopenEntry,
   selectEntryOfItem,
   selectEntryRow,
   selectEntryRows,
@@ -147,6 +150,7 @@ export function captureToBandeja(
 
 function stateOf(row: EntryRow, questions: readonly BandejaQuestion[], at: string): BandejaState {
   if (row.filed_at !== null) return 'filed';
+  if (row.closed_at !== null) return 'closed';
   const last = questions.at(-1);
   if (last !== undefined && last.answer === undefined) return 'asking';
   if (row.claimed_by !== null && row.claim_until !== null && row.claim_until > at)
@@ -178,6 +182,9 @@ function hydrate(ctx: Context, rows: readonly EntryRow[], at: string): BandejaEn
       item: row.item_id,
       filedBy: row.filed_by,
       filedAt: row.filed_at,
+      closedBy: row.closed_by,
+      closedAt: row.closed_at,
+      closeReason: row.close_reason,
     };
   });
 }
@@ -269,7 +276,19 @@ export function takeBandeja(
         `${was.ref} waits for the person's answer to your question "${was.asking?.text ?? ''}": it is taken again once they answer`,
       );
     }
-    const until = new Date(Date.parse(at) + BANDEJA_LEASE_MS).toISOString();
+    if (was.state === 'closed') {
+      throw new OteaError(
+        'invalid_transition',
+        `${was.ref} is closed (${was.closeReason ?? 'no reason given'}): the person may reopen it`,
+      );
+    }
+    // An entry taken for a refiner that has not called otea yet is held only for the handover: its
+    // first call (keepHeldEntries) makes it the whole lease, and one that never calls leaves the
+    // entry to the secretary again soon.
+    const handover = holder !== agent;
+    const until = new Date(
+      Date.parse(at) + (handover ? BANDEJA_HANDOVER_MS : BANDEJA_LEASE_MS),
+    ).toISOString();
     if (!holdEntry(project.db, id, holder, at, until)) {
       throw new OteaError(
         'forbidden',
@@ -286,6 +305,92 @@ export function keepHeldEntries(ctx: Context, agent: string, now: Clock = system
   renewEntries(ctx.db, agent, at, new Date(Date.parse(at) + BANDEJA_LEASE_MS).toISOString());
 }
 
+// One refiner for the whole Bandeja (field study 3, S5): it takes the entry it already holds, else
+// the oldest nobody holds, and gets none while nothing waits for a refiner (every entry filed,
+// closed, held by another or asking the person). Two refiners at once never get the same one.
+export function takeNextBandeja(
+  project: Project,
+  input: { agent: string },
+  now: Clock = systemClock,
+): Held | undefined {
+  const at = now();
+  const entries = listBandeja(project, {}, () => at);
+  const mine = entries.filter(
+    ({ state, claimedBy }) => state === 'refining' && claimedBy === input.agent,
+  );
+  const free = entries.filter(({ state }) => state === 'waiting');
+  for (const { id } of [...mine, ...free]) {
+    try {
+      return takeBandeja(project, { id, agent: input.agent }, () => at);
+    } catch (error) {
+      // Another refiner took it between the look and the take: the next one.
+      if (error instanceof OteaError && error.code === 'forbidden') continue;
+      throw error;
+    }
+  }
+  return undefined;
+}
+
+// The secretary closes an entry that needs no item (a duplicate of one that exists, a note that asks
+// nothing), or the refiner that holds it does; the reason is kept and shown, and the person may
+// reopen it. A filed entry is an item's already.
+export function closeBandeja(
+  project: Project,
+  input: { id: number; agent: string; reason: string },
+  now: Clock = systemClock,
+): BandejaEntry {
+  return transaction(project.db, () => {
+    const at = now();
+    const entry = requireEntry(project, input.id, () => at);
+    const reason = input.reason.trim();
+    if (entry.state === 'filed') {
+      throw new OteaError(
+        'invalid_transition',
+        `${entry.ref} is filed already, as ${entry.item ?? 'an item'}: nothing to close`,
+      );
+    }
+    if (entry.state === 'closed') {
+      throw new OteaError(
+        'invalid_transition',
+        `${entry.ref} is closed already (${entry.closeReason ?? 'no reason given'})`,
+      );
+    }
+    const holds = entry.state === 'refining' && entry.claimedBy === input.agent;
+    if (!holds && secretaryName(project.db) !== input.agent) {
+      throw new OteaError(
+        'forbidden',
+        `Only the project's secretary, or the refiner that holds ${entry.ref}, closes it${entry.claimedBy === null ? '' : ` (${entry.claimedBy} holds it)`}`,
+      );
+    }
+    if (reason === '') {
+      throw new OteaError(
+        'reason_required',
+        `Not closed: say the reason for closing ${entry.ref} (the person reads it, and may reopen the entry)`,
+      );
+    }
+    if (!closeEntry(project.db, input.id, input.agent, reason, at)) {
+      throw new OteaError('invalid_transition', `${entry.ref} was closed or filed meanwhile`);
+    }
+    return requireEntry(project, input.id, () => at);
+  });
+}
+
+// The person reopens a closed entry on the desk: it waits for the secretary again.
+export function reopenBandeja(
+  project: Project,
+  input: { id: number },
+  now: Clock = systemClock,
+): BandejaEntry {
+  return transaction(project.db, () => {
+    const at = now();
+    const entry = requireEntry(project, input.id, () => at);
+    if (entry.state !== 'closed' || !reopenEntry(project.db, input.id)) {
+      throw new OteaError('invalid_transition', `${entry.ref} is not closed: nothing to reopen`);
+    }
+    return requireEntry(project, input.id, () => at);
+  });
+}
+
 // The entry the agent holds now, or the refusal that says to take it.
 function requireHold(ctx: Context, id: number, agent: string, at: string): BandejaEntry {
   const entry = requireEntry(ctx, id, () => at);
@@ -293,6 +398,12 @@ function requireHold(ctx: Context, id: number, agent: string, at: string): Bande
     throw new OteaError(
       'invalid_transition',
       `${entry.ref} is filed already, as ${entry.item ?? 'an item'}`,
+    );
+  }
+  if (entry.state === 'closed') {
+    throw new OteaError(
+      'invalid_transition',
+      `${entry.ref} is closed (${entry.closeReason ?? 'no reason given'})`,
     );
   }
   if (entry.state !== 'refining' || entry.claimedBy !== agent) {
@@ -535,12 +646,15 @@ const STATE_WORD: Record<BandejaState, string> = {
   refining: 'being refined',
   asking: 'asked the person',
   filed: 'filed',
+  closed: 'closed',
 };
 
 function stateLine(entry: BandejaEntry): string {
   if (entry.state === 'refining')
     return `${STATE_WORD.refining} by ${entry.claimedBy ?? '?'} until ${timeText(entry.claimUntil ?? entry.at)}`;
   if (entry.state === 'filed') return `${STATE_WORD.filed} as ${entry.item ?? 'an item'}`;
+  if (entry.state === 'closed')
+    return `${STATE_WORD.closed} by ${entry.closedBy ?? '?'}: ${entry.closeReason ?? 'no reason given'}`;
   if (entry.state === 'asking') return `${STATE_WORD.asking}: "${entry.asking?.text ?? ''}"`;
   return STATE_WORD.waiting;
 }
@@ -577,7 +691,7 @@ export function entryText(
     ];
   });
   const next =
-    entry.state === 'filed'
+    entry.state === 'filed' || entry.state === 'closed'
       ? []
       : [
           `  Next: take it (otea bandeja take ${entry.ref}${as}), then make the item (otea create --collection <board> --title "<title>" --field "<What I want>=..." --field "<How I check it>=..." --from-bandeja ${entry.ref}${as}), or ask the person what is missing (otea ask ${entry.ref} "<question>" --option "<a>" --option "<b>"${as}).`,

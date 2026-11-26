@@ -12,6 +12,7 @@ import {
   bandejaOfItem,
   captureToBandeja,
   listBandeja,
+  reopenBandeja,
 } from '../app/bandeja.ts';
 import { syncBoardPresets } from '../app/boards.ts';
 import { briefFor } from '../app/brief.ts';
@@ -1092,6 +1093,14 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
           question,
           ...words,
         });
+        feed.notify();
+        return c.json(entry);
+      })
+      // The person reopens a note the secretary or its refiner closed: it waits for the secretary
+      // again.
+      .post('/bandeja/:id/reopen', (c) => {
+        assertWritable(c, auth);
+        const entry = reopenBandeja(project, { id: bandejaIdOf(c.req.param('id')) });
         feed.notify();
         return c.json(entry);
       })

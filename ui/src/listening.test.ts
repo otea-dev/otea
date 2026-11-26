@@ -4,9 +4,11 @@ import { ago, item as fixture, inMinutes, NOW } from './derive/fixtures.ts';
 import { setLanguage } from './i18n/i18n.ts';
 import {
   anyoneWaits,
+  connectedAgents,
   goneHolder,
   handsToAgent,
   hearing,
+  noAgents,
   silentHolder,
   unheard,
   unheardLead,
@@ -176,6 +178,23 @@ describe('hearing', () => {
     // An agent at work, or one connected, beats one with no signal.
     const silent = agent('s', { live: false, holding: ['TASK-2'], status: 'silent' });
     expect(hearing([silent, idle], [], NOW)).toEqual({ kind: 'connected', agents: ['a'] });
+  });
+
+  // Field study 3, S2: «en cola: lucia-sec está conectado» named the secretary, which never takes an
+  // item, as if it would do the work. The queue is about the agents that take items.
+  it('never counts the secretary as one that will see what waits for an agent', () => {
+    const secretary = agent('sec', { role: 'secretary', status: 'connected' });
+    expect(connectedAgents([secretary])).toEqual([]);
+    expect(
+      workingAgents([agent('sec', { role: 'secretary', status: 'working' })], [], NOW),
+    ).toEqual([]);
+    expect(hearing([secretary], [], NOW)).toEqual({ kind: 'nobody' });
+    expect(noAgents([secretary])).toBe(true);
+    // A worker beside it is the one named.
+    const worker = agent('w', { status: 'connected' });
+    expect(hearing([secretary, worker], [], NOW)).toEqual({ kind: 'connected', agents: ['w'] });
+    expect(unheardLead([], [secretary, worker], 'TASK-1')).toContain('w');
+    expect(unheardLead([], [secretary, worker], 'TASK-1')).not.toContain('sec');
   });
 
   it('raises the alarm only when the agents that remain gave no signal', () => {

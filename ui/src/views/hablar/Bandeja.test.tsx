@@ -31,6 +31,9 @@ function entry(o: Partial<BandejaEntry> & { id: number }): BandejaEntry {
     item: null,
     filedBy: null,
     filedAt: null,
+    closedBy: null,
+    closedAt: null,
+    closeReason: null,
     ...o,
   };
 }
@@ -281,6 +284,30 @@ describe('the Bandeja beside what came out', () => {
     await press(all(root, '.bn-row[data-state="asking"] .hb-foot button')[1]);
 
     expect(calls[0]?.body).toEqual({ delegate: true, question: 1 });
+  });
+
+  // Field study 3, S4: a duplicate the secretary closed says why, and you can reopen it.
+  it('shows a closed note with the reason it was closed for, and reopens it with one tap', async () => {
+    const calls = server([
+      entry({ id: 1, state: 'waiting', text: 'dark mode somewhere' }),
+      entry({
+        id: 5,
+        state: 'closed',
+        text: 'el botón otra vez',
+        closedBy: 'sol',
+        closedAt: ago(5),
+        closeReason: 'es lo mismo que CAM-1',
+      }),
+    ]);
+    const root = await show(<Live />);
+
+    const closed = q(root, '.bn-row[data-state="closed"]');
+    expect(text(q(closed as HTMLElement, '.bn-st'))).toBe('cerrada: es lo mismo que CAM-1');
+    await press(q(closed as HTMLElement, '.bn-reopen'));
+
+    expect(calls).toEqual([
+      expect.objectContaining({ method: 'POST', path: '/api/bandeja/5/reopen' }),
+    ]);
   });
 
   it('is not there while the Bandeja is empty', async () => {

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
-import { bandejaFileUrl, fetchBandeja, postBandejaAnswer } from '../../api.ts';
+import { bandejaFileUrl, fetchBandeja, postBandejaAnswer, postBandejaReopen } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
-import { type BandejaEntry, entryTitle, ordered } from '../../bandeja.ts';
+import { type BandejaEntry, entryTitle, isDone, ordered } from '../../bandeja.ts';
 import { useRemote } from '../../hooks.ts';
 import { t } from '../../i18n/i18n.ts';
 import { isImage } from '../../intake-files.ts';
@@ -87,6 +87,7 @@ function Row({
   const state = t(`bandeja.st.${entry.state}`, {
     agent: entry.claimedBy ?? '',
     item: entry.item ?? '',
+    reason: entry.closeReason ?? '',
   });
   return (
     <li
@@ -115,6 +116,22 @@ function Row({
       </div>
       <p className="bn-title">{entryTitle(entry) || t('bandeja.onlyFiles')}</p>
       <Files entry={entry} />
+      {entry.state === 'closed' ? (
+        <button
+          type="button"
+          className="bn-reopen"
+          disabled={!app.session.canWrite}
+          onClick={() => {
+            postBandejaReopen(entry.id)
+              .then(onAnswered)
+              .catch((error: unknown) =>
+                toast({ msg: error instanceof Error ? error.message : String(error) }),
+              );
+          }}
+        >
+          {t('bandeja.reopen')}
+        </button>
+      ) : null}
       {asking ? (
         answerBelow ? (
           <p className="bn-below">{t('bandeja.below')}</p>
@@ -141,8 +158,8 @@ export function Bandeja({ entries, reload, lit, answerBelow = false }: BandejaPr
   const app = useApp();
   const [all, setAll] = useState(false);
   const sorted = useMemo(() => ordered(entries ?? []), [entries]);
-  const open = sorted.filter(({ state }) => state !== 'filed');
-  const filed = sorted.filter(({ state }) => state === 'filed');
+  const open = sorted.filter((entry) => !isDone(entry));
+  const filed = sorted.filter(isDone);
   const shown = all ? filed : filed.slice(0, FILED_SHOWN);
   if (entries === undefined || sorted.length === 0) return null;
   return (

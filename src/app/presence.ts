@@ -546,12 +546,17 @@ export function waitBeat(
   db: DatabaseSync,
   { newSession: _, ...sighting }: Sighting,
   now: Clock = systemClock,
+  // false: the wait is for something other than the boards' work (the refiner's for the Bandeja):
+  // the agent is heard, but it is no listener on the boards.
+  boards = true,
 ): { everyMs: number; run: () => string } {
   const run = () => {
     const at = hearAgent(db, sighting, now);
-    markWaiting(db, sighting.agent, at);
-    // A listener on the boards ends every stretch of work nobody heard (the secretary is none).
-    clearStretchesFor(db, sighting.agent);
+    if (boards) {
+      markWaiting(db, sighting.agent, at);
+      // A listener on the boards ends every stretch of work nobody heard (the secretary is none).
+      clearStretchesFor(db, sighting.agent);
+    }
     // The harness its wait was noted under still runs: noted again, a minute at a time.
     const harness = selectListenerProcesses(db).get(sighting.agent)?.harness ?? null;
     if (harness !== null) beatProcess(db, harness, () => at);

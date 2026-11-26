@@ -35,7 +35,15 @@ export function workingAgents(
   items: readonly Pick<Item, 'id' | 'asks'>[],
   now: number,
 ): string[] {
-  return (agents ?? []).filter((a) => isWorking(a, items, now)).map((a) => a.name);
+  return takers(agents)
+    .filter((a) => isWorking(a, items, now))
+    .map((a) => a.name);
+}
+
+// The agents that take items: every one but the secretary, which talks with the person, never takes
+// an item, and so is never the one an item waits in the queue for (field study 3, S2).
+function takers(agents: readonly Agent[] | null | undefined): Agent[] {
+  return (agents ?? []).filter((a) => a.role !== 'secretary');
 }
 
 // Whether one agent is at work: the server's status, the one definition the pill, the menu and the
@@ -53,7 +61,9 @@ export function isWorking(
 // off, or sits idle in its chat with its MCP server open. They hear nothing of the desk until they
 // wait again, which is no fault: the desk says so calmly (P5-F12, P2-F4).
 export function connectedAgents(agents: readonly Agent[] | null | undefined): string[] {
-  return (agents ?? []).filter((a) => statusOf(a) === 'connected').map((a) => a.name);
+  return takers(agents)
+    .filter((a) => statusOf(a) === 'connected')
+    .map((a) => a.name);
 }
 
 // The agent that holds the item's live lease while it is no longer connected (P7-R3-10): its
@@ -112,7 +122,7 @@ export type Hearing =
 // Whether no agent is here at all (none connected, none silent on a lease): an empty room, which
 // the desk says calmly, never as a silence to fix. Before presence loads it is not.
 export function noAgents(agents: readonly Agent[] | null | undefined): boolean {
-  return !!agents && agents.every((a) => statusOf(a) === 'away');
+  return !!agents && takers(agents).every((a) => statusOf(a) === 'away');
 }
 
 export function hearing(

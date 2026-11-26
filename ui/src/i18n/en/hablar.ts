@@ -139,6 +139,8 @@ export const hablar = {
   'bandeja.st.refining': 'being refined · {agent}',
   'bandeja.st.asking': 'asks you',
   'bandeja.st.filed': 'filed as {item}',
+  'bandeja.st.closed': 'closed: {reason}',
+  'bandeja.reopen': 'Reopen',
   'bandeja.more': { one: 'Show {count} more filed', other: 'Show {count} more filed' },
   'bandeja.fewer': 'Show fewer',
   'bandeja.from': 'came out of the Inbox · “{snippet}”',

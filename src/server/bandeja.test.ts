@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { askOnBandeja, fileBandeja, takeBandeja } from '../app/bandeja.ts';
+import { askOnBandeja, closeBandeja, fileBandeja, takeBandeja } from '../app/bandeja.ts';
 import { addCollection } from '../app/collections.ts';
 import { pairDevice } from '../app/devices.ts';
 import { createItem } from '../app/items.ts';
@@ -296,6 +296,26 @@ describe('the Bandeja over the API', () => {
         mode: 'text',
       });
     });
+  });
+
+  // Field study 3, S4: the secretary could not close a duplicate; the person sees why and may
+  // reopen it, from the desk or their paired phone.
+  it('shows a closed entry with its reason, and lets the person reopen it', async () => {
+    declareSecretary(project.db, 'sol');
+    await capture('a duplicate of CAM-1');
+    closeBandeja(project, { id: 1, agent: 'sol', reason: 'the same as CAM-1' });
+
+    expect(await listed('?filed=0')).toEqual([]);
+    expect(await listed()).toMatchObject([
+      { ref: 'B-1', state: 'closed', closeReason: 'the same as CAM-1', closedBy: 'sol' },
+    ]);
+
+    const reopened = await call('/bandeja/1/reopen', { method: 'POST' }, 'phone');
+    expect(reopened.status).toBe(200);
+    expect(await reopened.json()).toMatchObject({ ref: 'B-1', state: 'waiting' });
+    expect(await listed('?filed=0')).toMatchObject([{ ref: 'B-1', state: 'waiting' }]);
+    // Not closed any more: nothing to reopen.
+    expect((await call('/bandeja/1/reopen', { method: 'POST' })).status).toBe(409);
   });
 
   it('lists the entries not filed first, then the filed ones, and tells the item where it came from', async () => {

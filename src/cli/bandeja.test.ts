@@ -142,6 +142,7 @@ describe('the Bandeja from the refiner', () => {
         expect(names).toEqual(expect.arrayContaining(['bandeja', 'bandeja_take']));
         expect(names.filter((name) => /bandeja|capture/.test(name)).sort()).toEqual([
           'bandeja',
+          'bandeja_close',
           'bandeja_take',
         ]);
       } finally {

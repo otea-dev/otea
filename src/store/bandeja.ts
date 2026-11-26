@@ -16,9 +16,13 @@ export type EntryRow = {
   item_id: string | null;
   filed_by: string | null;
   filed_at: string | null;
+  closed_at: string | null;
+  closed_by: string | null;
+  close_reason: string | null;
 };
 
-const COLUMNS = 'id, author_name, text, at, claimed_by, claim_until, item_id, filed_by, filed_at';
+const COLUMNS =
+  'id, author_name, text, at, claimed_by, claim_until, item_id, filed_by, filed_at, closed_at, closed_by, close_reason';
 
 export type NewEntry = {
   name: string;
@@ -70,15 +74,19 @@ export function selectEntryRow(db: DatabaseSync, id: number): EntryRow | undefin
     | undefined;
 }
 
-// The entries not filed yet, oldest first, and the filed ones, newest first up to `filed`.
+// The entries not filed or closed yet, oldest first, and the filed and closed ones, newest first up
+// to `filed`.
 export function selectEntryRows(db: DatabaseSync, filed: number): EntryRow[] {
   const open = db
-    .prepare(`SELECT ${COLUMNS} FROM bandeja_entries WHERE filed_at IS NULL ORDER BY id`)
+    .prepare(
+      `SELECT ${COLUMNS} FROM bandeja_entries WHERE filed_at IS NULL AND closed_at IS NULL ORDER BY id`,
+    )
     .all() as EntryRow[];
   if (filed <= 0) return open;
   const done = db
     .prepare(
-      `SELECT ${COLUMNS} FROM bandeja_entries WHERE filed_at IS NOT NULL ORDER BY id DESC LIMIT ?`,
+      `SELECT ${COLUMNS} FROM bandeja_entries
+       WHERE filed_at IS NOT NULL OR closed_at IS NOT NULL ORDER BY id DESC LIMIT ?`,
     )
     .all(filed) as EntryRow[];
   return [...open, ...done];
@@ -210,7 +218,7 @@ export function holdEntry(
 ): boolean {
   const sql = `UPDATE bandeja_entries
     SET claimed_by = :agent, claimed_at = :at, claim_until = :until
-    WHERE id = :id AND filed_at IS NULL
+    WHERE id = :id AND filed_at IS NULL AND closed_at IS NULL
       AND (claimed_by IS NULL OR claimed_by = :agent OR claim_until <= :at)`;
   return Number(db.prepare(sql).run({ id, agent, at, until }).changes) === 1;
 }
@@ -224,7 +232,8 @@ export function countWaitingEntries(
   const row = db
     .prepare(
       `SELECT COUNT(*) AS n, MIN(e.at) AS since FROM bandeja_entries e
-       WHERE e.filed_at IS NULL AND (e.claimed_by IS NULL OR e.claim_until <= :at)
+       WHERE e.filed_at IS NULL AND e.closed_at IS NULL
+         AND (e.claimed_by IS NULL OR e.claim_until <= :at)
          AND NOT EXISTS (SELECT 1 FROM bandeja_questions q WHERE q.entry_id = e.id AND q.answered_at IS NULL)`,
     )
     .get({ at }) as { n: number; since: string | null };
@@ -236,8 +245,32 @@ export function countWaitingEntries(
 export function renewEntries(db: DatabaseSync, agent: string, at: string, until: string): void {
   db.prepare(
     `UPDATE bandeja_entries SET claim_until = :until
-     WHERE claimed_by = :agent AND filed_at IS NULL AND claim_until > :at`,
+     WHERE claimed_by = :agent AND filed_at IS NULL AND closed_at IS NULL AND claim_until > :at`,
   ).run({ agent, at, until });
+}
+
+// Closes the entry for `agent`, with the reason, and ends any hold on it. True when this call did
+// (not filed or closed already).
+export function closeEntry(
+  db: DatabaseSync,
+  id: number,
+  agent: string,
+  reason: string,
+  at: string,
+): boolean {
+  const sql = `UPDATE bandeja_entries
+    SET closed_at = :at, closed_by = :agent, close_reason = :reason,
+        claimed_by = NULL, claimed_at = NULL, claim_until = NULL
+    WHERE id = :id AND filed_at IS NULL AND closed_at IS NULL`;
+  return Number(db.prepare(sql).run({ id, agent, reason, at }).changes) === 1;
+}
+
+// Opens a closed entry again. True when it was closed.
+export function reopenEntry(db: DatabaseSync, id: number): boolean {
+  const sql = `UPDATE bandeja_entries
+    SET closed_at = NULL, closed_by = NULL, close_reason = NULL
+    WHERE id = :id AND closed_at IS NOT NULL`;
+  return Number(db.prepare(sql).run({ id }).changes) === 1;
 }
 
 export function releaseEntry(db: DatabaseSync, id: number): void {
@@ -256,7 +289,8 @@ export function fileEntry(
 ): boolean {
   const sql = `UPDATE bandeja_entries
     SET item_id = :item, filed_by = :agent, filed_at = :at, claimed_by = NULL, claimed_at = NULL, claim_until = NULL
-    WHERE id = :id AND filed_at IS NULL AND claimed_by = :agent AND claim_until > :at`;
+    WHERE id = :id AND filed_at IS NULL AND closed_at IS NULL
+      AND claimed_by = :agent AND claim_until > :at`;
   return Number(db.prepare(sql).run({ id, agent, item, at }).changes) === 1;
 }
 

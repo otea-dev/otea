@@ -138,7 +138,9 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // Raised to 7150 for land sync, the one step that brings the person's main checkout up to date
   // (measured at 7144).
   // Raised to 7420 for what waits for the person: two tools (pending, escalate; measured at 7410).
-  tools: { mcp: 7420 },
+  // Raised to 7600 for closing a Bandeja note and taking the next one (bandeja_close, and --next,
+  // --wait and --timeout on bandeja_take; measured at 7593).
+  tools: { mcp: 7600 },
   // Otea's agent guide, the server's instructions: in every MCP agent's context from the start, so
   // it buys only what agents keep getting wrong. Measured at 203. Raised to 270 for the line on
   // declaring the profile every agent and subagent must keep current (measured at 246). Raised to

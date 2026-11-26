@@ -59,14 +59,14 @@ describe('migrate', () => {
         'bandeja_questions',
       ]),
     );
-    expect(userVersion(db)).toBe(47);
+    expect(userVersion(db)).toBe(48);
   });
 
   it('is idempotent', () => {
     migrate(db);
     migrate(db);
 
-    expect(userVersion(db)).toBe(47);
+    expect(userVersion(db)).toBe(48);
   });
 
   describe('from version 40, which kept a language on the project', () => {

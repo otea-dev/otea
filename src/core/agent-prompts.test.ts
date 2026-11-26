@@ -344,8 +344,33 @@ describe('the role prompts', () => {
       const board = lang === 'es' ? 'tablero' : 'board';
       expect(text).toContain(`otea prompt --role worker --board <${board}> --as <`);
       expect(text).toContain('otea prompt --role refiner --as <');
-      expect(text).toContain('otea bandeja take <B-n> --for <');
       expect(text).toMatch(lang === 'es' ? /subagente en segundo plano/ : /background subagent/);
+    });
+
+    // Field study 3 (S4 P1, S5 P3): rules 5 and 8 left a note reserved for a refiner session that
+    // did not exist, and a refiner subagent was launched per note and per answer.
+    it(`keeps one refiner for the whole Bandeja and never takes a note for one that is not running (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, { name: 'ana' });
+      // No instruction anywhere to take a note for a refiner.
+      expect(text).not.toContain('bandeja take <B-n> --for');
+      const rule = text.split('\n').find((line) => /^11\. /.test(line)) ?? '';
+      expect(rule).toContain('otea bandeja take --next --wait');
+      expect(rule).toContain('otea bandeja take <B-n> --as ana');
+      expect(rule).toContain('otea bandeja close <B-n> --reason');
+      expect(rule).toMatch(
+        lang === 'es' ? /un refinador para toda la Bandeja/ : /one refiner for the whole Bandeja/,
+      );
+      expect(rule).toMatch(lang === 'es' ? /por nota ni por respuesta/ : /per note or per answer/);
+      expect(rule).toMatch(lang === 'es' ? /la nota es tuya/ : /the note is yours/);
+    });
+
+    // Field study 3 (S2 P3): an answer gave an item's state from memory, five minutes stale.
+    it(`has the secretary read an item's state right before it states it, in any answer (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, { name: 'ana' });
+      const rule = text.split('\n').find((line) => /^6\. /.test(line)) ?? '';
+      expect(rule).toContain('otea show <id>');
+      expect(rule).toContain('otea pending --as ana');
+      expect(rule).toMatch(lang === 'es' ? /en cualquier respuesta/ : /in any answer/);
     });
 
     // M4: the first line is the conclusion, then at most 3 short lines; the rest is a file.
@@ -406,7 +431,15 @@ describe('the role prompts', () => {
     it(`has the refiner turn a Bandeja note into an item, asking on the entry with options (${lang})`, () => {
       const text = rolePrompt('refiner', lang, { name: 'ana-ref' });
       expect(text).toContain('otea bandeja --as ana-ref');
-      expect(text).toContain('otea bandeja take <B-n> --as ana-ref');
+      // One refiner for the whole Bandeja: it takes the notes in turn, waiting for the next, and
+      // goes on after it asks the person (field study 3, S5 P3).
+      expect(text).toContain('otea bandeja take --next --wait --as ana-ref');
+      expect(text).toMatch(
+        lang === 'es'
+          ? /nunca te detengas porque la Bandeja esté vacía/
+          : /never stop because the Bandeja is empty/,
+      );
+      expect(text).toContain('otea bandeja close <B-n> --reason');
       expect(text).toContain('--from-bandeja <B-n> --as ana-ref');
       expect(text).toContain(lang === 'es' ? '"Qué quiero=' : '"What I want=');
       expect(text).toContain(lang === 'es' ? '"Cómo lo valido=' : '"How I check it=');
@@ -450,6 +483,17 @@ describe('the role prompts', () => {
       const folder = lang === 'es' ? 'carpeta' : 'folder';
       expect(text).toContain(`D:/${folder}`);
       expect(text).toContain(`/d/${folder}`);
+    });
+
+    // Field study 3 (S1 P2): a remote added after init reached the person as a technical question.
+    it(`has the worker put the remote-added question to the person in plain words, with options (${lang})`, () => {
+      const text = rolePrompt('worker', lang, { board: 'Cambios', name: 'ana' });
+      const rule = text.split('\n').find((line) => /^7\. /.test(line)) ?? '';
+      expect(rule).toContain('otea ask');
+      expect(rule).toContain('--option');
+      expect(rule).toMatch(
+        lang === 'es' ? /nunca le pegues el comando/ : /never paste the command/,
+      );
     });
 
     it(`keeps a refiner's files inside the project and reads attachments where Otea prints them (${lang})`, () => {

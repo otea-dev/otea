@@ -25,11 +25,15 @@ export function entryTitle(entry: Pick<BandejaEntry, 'text'>, max = 120): string
   return messageSnippet(entry.text, max);
 }
 
+// Whether the entry is done with: filed as an item, or closed with a reason.
+export const isDone = (entry: Pick<BandejaEntry, 'state'>): boolean =>
+  entry.state === 'filed' || entry.state === 'closed';
+
 // The entries that need the person (a question waits for their tap) come first, then those that
-// are being worked on or wait, then the filed ones, newest first. Within a group, oldest first.
+// are being worked on or wait, then the filed and closed ones, newest first. Within a group, oldest
+// first.
 export function ordered(entries: readonly BandejaEntry[]): BandejaEntry[] {
-  const rank = (entry: BandejaEntry) =>
-    entry.state === 'asking' ? 0 : entry.state === 'filed' ? 2 : 1;
+  const rank = (entry: BandejaEntry) => (entry.state === 'asking' ? 0 : isDone(entry) ? 2 : 1);
   return [...entries].sort((a, b) => {
     const by = rank(a) - rank(b);
     if (by !== 0) return by;
