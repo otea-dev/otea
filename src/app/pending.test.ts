@@ -1,0 +1,261 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { sequenceIds } from '../core/board/ids.ts';
+import { instantiate, requireTemplate } from '../core/board/templates.ts';
+import { creatures } from '../core/board/testing.ts';
+import { appendEvent, updateItemState } from '../store/queries.ts';
+import { answerBandeja, askOnBandeja, captureToBandeja, takeBandeja } from './bandeja.ts';
+import { createBoard, publishBoard, saveDraft } from './boards.ts';
+import { addCollection } from './collections.ts';
+import { answerSecretaryQuestion, postPersonMessage, sayAsSecretary } from './conversation.ts';
+import { createItem } from './items.ts';
+import { claimItem } from './leases.ts';
+import { pendingOf, pendingText } from './pending.ts';
+import type { Project } from './project.ts';
+import { askQuestion } from './questions.ts';
+import { declareSecretary } from './secretary.ts';
+import { memoryContext, projectOf, publishAs, REVIEWS } from './testing.ts';
+
+const T0 = Date.parse('2026-11-26T10:00:00.000Z');
+const clock = (offsetMs: number) => () => new Date(T0 + offsetMs).toISOString();
+const MIN = 60_000;
+const you = { kind: 'human' as const, name: 'fede' };
+const agent = (name: string) => ({ kind: 'agent' as const, name });
+
+// F4 (field study 3): four personas waited 15 to 40 minutes on a question of the Bandeja that Te
+// toca never counted, and the secretary's «what waits for me» left a review out because it came
+// from its memory. Otea says what waits for the person, from the records.
+describe('what waits for the person', () => {
+  let root: string;
+  let project: Project;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'otea-pending-'));
+    project = projectOf(root, memoryContext(REVIEWS));
+    addCollection(project, { name: 'reviews', preset: 'reviews' });
+    declareSecretary(project.db, 'sol', clock(0));
+  });
+
+  afterEach(() => {
+    project.db.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  const note = (text: string, at: number) =>
+    captureToBandeja(project, { text }, clock(at)).entry.id;
+
+  it('says nothing waits for a project with nothing in it', () => {
+    expect(pendingOf(project, clock(MIN))).toMatchObject({ count: 0, entries: [], blocks: [] });
+  });
+
+  it('counts a question a refiner asked on a Bandeja note, with its options', () => {
+    const id = note('the Aprobar button is hidden on the phone', 1000);
+    takeBandeja(project, { id, agent: 'lia' }, clock(2000));
+    askOnBandeja(
+      project,
+      {
+        id,
+        agent: 'lia',
+        text: 'On which screen?',
+        options: ['Te toca', 'Hablar'],
+        recommended: 1,
+      },
+      clock(3000),
+    );
+
+    const pending = pendingOf(project, clock(MIN));
+    expect(pending.count).toBe(1);
+    expect(pending.entries).toEqual([
+      expect.objectContaining({
+        kind: 'bandeja',
+        ref: 'B-1',
+        title: 'the Aprobar button is hidden on the phone',
+        by: 'lia',
+        text: 'On which screen?',
+        options: ['Te toca', 'Hablar'],
+        recommended: 1,
+      }),
+    ]);
+
+    answerBandeja(project, { id, option: 1 }, clock(2 * MIN));
+    expect(pendingOf(project, clock(3 * MIN)).count).toBe(0);
+  });
+
+  it('counts a question of the secretary with options until the person answers it', () => {
+    const wrote = postPersonMessage(
+      project,
+      { text: 'should the idea of the boss wait?' },
+      clock(1000),
+    ).message;
+    const said = sayAsSecretary(
+      project,
+      {
+        agent: 'sol',
+        text: 'What do I do with it?',
+        replyTo: wrote.id,
+        options: ['Write it down', 'Leave it as an idea'],
+        recommended: 1,
+      },
+      clock(2000),
+    ).message;
+
+    const pending = pendingOf(project, clock(MIN));
+    expect(pending.entries).toEqual([
+      expect.objectContaining({
+        kind: 'secretary',
+        ref: String(said.id),
+        by: 'sol',
+        text: 'What do I do with it?',
+        options: ['Write it down', 'Leave it as an idea'],
+        recommended: 1,
+        turn: wrote.root,
+      }),
+    ]);
+
+    answerSecretaryQuestion(project, said.id, { option: 1 }, clock(2 * MIN));
+    expect(pendingOf(project, clock(3 * MIN)).count).toBe(0);
+  });
+
+  it('counts a review and a step of the person apart, oldest first', () => {
+    const make = (title: string, actor: typeof you | ReturnType<typeof agent>, at: number) =>
+      createItem(project, { collection: 'reviews', title, actor }, clock(at)).id;
+    const review = make('CSS review', agent('kiln'), 1000);
+    const own = make('Call the bank', you, 2000);
+
+    expect(pendingOf(project, clock(MIN)).entries.map(({ kind, ref }) => [kind, ref])).toEqual([
+      ['review', review],
+      ['step', own],
+    ]);
+  });
+
+  it('counts the question an agent asked on an item, with its options', () => {
+    const def = creatures();
+    const record = createBoard(project, { name: def.name, lang: 'es' }, clock(1), sequenceIds());
+    saveDraft(project, record.id, { definition: def, baseVersion: null }, clock(1));
+    publishBoard(project, record.id, { moves: {}, by: you }, clock(1));
+    const item = createItem(
+      project,
+      { collection: 'Criaturas', title: 'Tortuga', fields: { fdesc: 'Lenta' }, actor: you },
+      clock(2),
+    );
+    claimItem(project, { id: item.id, actor: agent('kiln') }, clock(3));
+    askQuestion(
+      project,
+      {
+        id: item.id,
+        text: 'Smooth or mossy?',
+        options: ['Smooth', 'Mossy'],
+        actor: agent('kiln'),
+        channel: 'cli',
+      },
+      clock(4),
+    );
+
+    expect(pendingOf(project, clock(MIN)).entries).toEqual([
+      expect.objectContaining({
+        kind: 'question',
+        ref: item.id,
+        title: 'Tortuga',
+        by: 'kiln',
+        text: 'Smooth or mossy?',
+        options: ['Smooth', 'Mossy'],
+      }),
+    ]);
+  });
+
+  it('lists the questions first, then what they decide', () => {
+    createItem(
+      project,
+      { collection: 'reviews', title: 'old review', actor: agent('kiln') },
+      clock(1000),
+    );
+    const id = note('a note', 2000);
+    takeBandeja(project, { id, agent: 'lia' }, clock(3000));
+    askOnBandeja(project, { id, agent: 'lia', text: 'Which one?' }, clock(4000));
+
+    expect(pendingOf(project, clock(MIN)).entries.map(({ kind }) => kind)).toEqual([
+      'bandeja',
+      'review',
+    ]);
+  });
+
+  // The field: «CAM-2 listo; CAM-3, 4 y 5 se integran después» and nothing said in Hablar.
+  it('says a review holds the rest of the queue of a board that works on main', () => {
+    let tick = 0;
+    const now = () => new Date(Date.UTC(2026, 10, 19, 9, 0, tick++)).toISOString();
+    const def = instantiate(requireTemplate('mainline'), 'es', {}, undefined, { keep: true });
+    publishAs(project, def, 'bmain', now);
+    const doing = (title: string) => {
+      const { id } = createItem(
+        project,
+        { collection: def.name, title, fields: { want: 'x' }, actor: you },
+        now,
+      );
+      updateItemState(project.db, id, 'doit', now());
+      return id;
+    };
+    const first = doing('first');
+    const second = doing('second');
+    const third = doing('third');
+    appendEvent(project.db, {
+      itemId: first,
+      type: 'transitioned',
+      actor: agent('claude-b'),
+      at: now(),
+      data: {
+        to: 'doit__review',
+        tip: { branch: 'main', commit: 'a'.repeat(40), tree: 'b'.repeat(40) },
+      },
+    });
+    updateItemState(project.db, first, 'doit__review', now());
+
+    const pending = pendingOf(project, now);
+    expect(pending.entries.map(({ kind, ref }) => [kind, ref])).toEqual([['review', first]]);
+    expect(pending.blocks).toEqual([
+      expect.objectContaining({
+        first,
+        title: 'first',
+        waitsFor: 'review',
+        waiting: [second, third],
+      }),
+    ]);
+    expect(pendingText(pending)).toContain(`${first} holds the queue`);
+  });
+
+  it('says the secretary is offline and how many things wait for it', () => {
+    postPersonMessage(project, { text: 'hello?' }, clock(1000));
+    const pending = pendingOf(project, clock(90 * MIN));
+    expect(pending.secretary).toMatchObject({
+      name: 'sol',
+      state: 'offline',
+      waiting: { count: 1 },
+    });
+  });
+
+  it('reads as plain text for the secretary: what waits and how long', () => {
+    const id = note('a note', 1000);
+    takeBandeja(project, { id, agent: 'lia' }, clock(2000));
+    askOnBandeja(
+      project,
+      { id, agent: 'lia', text: 'Which one?', options: ['a', 'b'] },
+      clock(3000),
+    );
+    createItem(
+      project,
+      { collection: 'reviews', title: 'CSS review', actor: agent('kiln') },
+      clock(4000),
+    );
+
+    const text = pendingText(pendingOf(project, clock(MIN)));
+    expect(text).toContain('2 things wait for the person');
+    expect(text).toContain('B-1');
+    expect(text).toContain('Which one?');
+    expect(text).toContain('CSS review');
+  });
+
+  it('says plainly that nothing waits', () => {
+    expect(pendingText(pendingOf(project, clock(MIN)))).toContain('Nothing waits for the person');
+  });
+});

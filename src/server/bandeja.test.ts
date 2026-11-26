@@ -94,6 +94,31 @@ describe('the Bandeja over the API', () => {
     ]);
   });
 
+  // F4: Te toca counted items only, so a question on a note waited with "Nada espera por ti".
+  it('says on /pending that a question on a note waits for the person, until they answer it', async () => {
+    declareSecretary(project.db, 'sol');
+    await capture('the Aprobar button is hidden');
+    takeBandeja(project, { id: 1, agent: 'lia' });
+    askOnBandeja(project, {
+      id: 1,
+      agent: 'lia',
+      text: 'Which screen?',
+      options: ['Te toca', 'Hablar'],
+    });
+
+    const pending = (await (await call('/pending')).json()) as {
+      count: number;
+      entries: { kind: string; ref: string; text: string }[];
+      secretary: { name: string } | null;
+    };
+    expect(pending.count).toBe(1);
+    expect(pending.entries).toMatchObject([{ kind: 'bandeja', ref: 'B-1', text: 'Which screen?' }]);
+    expect(pending.secretary).toMatchObject({ name: 'sol' });
+
+    await call('/bandeja/1/answer', { method: 'POST', body: { question: 1, option: 1 } });
+    expect(((await (await call('/pending')).json()) as { count: number }).count).toBe(0);
+  });
+
   it('keeps the images and files sent with it, and serves them back as what they are', async () => {
     const form = new FormData();
     form.set('message', JSON.stringify({ text: 'look' }));

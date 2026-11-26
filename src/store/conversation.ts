@@ -195,6 +195,22 @@ export function bumpKindNews(db: DatabaseSync, root: number): void {
   ).run(root, KIND_WAKES);
 }
 
+// The secretary's questions with options to tap that the person has not answered (no message of
+// theirs replies to it; see isAnswered). Oldest first.
+export function selectOpenQuestions(db: DatabaseSync): Message[] {
+  const rows = db
+    .prepare(
+      `SELECT ${COLUMNS} FROM conversation_messages m
+       WHERE m.author = 'secretary' AND m.options IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM conversation_messages p
+           WHERE p.author = 'person' AND p.reply_to = m.id)
+       ORDER BY m.id`,
+    )
+    .all() as MessageRow[];
+  return hydrate(db, rows);
+}
+
 // Every message of a turn, in order.
 export function selectTurn(db: DatabaseSync, root: number): Message[] {
   const rows = db

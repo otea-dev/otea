@@ -49,6 +49,7 @@ import { editNote, leaveNote, notesSummary, notesView, withdrawNote } from '../a
 import { listTargets } from '../app/notify-targets.ts';
 import { markOpened, openedFiles } from '../app/opened.ts';
 import { overlapsOf, scanned } from '../app/overlap.ts';
+import { pendingOf } from '../app/pending.ts';
 import { performanceAcross, performanceOf } from '../app/performance.ts';
 import {
   adoptTailscale,
@@ -590,6 +591,9 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       .get('/agents', (c) => c.json({ agents: listAgents(project.db) }))
       // The project's secretary: connected, listening or offline since when; null while it has none.
       .get('/secretary', (c) => c.json({ secretary: secretaryStatus(project.db) ?? null }))
+      // What waits for the person, computed from the records: items on their turn, the questions
+      // of the Bandeja and of the secretary, the review that holds a board's queue (app/pending.ts).
+      .get('/pending', (c) => c.json(pendingOf(project)))
       // What to paste into an agent's chat (Conectar un agente, the empty project): the first contact,
       // one more agent joining, or one more board; without a kind, the project's moment.
       .get('/agent-prompt', (c) => {
