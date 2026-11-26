@@ -99,10 +99,13 @@ export function thinkingRoot(
   return turns.findLast((turn) => turn.waits === 'reading')?.root;
 }
 
-// How much of a reply shows before «ver más»: the first line, then this many lines or characters.
-// The secretary's own rule is to be short (M4); this is the page's guard for when it is not.
-export const FOLD_LINES = 4;
-export const FOLD_CHARS = 280;
+// How much of a reply shows before «ver más»: the first line (the conclusion), then at most this
+// many short lines. It is the secretary's own rule (its text, `otea prompt --role secretary`: one
+// line, then at most 3 short lines, anything longer as a file or on the item); the page folds a
+// reply that breaks it. A line is short up to about 80 characters, so the rest is 240 at most.
+// Blank lines between paragraphs are not lines.
+export const FOLD_LINES = 3;
+export const FOLD_CHARS = 240;
 
 export type Reply = {
   // The one-line conclusion.
@@ -118,7 +121,7 @@ export function splitReply(text: string): Reply {
   const cut = trimmed.indexOf('\n');
   const lead = (cut < 0 ? trimmed : trimmed.slice(0, cut)).trim();
   const rest = cut < 0 ? '' : trimmed.slice(cut + 1).trim();
-  const lines = rest === '' ? 0 : rest.split(/\r?\n/).length;
+  const lines = rest.split(/\r?\n/).filter((line) => line.trim() !== '').length;
   return { lead, rest, folds: lines > FOLD_LINES || rest.length > FOLD_CHARS };
 }
 

@@ -155,9 +155,13 @@ describe('GET /api/agent-prompt', () => {
   // The same texts otea prompt --role prints, for the desk to copy.
   it('gives the text of a role, with the board and name filled in', async () => {
     initBoards(project, 'changes', 'es');
-    expect((await get('?role=coordinator&lang=en')).body).toEqual({
-      kind: 'coordinator',
-      prompt: rolePrompt('coordinator', 'en', {}),
+    expect((await get('?role=secretary&lang=en')).body).toEqual({
+      kind: 'secretary',
+      prompt: rolePrompt('secretary', 'en', {}),
+    });
+    expect((await get('?role=refiner&as=rita&lang=es')).body).toEqual({
+      kind: 'refiner',
+      prompt: rolePrompt('refiner', 'es', { name: 'rita' }),
     });
     // The board as the project names it, whatever the case it was asked in.
     expect((await get('?role=worker&board=cambios&as=ana&lang=es')).body).toEqual({
@@ -172,7 +176,9 @@ describe('GET /api/agent-prompt', () => {
     for (const query of [
       '?role=boss',
       '?role=worker',
-      '?role=coordinator&board=Cambios',
+      '?role=coordinator',
+      '?role=secretary&board=Cambios',
+      '?role=refiner&board=Cambios',
       '?role=worker&board=Cambios&kind=join',
       '?role=worker&board=Cambios&as=Not%20A%20Name',
       '?board=Cambios',

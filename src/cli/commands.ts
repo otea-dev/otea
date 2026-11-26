@@ -228,6 +228,7 @@ import {
   type Role,
   type RoleFacts,
   rolePrompt,
+  roleTakesBoard,
 } from '../core/agent-prompts.ts';
 import { bandejaIdOf, isBandejaRef } from '../core/bandeja.ts';
 import { isClosed, isLandStep, positionOf, waysOf } from '../core/board/engine.ts';
@@ -1714,8 +1715,8 @@ function projectRolePrompt(
   try {
     project = openProject(cwd);
   } catch (error) {
-    // No project: a coordinator's text needs none, a worker's board cannot exist.
-    if (error instanceof OteaError && error.code === 'not_found' && role === 'coordinator')
+    // No project: a secretary's or a refiner's text needs none, a worker's board cannot exist.
+    if (error instanceof OteaError && error.code === 'not_found' && !roleTakesBoard(role))
       return rolePrompt(role, asked ?? defaultLang(), facts);
     throw error;
   }
@@ -1730,7 +1731,7 @@ function projectRolePrompt(
 const promptCommand: Command = {
   name: 'prompt',
   summary:
-    "Print what to paste into an agent's chat: start (a new project: set up, connect, read the project, interview you to understand what you need, one question at a time, tell you plainly whether a template fits, fits with changes, needs a board of its own or Otea is not a good fit, and draft its boards), join (one more agent working the boards there are, named from the project now) or design (one more board); without one, start until the project has boards of its own, then join. Or --role coordinator (the chat you talk to: it puts your requests on boards and launches workers, never doing an item itself) or --role worker --board <name> [--as <name>] (what the coordinator gives each worker, or you paste into a new chat; without --as it tells the worker to pick a name with otea whoami). --lang en|es (default: the project's language, set when it was made; with no project yet, the one you use: the desk's, else this computer's, else English)",
+    "Print what to paste into an agent's chat: start (a new project: set up, connect, read the project, interview you to understand what you need, one question at a time, tell you plainly whether a template fits, fits with changes, needs a board of its own or Otea is not a good fit, and draft its boards), join (one more agent working the boards there are, named from the project now) or design (one more board); without one, start until the project has boards of its own, then join. Or --role secretary (the chat you talk to: it answers you shortly, turns requests into items on boards, keeps workers and a refiner running, never doing an item itself), --role worker --board <name> [--as <name>] (what the secretary gives each worker, or you paste into a new chat; without --as it tells the worker to pick a name with otea whoami) or --role refiner [--as <name>] (turns the Bandeja's rough notes into items). --lang en|es (default: the project's language, set when it was made; with no project yet, the one you use: the desk's, else this computer's, else English)",
   args: ['moment?'],
   options: {
     lang: { placeholder: 'en|es' },
@@ -1757,9 +1758,9 @@ const promptCommand: Command = {
     if (moment !== undefined) throw new UsageError('Give a moment or a --role, not both');
     if (role === 'worker' && board === undefined)
       throw new UsageError('--role worker needs --board <name>: the board it works');
-    if (role === 'coordinator' && board !== undefined)
+    if (!roleTakesBoard(role) && board !== undefined)
       throw new UsageError(
-        '--role coordinator takes no --board: each worker it launches gets its own',
+        `--role ${role} takes no --board: only a worker works one board (the secretary gives each its own)`,
       );
     // Only a name given with --as fills the text: the session's own (OTEA_AGENT) is the printer's,
     // never the worker's.

@@ -7,6 +7,7 @@ import {
   cardsOf,
   chipOf,
   FOLD_CHARS,
+  FOLD_LINES,
   type Message,
   mergeMessages,
   otherKind,
@@ -129,6 +130,20 @@ describe('a reply folding', () => {
     const chars = splitReply(`Lead\n${'x'.repeat(FOLD_CHARS + 1)}`);
     expect(chars.folds).toBe(true);
     expect(splitReply(`Lead\n${'x'.repeat(FOLD_CHARS)}`).folds).toBe(false);
+  });
+
+  // The secretary's rule (M4, its role text): the conclusion, then at most 3 short lines. The page
+  // shows exactly that much and folds the first line over it.
+  it('keeps what the secretary rule allows, a line and 3 short ones, and folds a fourth', () => {
+    const short = 'x'.repeat(70);
+    expect(FOLD_LINES).toBe(3);
+    expect(splitReply(['Lead', short, short, short].join('\n')).folds).toBe(false);
+    expect(splitReply(['Lead', short, short, short, short].join('\n')).folds).toBe(true);
+  });
+
+  it('does not count the blank lines between paragraphs as lines', () => {
+    expect(splitReply('Lead\n\nOne.\n\nTwo.\n\nThree.').folds).toBe(false);
+    expect(splitReply('Lead\n\nOne.\n\nTwo.\n\nThree.\n\nFour.').folds).toBe(true);
   });
 });
 

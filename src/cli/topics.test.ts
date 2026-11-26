@@ -136,7 +136,7 @@ describe('otea topic', () => {
     expect(before.err).toBe('');
     expect(before.out).not.toContain('otea topic');
 
-    // Turned on mid-session: the agent never read rule 13 in its guide.
+    // Turned on mid-session: the agent never read rule 14 in its guide.
     await person('topic', 'on');
     expect((await otea('next')).out).toContain('otea topic add');
 

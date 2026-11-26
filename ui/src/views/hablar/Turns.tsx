@@ -277,8 +277,8 @@ function PersonMessage({
 }
 
 // The secretary's reply: a one-line conclusion in the voice's serif and, under it, the rest; a long
-// rest folds behind «ver más» (M4 sets how long the secretary may be; the page guards for when it
-// is longer).
+// rest folds behind «ver más» (the secretary's rule is a line, then at most 3 short ones: FOLD_LINES
+// and FOLD_CHARS in conversation.ts guard for when it is longer).
 function Reply({ message, now, head }: { message: Message; now: number; head: ReactNode }) {
   const reply = useMemo(() => splitReply(message.text), [message.text]);
   const [open, setOpen] = useState(false);

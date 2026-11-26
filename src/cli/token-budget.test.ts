@@ -73,7 +73,9 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // work that does not need one (measured at 857).
   // Raised again for rule 10: ask with 2 to 4 options and the one you recommend, so the person
   // taps instead of reading and typing (raised to 895 and 890; measured at 894 and 885).
-  'board index': { text: 895, json: 53, mcp: 890 },
+  // Raised for rule 13, the secretary (0.8): who alone talks with the person in Hablar, so no other
+  // agent writes there (raised to 945 and 935; measured at 942 and 933).
+  'board index': { text: 945, json: 53, mcp: 935 },
   // The bug board's own words and each step's instructions, read once per session; show's Next:
   // block covers the step at hand. Raised when a preset collection read as a board kept its
   // playbook as the board's text: what agents read on the preset, as before.
@@ -166,7 +168,8 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // a new session or a compacted agent would otherwise be handed without the step (measured at
   // 796). Raised to 850 with rule 11's four outcomes (measured at 826).
   // Raised to 870 for rule 10: ask always with options and a recommendation (measured at 865).
-  instructions: { mcp: 870 },
+  // Raised to 915 for rule 13: the secretary alone talks with the person in Hablar (measured at 913).
+  instructions: { mcp: 915 },
   // The AGENTS.md block, in the context of every agent whose harness reads AGENTS.md: it says where
   // the guide is and holds no copy of it, which the instructions or otea board's index give
   // (MCP-TOKENS: the guide was in context two or three times; measured at 874 with the copy, 107).

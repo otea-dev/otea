@@ -270,6 +270,29 @@ describe('a long reply', () => {
     expect(q(root, '.hb-fold')).toBeNull();
     expect(text(q(root, '.hb-more-open'))).toBe('Una nota más.');
   });
+
+  // The secretary's rule (its role text): the conclusion, then at most 3 short lines. A reply that
+  // keeps it shows whole; one longer than that folds behind «ver más».
+  const rule = ['Listo.', 'Primera.', 'Segunda.', 'Tercera.'];
+  const reply = (lines: string[]) =>
+    conversation({
+      messages: [
+        say({ id: 1, author: 'person' }),
+        say({ id: 2, author: 'secretary', replyTo: 1, root: 1, text: lines.join('\n') }),
+      ],
+    });
+
+  it('shows a conclusion and 3 short lines whole', async () => {
+    const { root } = await open(reply(rule));
+    expect(q(root, '.hb-fold')).toBeNull();
+    expect(text(q(root, '.hb-more-open'))).toBe('Primera. Segunda. Tercera.');
+  });
+
+  it('folds a message with a fourth line behind «ver más»', async () => {
+    const { root } = await open(reply([...rule, 'Cuarta.']));
+    expect(q(root, '.hb-fold')).not.toBeNull();
+    expect(text(q(root, '.hb-toggle'))).toBe('ver más');
+  });
 });
 
 describe('the secretary thinking', () => {

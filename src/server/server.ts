@@ -103,6 +103,7 @@ import {
   PROMPT_KINDS,
   ROLES,
   rolePrompt,
+  roleTakesBoard,
 } from '../core/agent-prompts.ts';
 import { bandejaIdOf, type FromBandeja } from '../core/bandeja.ts';
 import { PERIOD_HINT, parsePeriod } from '../core/board/performance.ts';
@@ -570,15 +571,15 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         if (kind !== undefined && !isPromptKind(kind))
           throw new InvalidQuery(`kind must be one of ${PROMPT_KINDS.join(', ')}`);
         // A role's text (the canonical way of working): the same one otea prompt --role prints, for
-        // the desk to copy. A worker's board is required; a coordinator has none.
+        // the desk to copy. A worker's board is required; the secretary and the refiner have none.
         if (role === undefined && (board !== undefined || name !== undefined))
           throw new InvalidQuery(`board and as go with role (${ROLES.join(', ')})`);
         if (role !== undefined) {
           if (!isRole(role)) throw new InvalidQuery(`role must be one of ${ROLES.join(', ')}`);
           if (kind !== undefined) throw new InvalidQuery('give a kind or a role, not both');
           if (role === 'worker' && !board) throw new InvalidQuery('role worker needs a board');
-          if (role === 'coordinator' && board !== undefined)
-            throw new InvalidQuery('role coordinator takes no board');
+          if (!roleTakesBoard(role) && board !== undefined)
+            throw new InvalidQuery(`role ${role} takes no board`);
           if (name !== undefined && !isAgentName(name))
             throw new InvalidQuery(`"${name}" cannot name an agent`);
           return c.json({

@@ -109,14 +109,11 @@ describe('the start prompt', () => {
     );
   });
 
-  // P4-R3-10: Temas is off by default, and the interview never offered it.
-  it('asks in the interview whether to keep the side questions, and how to turn that on', () => {
-    expect(startPrompt('en')).toContain(
-      'Ask me too whether you should keep a record of the side questions I ask you off the work (Topics); if I say yes, turn it on: `otea topic on`.',
-    );
-    expect(startPrompt('es')).toContain(
-      'Pregúntame también si quiero que lleves registro de las preguntas sueltas que te hago fuera del trabajo (Temas); si digo que sí, actívalo: `otea topic on`.',
-    );
+  // 0.8: side questions are consultations the secretary saves, so the interview no longer offers
+  // Temas (and `otea topic on`).
+  it('does not offer to keep a record of the side questions', () => {
+    for (const lang of ['en', 'es'] as const)
+      expect(startPrompt(lang)).not.toMatch(/otea topic|\bTopics\b|\bTemas\b/);
   });
 });
 
@@ -257,9 +254,10 @@ describe('the start prompt interview', () => {
 });
 
 describe('the role prompts', () => {
-  it('knows its two roles', () => {
-    expect(ROLES).toEqual(['coordinator', 'worker']);
+  it('knows its three roles, and no coordinator any more', () => {
+    expect(ROLES).toEqual(['secretary', 'worker', 'refiner']);
     expect(isRole('worker')).toBe(true);
+    expect(isRole('coordinator')).toBe(false);
     expect(isRole('boss')).toBe(false);
   });
 
@@ -286,43 +284,135 @@ describe('the role prompts', () => {
       expect(text).not.toContain('ana-cambios');
     });
 
-    it(`keeps the coordinator from ever taking an item, and has it keep listening (${lang})`, () => {
-      const text = rolePrompt('coordinator', lang, {});
-      expect(text).toMatch(lang === 'es' ? /nunca haces un ítem/i : /never do an item yourself/i);
+    it(`has the secretary declare itself, listen, read and answer with --reply-to (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, {});
+      expect(text).toMatch(
+        lang === 'es' ? /Nunca tomas ni haces un ítem/i : /never take or do an item/i,
+      );
       expect(text).toMatch(lang === 'es' ? /Nunca tomes, reclames/ : /Never take, claim/);
       expect(text).toMatch(
         lang === 'es' ? /nunca apruebes ni devuelvas/i : /never approve or send back/i,
       );
       expect(text).toContain('otea whoami');
-      expect(text).toContain('otea profile --model');
-      expect(text).toContain('otea create');
-      // `otea wait` needs --turn: a bare one fails. This one wakes for the person's notes on its
-      // topics and for items no worker took (src/cli/prompt.test.ts runs it through the CLI).
-      expect(text).toContain('`otea wait --turn agent --unclaimed --as <');
-      expect(text).toContain(
-        `otea prompt --role worker --board <${lang === 'es' ? 'tablero' : 'board'}> --as <`,
-      );
-      expect(text).toContain(
-        `otea prompt --role worker --board <${lang === 'es' ? 'tablero' : 'board'}>`,
-      );
+      expect(text).toContain('otea profile --role secretary --model');
+      // Its wait is the secretary's own (a bare `otea wait` fails), run again after every action.
+      expect(text).toContain('`otea wait --secretary --as <');
+      expect(text).not.toContain('otea wait --turn');
+      expect(text).toMatch(lang === 'es' ? /después de cada acción/ : /after every action/);
       expect(text).toMatch(lang === 'es' ? /bucle de sondeo propio/ : /polling loop of your own/);
+      expect(text).toContain('otea conversation --as <');
+      expect(text).toContain('otea say "<');
+      expect(text).toMatch(lang === 'es' ? /da siempre --reply-to/ : /always give --reply-to/);
+    });
+
+    it(`sorts each message into a request with items from it or a consultation (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, {});
+      expect(text).toContain('otea create --collection');
+      expect(text).toContain('--from-message <');
+      expect(text).toContain('--request --links <');
+      expect(text).toContain('--consultation');
+      expect(text).toContain(lang === 'es' ? '"Qué quiero=' : '"What I want=');
+      expect(text).toContain(lang === 'es' ? '"Cómo lo valido=' : '"How I check it=');
+    });
+
+    it(`keeps a worker per board and a refiner for the Bandeja, launched with their texts (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, {});
+      const board = lang === 'es' ? 'tablero' : 'board';
+      expect(text).toContain(`otea prompt --role worker --board <${board}> --as <`);
+      expect(text).toContain('otea prompt --role refiner --as <');
+      expect(text).toContain('otea bandeja take <B-n> --for <');
+      expect(text).toMatch(lang === 'es' ? /subagente en segundo plano/ : /background subagent/);
+    });
+
+    // M4: the first line is the conclusion, then at most 3 short lines; the rest is a file.
+    it(`answers short: a conclusion, at most 3 short lines, the rest in a file, questions with options (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, {});
+      expect(text).toMatch(
+        lang === 'es'
+          ? /la primera línea es la conclusión, en una frase; luego, como máximo 3 líneas cortas/
+          : /the first line is the conclusion, in one sentence; then at most 3 short lines/,
+      );
+      expect(text).toContain('`--file <');
+      expect(text).toMatch(
+        lang === 'es'
+          ? /pregunta para mí siempre trae de 2 a 4 opciones, todas en una línea, y dice cuál recomiendas/
+          : /question to me always has 2 to 4 options, all on one line, and says which one you recommend/,
+      );
+    });
+
+    // M7: a harness with no background subagents does not do their work in the person's chat.
+    it(`tells the person how many sessions to open and gives each one's text when it has no subagents (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, {});
+      const fallback = text.split('\n').find((line) => /^8\. /.test(line)) ?? '';
+      expect(fallback).toMatch(
+        lang === 'es'
+          ? /no puede lanzar subagentes en segundo plano/
+          : /cannot launch background subagents/,
+      );
+      expect(fallback).toMatch(
+        lang === 'es'
+          ? /exactamente cuántas sesiones más abrir/
+          : /exactly how many other sessions/,
+      );
+      expect(fallback).toMatch(lang === 'es' ? /un solo mensaje numerado/ : /one numbered message/);
+      expect(fallback).toContain('otea prompt --role worker --board <');
+      expect(fallback).toContain('otea prompt --role refiner');
+    });
+
+    it(`has the refiner turn a Bandeja note into an item, asking on the entry with options (${lang})`, () => {
+      const text = rolePrompt('refiner', lang, { name: 'ana-ref' });
+      expect(text).toContain('otea bandeja --as ana-ref');
+      expect(text).toContain('otea bandeja take <B-n> --as ana-ref');
+      expect(text).toContain('--from-bandeja <B-n> --as ana-ref');
+      expect(text).toContain(lang === 'es' ? '"Qué quiero=' : '"What I want=');
+      expect(text).toContain(lang === 'es' ? '"Cómo lo valido=' : '"How I check it=');
+      expect(text).toContain('otea ask <B-n> "<');
+      expect(text).toContain('--option "<');
+      expect(text).toContain('--recommend <n>');
+      expect(text).toMatch(
+        lang === 'es' ? /nunca hagas un ítem tú mismo/ : /never do an item yourself/,
+      );
+      expect(text).not.toContain('<name>');
+    });
+
+    it(`asks a refiner given no name to pick one with whoami (${lang})`, () => {
+      const text = rolePrompt('refiner', lang, {});
+      expect(text).toContain('otea whoami');
+      expect(text).toContain(lang === 'es' ? '--as <nombre>' : '--as <name>');
+    });
+
+    // The worker asks the person with options too (the guide's rule 10).
+    it(`has the worker ask with options and stop only for the person or the secretary (${lang})`, () => {
+      const text = rolePrompt('worker', lang, { board: 'Cambios', name: 'ana' });
+      expect(text).toContain('--option "<');
+      expect(text).toContain('--recommend <n>');
+      expect(text).toMatch(
+        lang === 'es' ? /o el secretario te lo diga/ : /or the secretary tells you to/,
+      );
+      expect(text).not.toMatch(/coordinador|coordinator/i);
     });
   }
 
-  it('gives a coordinator its name when told, and is written in the language asked', () => {
-    const named = rolePrompt('coordinator', 'en', { name: 'ana' });
+  it('gives a secretary its name when told, and is written in the language asked', () => {
+    const named = rolePrompt('secretary', 'en', { name: 'ana' });
     expect(named).toContain('your name is ana');
     expect(named).not.toContain('otea whoami');
-    expect(rolePrompt('coordinator', 'es', {})).not.toBe(rolePrompt('coordinator', 'en', {}));
+    expect(rolePrompt('secretary', 'es', {})).not.toBe(rolePrompt('secretary', 'en', {}));
     expect(rolePrompt('worker', 'es', { board: 'Cambios' })).toContain('Eres un trabajador');
+    expect(rolePrompt('refiner', 'es', {})).toContain('Eres el refinador');
   });
 
-  // The Spanish texts say "trabajador"; `--role worker` stays the command's value.
-  it('says trabajador in Spanish, keeping only the --role value in English', () => {
+  // The Spanish texts say "trabajador" and "refinador"; `--role worker|refiner` stays the
+  // command's value.
+  it('says trabajador and refinador in Spanish, keeping only the --role value in English', () => {
     for (const role of ROLES) {
       const text = rolePrompt(role, 'es', { board: 'Cambios', name: 'ana' });
-      expect(text.replaceAll('--role worker', '')).not.toMatch(/\bworkers?\b/i);
+      expect(text.replace(/--role (worker|refiner|secretary)/g, '')).not.toMatch(
+        /\b(workers?|refiners?|secretary)\b/i,
+      );
     }
-    expect(rolePrompt('coordinator', 'es', {})).toContain('--role worker');
+    const secretary = rolePrompt('secretary', 'es', {});
+    expect(secretary).toContain('--role worker');
+    expect(secretary).toContain('--role refiner');
   });
 });

@@ -70,11 +70,6 @@ const DESK =
   'Never start the desk (otea serve) yourself: I run it in a terminal of my own or open the Otea desktop app, since one you start closes with your session. If I ask you to start it anyway, run otea serve --no-open.';
 const DESK_ES =
   'Nunca abras tú el escritorio (otea serve): lo abro yo en una terminal mía o con la app de escritorio de Otea, porque el que abres tú se cierra con tu sesión. Si igual te pido que lo abras, ejecuta otea serve --no-open.';
-// Topics are off until the person turns them on (P4-R3-10): the interview offers them.
-const TOPICS =
-  'Ask me too whether you should keep a record of the side questions I ask you off the work (Topics); if I say yes, turn it on: `otea topic on`.';
-const TOPICS_ES =
-  'Pregúntame también si quiero que lleves registro de las preguntas sueltas que te hago fuera del trabajo (Temas); si digo que sí, actívalo: `otea topic on`.';
 const PROFILE = 'otea profile --as <name> --model <model> --effort <effort> --harness <harness>';
 const PROFILE_ES =
   'otea profile --as <nombre> --model <modelo> --effort <esfuerzo> --harness <harness>';
@@ -99,7 +94,6 @@ const WORDS = {
       `- what "done" looks like: what I need to see to approve something (${repo ? 'a diff, screenshots, a video, test results, a document' : 'screenshots, the page or file itself, a document'});`,
       '- who reviews it, and how many review rounds are usual;',
       `- where the result lands${repo ? ' (for code: whether anything may reach the remote before I see it)' : ''}, and what must never happen without me.`,
-      `- ${TOPICS}`,
       '4. Then tell me plainly which of four outcomes fits, and why; templates are a starting point, never the only option:',
       '- A stock template fits as it is: name it (`otea board draft --help` lists them, sets too).',
       '- A template fits with these changes: name it and list the changes.',
@@ -162,7 +156,6 @@ const WORDS = {
       `- cómo se ve "terminado": qué necesito ver para aprobar algo (${repo ? 'un diff, capturas, un vídeo, resultados de pruebas, un documento' : 'capturas, la página o el archivo mismo, un documento'});`,
       '- quién lo revisa, y cuántas rondas de revisión son normales;',
       `- dónde termina el resultado${repo ? ' (en el código: si algo puede llegar al remoto antes de que yo lo vea)' : ''}, y qué no debe pasar nunca sin mí.`,
-      `- ${TOPICS_ES}`,
       '4. Luego dime con claridad cuál de cuatro resultados encaja, y por qué; las plantillas son un punto de partida, nunca la única opción:',
       '- Una plantilla de serie encaja tal cual: nómbrala (`otea board draft --help` las lista, también los conjuntos).',
       '- Una plantilla encaja con estos cambios: nómbrala y lista los cambios.',
@@ -257,11 +250,14 @@ export function connectFacts(facts: JoinFacts): ConnectFacts {
   return { code: facts.repo !== false, boards };
 }
 
-// The canonical way of working: one chat coordinates and never does an item, a worker per board
-// does them, and the person decides on the desk or the phone. Otea never launches an agent: the
-// coordinator launches its workers with the worker text, or the person pastes it into a chat of
-// each. Two texts, in the language of the project like the moments above.
-export const ROLES = ['coordinator', 'worker'] as const;
+// The canonical way of working: one chat, the secretary, talks with the person and never does an
+// item; a worker per board does them; a refiner turns the Bandeja's rough notes into items; and the
+// person decides on the desk or the phone. Otea never launches an agent: the secretary launches
+// workers and the refiner as background subagents with their texts, or, in a harness without
+// subagents, tells the person how many sessions to open and gives the text of each. Three texts, in
+// the language of the project like the moments above. (`coordinator`, the 0.7 name of the first,
+// is gone: Otea is not in real use yet, so it keeps no alias.)
+export const ROLES = ['secretary', 'worker', 'refiner'] as const;
 
 export type Role = (typeof ROLES)[number];
 
@@ -269,7 +265,13 @@ export function isRole(role: string): role is Role {
   return (ROLES as readonly string[]).includes(role);
 }
 
-// What a role text is filled with: the board a worker works (a coordinator names none: each worker
+// Whether a role's text names a board: only a worker's does (the secretary and the refiner each
+// work the whole project).
+export function roleTakesBoard(role: Role): boolean {
+  return role === 'worker';
+}
+
+// What a role text is filled with: the board a worker works (the secretary names none: each worker
 // it launches has its own) and the name the agent works under, when it is already chosen.
 export type RoleFacts = { board?: string; name?: string };
 
@@ -278,16 +280,22 @@ const quoted = (board: string) => (/\s/.test(board) ? `"${board}"` : board);
 
 const ROLE_WORDS = {
   en: {
-    coordinator: (name: string | undefined) => [
-      "You are the coordinator for this project's Otea boards. Your job is to talk with me and keep the work moving; you never do an item yourself.",
-      name === undefined
-        ? `1. Set up: run \`otea whoami\`, reuse its name or pick one (${NAME(exampleName())}), put it on every otea call (\`--as <name>\`), and declare your profile: \`otea profile --model <id> --effort <level> --as <name>\`.`
-        : `1. Set up: your name is ${name}; put \`--as ${name}\` on every otea call, and declare your profile: \`otea profile --model <id> --effort <level> --as ${name}\`.`,
-      '2. When I ask for something, put it on a board: `otea create` with What I want and How I check it filled in, so it skips Clarify. Ask me one question at a time if it is unclear. A question that is not a request (advice, an explanation) is a topic: record it and answer it there.',
-      '3. Keep workers running: one per board that has work, at most two on a code board. Give each its own name and launch it as a background subagent if your harness can, with the output of `otea prompt --role worker --board <board> --as <worker name>` as its instructions; otherwise tell me to open a new chat and paste that output. Relaunch a worker when the desk says nobody is listening on its board.',
-      `4. After every reply to me, start \`otea wait --turn agent --unclaimed --as ${name ?? '<name>'}\` again in the background so you hear the desk: my notes on your topics, and items I add that no worker has taken. When it returns, answer a topic note with \`otea topic answer\`; for an item nobody took, check that a worker is running on its board and launch one if not; then wait again. Never write a polling loop of your own.`,
-      '5. Never take, claim or hand off an item, never approve or send back for me, never relay my decisions.',
-    ],
+    secretary: (name: string | undefined) => {
+      const as = name ?? '<name>';
+      return [
+        "You are the secretary of this project's Otea boards: the one agent that talks with me and keeps the work moving. You never take or do an item yourself.",
+        name === undefined
+          ? `1. Set up: run \`otea whoami\`, reuse its name or pick one (${NAME(exampleName())}), put it on every otea call (\`--as <name>\`), and declare your profile and your role: \`otea profile --role secretary --model <id> --effort <level> --harness <harness> --as <name>\`.`
+          : `1. Set up: your name is ${name}; put \`--as ${name}\` on every otea call, and declare your profile and your role: \`otea profile --role secretary --model <id> --effort <level> --harness <harness> --as ${name}\`.`,
+        `2. Listen: run \`otea wait --secretary --as ${as}\` in the background and run it again after every action, so you always hear me; never write a polling loop of your own. It returns for a message of mine, a note in the Bandeja (my rough captures), or a board with work and nobody listening.`,
+        `3. Read what I wrote with \`otea conversation --as ${as}\` and answer with \`otea say "<text>" --reply-to <message id> --as ${as}\`: always give --reply-to.`,
+        `4. Sort each message of mine. A request (something to do): make each item with \`otea create --collection <board> --title "<title>" --field "What I want=<...>" --field "How I check it=<...>" --from-message <message id> --as ${as}\` (the field names are the board's own: \`otea board <board>\`; ask me when either is unclear), then say what you made: \`otea say "<text>" --reply-to <message id> --request --links <item ids> --as ${as}\`. A consultation (a question, advice, an explanation): answer it and mark it with \`otea say "<answer>" --reply-to <message id> --consultation --as ${as}\`. If you cannot tell, say which you think it is and ask me with two options; I correct it with one tap.`,
+        `5. Keep the work running: one worker per board that has work (at most two on a code board), each with its own name (such as <your name>-<board>), and a refiner for the Bandeja. Launch each as a background subagent with the output of \`otea prompt --role worker --board <board> --as <worker name>\` or \`otea prompt --role refiner --as <refiner name>\` as its instructions. When the wait says a board has work and nobody listens, or a note waits in the Bandeja, launch the one that is missing (for a note, first \`otea bandeja take <B-n> --for <refiner name> --as ${as}\`).`,
+        '6. Never take, claim or hand off an item, never approve or send back for me, never relay my decisions.',
+        '7. Answer short: the first line is the conclusion, in one sentence; then at most 3 short lines. Anything longer goes in a file (`--file <path>` on `otea say`) or on the item. A question to me always has 2 to 4 options, all on one line, and says which one you recommend.',
+        `8. If your harness cannot launch background subagents, do not do their work yourself: tell me, in one numbered message, exactly how many other sessions to open (one per board with work, plus one for the refiner) and paste under each number its full text, as \`otea prompt --role worker --board <board>\` and \`otea prompt --role refiner\` print it (run them to paste the real text). Until the refiner session is open, refine the Bandeja yourself the way its text says. Then go on listening.`,
+      ];
+    },
     worker: (board: string, name: string | undefined) => {
       const as = name ?? '<name>';
       return [
@@ -297,22 +305,42 @@ const ROLE_WORDS = {
         `1. Declare your profile: \`otea profile --model <id> --effort <level> --harness <harness> --as ${as}\`.`,
         `2. Loop: \`otea next --collection ${quoted(board)} --claim --as ${as}\`; do exactly what the step says, including every line of "Before you hand it off"; hand off with the exact command next prints; then run \`otea next\` again.`,
         "3. Work in your own git worktree for the item's branch. To land approved work: merge main into the branch (`git merge origin/main`), push normally, then push it to main as the step says. Never force push, never rebase a pushed branch.",
-        '4. If you need the person, ask on the item with `otea ask <id> "<question>"` and keep working on other items or wait; never stop silently.',
-        `5. When \`otea next\` has nothing for you, wait with \`otea wait --turn agent --unclaimed --as ${as}\` and continue when it returns. Stop only when the person or the coordinator tells you to; release what you hold first, with \`otea release <id> --as ${as}\`.`,
+        '4. If you need the person, ask on the item with `otea ask <id> "<question>" --option "<answer>" --recommend <n>` (2 to 4 options, the one you would choose marked) and keep working on other items or wait; never stop silently.',
+        `5. When \`otea next\` has nothing for you, wait with \`otea wait --turn agent --unclaimed --as ${as}\` and continue when it returns. Stop only when the person or the secretary tells you to; release what you hold first, with \`otea release <id> --as ${as}\`.`,
+      ];
+    },
+    refiner: (name: string | undefined) => {
+      const as = name ?? '<name>';
+      return [
+        name === undefined
+          ? `You are the refiner of this project's Bandeja: the rough notes I capture, which you turn into proper items. First run \`otea whoami --harness <harness>\` and reuse the name it gives back, or pick one of your own (${NAME(exampleName())}); then use \`--as <name>\` on every otea call.`
+          : `You are the refiner of this project's Bandeja: the rough notes I capture, which you turn into proper items. Your name is ${name}; use \`--as ${name}\` on every otea call.`,
+        `1. Declare your profile: \`otea profile --model <id> --effort <level> --harness <harness> --as ${as}\`.`,
+        `2. See what waits with \`otea bandeja --as ${as}\`. Take an entry (\`otea bandeja take <B-n> --as ${as}\`; the secretary may have taken it for you) and read it whole, with its files, with \`otea bandeja <B-n> --as ${as}\`. Read the boards with \`otea board\` and choose the one it belongs on.`,
+        `3. Refine it into an item on that board: \`otea create --collection <board> --title "<title>" --field "What I want=<...>" --field "How I check it=<...>" --from-bandeja <B-n> --as ${as}\`. Both fields come from my words (the field names are the board's own: \`otea board <board>\`); never invent what the note does not say. That files the entry under the item.`,
+        `4. When something is missing, ask me on the entry: \`otea ask <B-n> "<question>" --option "<answer>" --option "<answer>" --recommend <n> --as ${as}\` (2 to 4 options, the one you would choose marked). That ends your hold: I answer on the desk, and the secretary hands the entry back.`,
+        '5. Go on with the next entry. Never take an entry another refiner holds, and never do an item yourself.',
+        '6. When no entry waits, stop and say in one line what you filed and what waits for my answer.',
       ];
     },
   },
   es: {
-    coordinator: (name: string | undefined) => [
-      'Eres el coordinador de los tableros de Otea de este proyecto. Tu trabajo es hablar conmigo y mantener el trabajo en marcha; nunca haces un ítem tú mismo.',
-      name === undefined
-        ? `1. Configuración: ejecuta \`otea whoami\`, reutiliza su nombre o elige uno (${NAME_ES(exampleName())}), ponlo en cada llamada de otea (\`--as <nombre>\`) y declara tu perfil: \`otea profile --model <id> --effort <nivel> --as <nombre>\`.`
-        : `1. Configuración: tu nombre es ${name}; pon \`--as ${name}\` en cada llamada de otea y declara tu perfil: \`otea profile --model <id> --effort <nivel> --as ${name}\`.`,
-      '2. Cuando te pida algo, ponlo en un tablero: `otea create` con Qué quiero y Cómo lo valido llenados, para que se salte Aclarar. Hazme una pregunta a la vez si no está claro. Una pregunta que no es un pedido (un consejo, una explicación) es un tema: regístralo y respóndelo ahí.',
-      '3. Mantén trabajadores en marcha: uno por tablero que tenga trabajo, como máximo dos en un tablero de código. Dale a cada uno su propio nombre y lánzalo como subagente en segundo plano si tu harness puede, con lo que imprime `otea prompt --role worker --board <tablero> --as <nombre del trabajador>` como instrucciones; si no, dime que abra un chat nuevo y pegue eso. Vuelve a lanzar un trabajador cuando el escritorio diga que nadie escucha en su tablero.',
-      `4. Después de cada respuesta a mí, vuelve a iniciar \`otea wait --turn agent --unclaimed --as ${name ?? '<nombre>'}\` en segundo plano para oír el escritorio: mis notas en tus temas, y los ítems que agrego y ningún trabajador ha tomado. Cuando vuelva, responde una nota de un tema con \`otea topic answer\`; si un ítem no lo tomó nadie, comprueba que haya un trabajador en su tablero y lanza uno si no; luego espera de nuevo. Nunca escribas un bucle de sondeo propio.`,
-      '5. Nunca tomes, reclames ni entregues un ítem, nunca apruebes ni devuelvas con una nota por mí, nunca retransmitas mis decisiones.',
-    ],
+    secretary: (name: string | undefined) => {
+      const as = name ?? '<nombre>';
+      return [
+        'Eres el secretario de los tableros de Otea de este proyecto: el único agente que habla conmigo y mantiene el trabajo en marcha. Nunca tomas ni haces un ítem tú mismo.',
+        name === undefined
+          ? `1. Configuración: ejecuta \`otea whoami\`, reutiliza su nombre o elige uno (${NAME_ES(exampleName())}), ponlo en cada llamada de otea (\`--as <nombre>\`) y declara tu perfil y tu rol: \`otea profile --role secretary --model <id> --effort <nivel> --harness <harness> --as <nombre>\`.`
+          : `1. Configuración: tu nombre es ${name}; pon \`--as ${name}\` en cada llamada de otea y declara tu perfil y tu rol: \`otea profile --role secretary --model <id> --effort <nivel> --harness <harness> --as ${name}\`.`,
+        `2. Escucha: ejecuta \`otea wait --secretary --as ${as}\` en segundo plano y vuelve a ejecutarlo después de cada acción, para oírme siempre; nunca escribas un bucle de sondeo propio. Vuelve con un mensaje mío, una nota en la Bandeja (mis capturas sueltas) o un tablero con trabajo y nadie escuchando.`,
+        `3. Lee lo que escribí con \`otea conversation --as ${as}\` y responde con \`otea say "<texto>" --reply-to <id del mensaje> --as ${as}\`: da siempre --reply-to.`,
+        `4. Clasifica cada mensaje mío. Un pedido (algo que hacer): crea cada ítem con \`otea create --collection <tablero> --title "<título>" --field "Qué quiero=<...>" --field "Cómo lo valido=<...>" --from-message <id del mensaje> --as ${as}\` (los nombres de los campos son los del tablero: \`otea board <tablero>\`; pregúntame si falta alguno), y di lo que hiciste: \`otea say "<texto>" --reply-to <id del mensaje> --request --links <ids de los ítems> --as ${as}\`. Una consulta (una pregunta, un consejo, una explicación): respóndela y márcala con \`otea say "<respuesta>" --reply-to <id del mensaje> --consultation --as ${as}\`. Si no sabes cuál es, di cuál crees que es y pregúntame con dos opciones; lo corrijo con un toque.`,
+        `5. Mantén el trabajo en marcha: un trabajador por tablero que tenga trabajo (como máximo dos en un tablero de código), cada uno con su propio nombre (como <tu nombre>-<tablero>), y un refinador para la Bandeja. Lanza cada uno como subagente en segundo plano, con lo que imprime \`otea prompt --role worker --board <tablero> --as <nombre del trabajador>\` o \`otea prompt --role refiner --as <nombre del refinador>\` como instrucciones. Cuando la espera diga que un tablero tiene trabajo y nadie escucha, o que una nota espera en la Bandeja, lanza el que falta (para una nota, antes \`otea bandeja take <B-n> --for <nombre del refinador> --as ${as}\`).`,
+        '6. Nunca tomes, reclames ni entregues un ítem, nunca apruebes ni devuelvas con una nota por mí, nunca retransmitas mis decisiones.',
+        '7. Responde corto: la primera línea es la conclusión, en una frase; luego, como máximo 3 líneas cortas. Lo más largo va en un archivo (`--file <ruta>` en `otea say`) o en el ítem. Una pregunta para mí siempre trae de 2 a 4 opciones, todas en una línea, y dice cuál recomiendas.',
+        '8. Si tu harness no puede lanzar subagentes en segundo plano, no hagas tú su trabajo: dime, en un solo mensaje numerado, exactamente cuántas sesiones más abrir (una por tablero con trabajo, más una para el refinador) y pega bajo cada número su texto completo, tal como lo imprimen `otea prompt --role worker --board <tablero>` y `otea prompt --role refiner` (ejecútalos para pegar el texto real). Mientras la sesión del refinador no esté abierta, refina tú la Bandeja como dice su texto. Luego sigue escuchando.',
+      ];
+    },
     worker: (board: string, name: string | undefined) => {
       const as = name ?? '<nombre>';
       return [
@@ -322,8 +350,22 @@ const ROLE_WORDS = {
         `1. Declara tu perfil: \`otea profile --model <id> --effort <nivel> --harness <harness> --as ${as}\`.`,
         `2. Bucle: \`otea next --collection ${quoted(board)} --claim --as ${as}\`; haz exactamente lo que dice el paso, incluida cada línea de "Before you hand it off" (así la imprime otea next); entrega con el comando exacto que imprime next; luego vuelve a ejecutar \`otea next\`.`,
         '3. Trabaja en tu propio worktree de git para la rama del ítem. Para integrar el trabajo aprobado: mezcla main en la rama (`git merge origin/main`), publícala normalmente y luego súbela a main como dice el paso. Nunca hagas force push, nunca rebases una rama ya publicada.',
-        '4. Si necesitas a la persona, pregunta en el ítem con `otea ask <id> "<pregunta>"` y sigue con otros ítems o espera; nunca te detengas en silencio.',
-        `5. Cuando \`otea next\` no tenga nada para ti, espera con \`otea wait --turn agent --unclaimed --as ${as}\` y sigue cuando vuelva. Detente solo cuando la persona o el coordinador te lo diga; suelta antes lo que tengas, con \`otea release <id> --as ${as}\`.`,
+        '4. Si necesitas a la persona, pregunta en el ítem con `otea ask <id> "<pregunta>" --option "<respuesta>" --recommend <n>` (de 2 a 4 opciones, marcada la que elegirías) y sigue con otros ítems o espera; nunca te detengas en silencio.',
+        `5. Cuando \`otea next\` no tenga nada para ti, espera con \`otea wait --turn agent --unclaimed --as ${as}\` y sigue cuando vuelva. Detente solo cuando la persona o el secretario te lo diga; suelta antes lo que tengas, con \`otea release <id> --as ${as}\`.`,
+      ];
+    },
+    refiner: (name: string | undefined) => {
+      const as = name ?? '<nombre>';
+      return [
+        name === undefined
+          ? `Eres el refinador de la Bandeja de este proyecto: las notas sueltas que capturo, que conviertes en ítems en regla. Primero ejecuta \`otea whoami --harness <harness>\` y reutiliza el nombre que te devuelve, o elige uno propio (${NAME_ES(exampleName())}); luego usa \`--as <nombre>\` en cada llamada de otea.`
+          : `Eres el refinador de la Bandeja de este proyecto: las notas sueltas que capturo, que conviertes en ítems en regla. Tu nombre es ${name}; usa \`--as ${name}\` en cada llamada de otea.`,
+        `1. Declara tu perfil: \`otea profile --model <id> --effort <nivel> --harness <harness> --as ${as}\`.`,
+        `2. Mira lo que espera con \`otea bandeja --as ${as}\`. Toma una entrada (\`otea bandeja take <B-n> --as ${as}\`; puede que el secretario ya la haya tomado para ti) y léela entera, con sus archivos, con \`otea bandeja <B-n> --as ${as}\`. Lee los tableros con \`otea board\` y elige en cuál va.`,
+        `3. Refínala como un ítem de ese tablero: \`otea create --collection <tablero> --title "<título>" --field "Qué quiero=<...>" --field "Cómo lo valido=<...>" --from-bandeja <B-n> --as ${as}\`. Los dos campos salen de mis palabras (los nombres de los campos son los del tablero: \`otea board <tablero>\`); nunca inventes lo que la nota no dice. Eso archiva la entrada bajo el ítem.`,
+        `4. Cuando falte algo, pregúntame en la entrada: \`otea ask <B-n> "<pregunta>" --option "<respuesta>" --option "<respuesta>" --recommend <n> --as ${as}\` (de 2 a 4 opciones, marcada la que elegirías). Eso termina tu retención: respondo en el escritorio y el secretario te devuelve la entrada.`,
+        '5. Sigue con la entrada siguiente. Nunca tomes una entrada que tiene otro refinador, y nunca hagas un ítem tú mismo.',
+        '6. Cuando no espere ninguna entrada, detente y di en una línea qué archivaste y qué espera mi respuesta.',
       ];
     },
   },
@@ -333,7 +375,8 @@ const ROLE_WORDS = {
 // without a name tells the agent to pick it with whoami, and the commands carry a placeholder.
 export function rolePrompt(role: Role, lang: Lang, facts: RoleFacts): string {
   const words = ROLE_WORDS[lang];
-  if (role === 'coordinator') return words.coordinator(facts.name).join('\n');
+  if (role === 'secretary') return words.secretary(facts.name).join('\n');
+  if (role === 'refiner') return words.refiner(facts.name).join('\n');
   return words.worker(facts.board ?? '<board>', facts.name).join('\n');
 }
 
