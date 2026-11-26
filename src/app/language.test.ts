@@ -35,6 +35,21 @@ describe('the default language', () => {
     expect(systemLanguage({ LC_ALL: 'POSIX', LANG: 'es_ES' }, nothing)).toBe('es');
   });
 
+  // Field study 3: init before the desk opened made the project in English for a Spanish user:
+  // their computer is Spanish and the shell an agent runs in carried LANG=en_US.UTF-8 (set by the
+  // program that started it, never by the person). LC_ALL and LC_MESSAGES are choices; LANG is a
+  // default the computer's own language outranks.
+  it('puts the computer language over a bare LANG, and a deliberate LC_ALL over both', () => {
+    expect(systemLanguage({ LANG: 'en_US.UTF-8' }, () => 'es-ES')).toBe('es');
+    expect(systemLanguage({ LANG: 'es_ES.UTF-8' }, () => 'en-US')).toBe('en');
+    expect(systemLanguage({ LC_ALL: 'en_US.UTF-8', LANG: 'es_ES.UTF-8' }, () => 'es-ES')).toBe(
+      'en',
+    );
+    expect(systemLanguage({ LC_MESSAGES: 'es_ES.UTF-8', LANG: 'en_US.UTF-8' }, () => 'en-US')).toBe(
+      'es',
+    );
+  });
+
   it('does not take a language that merely begins with es for Spanish', () => {
     expect(systemLanguage({ LANG: 'est_EE' }, nothing)).toBe('en');
   });
