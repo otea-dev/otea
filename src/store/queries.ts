@@ -388,14 +388,40 @@ export function selectEventsOfTypes(db: DatabaseSync, types: readonly string[]):
 
 // What agents did on the boards lately: the newest claims, releases and moves of theirs, with the
 // collection of the item each was on. The newest `limit` events are read, whatever their age.
-export type AgentWork = { agent: string; collection: string; at: string };
+export type AgentWork = {
+  agent: string;
+  collection: string;
+  at: string;
+  type: 'claimed' | 'released' | 'transitioned';
+  // The state the item was in before a move (null for a claim or a release); `state` is the one it
+  // is in now.
+  from: string | null;
+  state: string;
+};
 
 export function selectRecentAgentWork(db: DatabaseSync, limit = 400): AgentWork[] {
-  const sql = `SELECT e.actor_name AS agent, i.collection AS collection, e.at AS at
+  const sql = `SELECT e.actor_name AS agent, i.collection AS collection, e.at AS at, e.type AS type,
+      e.data AS data, i.state AS state
     FROM (SELECT * FROM events ORDER BY id DESC LIMIT :limit) e
     JOIN items i ON i.id = e.item_id
     WHERE e.actor_kind = 'agent' AND e.type IN ('claimed', 'released', 'transitioned')`;
-  return db.prepare(sql).all({ limit }) as AgentWork[];
+  const rows = db.prepare(sql).all({ limit }) as {
+    agent: string;
+    collection: string;
+    at: string;
+    type: AgentWork['type'];
+    data: string;
+    state: string;
+  }[];
+  return rows.map(({ data, ...row }) => {
+    let from: unknown = null;
+    try {
+      from = (JSON.parse(data) as { from?: unknown }).from ?? null;
+    } catch {
+      // An event with no readable data says no state it left.
+    }
+    return { ...row, from: typeof from === 'string' ? from : null };
+  });
 }
 
 // limit caps the oldest events after the cursor; latest keeps the newest ones instead (where a feed

@@ -375,6 +375,19 @@ describe('the person answers', () => {
       expect(after.expiredLease).toBeUndefined();
     });
 
+    it('answered with plenty of its lease left, writes no new lease', () => {
+      const ctx = memoryContext();
+      const item = working(ctx);
+      ask(ctx, item.id);
+      const before = getItem(ctx, item.id, now).lease;
+      tick += 2 * 60;
+      seeAgent(ctx.db, { agent: 'kiln', channel: 'cli', call: true }, now);
+
+      answerQuestion(ctx, { id: item.id, text: 'Con musgo', actor: you, channel: 'ui' }, now);
+
+      expect(getItem(ctx, item.id, now).lease?.expiresAt).toBe(before?.expiresAt);
+    });
+
     it('answered in Otea, leaves it to whichever agent claims it', () => {
       const ctx = memoryContext();
       const item = working(ctx);

@@ -98,10 +98,12 @@ export function secretaryStatus(
   db: DatabaseSync,
   now: Clock = systemClock,
   processes: (pid: number) => boolean = processAlive,
+  // The agents, when the caller already read them.
+  agents?: readonly AgentPresence[],
 ): SecretaryStatus | undefined {
   const name = secretaryName(db);
   if (name === undefined) return undefined;
-  const agent = listAgents(db, now, processes).find((each) => each.name === name);
+  const agent = (agents ?? listAgents(db, now, processes)).find((each) => each.name === name);
   const pending = countPendingSignals(db);
   if (!agent || secretaryGone(agent, Date.parse(now()))) {
     const since = agent ? latest(agent.lastSeen, agent.actedAt) : null;

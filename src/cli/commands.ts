@@ -280,6 +280,7 @@ import {
   markMcpAsked,
   type ProfileView,
   profileView,
+  selectListenerProcesses,
   selectMcpLoads,
 } from '../store/queries.ts';
 import { baseStray } from './base-strays.ts';
@@ -2599,7 +2600,20 @@ const SECRETARY_RECHECK_MS = 5000;
 
 // How long a secretary wait that already has its answer waits for the process table, to note the
 // harness session it runs under.
-const HARNESS_READ_MS = 8000;
+const HARNESS_READ_MS = 4000;
+
+// Whether the harness session of the agent's waits is noted and still runs, so a wait need not read
+// the process table to find it again.
+function harnessNoted(cwd: string, agent: string): boolean {
+  try {
+    return withProject(cwd, (project) => {
+      const harness = selectListenerProcesses(project.db).get(agent)?.harness ?? null;
+      return harness !== null && processAlive(harness);
+    });
+  } catch {
+    return false;
+  }
+}
 
 // Runs `look` as a wait: the agent is heard as it waits, so it counts as connected and its profile
 // stays confirmed, from the start and on every beat; a wait that ends (it found something, was
@@ -2673,8 +2687,12 @@ async function waitForSecretary(input: Input): Promise<Output> {
   const timeoutMs = durationFrom('timeout', timeout);
   const me = input.actor.name;
   // Its harness session is noted as soon as the processes are read: that is the one process that
-  // says the secretary's session ended once no wait of it runs (it works between two waits).
-  const owner = watchOwner(input.signal, { early: input.channel === 'cli' });
+  // says the secretary's session ended once no wait of it runs (it works between two waits). Once
+  // noted and still running it is not read again by the waits that follow, which stay as quick as
+  // before: only the first wait of a session reads the process table early, and a wake that comes
+  // before it is done waits for it a few seconds at most.
+  const noting = input.channel === 'cli' && !harnessNoted(input.cwd, me);
+  const owner = watchOwner(input.signal, { early: noting });
   const options = {
     signal: owner.signal,
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
@@ -2699,7 +2717,7 @@ async function waitForSecretary(input: Input): Promise<Output> {
     const waited = await listenWhile(project, input, owner, look, options);
     // A wake in the first seconds comes before the processes are read: it gives them a moment, as
     // the harness noted is what tells its session ended once this process is gone.
-    if (!owner.orphaned())
+    if (noting && !owner.orphaned())
       await Promise.race([noted, delay(HARNESS_READ_MS, undefined, { ref: false })]);
     if (!('found' in waited)) return waited;
     const wake = waited.found;

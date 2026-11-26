@@ -17,14 +17,17 @@ export function liveStreams(feed: ChangeFeed, presence?: () => string): LiveStre
       streamSSE(c, async (stream) => {
         const { promise: ended, resolve } = Promise.withResolvers<void>();
         let seen = presence?.();
-        const unsubscribe = feed.subscribe(() => {
-          void stream.writeSSE({ event: 'change', data: '' });
-          if (!presence) return;
-          const now = presence();
-          if (now === seen) return;
-          seen = now;
-          void stream.writeSSE({ event: 'presence', data: '' });
-        });
+        const unsubscribe = feed.subscribe(
+          () => {
+            void stream.writeSSE({ event: 'change', data: '' });
+            if (!presence) return;
+            const now = presence();
+            if (now === seen) return;
+            seen = now;
+            void stream.writeSSE({ event: 'presence', data: '' });
+          },
+          { desk: true },
+        );
         const end = () => {
           unsubscribe();
           open.delete(end);

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { SILENT_AFTER_MS } from '../core/agent-status.ts';
 import { cambios, tareasDeRepo } from '../core/board/testing.ts';
-import { updateItemState } from '../store/queries.ts';
+import { appendEvent, updateItemState } from '../store/queries.ts';
 import { BETWEEN_ITEMS_MS } from './board-workers.ts';
 import type { Context } from './context.ts';
 import { createItem } from './items.ts';
@@ -66,7 +67,7 @@ describe('one live worker per board', () => {
     expect(() => claim('bea-cambios', second, 2000)).toThrow(
       expect.objectContaining({
         code: 'not_claimable',
-        message: expect.stringContaining('ana-cambios already works the board Cambios'),
+        message: expect.stringContaining('already works the board Cambios'),
       }),
     );
   });
@@ -84,11 +85,86 @@ describe('one live worker per board', () => {
     expect(claim('bea-cambios', second, later).lease?.holder).toBe('bea-cambios');
   });
 
+  it('says who holds the board, until when, and what to run to wait for it', () => {
+    declareSecretary(ctx.db, 'sol', at(0), running);
+    const [first, second] = [change('A'), change('B')] as [string, string];
+    claim('ana-cambios', first);
+
+    expect(() => claim('bea-cambios', second, 2000)).toThrow(
+      expect.objectContaining({
+        message: expect.stringMatching(
+          /ana-cambios \(until 2026-11-26 10:15 UTC\) already works the board Cambios.*otea wait --turn agent --unclaimed --as bea-cambios/,
+        ),
+      }),
+    );
+  });
+
+  // A CLI worker that crashed leaves a lease and no process: the board is free once it has given no
+  // sign for SILENT_AFTER_MS, not when the (longer) lease runs out.
+  it('frees the board of a crashed CLI worker once it gave no sign for the silent time', () => {
+    declareSecretary(ctx.db, 'sol', at(0), running);
+    const [first, second] = [change('A'), change('B')] as [string, string];
+    claimItem(ctx, { id: first, actor: agent('ana-cambios'), ttlMs: 60 * 60_000 }, at(0));
+    seeAgent(ctx.db, { agent: 'ana-cambios', channel: 'cli', call: true }, at(0));
+
+    expect(() => claim('bea-cambios', second, SILENT_AFTER_MS - 60_000)).toThrow(
+      expect.objectContaining({ code: 'not_claimable' }),
+    );
+    expect(claim('bea-cambios', second, SILENT_AFTER_MS + 60_000).lease?.holder).toBe(
+      'bea-cambios',
+    );
+  });
+
+  it('does not count an agent that only reviewed or sent back: that is no worker of the board', () => {
+    declareSecretary(ctx.db, 'sol', at(0), running);
+    const [first, second] = [change('A'), change('B')] as [string, string];
+    // A reviewer, connected, whose last move was out of a review step (a send-back).
+    seeAgent(ctx.db, { agent: 'rita-review', channel: 'cli', call: true }, at(1000));
+    appendEvent(ctx.db, {
+      itemId: first,
+      type: 'transitioned',
+      actor: agent('rita-review'),
+      at: at(1000)(),
+      data: { from: 'sanalyse__review', to: 'sanalyse' },
+    });
+
+    expect(claim('bea-cambios', second, 2000).lease?.holder).toBe('bea-cambios');
+  });
+
+  it('counts an agent that just handed a doing step off, though it holds nothing now', () => {
+    declareSecretary(ctx.db, 'sol', at(0), running);
+    const [first, second] = [change('A'), change('B')] as [string, string];
+    seeAgent(ctx.db, { agent: 'ana-cambios', channel: 'cli', call: true }, at(1000));
+    appendEvent(ctx.db, {
+      itemId: first,
+      type: 'transitioned',
+      actor: agent('ana-cambios'),
+      at: at(1000)(),
+      data: { from: 'sanalyse', to: 'sanalyse__review' },
+    });
+
+    expect(() => claim('bea-cambios', second, 2000)).toThrow(
+      expect.objectContaining({ code: 'not_claimable' }),
+    );
+  });
+
   it('takes no stand in a project with no secretary: agents are free to share a board', () => {
     const [first, second] = [change('A'), change('B')] as [string, string];
     claim('ana-cambios', first);
 
     expect(claim('bea-cambios', second, 2000).lease?.holder).toBe('bea-cambios');
+  });
+
+  it('offers a second worker the next item of another board, not the one it would be refused', () => {
+    declareSecretary(ctx.db, 'sol', at(0), running);
+    const [first] = [change('A'), change('B')] as [string, string];
+    const task = repoTask('C', 'feat/c');
+    claim('ana-cambios', first);
+    seeAgent(ctx.db, { agent: 'bea-repo', channel: 'cli', call: true }, at(2000));
+
+    const offered = nextFor(ctx, 'bea-repo', { claim: true }, at(2000));
+
+    expect(offered.item).toBe(task);
   });
 
   it('allows two on a board that merges code, and no third', () => {
@@ -115,6 +191,6 @@ describe('one live worker per board', () => {
     const offered = nextFor(ctx, 'bea-cambios', { claim: true }, at(2000));
 
     expect(offered.item).toBeNull();
-    expect(offered.text).toContain('ana-cambios already works the board Cambios');
+    expect(offered.text).toContain('already works the board Cambios');
   });
 });

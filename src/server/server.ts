@@ -41,7 +41,7 @@ import {
 } from '../app/items.ts';
 import { rememberLanguage, storedLanguage } from '../app/language.ts';
 import type { Launcher } from '../app/launcher.ts';
-import { livenessSignature } from '../app/liveness.ts';
+import { deskSignature, livenessSignature } from '../app/liveness.ts';
 import { memoryMachine } from '../app/machine.ts';
 import { mergeOnlyOf } from '../app/merge-only.ts';
 import { boardRoundOf, landWaitOf, liveBoards, rowFactsOf } from '../app/next.ts';
@@ -62,7 +62,7 @@ import {
   setLanOpen,
   switchToTailscale,
 } from '../app/phone.ts';
-import { listAgents, presenceSignature } from '../app/presence.ts';
+import { listAgents } from '../app/presence.ts';
 import { listPresetViews } from '../app/preset-views.ts';
 import { estimatesOfItems, pinItems, priorityOf, setOrder } from '../app/priority.ts';
 import { type Env, type Project, projectView } from '../app/project.ts';
@@ -1358,10 +1358,7 @@ export function createServer(
       signature: () => livenessSignature(project.db),
       everyMs: options.livenessEveryMs ?? LIVENESS_EVERY_MS,
     });
-    const streams = liveStreams(
-      feed,
-      () => `${presenceSignature(project.db)}${livenessSignature(project.db)}`,
-    );
+    const streams = liveStreams(feed, () => deskSignature(project.db));
     const notifier = createNotifier(project, feed, {
       sender,
       targets: machine,

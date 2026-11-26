@@ -211,21 +211,35 @@ export function hearAgent(db: DatabaseSync, sighting: Sighting, now: Clock = sys
 // The harness session a command-line agent's wait runs under (its process, above the shells that
 // run its commands), for as long as that session lives: when it is gone the agent's session is over
 // though no process of Otea's runs, which is what a secretary between two waits looks like.
-export function noteHarness(db: DatabaseSync, agent: string, pid: number): void {
+export function noteHarness(
+  db: DatabaseSync,
+  agent: string,
+  pid: number,
+  now: Clock = systemClock,
+): void {
   saveHarness(db, agent, pid);
+  beatProcess(db, pid, now);
 }
 
-// An agent speaks again after the harness noted for it ended: that is another session of it (the
-// same name after a restart), so the old one no longer counts against it; its next wait notes its
-// own.
+// An agent speaks again: the harness noted for it that ended means another session of it (the same
+// name after a restart), so the old one no longer counts against it, and its next wait notes its
+// own; one that runs is noted as running (HARNESS_BEAT_MS), at most every SEEN_PRECISION_MS.
 export function forgetGoneHarness(
   db: DatabaseSync,
   agent: string,
   alive: (pid: number) => boolean = processAlive,
+  now: Clock = systemClock,
 ): void {
   const harness = selectListenerProcesses(db).get(agent)?.harness ?? null;
-  if (harness === null || alive(harness)) return;
-  forgetHarness(db, agent, harness);
+  if (harness === null) return;
+  if (!alive(harness)) {
+    forgetHarness(db, agent, harness);
+    return;
+  }
+  const beat = selectProcessBeats(db).get(harness);
+  if (beat === undefined || Date.parse(now()) - Date.parse(beat) >= SEEN_PRECISION_MS) {
+    beatProcess(db, harness, now);
+  }
 }
 
 // A listener that ends (an MCP server whose client closed it, a wait whose session ended) stops
@@ -307,14 +321,22 @@ export function runningProcesses(
   db: DatabaseSync,
   now: Clock = systemClock,
   alive: (pid: number) => boolean = processAlive,
+  windowMs: number = LISTEN_WINDOW_MS,
 ): (pid: number) => boolean {
   const at = Date.parse(now());
   const beats = selectProcessBeats(db);
   return (pid) => {
     const beat = beats.get(pid);
-    return beat !== undefined && at - Date.parse(beat) <= LISTEN_WINDOW_MS && alive(pid);
+    return beat !== undefined && at - Date.parse(beat) <= windowMs && alive(pid);
   };
 }
+
+// A harness session is no Otea process, so nothing of Otea beats for it, but what the secretary
+// does keeps noting it as running (a wait's beat every minute, each command it runs): its id means
+// the session while it was noted lately, and only then. Past the secretary's held time with no
+// sign of it, an id that still runs may be another process's, as Windows hands them out within
+// seconds of one ending.
+export const HARNESS_BEAT_MS = 35 * 60_000;
 
 // An MCP session (`session`, its server's process id) takes an agent name only while no other open
 // session works under it: two sessions under one name would take one item twice and hand off each
@@ -404,7 +426,7 @@ export function sessionEnded(
   return listenersEnded(
     selectListenerProcesses(db).get(agent),
     runningProcesses(db, now, alive),
-    alive,
+    runningProcesses(db, now, alive, HARNESS_BEAT_MS),
   );
 }
 
@@ -420,7 +442,11 @@ export function sessionRuns(
 ): boolean {
   const processes = selectListenerProcesses(db).get(agent);
   if (!processes) return false;
-  return !listenersEnded(processes, runningProcesses(db, now, alive), alive);
+  return !listenersEnded(
+    processes,
+    runningProcesses(db, now, alive),
+    runningProcesses(db, now, alive, HARNESS_BEAT_MS),
+  );
 }
 
 // Whether the agent's session is alive now (P7-R3-11): a process it listens through (its MCP
@@ -464,16 +490,27 @@ export function renewLeases(db: DatabaseSync, agent: string, now: Clock = system
 function listenersEnded(
   processes: ListenerProcesses | undefined,
   alive: (pid: number) => boolean,
-  // The system's word on a process, with no beat asked of it: the harness session is no Otea
-  // process, nothing of Otea beats for it. Without it the harness is not looked at.
+  // Whether the harness session still runs (runningProcesses with HARNESS_BEAT_MS). Without it
+  // the harness is not looked at.
   exists?: (pid: number) => boolean,
 ): boolean {
   const { session = null, waiter = null, harness = null } = processes ?? {};
-  // The harness session its waits ran under is gone, and every process of the session with it,
-  // whether a wait runs now or not.
+  // A listener that runs is the session: nothing about another process overrides it.
+  if ((session !== null && alive(session)) || (waiter !== null && alive(waiter))) return false;
+  // None runs. The harness session its waits ran under is gone, and every process of the session
+  // with it, whether a wait runs now or not.
   if (harness !== null && exists && !exists(harness)) return true;
   if (session === null && waiter === null) return false;
-  return !(session !== null && alive(session)) && !(waiter !== null && alive(waiter));
+  return true;
+}
+
+// Whether a listener process of the agent runs (its MCP server, its wait).
+function listenerRuns(
+  processes: ListenerProcesses | undefined,
+  alive: (pid: number) => boolean,
+): boolean {
+  const { session = null, waiter = null } = processes ?? {};
+  return (session !== null && alive(session)) || (waiter !== null && alive(waiter));
 }
 
 // A name of the same stem as `base` that no agent ever used and no other session was handed:
@@ -515,6 +552,9 @@ export function waitBeat(
     markWaiting(db, sighting.agent, at);
     // A listener on the boards ends every stretch of work nobody heard (the secretary is none).
     clearStretchesFor(db, sighting.agent);
+    // The harness its wait was noted under still runs: noted again, a minute at a time.
+    const harness = selectListenerProcesses(db).get(sighting.agent)?.harness ?? null;
+    if (harness !== null) beatProcess(db, harness, () => at);
     keepLeases(db, sighting.agent, at);
     return at;
   };
@@ -625,11 +665,13 @@ export function listAgents(
     last !== undefined && Date.parse(at) - Date.parse(last) <= window;
   const within = (last: string | undefined) => since(last, LISTEN_WINDOW_MS);
   // Every listener process it was heard through has ended.
-  const silenced = (name: string) => listenersEnded(listeners.get(name), alive, processes);
-  // The harness session it was heard through is gone: nothing of it can still be acting.
+  const harnessRuns = runningProcesses(db, () => at, processes, HARNESS_BEAT_MS);
+  const silenced = (name: string) => listenersEnded(listeners.get(name), alive, harnessRuns);
+  // The harness session it was heard through is gone and no listener of it runs: nothing of it
+  // can still be acting. A listener that runs is never overridden by another process.
   const harnessGone = (name: string) => {
     const harness = listeners.get(name)?.harness ?? null;
-    return harness !== null && !processes(harness);
+    return harness !== null && !harnessRuns(harness) && !listenerRuns(listeners.get(name), alive);
   };
   const records = selectAgents(db);
   const released = selectLastReleases(db);
@@ -763,9 +805,15 @@ export function isSubagent(name: string, names: readonly string[]): boolean {
 // stream tells the UI to read the agents again when it differs. What time alone changes is
 // livenessSignature's.
 export function presenceSignature(db: DatabaseSync, now: Clock = systemClock): string {
-  const agents = listAgents(db, now).sort((a, b) => a.name.localeCompare(b.name));
+  return presenceSignatureOf(listAgents(db, now));
+}
+
+// The same, of agents already read: a caller that also needs them for something else reads them
+// once.
+export function presenceSignatureOf(agents: readonly AgentPresence[]): string {
+  const sorted = [...agents].sort((a, b) => a.name.localeCompare(b.name));
   return JSON.stringify(
-    agents.map((agent) => [
+    sorted.map((agent) => [
       agent.name,
       agent.harness,
       agent.holding,
@@ -867,8 +915,9 @@ export function nameFor(
   // Its session ended: every process it was heard listening through is gone (P4-R3-2). Its
   // lease is then the returning session's to carry on, and its last acts no other terminal's.
   const listeners = selectListenerProcesses(db);
+  const harnessRuns = runningProcesses(db, now, processes, HARNESS_BEAT_MS);
   const ended = (agent: AgentPresence) =>
-    listenersEnded(listeners.get(agent.name), alive, processes);
+    listenersEnded(listeners.get(agent.name), alive, harnessRuns);
   // A lease keeps a name busy only while its session is alive: one heard through nothing that
   // runs, quiet past the listening window, left it to whoever comes back under it (P7-R3-11).
   const holds = (agent: AgentPresence) =>

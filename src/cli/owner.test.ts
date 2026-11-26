@@ -47,6 +47,45 @@ describe('the processes that own a command', () => {
     expect(harnessOf(windows, 700)).toBe(700);
   });
 
+  // On Windows npx and npm are node programs: told from the harness by their command line only.
+  it('walks up past node running npx or npm, which end with the command', () => {
+    const rows = readProcessTable(
+      [
+        '700 1 claude.exe\tC:\\bin\\claude.exe\tclaude',
+        '600 700 bash.exe\tC:\\Git\\bin\\bash.exe\tbash -c otea',
+        '500 600 node.exe\tC:\\node\\node.exe\t"C:\\node\\node.exe" "C:\\node\\node_modules\\npm\\bin\\npx-cli.js" otea wait',
+        '400 500 sh.exe\tC:\\Git\\usr\\bin\\sh.exe\tsh -c otea wait',
+      ].join('\r\n'),
+    );
+
+    expect(harnessOf(rows, 400)).toBe(700);
+  });
+
+  it('takes node itself for the harness when it runs something that is no package runner', () => {
+    const rows = readProcessTable(
+      [
+        '700 1 node.exe\tC:\\node\\node.exe\tnode C:\\harness\\agent.js',
+        '500 700 sh.exe\tC:\\Git\\usr\\bin\\sh.exe\tsh -c otea',
+      ].join('\r\n'),
+    );
+
+    expect(harnessOf(rows, 500)).toBe(700);
+  });
+
+  it('reads the command line the listing says, and none when it says none', () => {
+    expect(
+      readProcessTable('500 600 node.exe\tC:\\n\\node.exe\tnode npm-cli.js exec x\r\n'),
+    ).toEqual([
+      {
+        pid: 500,
+        parent: 600,
+        name: 'node.exe',
+        path: 'C:\\n\\node.exe',
+        command: 'node npm-cli.js exec x',
+      },
+    ]);
+  });
+
   it('names no harness when the table does not reach one', () => {
     expect(harnessOf([{ pid: 500, parent: 600, name: 'sh' }], 500)).toBeUndefined();
     expect(harnessOf([], 500)).toBeUndefined();

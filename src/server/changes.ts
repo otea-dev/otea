@@ -3,8 +3,12 @@ import { dataVersion } from '../store/database.ts';
 
 export type Listener = () => void;
 
+// `desk`: a desk's live stream is the one listening. What the clock alone changes is looked at only
+// while one is, since only a desk shows it; the notifier has its own, slower tick.
+export type SubscribeOptions = { desk?: boolean };
+
 export type ChangeFeed = {
-  subscribe(listener: Listener): () => void;
+  subscribe(listener: Listener, options?: SubscribeOptions): () => void;
   notify(): void;
   close(): void;
 };
@@ -22,6 +26,7 @@ export function createChangeFeed(
   watch?: ClockWatch,
 ): ChangeFeed {
   const listeners = new Set<Listener>();
+  const desks = new Set<Listener>();
   let timer: ReturnType<typeof setInterval> | undefined;
   let version = 0;
   let seen: string | undefined;
@@ -31,10 +36,10 @@ export function createChangeFeed(
     for (const listener of listeners) listener();
   };
 
-  // A process that ended writes nothing (a secretary killed with its session): the desk is told
+  // A process that ended writes nothing (a secretary killed with its session): an open desk is told
   // by looking, now and then, at what depends on the clock and on the processes.
   const look = () => {
-    if (!watch || Date.now() - looked < watch.everyMs) return false;
+    if (!watch || desks.size === 0 || Date.now() - looked < watch.everyMs) return false;
     looked = Date.now();
     let now: string;
     try {
@@ -56,9 +61,6 @@ export function createChangeFeed(
 
   const start = () => {
     version = dataVersion(db);
-    looked = 0;
-    seen = undefined;
-    look();
     timer = setInterval(poll, intervalMs);
   };
 
@@ -68,17 +70,28 @@ export function createChangeFeed(
   };
 
   return {
-    subscribe(listener) {
+    subscribe(listener, options = {}) {
       listeners.add(listener);
+      if (options.desk) {
+        // The first desk takes the baseline the next look is compared with.
+        if (desks.size === 0) {
+          looked = 0;
+          seen = undefined;
+        }
+        desks.add(listener);
+        look();
+      }
       if (!timer) start();
       return () => {
         listeners.delete(listener);
+        desks.delete(listener);
         if (listeners.size === 0) stop();
       };
     },
     notify,
     close() {
       listeners.clear();
+      desks.clear();
       stop();
     },
   };

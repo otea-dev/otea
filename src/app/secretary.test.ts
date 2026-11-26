@@ -135,8 +135,32 @@ describe('the secretary', () => {
       // Its harness session (noted by its wait) is the one process left to ask about.
       describe('with the harness session it runs under noted', () => {
         const harness = 4242;
-        beforeEach(() => noteHarness(ctx.db, 'sol', harness));
+        beforeEach(() => noteHarness(ctx.db, 'sol', harness, stamp(T0)));
         const only = (pid: number) => (other: number) => other === pid;
+
+        // A harness id that runs may be another process's by now (Windows hands ids out within
+        // seconds): it means the session only while something of the secretary noted it lately.
+        it('is no session once its id runs but nothing of the secretary noted it for a long while', () => {
+          const later = T0 + 40 * 60_000;
+          seeAgent(ctx.db, { agent: 'sol', channel: 'cli', call: true }, stamp(later));
+
+          expect(secretaryStatus(ctx.db, stamp(later), only(harness))?.state).toBe('offline');
+        });
+
+        it('is kept as the session by what the secretary does: a command notes it again', () => {
+          const later = T0 + 40 * 60_000;
+          seeAgent(ctx.db, { agent: 'sol', channel: 'cli', call: true }, stamp(later - 1000));
+          forgetGoneHarness(ctx.db, 'sol', only(harness), stamp(later - 1000));
+
+          expect(secretaryStatus(ctx.db, stamp(later), only(harness))?.state).toBe('connected');
+        });
+
+        it('never overrides a listener of it that runs', () => {
+          wait('sol', T0 + 1000, 101);
+
+          // The wait (101) runs; the harness id does not.
+          expect(secretaryStatus(ctx.db, stamp(T0 + 2000), only(101))?.state).toBe('listening');
+        });
 
         it('holds while that session lives', () => {
           const later = T0 + 10 * 60_000;

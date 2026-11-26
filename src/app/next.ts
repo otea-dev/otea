@@ -113,7 +113,7 @@ import {
   selectRelationsOf,
   selectStateEntries,
 } from '../store/queries.ts';
-import { crowdedBoard } from './board-workers.ts';
+import { crowdCheck } from './board-workers.ts';
 import { collectionNamed } from './collections.ts';
 import type { Context } from './context.ts';
 import { type DraftRequest, draftRequestOf, handInCommand } from './draft-request.ts';
@@ -1142,15 +1142,17 @@ export function offerableTo(ctx: Context, agent: string, now = systemClock) {
   const at = now();
   const offered = offeredElsewhere(ctx, agent, at);
   const boards = liveBoards(ctx);
+  // Who works each board is read once for the whole look, however many items it asks about.
+  const crowded = crowdCheck(ctx.db, at);
   return (item: { id: string; collection: string }): boolean => {
     const board = boards.find(({ collection }) => collection === item.collection);
     if (!board) return true;
     const record = requireItem(ctx.db, item.id);
     if (offered(record) || !isTheirs(ctx, board.def, record, agent, at)) return false;
     // Not an item it could only be refused: a second worker beside a live one waits for nothing
-    // here (crowdedBoard), or its wait would wake it at once, again and again.
+    // here (crowdCheck), or its wait would wake it at once, again and again.
     const mine = activeLease(record.lease, at)?.holder === agent;
-    return mine || crowdedBoard(ctx.db, record, agent, board.def, at) === undefined;
+    return mine || crowded(record, agent, board.def) === undefined;
   };
 }
 
@@ -1475,7 +1477,28 @@ export function nextFor(
         since(a.item).localeCompare(since(b.item)) ||
         a.item.createdAt.localeCompare(b.item.createdAt),
     );
-    const first = candidates[0];
+    // Claiming: a second worker beside a live one on a board is offered the next item of another
+    // board, not an item it would only be refused; with nothing else it is told why.
+    const crowdOf = options.claim ? crowdCheck(ctx.db, at) : undefined;
+    const refused: OteaError[] = [];
+    const takeable = crowdOf
+      ? candidates.filter((each) => {
+          if (each.held) return true;
+          const refusal = crowdOf(each.item, agent, each.board.def);
+          if (refusal) refused.push(refusal);
+          return refusal === undefined;
+        })
+      : candidates;
+    const first = takeable[0];
+    const [crowded] = refused;
+    if (!first && crowded) {
+      return {
+        item: null,
+        collection: options.collection ?? null,
+        text: crowded.message,
+        idle: true,
+      };
+    }
     if (!first) {
       // Pedidos, there on every project, is named only once something was asked on it.
       const used = boards.filter(
@@ -1513,19 +1536,6 @@ export function nextFor(
       };
     }
     const { board } = first;
-    // A second worker beside a live one on the board takes nothing: it is told so, and waits.
-    const crowded =
-      options.claim && !first.held
-        ? crowdedBoard(ctx.db, first.item, agent, board.def, at)
-        : undefined;
-    if (crowded) {
-      return {
-        item: null,
-        collection: options.collection ?? null,
-        text: `${crowded.message}\nWait for work with otea wait --turn agent --unclaimed --as ${agent}, or stop.`,
-        idle: true,
-      };
-    }
     const lease = options.claim
       ? takeItem(
           ctx.db,

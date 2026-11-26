@@ -5,7 +5,15 @@ import { basename, dirname, join } from 'node:path';
 import { ownerGone, processAlive } from '../app/presence.ts';
 import { STARTED_BY } from './started-by.ts';
 
-export type ProcessRow = { pid: number; parent: number; name: string; path?: string };
+// `command`: the command line, when the system says it (Windows does): npm and npx are node
+// programs there, told from the harness only by it.
+export type ProcessRow = {
+  pid: number;
+  parent: number;
+  name: string;
+  path?: string;
+  command?: string;
+};
 
 // The programs that only run a command for someone else: a harness runs `otea` through them (its
 // shell, npm's sh or cmd shim), and on Windows they outlive the harness that started them.
@@ -63,10 +71,23 @@ const WRAPPERS = new Set([
   'winpty',
 ]);
 
+// The program a process runs, by its name: `npm exec otea` (a process title) is npm.
 const programOf = (name: string) =>
   basename(name.replaceAll('\\', '/'))
     .toLowerCase()
-    .replace(/\.(exe|cmd|bat)$/, '');
+    .replace(/\.(exe|cmd|bat)$/, '')
+    .split(/\s+/)[0] as string;
+
+// npm, npx, pnpm and yarn are node programs: node running their script is a wrapper too, however
+// the system names the process.
+const PACKAGE_RUNNER =
+  /(?:^|[\\/\s"'])(?:npm-cli|npx-cli|npm|npx|pnpm|pnpm\.cjs|yarn)(?:\.c?js)?(?:["'\s]|$)/i;
+
+function isWrapper(row: ProcessRow): boolean {
+  const program = programOf(row.name);
+  if (WRAPPERS.has(program)) return true;
+  return program === 'node' && row.command !== undefined && PACKAGE_RUNNER.test(row.command);
+}
 
 // The harness session a command started by `start` runs under: the first process above it that is
 // no shell and no wrapper, and so lasts as long as the session does. Undefined when the table does
@@ -77,8 +98,7 @@ export function harnessOf(rows: readonly ProcessRow[], start: number): number | 
   let row = byPid.get(start);
   while (row && !seen.has(row.pid)) {
     seen.add(row.pid);
-    const program = programOf(row.name);
-    if (!SHELLS.has(program) && !WRAPPERS.has(program)) return row.pid;
+    if (!SHELLS.has(programOf(row.name)) && !isWrapper(row)) return row.pid;
     row = byPid.get(row.parent);
   }
   return undefined;
@@ -88,11 +108,17 @@ export function harnessOf(rows: readonly ProcessRow[], start: number): number | 
 // file follow, when Windows says it.
 export function readProcessTable(text: string): ProcessRow[] {
   return text.split(/\r?\n/).flatMap((line) => {
-    const match = /^\s*(\d+)\s+(\d+)\s+([^\t]+?)\s*(?:\t(.*?)\s*)?$/.exec(line);
+    const match = /^\s*(\d+)\s+(\d+)\s+([^\t]+?)\s*(?:\t([^\t]*)(?:\t(.*?))?)?\s*$/.exec(line);
     if (!match) return [];
-    const [, pid, parent, name, path] = match;
+    const [, pid, parent, name, path, command] = match;
     const row: ProcessRow = { pid: Number(pid), parent: Number(parent), name: name as string };
-    return [path ? { ...row, path } : row];
+    return [
+      {
+        ...row,
+        ...(path?.trim() ? { path: path.trim() } : {}),
+        ...(command?.trim() ? { command: command.trim() } : {}),
+      },
+    ];
   });
 }
 
@@ -137,7 +163,7 @@ export function withPosixParents(
 }
 
 const WINDOWS_LISTING =
-  'Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,Name,ExecutablePath | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.Name)`t$($_.ExecutablePath)" }';
+  "Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine | ForEach-Object { \"$($_.ProcessId) $($_.ParentProcessId) $($_.Name)`t$($_.ExecutablePath)`t$(($_.CommandLine -replace '[\\t\\r\\n]+', ' '))\" }";
 
 // The busy Windows runner answered WMI after 20 s; the owner check waits for it in the background.
 const LISTING_TIMEOUT_MS = 60_000;
