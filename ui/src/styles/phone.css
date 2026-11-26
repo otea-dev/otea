@@ -1665,7 +1665,6 @@
   text-align: center;
   /* a long step name («Devolver a Investigar») wraps inside the button instead of being cut at 390 */
   white-space: normal;
-  line-height: 1.15;
   overflow-wrap: anywhere;
   border-radius: 10px;
   font: 600 15.5px / 1.15 var(--sans);
