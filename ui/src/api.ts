@@ -684,6 +684,13 @@ export function correctTurn(message: number, kind: MessageKind): Promise<Message
   return post<Message>(`/api/conversation/messages/${message}/kind`, { kind });
 }
 
+// The person's tap on a question of the secretary's (a message with options): one of its options
+// (by number, from 1), their own words, or the decision left to the secretary. It is their own
+// message in reply to it, which the secretary hears.
+export function answerSecretaryQuestion(message: number, given: AnswerWords): Promise<Message> {
+  return post<Message>(`/api/conversation/messages/${message}/answer`, given);
+}
+
 // The Bandeja: the entries not filed yet, and the latest filed ones.
 export async function fetchBandeja(signal: AbortSignal): Promise<BandejaView> {
   return (await get('/api/bandeja', signal)).json();

@@ -127,6 +127,7 @@ export function AskBody({
   options,
   recommended,
   gone = false,
+  bare = false,
   send,
 }: {
   by: string;
@@ -136,6 +137,8 @@ export function AskBody({
   options: readonly string[];
   recommended: number | undefined;
   gone?: boolean;
+  // Only the buttons: the question is the words just above (the secretary's own question).
+  bare?: boolean;
   send: (given: AnswerWords) => Promise<void>;
 }) {
   const app = useApp();
@@ -154,14 +157,22 @@ export function AskBody({
     );
   };
   return (
-    <div className="hb-ask" data-answered={said !== null ? '' : undefined}>
-      <div className="hb-who">
-        <AgentMark name={by} decorative />
-        <span>
-          {t('sheet.qa.asks', { agent: by })} · {about}
-        </span>
-      </div>
-      <p className="hb-q">{text}</p>
+    <div
+      className="hb-ask"
+      data-answered={said !== null ? '' : undefined}
+      data-bare={bare ? '' : undefined}
+    >
+      {bare ? null : (
+        <>
+          <div className="hb-who">
+            <AgentMark name={by} decorative />
+            <span>
+              {t('sheet.qa.asks', { agent: by })} · {about}
+            </span>
+          </div>
+          <p className="hb-q">{text}</p>
+        </>
+      )}
       {said !== null || gone ? (
         <p className="hb-said">{said ?? t('hablar.ask.gone')}</p>
       ) : (

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { correctTurn } from '../../api.ts';
+import { type AnswerWords, answerSecretaryQuestion, correctTurn } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { askingCount } from '../../bandeja.ts';
 import { CopyCommand } from '../../components/CopyCommand.tsx';
@@ -8,7 +8,9 @@ import {
   cardCounts,
   cardsOf,
   type Filter,
+  type Message,
   type MessageKind,
+  rowsOf,
   type Turn,
   thinkingRoot,
   turnAt,
@@ -104,6 +106,7 @@ export function HablarView({
     [app.all],
   );
   const turns = useMemo(() => turnsOf(messages ?? []), [messages]);
+  const rows = useMemo(() => rowsOf(messages ?? [], turns), [messages, turns]);
   const thinking = thinkingRoot(turns, secretary);
   const cards = useMemo(
     () => cardsOf(turns, items, app.now, filter),
@@ -252,6 +255,14 @@ export function HablarView({
     });
   };
 
+  // A tap on a question of the secretary's goes back to it as your own message; the page reads the
+  // conversation again so what you chose is in the thread at once.
+  const onAnswer = (message: Message, given: AnswerWords) =>
+    answerSecretaryQuestion(message.id, given).then(() => {
+      near.current = true;
+      if (convo.status === 'ready') convo.reload();
+    });
+
   const name = app.project?.name ?? '';
   const none = convo.status === 'ready' && secretary === null;
   const status = secretary && secretary.state !== 'offline' ? secretary : null;
@@ -338,10 +349,13 @@ export function HablarView({
                   ) : null}
                   <Turns
                     turns={turns}
+                    rows={rows}
                     thinking={thinking}
                     items={items}
                     found={found}
                     onKind={onKind}
+                    onGo={goTo}
+                    onAnswer={onAnswer}
                     scroller={scroller}
                     onFirst={() => {
                       const box = scroller.current;

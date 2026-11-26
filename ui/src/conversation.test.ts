@@ -12,6 +12,7 @@ import {
   mergeMessages,
   otherKind,
   piecesOf,
+  rowsOf,
   type SecretaryStatus,
   splitReply,
   thinkingRoot,
@@ -39,6 +40,11 @@ function say(o: Partial<Message> & { author: Message['author'] }): Message {
     delivery: o.author === 'person' ? 'read' : null,
     readAt: null,
     topic: null,
+    options: [],
+    recommended: null,
+    choice: null,
+    heardAt: null,
+    kindNews: false,
     ...o,
   };
 }
@@ -83,7 +89,95 @@ describe('the conversation worked into turns', () => {
   });
 });
 
+describe('the thread in time', () => {
+  // The secretary's news arrive as messages of their own and stand where they were said, below
+  // what the person wrote since; a reply to an older message says which one it answers.
+  it('lists every message once, in the order it was said, whatever turn it belongs to', () => {
+    const messages = [
+      say({ id: 1, author: 'person', text: 'Armá el tablero' }),
+      say({ id: 2, author: 'secretary', replyTo: 1, root: 1, text: 'Hecho.' }),
+      say({ id: 3, author: 'person', text: '¿Y los reintentos?' }),
+      say({ id: 4, author: 'secretary', replyTo: 3, root: 3, text: 'Mejor con backoff.' }),
+      say({ id: 5, author: 'secretary', replyTo: 1, root: 1, text: 'CAM-1 está listo.' }),
+      say({ id: 6, author: 'secretary', text: 'CAM-2 espera tu revisión.', links: ['CAM-2'] }),
+    ];
+    const rows = rowsOf(messages, turnsOf(messages));
+
+    expect(rows.map((row) => row.message.id)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(rows.map((row) => row.type)).toEqual([
+      'person',
+      'reply',
+      'person',
+      'reply',
+      'reply',
+      'reply',
+    ]);
+    // Only a reply that is not right after the message it answers names it.
+    expect(rows.map((row) => (row.type === 'reply' ? (row.answers?.id ?? null) : null))).toEqual([
+      null,
+      null,
+      null,
+      null,
+      1,
+      null,
+    ]);
+    // The first reply of a turn carries its kind and its branch; a later one does not.
+    expect(rows.map((row) => (row.type === 'reply' ? row.head : null))).toEqual([
+      null,
+      true,
+      null,
+      true,
+      false,
+      true,
+    ]);
+  });
+
+  it('shows what the person chose as its own row, and a question as open until they speak after it', () => {
+    const question = say({
+      id: 2,
+      author: 'secretary',
+      text: '¿Lo anoto?',
+      options: ['Anotarlo', 'Dejarlo'],
+      recommended: 1,
+    });
+    const asked = [say({ id: 1, author: 'person' }), question];
+    const open = rowsOf(asked, turnsOf(asked));
+    expect(open.at(-1)).toMatchObject({ type: 'reply', question: 'open' });
+
+    const chose = say({
+      id: 3,
+      author: 'person',
+      replyTo: 2,
+      text: 'Dejarlo',
+      choice: { mode: 'option', option: 2, about: null, asked: null },
+    });
+    const answered = rowsOf([question, chose], turnsOf([question, chose]));
+    expect(answered.map((row) => row.type)).toEqual(['reply', 'choice']);
+    expect(answered[0]).toMatchObject({ question: 'answered' });
+
+    // What they chose on an agent's question about an item is a trace: it answers no question of
+    // the secretary's, and the secretary is not thinking about it.
+    const trace = say({
+      id: 4,
+      author: 'person',
+      text: 'Con musgo',
+      choice: { mode: 'option', option: 2, about: 'CAM-12', asked: '¿Liso o con musgo?' },
+    });
+    const after = rowsOf([question, trace], turnsOf([question, trace]));
+    expect(after[0]).toMatchObject({ question: 'open' });
+    expect(turnsOf([trace])[0]?.waits).toBeNull();
+  });
+});
+
 describe('the secretary thinking', () => {
+  it('knows a message was heard the moment the wait returned it, before it was read', () => {
+    const [turn] = turnsOf([
+      say({ id: 1, author: 'person', delivery: 'pending', heardAt: ago(1) }),
+    ]);
+    expect(turn?.waits).toBe('reading');
+    expect(thinkingRoot(turn ? [turn] : [], listening)).toBe(1);
+  });
+
   it('holds the turn it read and has not answered, only while it is there', () => {
     const turns = turnsOf([
       say({ id: 1, author: 'person', delivery: 'read' }),
@@ -141,6 +235,40 @@ describe('a reply folding', () => {
     expect(splitReply(['Lead', short, short, short, short].join('\n')).folds).toBe(true);
   });
 
+  // A reply that is one long paragraph is no headline: only its first sentence is set in the serif
+  // conclusion style, the rest is body text (and folds when it is long).
+  it('takes only the first sentence of a one-paragraph reply as the conclusion', () => {
+    const paragraph =
+      'Lo anoté en Cambios. Ya lo tomó un trabajador y está probando a 390 px. Te aviso cuando haya algo para revisar, que no debería tardar mucho.';
+    const reply = splitReply(paragraph);
+    expect(reply.lead).toBe('Lo anoté en Cambios.');
+    expect(reply.rest).toBe(
+      'Ya lo tomó un trabajador y está probando a 390 px. Te aviso cuando haya algo para revisar, que no debería tardar mucho.',
+    );
+    expect(reply.folds).toBe(false);
+    const longer = splitReply(`${paragraph} ${paragraph} ${paragraph}`);
+    expect(longer.lead).toBe('Lo anoté en Cambios.');
+    expect(longer.folds).toBe(true);
+  });
+
+  it('does not end a sentence at an abbreviation, a version or a path', () => {
+    expect(
+      splitReply('Usa p. ej. el modo oscuro, v1.2 de change/CHA-5.x. Después sigo.').lead,
+    ).toBe('Usa p. ej. el modo oscuro, v1.2 de change/CHA-5.x.');
+    expect(splitReply('Mira e.g. esto y aquello. Luego más.').lead).toBe(
+      'Mira e.g. esto y aquello.',
+    );
+  });
+
+  it('cuts a first sentence that is itself too long at a word, so a headline is never a wall', () => {
+    const wall = `${'palabra '.repeat(40).trim()}. Fin.`;
+    const reply = splitReply(wall);
+    expect(reply.lead.length).toBeLessThanOrEqual(141);
+    expect(reply.lead.endsWith('…')).toBe(true);
+    // Nothing is lost: the lead and the rest hold every word.
+    expect(`${reply.lead.slice(0, -1)} ${reply.rest}`.replace(/\s+/g, ' ')).toBe(wall);
+  });
+
   it('does not count the blank lines between paragraphs as lines', () => {
     expect(splitReply('Lead\n\nOne.\n\nTwo.\n\nThree.').folds).toBe(false);
     expect(splitReply('Lead\n\nOne.\n\nTwo.\n\nThree.\n\nFour.').folds).toBe(true);
@@ -156,6 +284,18 @@ describe('plain words with ids and links', () => {
       { kind: 'text', text: ' and ZZ-9 at ' },
       { kind: 'url', url: 'https://otea.dev/x' },
       { kind: 'text', text: '.' },
+    ]);
+  });
+
+  it('keeps a branch name whole: an item id inside it is not a link', () => {
+    const pieces = piecesOf(
+      'Subí change/CHA-5-undo-delete-v2 y CHA-5 sigue en curso.',
+      new Set(['CHA-5']),
+    );
+    expect(pieces).toEqual([
+      { kind: 'text', text: 'Subí change/CHA-5-undo-delete-v2 y ' },
+      { kind: 'item', id: 'CHA-5' },
+      { kind: 'text', text: ' sigue en curso.' },
     ]);
   });
 
@@ -271,6 +411,30 @@ describe('what came out, in cards', () => {
     expect(cards[1]).toMatchObject({ title: 'El botón queda tapado', asks: true });
     expect(cards[1]?.chips.map((chip) => chip.id)).toEqual(['CAM-12', 'CAM-13']);
     expect(cards[0]).toMatchObject({ answer: 'Sí, si cada cliente revisa distinto.' });
+  });
+
+  // The person's own tap on «consulta ⇄» makes the turn a request nothing has taken yet: it stays
+  // in sight, saying the secretary is taking it, instead of vanishing from the list.
+  it('keeps a request the person corrected, with no items yet, saying the secretary takes it', () => {
+    const corrected = turnsOf([
+      say({ id: 1, author: 'person', text: '¿Vale la pena exportar a Markdown?' }),
+      say({
+        id: 2,
+        author: 'secretary',
+        replyTo: 1,
+        root: 1,
+        kind: 'request',
+        kindBy: 'person',
+        kindNews: true,
+      }),
+    ]);
+
+    const cards = cardsOf(corrected, items, NOW);
+
+    expect(cards).toEqual([
+      expect.objectContaining({ root: 1, kind: 'request', chips: [], taking: true }),
+    ]);
+    expect(cardCounts(corrected, items, NOW).request).toBe(1);
   });
 
   it('filters by kind and counts each', () => {

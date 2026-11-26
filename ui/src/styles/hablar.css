@@ -393,6 +393,49 @@
   position: absolute;
   inset: -10px -8px;
 }
+/* a reply said later names the older message it answers, quietly, above its words */
+.hb-re {
+  position: relative;
+  display: block;
+  max-width: 100%;
+  margin-top: 1px;
+  overflow: hidden;
+  font: 400 11.5px / 1.4 var(--sans);
+  color: var(--ink-3);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hb-re::before {
+  content: "↩ ";
+}
+.hb-re:hover {
+  color: var(--ink-2);
+}
+.hb-re::after {
+  content: "";
+  position: absolute;
+  inset: -8px 0;
+}
+/* what you chose: your own row, a line, never a headline */
+.hb-chose {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+}
+.hb-chose .hb-on {
+  font: 400 11.5px / 1.4 var(--sans);
+  color: var(--ink-3);
+}
+/* a question of the secretary's: its buttons sit under its words, no card of their own */
+.hb-ask[data-bare] {
+  max-width: 480px;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
 .hb-thinking {
   display: flex;
   align-items: center;
@@ -1062,6 +1105,10 @@ button.hb-chip:hover {
 }
 .hb-ans {
   font: 400 12.5px / 1.45 var(--sans);
+  color: var(--ink-2);
+}
+.hb-taking {
+  font: 400 italic 12.5px / 1.45 var(--serif);
   color: var(--ink-2);
 }
 .hb-kids {

@@ -32,6 +32,11 @@ function say(o: Partial<Message> & { author: Message['author'] }): Message {
     delivery: o.author === 'person' ? 'read' : null,
     readAt: null,
     topic: null,
+    options: [],
+    recommended: null,
+    choice: null,
+    heardAt: null,
+    kindNews: false,
     ...o,
   };
 }
@@ -224,6 +229,197 @@ describe('the conversation on the two lanes', () => {
   });
 });
 
+describe('the conversation as a thread in time', () => {
+  const thread = () => [
+    ...request(['CAM-12']),
+    say({ id: 3, author: 'person', text: '¿Y los reintentos con backoff?', kind: 'consultation' }),
+    say({
+      id: 4,
+      author: 'secretary',
+      replyTo: 3,
+      root: 3,
+      kind: 'consultation',
+      text: 'Conviene, con tope.',
+    }),
+    // The secretary's news about the first request, said later with --reply-to.
+    say({
+      id: 5,
+      author: 'secretary',
+      replyTo: 1,
+      root: 1,
+      kind: 'request',
+      links: ['CAM-12'],
+      text: 'CAM-12 ya está para revisar.',
+    }),
+    // And news of its own, with no message it answers.
+    say({
+      id: 6,
+      author: 'secretary',
+      links: ['CAM-13'],
+      text: 'CAM-13 también espera tu revisión.',
+    }),
+  ];
+
+  it('puts each message where it was said, the news at the foot, a late reply naming what it answers', async () => {
+    const { root } = await open(conversation({ messages: thread() }), { all: [working, queued] });
+
+    const rows = all(root, '.hb-row');
+    expect(rows.map((row) => text(row)?.includes('ya está para revisar'))).toEqual([
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+    ]);
+    expect(text(rows[5])).toContain('CAM-13 también espera tu revisión.');
+    const reference = q(rows[4] as HTMLElement, '.hb-re');
+    expect(text(reference)).toContain('El botón Aprobar queda tapado en el celu');
+    // The next reply right below its message says nothing of what it answers.
+    expect(q(rows[1] as HTMLElement, '.hb-re')).toBeNull();
+    // The notice points at its own items, and the first request keeps its own branch.
+    expect(all(rows[5] as HTMLElement, '.hb-branch .hb-chip').map((chip) => text(chip))).toEqual([
+      expect.stringContaining('CAM-13'),
+    ]);
+    expect(all(rows[1] as HTMLElement, '.hb-branch .hb-chip')).toHaveLength(1);
+    // The consultation stays a consultation.
+    expect(all(root, '.hb-row .hb-kind').map((label) => label.dataset.kind)).toEqual([
+      'request',
+      'consultation',
+    ]);
+  });
+
+  it('shows an agent’s question at the foot of the conversation, below what was said after it', async () => {
+    const messages = [
+      ...request(['CAM-14']),
+      say({ id: 3, author: 'person', text: 'y otra cosa' }),
+    ];
+    const { root } = await open(conversation({ messages }), { all: [asking] });
+
+    const card = q(root, '.hb-ask') as HTMLElement;
+    const last = all(root, '.hb-row.you').at(-1) as HTMLElement;
+    expect(text(last)).toContain('y otra cosa');
+    expect(last.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('keeps what you chose in the thread, as your own row', async () => {
+    const messages = [
+      ...request(['CAM-14']),
+      say({
+        id: 3,
+        author: 'person',
+        text: 'Celular, tablet y escritorio',
+        choice: {
+          mode: 'option',
+          option: 2,
+          about: 'CAM-14',
+          asked: '¿Lo pruebo también en tablet?',
+        },
+      }),
+    ];
+    const { root } = await open(conversation({ messages }));
+
+    const chose = q(root, '.hb-row.you .hb-chose') as HTMLElement;
+    expect(text(chose)).toContain('Elegiste: Celular, tablet y escritorio');
+    expect(text(chose)).toContain('CAM-14');
+    // A trace is no message waiting for the secretary.
+    expect(q(root, '.hb-thinking')).toBeNull();
+  });
+});
+
+describe('a question of the secretary', () => {
+  const question = () => [
+    say({ id: 1, author: 'person', text: '¿no estaría bueno un jefe en el piso 3?' }),
+    say({
+      id: 2,
+      author: 'secretary',
+      replyTo: 1,
+      root: 1,
+      text: '¿Qué hago con esto?',
+      options: ['Anotarlo', 'Dejarlo como idea'],
+      recommended: 1,
+    }),
+  ];
+
+  it('comes with buttons, the recommended one marked, and a tap goes back to the secretary', async () => {
+    const { root, calls } = await open(conversation({ messages: question() }));
+
+    const options = all(root, '.hb-row.secretary .hb-opt');
+    expect(options.map((option) => text(option))).toEqual([
+      'Anotarlorecomendada',
+      'Dejarlo como idea',
+    ]);
+
+    await press(options[1]);
+
+    expect(calls.map(({ method, url, body }) => [method, url, body])).toEqual([
+      ['POST', '/api/conversation/messages/2/answer', { option: 2 }],
+    ]);
+  });
+
+  it('has no buttons once you answered it, and your answer is in the thread', async () => {
+    const messages = [
+      ...question(),
+      say({
+        id: 3,
+        author: 'person',
+        replyTo: 2,
+        text: 'Dejarlo como idea',
+        choice: { mode: 'option', option: 2, about: null, asked: null },
+      }),
+    ];
+    const { root } = await open(conversation({ messages }));
+
+    expect(q(root, '.hb-opt')).toBeNull();
+    expect(text(q(root, '.hb-chose'))).toContain('Elegiste: Dejarlo como idea');
+    // It is waiting for the secretary, as any message of yours.
+    expect(q(root, '.hb-thinking')).not.toBeNull();
+  });
+});
+
+describe('a one-paragraph reply', () => {
+  it('sets only its first sentence as the conclusion, the rest in body text', async () => {
+    const paragraph =
+      'Lo anoté en Cambios. Ya lo tomó un trabajador y está probando a 390 px. Te aviso cuando haya algo para revisar.';
+    const { root } = await open(
+      conversation({
+        messages: [
+          say({ id: 1, author: 'person' }),
+          say({ id: 2, author: 'secretary', replyTo: 1, root: 1, text: paragraph }),
+        ],
+      }),
+    );
+
+    expect(text(q(root, '.hb-bluf'))).toBe('Lo anoté en Cambios.');
+    expect(text(q(root, '.hb-more-open'))).toBe(
+      'Ya lo tomó un trabajador y está probando a 390 px. Te aviso cuando haya algo para revisar.',
+    );
+  });
+});
+
+describe('a kind you corrected', () => {
+  it('stays in «Lo que salió» with no items yet, saying the secretary is taking it', async () => {
+    const messages = [
+      say({ id: 1, author: 'person', text: '¿Vale la pena exportar a Markdown?' }),
+      say({
+        id: 2,
+        author: 'secretary',
+        replyTo: 1,
+        root: 1,
+        kind: 'request',
+        kindBy: 'person',
+        kindNews: true,
+        text: 'Lo tomo como una consulta.',
+      }),
+    ];
+    const { root } = await open(conversation({ messages }));
+
+    const card = q(root, '.hb-card') as HTMLElement;
+    expect(text(card)).toContain('¿Vale la pena exportar a Markdown?');
+    expect(text(q(card, '.hb-taking'))).toBe('el secretario lo está tomando');
+  });
+});
+
 describe('a long reply', () => {
   const long = [
     'Listo: lo dejé en tres pasos.',
@@ -298,10 +494,21 @@ describe('a long reply', () => {
 describe('the secretary thinking', () => {
   const read = [say({ id: 1, author: 'person', delivery: 'read', text: '¿Tailscale o el relay?' })];
 
-  it('says «pensando…» on its lane while it holds a turn it read and has not answered', async () => {
+  it('says «leído · pensando…» on its lane while it holds a turn it read and has not answered', async () => {
     const { root } = await open(conversation({ messages: read }));
-    expect(text(q(root, '.hb-thinking'))).toBe('pensando…');
+    expect(text(q(root, '.hb-thinking'))).toBe('leído · pensando…');
     expect(q(root, '.nd.secretary[data-busy]')).not.toBeNull();
+  });
+
+  // The secretary's wait returned the message: the person sees it arrived at once, before it is read.
+  it('says it at once when the wait only heard the message, without calling it waiting', async () => {
+    const { root } = await open(
+      conversation({
+        messages: [say({ id: 1, author: 'person', delivery: 'pending', heardAt: ago(0) })],
+      }),
+    );
+    expect(text(q(root, '.hb-thinking'))).toBe('leído · pensando…');
+    expect(q(root, '.hb-who .hb-pend')).toBeNull();
   });
 
   it('does not while it is away: the banner says so instead', async () => {

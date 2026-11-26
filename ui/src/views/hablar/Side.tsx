@@ -58,6 +58,7 @@ function CardView({ card, now, onGo }: { card: Card; now: number; onGo: (root: n
         {card.title}
       </button>
       {card.answer ? <p className="hb-ans">{card.answer}</p> : null}
+      {card.taking ? <p className="hb-taking">{t('hablar.out.taking')}</p> : null}
       {card.chips.length > 0 ? (
         <div className="hb-kids">
           {card.chips.map((chip) => (

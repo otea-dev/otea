@@ -9,13 +9,16 @@ import {
   useRef,
   useState,
 } from 'react';
+import type { AnswerWords } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import {
   asksOf,
   branchOf,
   type Message,
   type MessageKind,
+  messageSnippet,
   otherKind,
+  type Row as RowOf,
   splitReply,
   type Turn,
 } from '../../conversation.ts';
@@ -28,7 +31,7 @@ import { reduced } from '../../motion/reduced.ts';
 import type { Item } from '../../types.ts';
 import { noteTime } from '../detail/notes.ts';
 import { Attachments } from './Attachments.tsx';
-import { AskCard, Branch } from './Branch.tsx';
+import { AskBody, AskCard, Branch } from './Branch.tsx';
 import { Plain } from './Plain.tsx';
 import { SecretaryMark } from './SecretaryMark.tsx';
 
@@ -263,7 +266,7 @@ function PersonMessage({
       <div className="hb-who">
         <span className="mk you">{t('mark.you')}</span>
         <time dateTime={message.at}>{noteTime(message.at, now)}</time>
-        {message.delivery === 'pending' ? (
+        {message.delivery === 'pending' && message.heardAt === null ? (
           <span className="hb-pend">{t('hablar.pending')}</span>
         ) : null}
         {extra}
@@ -276,10 +279,59 @@ function PersonMessage({
   );
 }
 
+// What you chose or answered: your own row, «Elegiste: …» (and on which item or note, when it only
+// records an answer to an agent's question).
+function Chose({ message, now, asked }: { message: Message; now: number; asked: Message | null }) {
+  const { choice } = message;
+  if (choice === null) return null;
+  const words =
+    choice.mode === 'delegated'
+      ? t('hablar.chose.delegated')
+      : t(choice.mode === 'option' ? 'hablar.chose.option' : 'hablar.chose.text', {
+          text: message.text,
+        });
+  return (
+    <>
+      <div className="hb-who">
+        <span className="mk you">{t('mark.you')}</span>
+        <time dateTime={message.at}>{noteTime(message.at, now)}</time>
+        {message.delivery === 'pending' && message.heardAt === null ? (
+          <span className="hb-pend">{t('hablar.pending')}</span>
+        ) : null}
+      </div>
+      <div className="hb-mine hb-chose" data-mode={choice.mode}>
+        <Plain text={words} />
+        {choice.about === null ? null : (
+          <span className="hb-on">
+            {t('hablar.chose.on', { about: choice.about })}
+            {choice.asked ? ` · «${messageSnippet(choice.asked, 60)}»` : ''}
+          </span>
+        )}
+        {choice.about === null && asked?.text ? (
+          <span className="hb-on">«{messageSnippet(asked.text, 60)}»</span>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
 // The secretary's reply: a one-line conclusion in the voice's serif and, under it, the rest; a long
 // rest folds behind «ver más» (the secretary's rule is a line, then at most 3 short ones: FOLD_LINES
 // and FOLD_CHARS in conversation.ts guard for when it is longer).
-function Reply({ message, now, head }: { message: Message; now: number; head: ReactNode }) {
+function Reply({
+  message,
+  now,
+  head,
+  answers,
+  onGo,
+}: {
+  message: Message;
+  now: number;
+  head: ReactNode;
+  // The older message it answers, when it is not the one right above it.
+  answers: Message | null;
+  onGo: (root: number) => void;
+}) {
   const reply = useMemo(() => splitReply(message.text), [message.text]);
   const [open, setOpen] = useState(false);
   const id = `hb-more-${message.id}`;
@@ -293,6 +345,11 @@ function Reply({ message, now, head }: { message: Message; now: number; head: Re
         <time dateTime={message.at}>{noteTime(message.at, now)}</time>
         {head}
       </div>
+      {answers === null ? null : (
+        <button type="button" className="hb-re" onClick={() => onGo(answers.root)}>
+          {t('hablar.re', { snippet: messageSnippet(answers.text, 60) })}
+        </button>
+      )}
       {reply.lead === '' ? null : (
         <p className="hb-bluf">
           <Plain text={reply.lead} />
@@ -340,92 +397,94 @@ function Thinking() {
   );
 }
 
-type TurnProps = {
-  turn: Turn;
+type EntryProps = {
+  row: RowOf;
   thinking: boolean;
   items: ReadonlyMap<string, Item>;
   now: number;
   fresh: (key: string) => boolean;
   found: boolean;
+  // The first row drawn of its turn: where a link to the turn lands.
+  begins: boolean;
   onKind: (turn: Turn, kind: MessageKind) => void;
+  onGo: (root: number) => void;
+  onAnswer: (message: Message, given: AnswerWords) => Promise<void>;
 };
 
-function TurnBlock({ turn, thinking, items, now, fresh, found, onKind }: TurnProps) {
-  const [first, ...later] = turn.replies;
-  const chips = branchOf(turn, items, now);
-  const asks = asksOf(turn, items);
-  const asked = useLingering(asks);
+// One message of the thread, where it was said. The turn it belongs to only lends it what it
+// shares: the kind label (on the person's message until the secretary has answered, then on its
+// first reply) and the branch of items that came out of it (under that first reply).
+function Entry({
+  row,
+  thinking,
+  items,
+  now,
+  fresh,
+  found,
+  begins,
+  onKind,
+  onGo,
+  onAnswer,
+}: EntryProps) {
+  const { message, turn } = row;
   const label = <KindLabel turn={turn} onKind={onKind} />;
-  const rows: ReactNode[] = [];
-  turn.person.forEach((message, index) => {
-    rows.push(
-      <Row
-        key={`m${message.id}`}
-        lane="you"
-        bodyKey={`m${message.id}`}
-        fresh={fresh(`m${message.id}`)}
-      >
+  let body: ReactNode;
+  if (row.type === 'person') {
+    const first = turn.person[0]?.id === message.id;
+    body = (
+      <Row lane="you" bodyKey={`m${message.id}`} fresh={fresh(`m${message.id}`)}>
         <PersonMessage
           message={message}
           now={now}
-          extra={index === 0 && !first && !thinking ? label : null}
+          extra={first && turn.replies.length === 0 && !thinking ? label : null}
         />
-      </Row>,
+      </Row>
     );
-  });
-  const replies = first ? [first, ...later] : [];
-  // A reply's row is its slot in the turn: the thinking row holds the slot the reply then takes,
-  // so the node stays and only the body is new.
-  replies.forEach((message, position) => {
-    const slot = `s${position}`;
-    const head = position === 0;
-    rows.push(
+  } else if (row.type === 'choice') {
+    body = (
+      <Row lane="you" bodyKey={`m${message.id}`} fresh={fresh(`m${message.id}`)}>
+        <Chose message={message} now={now} asked={row.asked} />
+      </Row>
+    );
+  } else {
+    const chips = row.head ? branchOf(turn, items, now) : [];
+    body = (
       <Row
-        key={slot}
         lane="secretary"
         bodyKey={`r${message.id}`}
         fresh={fresh(`r${message.id}`)}
-        className={head && chips.length > 0 ? 'has-branch' : undefined}
+        className={chips.length > 0 ? 'has-branch' : undefined}
       >
-        <Reply message={message} now={now} head={head ? label : null} />
-        {head ? <Branch chips={chips} fresh={(id) => fresh(`c${turn.root}:${id}`)} /> : null}
-      </Row>,
-    );
-  });
-  if (thinking) {
-    rows.push(
-      <Row
-        key={`s${replies.length}`}
-        lane="secretary"
-        bodyKey={`t${turn.root}`}
-        fresh={fresh(`t${turn.root}`)}
-        busy
-      >
-        <Thinking />
-      </Row>,
-    );
-  }
-  for (const { item, leaving } of asked) {
-    rows.push(
-      <Row
-        key={`a${item.id}`}
-        lane="secretary"
-        bodyKey={`a${item.id}`}
-        fresh={fresh(`a${item.id}`)}
-        leaving={leaving}
-      >
-        <AskCard item={item} gone={!asks.some((each) => each.id === item.id)} />
-      </Row>,
+        <Reply
+          message={message}
+          now={now}
+          head={row.head ? label : null}
+          answers={row.answers}
+          onGo={onGo}
+        />
+        {row.question === 'open' ? (
+          <AskBody
+            bare
+            by={message.by}
+            about=""
+            text={message.text}
+            options={message.options}
+            recommended={message.recommended ?? undefined}
+            send={(given) => onAnswer(message, given)}
+          />
+        ) : null}
+        {row.head ? <Branch chips={chips} fresh={(id) => fresh(`c${turn.root}:${id}`)} /> : null}
+      </Row>
     );
   }
   return (
     <section
       className="hb-turn"
-      id={`hb-turn-${turn.root}`}
-      data-k={`turn:${turn.root}`}
+      id={begins ? `hb-turn-${turn.root}` : undefined}
+      data-k={`m:${message.id}`}
       data-found={found ? '' : undefined}
     >
-      {rows}
+      {body}
     </section>
   );
 }
@@ -526,11 +585,17 @@ function LaneInk({ geometry }: { geometry: Geometry }) {
 
 export type TurnsProps = {
   turns: readonly Turn[];
+  // The thread, message by message, in the order it was said.
+  rows: readonly RowOf[];
   thinking: number | undefined;
   items: ReadonlyMap<string, Item>;
   // The turn a link asked for, to find: it shows lit for a moment.
   found: number | undefined;
   onKind: (turn: Turn, kind: MessageKind) => void;
+  // Goes to the turn a message answers.
+  onGo: (root: number) => void;
+  // The person's tap on a question of the secretary's.
+  onAnswer: (message: Message, given: AnswerWords) => Promise<void>;
   // The element that scrolls the conversation: the lanes draw in against it.
   scroller: RefObject<HTMLElement | null>;
   // Said when the turns are first there, just before the lanes draw in (the page scrolls to the
@@ -538,22 +603,45 @@ export type TurnsProps = {
   onFirst?: () => void;
 };
 
-export function Turns({ turns, thinking, items, found, onKind, scroller, onFirst }: TurnsProps) {
+export function Turns({
+  turns,
+  rows,
+  thinking,
+  items,
+  found,
+  onKind,
+  onGo,
+  onAnswer,
+  scroller,
+  onFirst,
+}: TurnsProps) {
   const app = useApp();
   const list = useRef<HTMLDivElement>(null);
   const geometry = useGeometry(list);
+  // The questions of agents that wait for you, on any item the thread produced: they stand at the
+  // foot, where the thread is now, not under the message that began their turn.
+  const asks = useMemo(
+    () => [
+      ...new Map(
+        turns.flatMap((turn) => asksOf(turn, items)).map((item) => [item.id, item]),
+      ).values(),
+    ],
+    [turns, items],
+  );
+  const asked = useLingering(asks);
   const keys = useMemo(
     () => [
-      ...turns.flatMap((turn) => [
-        ...turn.messages.map((m) => (m.author === 'person' ? `m${m.id}` : `r${m.id}`)),
-        ...turn.links.map((id) => `c${turn.root}:${id}`),
-        ...(turn.root === thinking ? [`t${turn.root}`] : []),
-        ...asksOf(turn, items).map((item) => `a${item.id}`),
-      ]),
+      ...rows.map(({ message }) =>
+        message.author === 'person' ? `m${message.id}` : `r${message.id}`,
+      ),
+      ...turns.flatMap((turn) => turn.links.map((id) => `c${turn.root}:${id}`)),
+      ...(thinking === undefined ? [] : [`t${thinking}`]),
+      ...asks.map((item) => `a${item.id}`),
     ],
-    [turns, thinking, items],
+    [rows, turns, thinking, asks],
   );
   const fresh = useFresh(keys);
+  const begun = new Set<number>();
   // The lanes draw in once, when the first turns are there.
   const drawn = useRef(false);
   const first = useRef(onFirst);
@@ -571,18 +659,47 @@ export function Turns({ turns, thinking, items, found, onKind, scroller, onFirst
         <span className="ag">sec</span>
         <span className="you">{t('lanes.you')}</span>
       </div>
-      {turns.map((turn) => (
-        <TurnBlock
-          key={turn.root}
-          turn={turn}
-          thinking={turn.root === thinking}
-          items={items}
-          now={app.now}
-          fresh={fresh}
-          found={turn.root === found}
-          onKind={onKind}
-        />
-      ))}
+      {rows.map((row) => {
+        const begins = !begun.has(row.turn.root);
+        begun.add(row.turn.root);
+        return (
+          <Entry
+            key={row.message.id}
+            row={row}
+            thinking={row.turn.root === thinking}
+            items={items}
+            now={app.now}
+            fresh={fresh}
+            found={row.turn.root === found}
+            begins={begins}
+            onKind={onKind}
+            onGo={onGo}
+            onAnswer={onAnswer}
+          />
+        );
+      })}
+      {thinking === undefined ? null : (
+        <section className="hb-turn" data-k="thinking">
+          <Row lane="secretary" bodyKey={`t${thinking}`} fresh={fresh(`t${thinking}`)} busy>
+            <Thinking />
+          </Row>
+        </section>
+      )}
+      {asked.length === 0 ? null : (
+        <section className="hb-turn" data-k="asks">
+          {asked.map(({ item, leaving }) => (
+            <Row
+              key={`a${item.id}`}
+              lane="secretary"
+              bodyKey={`a${item.id}`}
+              fresh={fresh(`a${item.id}`)}
+              leaving={leaving}
+            >
+              <AskCard item={item} gone={!asks.some((each) => each.id === item.id)} />
+            </Row>
+          ))}
+        </section>
+      )}
     </div>
   );
 }
