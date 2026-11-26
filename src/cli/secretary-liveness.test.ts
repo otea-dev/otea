@@ -6,7 +6,15 @@ import { processAlive } from '../app/presence.ts';
 import { openProject, type Project } from '../app/project.ts';
 import { secretaryStatus } from '../app/secretary.ts';
 import { selectListenerProcesses } from '../store/queries.ts';
-import { type Cli, cliAt, declareProfiles, type TempRepo, tempGitRepo, until } from './testing.ts';
+import {
+  type Cli,
+  cliAt,
+  declareProfiles,
+  removeOnceReleased,
+  type TempRepo,
+  tempGitRepo,
+  until,
+} from './testing.ts';
 
 const MAIN = fileURLToPath(new URL('./main.ts', import.meta.url));
 
@@ -34,7 +42,8 @@ describe('the secretary seen offline once its process is gone', () => {
     }
   });
 
-  afterAll(() => repo.remove());
+  // Windows holds the folder of processes that just ended a moment longer.
+  afterAll(() => removeOnceReleased(repo.dir), 30_000);
 
   // A real `otea wait --secretary` process, as the harness's background task runs it.
   const startWait = (): ChildProcess => {
