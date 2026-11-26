@@ -117,6 +117,7 @@ export const hablar = {
   'bandeja.save': 'Save note',
   'bandeja.saving': 'Saving…',
   'bandeja.saved': 'Saved in the Inbox',
+  'bandeja.see': 'See it in the Inbox',
   'bandeja.queued': 'Queued for the Inbox · it goes when your computer answers',
   'bandeja.queues':
     'Your computer is not answering: the note waits in the queue and goes when it is back.',

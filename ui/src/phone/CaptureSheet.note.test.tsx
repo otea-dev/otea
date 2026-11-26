@@ -8,6 +8,13 @@ import type { CollectionView } from '../types.ts';
 import { CaptureSheet } from './CaptureSheet.tsx';
 import { captureNow, closeCapture, openCapture, startMode } from './capture.ts';
 
+const toasts = vi.hoisted(
+  () => [] as { msg: unknown; action?: { label: string; run: () => void } }[],
+);
+vi.mock('../kit/pop/toast.tsx', async (actual) => ({
+  ...(await actual<typeof import('../kit/pop/toast.tsx')>()),
+  toast: (options: (typeof toasts)[number]) => void toasts.push(options),
+}));
 vi.mock('../board-studio/home/boards-store.ts', () => ({
   useBoards: () => ({ status: 'ready', boards: [] }),
   boardsOf: () => [],
@@ -86,6 +93,34 @@ describe('the phone’s quick note', () => {
     ]);
     await settle();
     expect(captureNow().open).toBe(false);
+    view.unmount();
+  });
+
+  // Field study 3: after «Anotar» nothing said where the note went; it lives in Hablar's «Lo que
+  // salió», which the phone's Panel does not name.
+  it('says where the note went, with a link to its row in the Bandeja', async () => {
+    const went: unknown[] = [];
+    const here = testApp({
+      phone: true,
+      collections: [pedidos],
+      route: { view: 'toca' },
+      go: (route: unknown) => void went.push(route),
+    });
+    const view = mount(
+      <AppTestProvider value={here}>
+        <CaptureSheet />
+      </AppTestProvider>,
+    );
+    await settle();
+    openCapture();
+    await settle();
+    await typeInto(document.querySelector<HTMLTextAreaElement>('.bn-text'), 'una nota');
+    await press(document.querySelector('.bn-save'));
+    await settle();
+    const shown = toasts.at(-1);
+    expect(shown?.action?.label).toBe('See it in the Inbox');
+    shown?.action?.run();
+    expect(went).toEqual([{ view: 'hablar', bandeja: 'B-1' }]);
     view.unmount();
   });
 

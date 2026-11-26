@@ -530,8 +530,20 @@ export function CaptureSheet() {
         <div ref={noteBox}>
           <NoteCapture
             key={cap.seq}
-            onSent={(how) => {
-              toast({ msg: t(how === 'queued' ? 'bandeja.queued' : 'bandeja.saved'), at: 'top' });
+            onSent={(how, ref) => {
+              toast({
+                msg: t(how === 'queued' ? 'bandeja.queued' : 'bandeja.saved'),
+                at: 'top',
+                // Where it went: its row in Hablar's «Lo que salió».
+                ...(ref
+                  ? {
+                      action: {
+                        label: t('bandeja.see'),
+                        run: () => app.go({ view: 'hablar', bandeja: ref }),
+                      },
+                    }
+                  : {}),
+              });
               closeCapture();
             }}
           />

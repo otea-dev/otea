@@ -37,8 +37,9 @@ export function NoteCapture({
   autoFocus = false,
   hint,
 }: {
-  // It landed in the Bandeja, or waits on this device for the PC to answer (queued).
-  onSent: (how: 'sent' | 'queued') => void;
+  // It landed in the Bandeja (under `ref`, B-3), or waits on this device for the PC to answer
+  // (queued: no entry yet).
+  onSent: (how: 'sent' | 'queued', ref?: string) => void;
   autoFocus?: boolean;
   hint?: string | undefined;
 }) {
@@ -90,14 +91,15 @@ export function NoteCapture({
     setBusy(true);
     setError(null);
     // It is over: the box is empty, and the words kept for a failed send are no longer needed.
-    const done = (how: 'sent' | 'queued') => {
+    const done = (how: 'sent' | 'queued', ref?: string) => {
       attempt.current = null;
       clearNoteDraft(project);
       if (!alive.current) return;
       setText('');
       setDrafts([]);
       setBusy(false);
-      onSent(how);
+      if (ref === undefined) onSent(how);
+      else onSent(how, ref);
     };
     // What goes wrong is said here, with the words kept (and on the phone for a reload): never a
     // button left busy with no word.
@@ -141,8 +143,8 @@ export function NoteCapture({
     };
     try {
       if (app.sync.offline && queueAvailable()) return await keep();
-      await postCapture({ text: words, files }, key);
-      done('sent');
+      const entry = await postCapture({ text: words, files }, key);
+      done('sent', entry.ref);
     } catch (failure) {
       if (failure instanceof Unheard && queueAvailable()) return keep();
       fail(failure instanceof Error ? failure.message : String(failure));
