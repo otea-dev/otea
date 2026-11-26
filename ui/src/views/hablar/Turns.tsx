@@ -18,6 +18,7 @@ import {
   asksOf,
   blocksOf,
   branchOf,
+  fencesOf,
   type Message,
   type MessageKind,
   messageSnippet,
@@ -371,7 +372,7 @@ function Reply({
         <>
           <div className="hb-fold" data-open={open ? '' : undefined}>
             <div id={id} className="hb-more" aria-hidden={open ? undefined : true} inert={!open}>
-              <Plain text={reply.rest} />
+              <Prose text={reply.rest} />
             </div>
           </div>
           <button
@@ -385,33 +386,52 @@ function Reply({
           </button>
         </>
       ) : (
-        <p className="hb-more-open">
-          <Plain text={reply.rest} />
-        </p>
+        <div className="hb-more-open">
+          <Prose text={reply.rest} />
+        </div>
       )}
       {parts.blocks.map((block, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of a said message never move
-        <PasteBlock key={index} block={block} n={index + 1} />
+        <PasteBlock key={index} block={block} />
       ))}
       <Attachments files={message.attachments} />
     </>
   );
 }
 
+// Words and, where the reply fenced some, its code drawn as code.
+function Prose({ text }: { text: string }) {
+  const parts = useMemo(() => fencesOf(text), [text]);
+  if (parts.length === 1 && !parts[0]?.code) return <Plain text={text} />;
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.code ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a said message never move
+          <pre key={index} className="hb-code">
+            {part.text}
+          </pre>
+        ) : (
+          // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a said message never move
+          <Plain key={index} text={part.text} />
+        ),
+      )}
+    </>
+  );
+}
+
 // A text for another session to read, as the secretary pasted it: its caption, the text in a box
 // that scrolls on its own, and a button that copies all of it.
-function PasteBlock({ block, n }: { block: TextBlock; n: number }) {
+function PasteBlock({ block }: { block: TextBlock }) {
   const [copied, copy] = useCopy(block.text);
   return (
     <div className="hb-block">
       <div className="hb-bhead">
         <span className="hb-bn" aria-hidden="true">
-          {n}
+          {block.number}
         </span>
         {/* The number is the badge's: «1. Trabajador…» reads «Trabajador…» beside it. */}
-        <span className="hb-bcap">
-          {block.caption.replace(/^\d+[.)]\s*/, '') || t('hablar.block', { n })}
-        </span>
+        <span className="hb-bcap">{block.caption || t('hablar.block')}</span>
         <button type="button" className="hb-bcopy" onClick={copy}>
           <CopyGlyph />
           {copied ? t('hablar.block.copied') : t('hablar.block.copy')}

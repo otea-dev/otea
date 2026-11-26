@@ -9,6 +9,7 @@ import {
   chipOf,
   FOLD_CHARS,
   FOLD_LINES,
+  fencesOf,
   type Message,
   mergeMessages,
   otherKind,
@@ -248,14 +249,15 @@ describe('texts to paste, in fenced blocks', () => {
     '```',
   ].join('\n');
 
-  it('takes each block out of the words, with the line above it as its caption', () => {
+  it('takes each numbered block out of the words, with its number and the line above as caption', () => {
     const { rest, blocks } = blocksOf(text);
     expect(blocks).toEqual([
       {
-        caption: '1. Trabajador de Cambios: pega esto en una sesión nueva.',
+        number: 1,
+        caption: 'Trabajador de Cambios: pega esto en una sesión nueva.',
         text: 'Eres un trabajador del tablero Cambios.\n1. Declara tu perfil: `otea profile`.',
       },
-      { caption: '2. Refinador:', text: 'Eres el refinador.' },
+      { number: 2, caption: 'Refinador:', text: 'Eres el refinador.' },
     ]);
     expect(rest).toBe('Abre 2 sesiones más.');
   });
@@ -265,9 +267,52 @@ describe('texts to paste, in fenced blocks', () => {
     const open = 'Hola.\n```\nsin cierre';
     expect(blocksOf(open)).toEqual({ rest: open, blocks: [] });
   });
+
+  // A snippet in an ordinary reply is a code block of that reply, not a text to paste.
+  it('leaves a fenced snippet of an ordinary reply in its words', () => {
+    const reply = 'Corre esto y dime qué sale:\n```\nnpm test\n```\nSi falla, avísame.';
+    expect(blocksOf(reply)).toEqual({ rest: reply, blocks: [] });
+    // A caption that is only a number is not a numbered line of words either.
+    const noCaption = 'Abre 2 sesiones.\n```\nEres el refinador.\n```';
+    expect(blocksOf(noCaption).blocks).toEqual([]);
+  });
+
+  it('keeps a fence inside a longer fence as the text of the block', () => {
+    const nested = [
+      '1. Trabajador:',
+      '````',
+      'Usa esto:',
+      '```',
+      'otea next',
+      '```',
+      'Fin.',
+      '````',
+    ];
+    expect(blocksOf(nested.join('\n'))).toEqual({
+      rest: '',
+      blocks: [{ number: 1, caption: 'Trabajador:', text: 'Usa esto:\n```\notea next\n```\nFin.' }],
+    });
+  });
+
+  it('draws the code of an ordinary reply apart from its words', () => {
+    expect(fencesOf('Corre esto:\n```sh\nnpm test\n```\nListo.')).toEqual([
+      { code: false, text: 'Corre esto:' },
+      { code: true, text: 'npm test' },
+      { code: false, text: 'Listo.' },
+    ]);
+    expect(fencesOf('Solo palabras.')).toEqual([{ code: false, text: 'Solo palabras.' }]);
+  });
 });
 
 describe('a reply folding', () => {
+  // The first sentence does not end at the number of a list item.
+  it('does not split a line after a bare number', () => {
+    expect(splitReply('1. Declara tu perfil con otea profile.').lead).toBe(
+      '1. Declara tu perfil con otea profile.',
+    );
+    expect(splitReply('Hay 3. Luego sigue.').lead).toBe('Hay 3. Luego sigue.');
+  });
+
   it('leads with its first line and keeps a short rest open', () => {
     expect(splitReply('Done.\nOne more thing.')).toEqual({
       lead: 'Done.',

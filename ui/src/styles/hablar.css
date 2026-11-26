@@ -1240,6 +1240,18 @@ button.hb-chip:hover {
 .hb-bcopy .pj-copy-glyph {
   stroke: currentColor;
 }
+/* the code a reply fenced: quiet, in its own box that scrolls sideways */
+.hb-code {
+  margin: 6px 0;
+  max-width: 62ch;
+  padding: 8px 10px;
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--sheet);
+  font: 400 12px / 1.5 var(--mono);
+  color: var(--ink-2);
+}
 .hb-bpre {
   margin: 0;
   padding: 10px 12px;

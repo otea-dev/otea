@@ -35,7 +35,7 @@ export const hablar = {
   'hablar.chose.delegated': 'You left the decision to whoever asked',
   'hablar.chose.on': 'on {about}',
   'hablar.out.taking': 'the secretary is taking it',
-  'hablar.block': 'Text {n}',
+  'hablar.block': 'Text to paste',
   'hablar.block.copy': 'Copy',
   'hablar.block.copied': 'Copied',
   'hablar.more': 'see more',

@@ -131,8 +131,10 @@ export type Reply = {
 // The most a conclusion is, in characters: a headline, never a paragraph.
 export const LEAD_CHARS = 140;
 
-// Words after which a full stop does not end a sentence (e.g., p. ej., etc., vs.).
-const ABBREVIATIONS = /(?:^|\s)(?:[A-Za-zÁÉÍÓÚáéíóú]|e\.g|i\.e|ej|etc|vs|sr|sra|dr|dra|aprox|nº)$/i;
+// Words after which a full stop does not end a sentence (e.g., p. ej., etc., vs.), and a bare
+// number: the «1.» of a list item.
+const ABBREVIATIONS =
+  /(?:^|\s)(?:[A-Za-zÁÉÍÓÚáéíóú]|\d+|e\.g|i\.e|ej|etc|vs|sr|sra|dr|dra|aprox|nº)$/i;
 
 // Where the first sentence of a line ends: after . ! ? or … followed by a space or the end, and not
 // at an abbreviation. A line with no such end is one sentence.
@@ -171,8 +173,27 @@ export function splitReply(text: string): Reply {
 // text of a worker or a refiner, when its harness cannot launch subagents). The secretary sets
 // each in a fenced block under its number (the secretary text says so); the page draws it apart,
 // with the line above as its caption and a button that copies it, and never folds it.
-export type TextBlock = { caption: string; text: string };
+// `number` is the secretary's own (the «2.» of «2. Refinador:»), `caption` the words after it.
+export type TextBlock = { number: number; caption: string; text: string };
 
+// Where a fenced block opens and closes in a list of lines: the fence is three backticks or more,
+// and only a line of at least as many closes it, so a block can hold a shorter fence. A fence that
+// never closes is not one. `at` is the line it opens on, `end` the line that closes it.
+function fenceAt(lines: readonly string[], at: number): { end: number; inner: string[] } | null {
+  const open = /^\s*(`{3,})/.exec(lines[at] ?? '');
+  if (!open?.[1]) return null;
+  const size = open[1].length;
+  const close = new RegExp(`^\\s*\`{${size},}\\s*$`);
+  const end = lines.findIndex((line, index) => index > at && close.test(line));
+  return end < 0 ? null : { end, inner: lines.slice(at + 1, end) };
+}
+
+// The numbered line of words above a block of text to paste: «1. Trabajador de Cambios: …».
+const NUMBERED = /^\s*(\d+)[.)]\s*(.*)$/;
+
+// Only a fenced block under a numbered line is a text to paste (the secretary's rule for the
+// sessions it asks the person to open); any other fence is a code block of an ordinary reply and
+// stays in its words.
 export function blocksOf(text: string): { rest: string; blocks: TextBlock[] } {
   const lines = text.split(/\r?\n/);
   const rest: string[] = [];
@@ -182,26 +203,60 @@ export function blocksOf(text: string): { rest: string; blocks: TextBlock[] } {
   let since = 0;
   let at = 0;
   while (at < lines.length) {
-    const line = lines[at] ?? '';
-    if (/^\s*```/.test(line)) {
-      const close = lines.findIndex((each, index) => index > at && /^\s*```\s*$/.test(each));
-      if (close > at) {
-        while (since > 0 && (rest[rest.length - 1] ?? '').trim() === '') {
-          rest.pop();
-          since -= 1;
-        }
-        const caption = since > 0 ? (rest.pop() ?? '').trim() : '';
-        blocks.push({ caption, text: lines.slice(at + 1, close).join('\n') });
+    const fence = fenceAt(lines, at);
+    if (fence) {
+      let caption: RegExpExecArray | null = null;
+      let blanks = 0;
+      while (since > blanks && (rest[rest.length - 1 - blanks] ?? '').trim() === '') blanks += 1;
+      if (since > blanks) caption = NUMBERED.exec(rest[rest.length - 1 - blanks] ?? '');
+      if (caption) {
+        rest.length -= blanks + 1;
+        blocks.push({
+          number: Number(caption[1]),
+          caption: (caption[2] ?? '').trim(),
+          text: fence.inner.join('\n'),
+        });
         since = 0;
-        at = close + 1;
+        at = fence.end + 1;
         continue;
       }
+      // An ordinary code block: its lines stay with the words.
+      rest.push(...lines.slice(at, fence.end + 1));
+      since += fence.end + 1 - at;
+      at = fence.end + 1;
+      continue;
     }
-    rest.push(line);
+    rest.push(lines[at] ?? '');
     since += 1;
     at += 1;
   }
   return blocks.length === 0 ? { rest: text, blocks } : { rest: rest.join('\n').trim(), blocks };
+}
+
+// A text as words and code, in order: the code of an ordinary reply is drawn as code.
+export function fencesOf(text: string): { code: boolean; text: string }[] {
+  const lines = text.split(/\r?\n/);
+  const parts: { code: boolean; text: string }[] = [];
+  let words: string[] = [];
+  const flush = () => {
+    const joined = words.join('\n').trim();
+    if (joined !== '') parts.push({ code: false, text: joined });
+    words = [];
+  };
+  let at = 0;
+  while (at < lines.length) {
+    const fence = fenceAt(lines, at);
+    if (fence) {
+      flush();
+      parts.push({ code: true, text: fence.inner.join('\n') });
+      at = fence.end + 1;
+    } else {
+      words.push(lines[at] ?? '');
+      at += 1;
+    }
+  }
+  flush();
+  return parts;
 }
 
 // The text as pieces: item ids of this project (they link to the item), web addresses (they open),

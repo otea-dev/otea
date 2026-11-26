@@ -37,7 +37,7 @@ export const hablar = {
   'hablar.chose.delegated': 'Dejaste la decisión a quien preguntó',
   'hablar.chose.on': 'en {about}',
   'hablar.out.taking': 'el secretario lo está tomando',
-  'hablar.block': 'Texto {n}',
+  'hablar.block': 'Texto para pegar',
   'hablar.block.copy': 'Copiar',
   'hablar.block.copied': 'Copiado',
   'hablar.more': 'ver más',

@@ -522,6 +522,60 @@ describe('a long reply', () => {
     expect(written).toEqual(['Eres el refinador.']);
   });
 
+  // The badge is the number the secretary gave the session, whatever its place in the message; a
+  // caption with only the number says what the block is without repeating it.
+  it("shows the secretary's own number on the badge, and a generic label for a bare one", async () => {
+    const { root } = await open(
+      conversation({
+        messages: [
+          say({ id: 1, author: 'person' }),
+          say({
+            id: 2,
+            author: 'secretary',
+            replyTo: 1,
+            root: 1,
+            text: [
+              'Abre 2 sesiones.',
+              '3. Refinador:',
+              '```',
+              'a',
+              '```',
+              '4.',
+              '```',
+              'b',
+              '```',
+            ].join('\n'),
+          }),
+        ],
+      }),
+    );
+    const blocks = all(root, '.hb-block');
+    expect(blocks.map((block) => text(q(block, '.hb-bn')))).toEqual(['3', '4']);
+    expect(text(q(blocks[0] as HTMLElement, '.hb-bcap'))).toBe('Refinador:');
+    expect(text(q(blocks[1] as HTMLElement, '.hb-bcap'))).toBe('Texto para pegar');
+  });
+
+  // Field study 3 review: a snippet in an ordinary reply is its code, with the lead sentence kept.
+  it('keeps the lead sentence of a reply with code, and draws the code as code', async () => {
+    const { root } = await open(
+      conversation({
+        messages: [
+          say({ id: 1, author: 'person' }),
+          say({
+            id: 2,
+            author: 'secretary',
+            replyTo: 1,
+            root: 1,
+            text: 'Corre esto y dime qué sale:\n```sh\nnpm test\n```',
+          }),
+        ],
+      }),
+    );
+    expect(text(q(root, '.hb-bluf'))).toBe('Corre esto y dime qué sale:');
+    expect(all(root, '.hb-block')).toHaveLength(0);
+    expect(text(q(root, 'pre.hb-code'))).toBe('npm test');
+  });
+
   it('shows a short rest without folding it', async () => {
     const { root } = await open(
       conversation({
