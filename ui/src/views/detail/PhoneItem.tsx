@@ -37,6 +37,7 @@ import { roundsOf } from '../../rounds.ts';
 import type { Evidence, ItemView, TypeView } from '../../types.ts';
 import { evidenceWords } from '../toca/phone.ts';
 import { Acts, type ActsMode } from './Acts.tsx';
+import { Body, type Sec } from './Body.tsx';
 import { evidenceGaps, type EvidenceGaps as Gaps } from './board-item.ts';
 import { cautionKeyOf, useCaution } from './caution.ts';
 import type { Facts } from './facts.ts';
@@ -71,6 +72,9 @@ import { takePick } from './pick-intent.ts';
 // it came. An item that is not on your turn is read only: the stuck one keeps Retomar and
 // Reasignar, one an agent set aside keeps Retomar, nothing closes or discards it here.
 
+// A part of the item an agent filled in, by the board's part id.
+export type WorkedSec = Sec & { ref: string };
+
 type PhoneItemProps = {
   item: ItemView;
   type: TypeView | undefined;
@@ -87,6 +91,9 @@ type PhoneItemProps = {
   checks: ReactNode;
   details: ReactNode;
   detailsSummary: string;
+  // On a board, the fields the agents filled in (findings, options, sources), drawn as the desk
+  // draws them; the ones the round under review hands in are shown with that round instead.
+  worked?: readonly WorkedSec[] | undefined;
   request: ReactNode;
   requestSummary: string;
   // What holds it back, what it holds back, implements or relates to, in any board (read only).
@@ -704,6 +711,8 @@ export function PhoneItem(p: PhoneItemProps) {
     () => (p.board ? evidenceGaps(p.board.def, item) : undefined),
     [p.board, item],
   );
+  // What the round under review hands in is drawn with the round; the rest is shown here.
+  const work = (p.worked ?? []).filter(({ ref }) => !handed.some((h) => h.ref === ref));
   const [pick, setPick] = useState<number | 'compare' | null>(null);
   const shown = pick === 'compare' ? null : (rounds.find((r) => r.n === pick) ?? rounds[0] ?? null);
   const newest = rounds[0];
@@ -998,6 +1007,8 @@ export function PhoneItem(p: PhoneItemProps) {
           blind={blind}
         />
       ) : null}
+
+      {work.length ? <Body id={item.id} sections={work} /> : null}
 
       <Fold
         label={t('phone.r.details')}

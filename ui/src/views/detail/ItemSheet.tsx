@@ -14,6 +14,7 @@ import { noteAnchor } from '../../components/evidence/video-moment.ts';
 import { blindPartsOf } from '../../evidence.ts';
 import { t, tx } from '../../i18n/i18n.ts';
 import { TypeIcon } from '../../icons/TypeIcon.tsx';
+import { detailBlocks, slotData } from '../../item-types.ts';
 import { GhostButton, Icon, StepPill, Swap, toast } from '../../kit/index.ts';
 import { laneOf } from '../../lanes/geometry.ts';
 import { lookOf } from '../../lanes/looks.ts';
@@ -48,7 +49,7 @@ import {
   RoundNotes,
   WaitChecklist,
 } from './BoardSections.tsx';
-import { Body, bodySections } from './Body.tsx';
+import { Body, bodySections, Plain } from './Body.tsx';
 import {
   approvalRefusal,
   backOf,
@@ -72,7 +73,7 @@ import {
   waitRows,
 } from './board-item.ts';
 import { cautionKeyOf, useCaution } from './caution.ts';
-import { Details, detailCells } from './Details.tsx';
+import { Details, detailCells, Value } from './Details.tsx';
 import { useDiffFiles, useDiffOffTip } from './diff-tip.ts';
 import { useDrift } from './drift.ts';
 import { boardFactsOf, factsOf, standAgentOf, standOf } from './facts.ts';
@@ -96,7 +97,7 @@ import {
 } from './notes.ts';
 import { useOpened } from './opened.ts';
 import { useOverlaps } from './overlaps.ts';
-import { PhoneItem } from './PhoneItem.tsx';
+import { PhoneItem, type WorkedSec } from './PhoneItem.tsx';
 import { ProofChecklist } from './ProofChecklist.tsx';
 import { partNames, phoneRounds, readerOf, requestLine, unopenedOf } from './phone-review.ts';
 import { pickOf, pickWays } from './pick.ts';
@@ -831,7 +832,41 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
     // On the phone: what was delivered first, the rounds as one segment, the moves docked. What
     // was asked is the item's fields; the rounds, the evidence and the board's sections are
     // drawn by the delivery, and links and parts stay on the computer.
-    const request = sections.filter(({ key }) => key.startsWith('f:'));
+    // On a board only the creation form's fields are what was asked: the rest (the findings, the
+    // options, the sources an agent filled in) are its work, drawn as the desk draws them and not
+    // kept in the closed «Lo pedido» (field study 3: a decision showed none of what was researched).
+    const asked = new Set(live?.form.map(({ ref }) => ref));
+    const fieldKey = (key: string) => key.slice(2);
+    const request = sections.filter(
+      ({ key }) => key.startsWith('f:') && (!live || asked.has(fieldKey(key))),
+    );
+    const longWork = live
+      ? sections.filter(({ key }) => key.startsWith('f:') && !asked.has(fieldKey(key)))
+      : [];
+    // The short ones (a link, a number) are the desk's Details cells; here they stand with the rest.
+    const blocks = detailBlocks(type, item.fields);
+    const shortWork: WorkedSec[] = live
+      ? [...blocks.primary, ...(blocks.sections ?? []).flatMap((s) => s.blocks), ...blocks.side]
+          .flatMap((b) => (b.kind === 'fields' ? b.values : []))
+          .filter(
+            (v) => v.field.module !== 'markdown' && v.value !== '' && !asked.has(v.field.name),
+          )
+          .map((v) => ({
+            key: `f:${v.field.name}`,
+            ref: v.field.name,
+            node: (
+              <Plain k={`f:${v.field.name}`} label={v.label} className="d-sec field">
+                <div {...slotData(v.at)}>
+                  <Value placed={v} />
+                </div>
+              </Plain>
+            ),
+          }))
+      : [];
+    const worked: WorkedSec[] = [
+      ...longWork.map((s) => ({ ...s, ref: fieldKey(s.key) })),
+      ...shortWork,
+    ];
     const firstField = request[0]?.key.slice(2);
     return (
       <ItemTypeScope type={type}>
@@ -896,6 +931,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
               detailsSummary={[facts.agent, typeWord(type, item.type), item.collection]
                 .filter(Boolean)
                 .join(' · ')}
+              worked={worked}
               request={request.length ? <Body id={item.id} sections={request} /> : null}
               requestSummary={firstField ? requestLine(String(item.fields[firstField] ?? '')) : ''}
               links={

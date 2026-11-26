@@ -54,7 +54,7 @@ function Note({
   );
 }
 
-function Plain({
+export function Plain({
   k,
   label,
   aside,
