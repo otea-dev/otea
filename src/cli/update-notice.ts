@@ -62,18 +62,21 @@ function writeCache(home: string, cache: Cache): void {
 }
 
 const VERSION = /^(\d+)\.(\d+)\.(\d+)$/;
+// What runs may be a build ahead of its release (0.8.0-dev): older than that release.
+const RUNNING = /^(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?$/;
 
-// Whether `latest` is a later release than `current`; false when either is not a plain x.y.z.
+// Whether `latest` is a later release than `current`; false when `latest` is not a plain x.y.z or
+// `current` is not x.y.z (with an optional pre-release suffix).
 export function isNewer(latest: string, current: string): boolean {
   const a = VERSION.exec(latest);
-  const b = VERSION.exec(current);
+  const b = RUNNING.exec(current);
   if (!a || !b) return false;
   for (let i = 1; i <= 3; i++) {
     const x = Number(a[i]);
     const y = Number(b[i]);
     if (x !== y) return x > y;
   }
-  return false;
+  return b[4] !== undefined;
 }
 
 // Whether this run may look at all: a person at a terminal, not CI, not --json, not turned off, not

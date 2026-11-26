@@ -158,4 +158,13 @@ describe('the notice of a newer otea', () => {
     expect(isNewer('0.1.0', '0.1.1')).toBe(false);
     expect(isNewer('1.0.0-rc.1', '0.1.1')).toBe(false);
   });
+
+  // A build ahead of its release says so (0.8.0-dev): it is older than that release and than any
+  // later one, and newer than the one before.
+  it('reads a pre-release build as older than its release', () => {
+    expect(isNewer('0.8.0', '0.8.0-dev')).toBe(true);
+    expect(isNewer('0.9.0', '0.8.0-dev')).toBe(true);
+    expect(isNewer('0.7.0', '0.8.0-dev')).toBe(false);
+    expect(isNewer('0.8.0-dev', '0.8.0')).toBe(false);
+  });
 });
