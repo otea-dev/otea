@@ -48,8 +48,10 @@ describe('Preferencias › Avisos', () => {
   it('shows what is told, all on by default, and how to turn them off', () => {
     setLanguage('es');
     const html = render({ view: { ...view, subscribed: true } });
-    expect(html.match(/role="switch" aria-checked="true"/g)).toHaveLength(6);
-    expect(html).toContain('Mostrar el texto de la pregunta');
+    expect(html.match(/role="switch" aria-checked="true"/g)).toHaveLength(8);
+    expect(html).toContain('Mostrar el texto en el aviso');
+    expect(html).toContain('Tu secretario te responde');
+    expect(html).toContain('Tu secretario está desconectado y te esperan mensajes');
     expect(html.match(/role="switch" aria-checked="false"/g)).toHaveLength(2);
     expect(html).toContain('Te toca');
     expect(html).toContain('una revisión o una aprobación');
