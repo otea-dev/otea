@@ -119,6 +119,24 @@ describe('the Bandeja over the API', () => {
     expect(((await (await call('/pending')).json()) as { count: number }).count).toBe(0);
   });
 
+  // F4 review round: every open desk reads /pending on each change; what it says is kept until a
+  // change is announced (the stream tells every desk), never worked out again for nothing.
+  it('keeps /pending until a change is announced', async () => {
+    declareSecretary(project.db, 'sol');
+    await capture('first note');
+    takeBandeja(project, { id: 1, agent: 'lia' });
+    const count = async () => ((await (await call('/pending')).json()) as { count: number }).count;
+    expect(await count()).toBe(0);
+
+    // Written behind the server's back (no announcement): the kept answer stands.
+    askOnBandeja(project, { id: 1, agent: 'lia', text: 'Which?', options: ['a', 'b'] });
+    expect(await count()).toBe(0);
+
+    // Any announced change reads it again.
+    await capture('second note');
+    expect(await count()).toBe(1);
+  });
+
   it('keeps the images and files sent with it, and serves them back as what they are', async () => {
     const form = new FormData();
     form.set('message', JSON.stringify({ text: 'look' }));

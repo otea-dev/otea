@@ -480,6 +480,12 @@ describe('the role prompts', () => {
       expect(rule).toContain('Hablar');
       expect(rule).toContain('otea say "<');
       expect(rule).toContain('--links');
+      // A question the person already sees (it is in otea pending) is pointed to, never asked again:
+      // it would count twice.
+      expect(rule).toContain('`otea pending`');
+      expect(rule).toMatch(
+        lang === 'es' ? /no la repitas con opciones/ : /do not ask it again with options/,
+      );
     });
 
     it(`has a worker and a refiner escalate to the secretary what I must know (${lang})`, () => {

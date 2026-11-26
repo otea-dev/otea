@@ -121,7 +121,9 @@ import {
 import { OteaError } from '../core/errors.ts';
 import { MAX_EVIDENCE_MB } from '../core/evidence.ts';
 import { isAgentName } from '../core/item.ts';
+import type { Pending } from '../core/pending.ts';
 import { TURNS, type Turn } from '../core/workflow.ts';
+import { dataVersion } from '../store/database.ts';
 import {
   type EventFilter,
   itemOfClientKey,
@@ -542,8 +544,24 @@ function machineApi(doors: Doors): Hono<OteaEnv> {
   );
 }
 
-function api(project: Project, { feed, streams, notifier }: Live, doors: Doors): Hono<OteaEnv> {
+const PENDING_KEPT_MS = 3_000;
+
+function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
+  const { streams, notifier } = live;
   const { auth, env, machine } = doors;
+  // What waits for the person, as the last read found it: every open desk asks on each change, so
+  // it is worked out again only after this server announces a change (its own writes), another
+  // process writes (the database's data version moves), or PENDING_KEPT_MS passes, for what the
+  // clock alone changes (a lease running out, the secretary going quiet). It does not subscribe to
+  // the feed: a listener of its own would keep the feed polling with no desk open.
+  let pendingKept: { at: number; version: number; value: Pending } | undefined;
+  const feed: ChangeFeed = {
+    ...live.feed,
+    notify: () => {
+      pendingKept = undefined;
+      live.feed.notify();
+    },
+  };
   return (
     new Hono<OteaEnv>()
       // A board published from another process (the CLI, another server) joins the catalog before
@@ -593,7 +611,18 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       .get('/secretary', (c) => c.json({ secretary: secretaryStatus(project.db) ?? null }))
       // What waits for the person, computed from the records: items on their turn, the questions
       // of the Bandeja and of the secretary, the review that holds a board's queue (app/pending.ts).
-      .get('/pending', (c) => c.json(pendingOf(project)))
+      .get('/pending', (c) => {
+        const now = Date.now();
+        const version = dataVersion(project.db);
+        if (
+          !pendingKept ||
+          pendingKept.version !== version ||
+          now - pendingKept.at > PENDING_KEPT_MS
+        ) {
+          pendingKept = { at: now, version, value: pendingOf(project) };
+        }
+        return c.json(pendingKept.value);
+      })
       // What to paste into an agent's chat (Conectar un agente, the empty project): the first contact,
       // one more agent joining, or one more board; without a kind, the project's moment.
       .get('/agent-prompt', (c) => {

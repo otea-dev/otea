@@ -16,6 +16,7 @@ import {
 import { type Item, listItems } from '../app/items.ts';
 import type { Launcher } from '../app/launcher.ts';
 import { liveBoards } from '../app/next.ts';
+import { offItemOf } from '../app/pending.ts';
 import { listAgents } from '../app/presence.ts';
 import { addPathToProject, databasePath, type Env, type Project } from '../app/project.ts';
 import { identityAt, listRepos, type Repo, readReposAtFolder, reposInside } from '../app/repos.ts';
@@ -24,6 +25,7 @@ import { CommandFailure } from '../cli/command.ts';
 import { hasOteaGitHook, hasOutdatedGitHook, installGitHook } from '../cli/hooks.ts';
 import type { AgentStatus } from '../core/agent-status.ts';
 import { OteaError } from '../core/errors.ts';
+import type { PendingEntry } from '../core/pending.ts';
 import { stateLabel } from '../core/workflow.ts';
 import type { Storage } from '../store/registry.ts';
 import type { ServedPath, ServedProject } from './hub.ts';
@@ -43,6 +45,9 @@ export type ProjectOverview = {
   waiting: WaitingItem[];
   // Side topics an agent answered: the person's turn to read, though never work.
   topics: AnsweredTopic[];
+  // What waits for you there that is no item: a refiner's question on a Bandeja note, the
+  // secretary's own questions, what agents escalated while it is away (app/pending.ts).
+  asking?: PendingEntry[];
   // Open items on an agent's turn.
   withAgents: number;
   // The agents there that are not away, and the away ones that left an item stuck, each with the server's own word for what it is doing now
@@ -86,7 +91,9 @@ function answeredTopics(project: Project): AnsweredTopic[] {
     }));
 }
 
-type Counts = Pick<ProjectOverview, 'waiting' | 'topics' | 'withAgents' | 'agents' | 'open'>;
+type Counts = Pick<ProjectOverview, 'waiting' | 'topics' | 'withAgents' | 'agents' | 'open'> & {
+  asking: PendingEntry[];
+};
 
 // What waits for you is what Te toca lists: your turn, and the work of an agent that went quiet
 // (its lease ran out), yours to restart or reassign (ONB3-5).
@@ -105,6 +112,7 @@ export function countsOf(project: Project): Counts {
   return {
     waiting: open.filter(yours).map((item) => withIcon(project, item)),
     topics: answeredTopics(project),
+    asking: offItemOf(project),
     withAgents: open.filter((item) => !yours(item)).length,
     agents: listAgents(project.db)
       .filter((agent) => agent.status !== 'away' || leftStuck.has(agent.name))
@@ -113,7 +121,7 @@ export function countsOf(project: Project): Counts {
   };
 }
 
-const NOTHING: Counts = { waiting: [], topics: [], withAgents: 0, agents: [], open: 0 };
+const NOTHING: Counts = { waiting: [], topics: [], asking: [], withAgents: 0, agents: [], open: 0 };
 
 function overviewOf(served: ServedProject, currentId: string): ProjectOverview {
   const { id, name, storage, paths, project } = served;
