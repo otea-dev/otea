@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { basename } from 'node:path';
+import { checkOptions, DELEGATED } from '../core/board/questions.ts';
 import {
+  type AnswerMode,
   type FromMessage,
   MAX_MESSAGE_CHARS,
   MAX_MESSAGE_FILES,
@@ -16,7 +18,10 @@ import { evidenceTypeOf, MAX_EVIDENCE_BYTES, MAX_EVIDENCE_MB } from '../core/evi
 import type { Actor } from '../core/item.ts';
 import type { SecretaryStatus } from '../core/secretary.ts';
 import { timeText } from '../core/time.ts';
+import { selectEntryOfItem } from '../store/bandeja.ts';
 import {
+  answeredSince,
+  clearKindNews,
   countPending,
   insertAttachment,
   insertLink,
@@ -27,10 +32,12 @@ import {
   type NewFile,
   type Page,
   selectDefaultTurn,
+  selectKindNews,
   selectMessage,
   selectMessages,
   selectPending,
   selectRootKind,
+  selectTurn,
   selectTurnsOfItem,
   setKind,
 } from '../store/conversation.ts';
@@ -210,9 +217,13 @@ export type SayInput = {
   replyTo?: number;
   // The turn is a request or a consultation. Without --reply-to it is the person's latest message.
   kind?: MessageKind;
-  // The items (and the Pedidos of board drafts) it produced; they imply a request unless the turn
-  // is already classified.
+  // The items (and the Pedidos of board drafts) it produced; with --reply-to they imply a request
+  // unless the turn is already classified. Without --reply-to the message is a notice and the items
+  // are what it mentions: they never become the origin of anything.
   links?: string[];
+  // A question with 2 to 4 options to tap, and the number of the one the secretary recommends.
+  options?: readonly string[];
+  recommended?: number;
 };
 
 export type Said = {
@@ -223,10 +234,22 @@ export type Said = {
   kept: boolean;
 };
 
-// Gives the turn a kind, unless the person set it (their correction stands). True when it did.
+// Gives the turn a kind, unless the person set it (their correction stands). True when it did. A
+// kind the secretary already gave is not turned into the other by saying something else about the
+// turn (a notice about items is a message of its own), and a notice has no kind.
 function classify(project: Project, root: number, kind: MessageKind): boolean {
   const current = selectRootKind(project.db, root);
   if (current.by === 'person' && current.kind !== null) return current.kind === kind;
+  if (current.kind !== null && current.kind !== kind) {
+    invalid(
+      `Message ${root} is already a ${current.kind}: saying more about it does not make it a ${kind} (the person corrects a kind with one tap). To tell them about items, send a notice: otea say "<text>" --links <item ids> with no --reply-to`,
+    );
+  }
+  if (selectMessage(project.db, root)?.author === 'secretary') {
+    invalid(
+      `Message ${root} is your own notice, and a notice has no kind: say it about the person's message it follows`,
+    );
+  }
   setKind(project.db, root, kind, 'secretary');
   return true;
 }
@@ -241,11 +264,14 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
   const files = checkedFiles(input.files ?? []);
   const text = checkedText(input.text, files);
   const links = [...new Set((input.links ?? []).map((id) => id.trim()).filter((id) => id !== ''))];
-  // Classifying or linking is about a turn of the person's. Without --reply-to it is the latest
-  // message already read, and only when that is no guess: another message not read yet, or another
-  // read turn not classified, and the secretary says which (a reply to the wrong turn would tie the
-  // items to it).
-  const classifies = input.kind !== undefined || links.length > 0;
+  const checked = checkOptions(input.options, input.recommended);
+  if ('problem' in checked) invalid(`Not said: ${checked.problem}`);
+  // Classifying is about a turn of the person's. Without --reply-to it is the latest message
+  // already read, and only when that is no guess: another message not read yet, or another read
+  // turn not classified, and the secretary says which (a reply to the wrong turn would tie the
+  // items to it). Links alone, with no --reply-to, are no classifying: the message is a notice that
+  // mentions the items.
+  const classifies = input.kind !== undefined;
   let replyTo = input.replyTo;
   if (classifies && replyTo === undefined) {
     const { latest, unread, otherUnclassified } = selectDefaultTurn(project.db);
@@ -262,7 +288,16 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
     replyTo = latest;
   }
   if (replyTo !== undefined) requireMessage(project, replyTo);
-  for (const id of links) requireItem(project.db, id);
+  for (const id of links) {
+    const item = requireItem(project.db, id);
+    // An item that came from a Bandeja note hangs from that note: never from a turn of the person's.
+    const note = replyTo === undefined ? undefined : selectEntryOfItem(project.db, item.id);
+    if (note !== undefined) {
+      invalid(
+        `${item.id} came from the Bandeja note B-${note.id}: it does not hang from a message. Mention it in a notice instead: otea say "<text>" --links ${item.id} with no --reply-to`,
+      );
+    }
+  }
   const at = now();
   return transaction(project.db, () => {
     const id = insertMessage(project.db, {
@@ -272,15 +307,17 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
       at,
       read: true,
       ...(replyTo === undefined ? {} : { replyTo }),
+      options: checked.options,
+      recommended: checked.recommended,
     });
     keepFiles(project, id, files);
     // What it answers is read: it answered from what the wake showed, without `otea conversation`,
     // and the next wait must not bring the same message back.
     if (replyTo !== undefined) markRead(project.db, [replyTo], at);
     const root = requireMessage(project, id).root;
-    // Items linked to a turn not classified yet make it a request.
-    const unclassified = links.length > 0 && selectRootKind(project.db, root).kind === null;
-    const wanted = input.kind ?? (unclassified ? 'request' : undefined);
+    // Items linked to a turn make it a request unless it is classified; a notice's links are its own.
+    const wanted =
+      input.kind ?? (replyTo !== undefined && links.length > 0 ? ('request' as const) : undefined);
     const kept = wanted === undefined ? false : !classify(project, root, wanted);
     linkItems(project, root, links, at);
     const message = requireMessage(project, id);
@@ -309,11 +346,92 @@ export function linkMessageToItem(
 }
 
 // The person corrects what the secretary made of a turn, with one tap: it keeps the correction, and
-// the secretary's later say of that turn does not undo it.
+// the secretary's later say of that turn does not undo it. A change wakes the secretary (kind_changed,
+// from the turn's own state) until it reads the turn.
 export function correctKind(project: Project, id: number, kind: MessageKind): Message {
   const message = requireMessage(project, id);
-  setKind(project.db, message.root, kind, 'person');
+  const changed = selectRootKind(project.db, message.root).kind !== kind;
+  setKind(project.db, message.root, kind, 'person', changed);
   return requireMessage(project, id);
+}
+
+// What the person gives to a question of the secretary's: one of its options (the number from 1),
+// their own words, or the decision left to the secretary. Exactly one.
+export type GivenAnswer =
+  | { option: number; text?: never; delegate?: never }
+  | { text: string; option?: never; delegate?: never }
+  | { delegate: true; text?: never; option?: never };
+
+// The person's answer to a question of the secretary's (say --option): their own message, in reply
+// to it, that wakes the secretary like any message. Answered once: a person who has spoken since
+// has answered it. Only the desk's authenticated routes call this.
+export function answerSecretaryQuestion(
+  project: Project,
+  id: number,
+  given: GivenAnswer,
+  now: Clock = systemClock,
+  by = 'human',
+): Message {
+  const question = requireMessage(project, id);
+  if (question.author !== 'secretary' || question.options.length === 0) {
+    throw new OteaError('invalid_fields', `Message ${id} is not a question with options to tap`);
+  }
+  let words: string;
+  let mode: AnswerMode;
+  let option: number | undefined;
+  if (given.delegate) {
+    words = DELEGATED;
+    mode = 'delegated';
+  } else if (given.option !== undefined) {
+    const chosen = question.options[given.option - 1];
+    if (chosen === undefined) invalid(`Message ${id} has no option ${given.option}`);
+    words = chosen;
+    mode = 'option';
+    option = given.option;
+  } else {
+    words = (given.text ?? '').trim();
+    if (words === '') invalid('Say your answer');
+    mode = 'text';
+  }
+  return transaction(project.db, () => {
+    if (answeredSince(project.db, id)) {
+      throw new OteaError('invalid_transition', `Message ${id} was already answered`);
+    }
+    const made = insertMessage(project.db, {
+      author: 'person',
+      name: by,
+      text: words,
+      at: now(),
+      replyTo: id,
+      choice: { mode, option },
+    });
+    return requireMessage(project, made);
+  });
+}
+
+// What the person answered to an agent's question on an item or a Bandeja entry (CAM-1, B-3), kept
+// in the thread as their own message, already read: a trace of what they chose, which wakes nobody
+// (the agent is told by the item).
+export function traceAnswer(
+  ctx: Context,
+  trace: {
+    about: string;
+    asked: string;
+    text: string;
+    mode: AnswerMode;
+    option?: number | undefined;
+    by: string;
+  },
+  now: Clock = systemClock,
+): void {
+  insertMessage(ctx.db, {
+    author: 'person',
+    name: trace.by,
+    text: trace.text,
+    at: now(),
+    read: true,
+    choice: { mode: trace.mode, option: trace.option, about: trace.about, asked: trace.asked },
+  });
 }
 
 export type Look = {
@@ -404,8 +522,17 @@ export function readAsSecretary(
         more = after.more;
       }
     }
+    // A kind the person changed is read with its turn, wherever it lies, so the secretary sees what
+    // they decided and the news stops waking it.
+    const news = selectKindNews(project.db).map(({ root }) => root);
+    const have = new Set(messages.map(({ id }) => id));
+    const turns = news.flatMap((root) =>
+      selectTurn(project.db, root).filter(({ id }) => !have.has(id)),
+    );
+    if (turns.length > 0) messages = [...messages, ...turns].sort((a, b) => a.id - b.id);
     // The files first: the messages are marked read only once they are in hand.
     const { paths, problems } = openablePaths(project, messages);
+    clearKindNews(project.db, news);
     const fresh = markRead(
       project.db,
       messages
@@ -428,6 +555,18 @@ function sizeText(bytes: number): string {
     : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+// How a message of the person's answers a question, for the secretary's read of it.
+function choiceHeads(message: Message): string[] {
+  const { choice } = message;
+  if (choice === null) return [];
+  if (choice.about !== null)
+    return [`answered ${choice.about}'s question${choice.asked ? ` "${choice.asked}"` : ''}`];
+  if (choice.mode === 'delegated')
+    return ['answer to your question: left the decision to you, your call'];
+  if (choice.mode === 'option') return [`answer to your question: chose option ${choice.option}`];
+  return ['answer to your question, in their own words'];
+}
+
 // The messages as the secretary reads them: plain text, each with its number, who wrote it and
 // when, the kind and the items of its turn, and each file with a path it can open.
 export function messagesText(
@@ -446,7 +585,13 @@ export function messagesText(
         ...(message.kind === null
           ? []
           : [
-              `${message.kind}${message.links.length === 0 ? '' : ` -> ${message.links.join(', ')}`}`,
+              `${message.kind}${message.kindNews && message.id === message.root ? ' (changed by the person)' : ''}${message.links.length === 0 ? '' : ` -> ${message.links.join(', ')}`}`,
+            ]),
+        ...choiceHeads(message),
+        ...(message.options.length === 0
+          ? []
+          : [
+              `question with options to tap: ${message.options.map((each, at) => `${at + 1}) ${each}`).join(' · ')}`,
             ]),
       ];
       const files = message.attachments.map((file) => {
@@ -479,10 +624,18 @@ export function conversationText(agent: string, read: Read): string {
     last === undefined
       ? []
       : [
-          `Answer with: otea say "<text>" --reply-to ${last.id} --as ${agent}. Mark the turn a request with --request --links <item ids>, or a consultation (a question you answer) with --consultation; plain text with item ids, short, the conclusion first.`,
+          `Answer with: otea say "<text>" --reply-to ${last.id} --as ${agent}. Mark the turn a request with --request --links <item ids>, or a consultation (a question you answer) with --consultation; plain text with item ids, short, the conclusion first. News of your own (an item ready for review, something that went wrong) is a message with no --reply-to: otea say "<text>" --links <item ids> --as ${agent}. A question with options to tap: --option "<a>" --option "<b>" --recommend <n>.`,
         ];
+  const changed = read.messages.filter(
+    ({ id, root, kind, kindNews }) => kindNews && id === root && kind !== null,
+  );
+  const changes = changed.map(
+    ({ id, kind }) =>
+      `The person changed message ${id} to a ${kind}: act on it (a request becomes items, a consultation is answered) and do not ask again what they decided.`,
+  );
   return [
     heading,
+    ...changes,
     ...(read.messages.length === 0
       ? []
       : [messagesText(read.messages, fresh, read.paths, read.problems)]),
@@ -508,6 +661,19 @@ addSecretarySource((ctx) => {
     kind: 'person_message',
     ref: String(first.id),
     text: `"${messageSnippet(first.text, 120)}"${more}`,
+  };
+});
+
+// A kind the person changed wakes the secretary from the turn's own state, as a message of theirs
+// does, until it reads the turn.
+addSecretarySource((ctx) => {
+  const [first] = selectKindNews(ctx.db);
+  if (first === undefined) return undefined;
+  const kind = selectRootKind(ctx.db, first.root).kind;
+  return {
+    kind: 'kind_changed',
+    ref: String(first.root),
+    text: `"${messageSnippet(first.text, 120)}" is now a ${kind ?? 'turn'}`,
   };
 });
 

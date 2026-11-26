@@ -1,7 +1,7 @@
 import { basename } from 'node:path';
 import type { Context } from 'hono';
 import { z } from 'zod';
-import type { MessageFileInput } from '../app/conversation.ts';
+import type { GivenAnswer, MessageFileInput } from '../app/conversation.ts';
 import type { EvidenceFile } from '../app/evidence.ts';
 import type { Performer } from '../core/authority.ts';
 import { MAX_MESSAGE_FILES, MESSAGE_KINDS, type MessageKind } from '../core/conversation.ts';
@@ -551,6 +551,26 @@ export type ChosenAnswer = { question: number } & (
   | { option: number }
   | { delegate: true }
 );
+
+// What the person gives a question of the secretary's: the same, with no question number (the
+// question is the message the route names).
+const SecretaryAnswerBody = z.union([
+  z.object({ text: z.string() }).strict(),
+  z.object({ option: z.number().int().positive() }).strict(),
+  z.object({ delegate: z.literal(true) }).strict(),
+]);
+
+export async function secretaryAnswerRequest(c: Context): Promise<GivenAnswer> {
+  const raw: unknown = await c.req.json().catch(() => undefined);
+  const parsed = SecretaryAnswerBody.safeParse(raw);
+  if (!parsed.success)
+    throw new RejectedRequest(
+      400,
+      'invalid_body',
+      'Expected {"text": string}, {"option": number} or {"delegate": true}',
+    );
+  return parsed.data;
+}
 
 export async function chosenAnswerRequest(c: Context): Promise<ChosenAnswer> {
   const raw: unknown = await c.req.json().catch(() => undefined);

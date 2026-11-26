@@ -37,7 +37,7 @@ import {
 import { transaction } from '../store/database.ts';
 import { findAgent } from '../store/queries.ts';
 import type { Context } from './context.ts';
-import type { MessageFileInput } from './conversation.ts';
+import { type MessageFileInput, traceAnswer } from './conversation.ts';
 import { evidenceFile, namedReadPath, storeFile } from './evidence.ts';
 import { type Clock, requireItem, systemClock } from './items.ts';
 import type { Project } from './project.ts';
@@ -414,6 +414,18 @@ export function answerBandeja(
     if (!answerQuestionRow(project.db, input.id, open.question, answer, at)) {
       throw new OteaError('invalid_transition', `${entry.ref}: the question was answered already`);
     }
+    traceAnswer(
+      project,
+      {
+        about: entry.ref,
+        asked: open.text,
+        text: answer.text,
+        mode: answer.mode,
+        option: answer.option,
+        by: input.by ?? 'human',
+      },
+      () => at,
+    );
     return requireEntry(project, input.id, () => at);
   });
 }

@@ -7,6 +7,7 @@ import {
   type SecretaryStatus,
   type SecretaryWakeKind,
 } from '../core/secretary.ts';
+import { markHeard } from '../store/conversation.ts';
 import { transaction } from '../store/database.ts';
 import { selectEvents } from '../store/queries.ts';
 import {
@@ -192,6 +193,8 @@ export const wakeText = (pending: SecretaryPending): string => {
     return `The person wrote to you${about}${said}. Read the conversation and answer.`;
   if (kind === 'bandeja_item')
     return `The person captured a note in the Bandeja${about}${said}. Read it (otea bandeja${ref ? ` ${ref}` : ''}), then refine it yourself or hand it to a refiner: take it first (otea bandeja take${ref ? ` ${ref}` : ' <id>'}), for the refiner with --for <its name> when it is one you launch.`;
+  if (kind === 'kind_changed')
+    return `The person changed how you sorted their message${about}${said}. Read it (otea conversation) and act on it: a request becomes items (otea create ... --from-message ${ref ?? '<id>'}, then say what you made), a consultation is answered; do not ask again what they just decided.`;
   return `A question is escalated to you${ref ? ` on ${ref}` : ''}${said}. Answer it, or ask the person.`;
 };
 
@@ -328,6 +331,18 @@ export function secretaryWake(
   wait: SecretaryWait,
   now: Clock = systemClock,
   processes: (pid: number) => boolean = processAlive,
+): SecretaryWake | undefined {
+  const woke = wakeOf(ctx, wait, now, processes);
+  // The person's message reached the secretary: the desk can say so now, before it reads it.
+  if (woke?.kind === 'person_message') markHeard(ctx.db, now());
+  return woke;
+}
+
+function wakeOf(
+  ctx: Context,
+  wait: SecretaryWait,
+  now: Clock,
+  processes: (pid: number) => boolean,
 ): SecretaryWake | undefined {
   const signal = signalWake(ctx, wait, now);
   if (signal) return signal;

@@ -1223,6 +1223,11 @@ const create: Command = {
     const from = input.option('from');
     const fromMessage = input.option('from-message');
     const fromBandeja = input.option('from-bandeja');
+    if (fromMessage !== undefined && fromBandeja !== undefined) {
+      throw new UsageError(
+        'An item comes from a message or a Bandeja note, not both: give --from-message or --from-bandeja',
+      );
+    }
     const fields = await fieldsFrom(input);
     const { actor, channel } = input;
     return withAgent(input, (project) => {
@@ -5071,19 +5076,34 @@ const conversation: Command = {
 const say: Command = {
   name: 'say',
   summary:
-    'For the secretary: answer the person in plain text, short, the conclusion first (- reads stdin); --reply-to <id> picks the message it answers, --request with --links <item ids made> or --consultation classifies that turn',
+    'For the secretary: tell the person something in plain text, short, the conclusion first (- reads stdin). Answering a message of theirs: --reply-to <id>, with --request and --links <item ids made>, or --consultation, to classify that turn. News of your own (an item ready for review, something that went wrong) is a message with no --reply-to, with --links <item ids> to point at items. A question: 2 to 4 --option answers they tap, and --recommend the one you would choose',
   args: ['text'],
   options: {
     file: { multiple: true, placeholder: 'path' },
     'reply-to': { placeholder: 'id' },
     request: { flag: true },
     consultation: { flag: true },
-    links: { placeholder: 'ids', about: 'item ids, comma separated' },
+    links: {
+      placeholder: 'ids',
+      about:
+        'item ids, comma separated: with --reply-to the items the turn produced; with no --reply-to the items a notice mentions',
+    },
+    option: {
+      multiple: true,
+      placeholder: 'text',
+      about: 'a question to the person: 2 to 4 answers they tap',
+    },
+    recommend: { placeholder: 'n', about: 'number (from 1) of the option you recommend' },
   },
   execute: async (input) => {
     const [given = ''] = input.args;
     const { actor, cwd } = input;
     const replyTo = input.option('reply-to');
+    const options = input.options('option');
+    const recommend = input.option('recommend');
+    const recommended = recommend === undefined ? undefined : Number(recommend.replace(/^#/, ''));
+    if (recommended !== undefined && !Number.isInteger(recommended))
+      throw new UsageError('--recommend is the number of an option, from 1');
     if (input.flag('request') && input.flag('consultation')) {
       throw new UsageError(
         'A turn is a request or a consultation: give --request or --consultation',
@@ -5107,6 +5127,8 @@ const say: Command = {
         ...(replyTo === undefined ? {} : { replyTo: messageIdOf(replyTo) }),
         ...(kind === undefined ? {} : { kind }),
         links,
+        ...(options.length === 0 ? {} : { options }),
+        ...(recommended === undefined ? {} : { recommended }),
       });
       const { message } = said;
       const turn =

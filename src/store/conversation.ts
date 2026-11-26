@@ -1,8 +1,10 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type {
+  AnswerMode,
   KindBy,
   Message,
   MessageAuthor,
+  MessageChoice,
   MessageFile,
   MessageKind,
 } from '../core/conversation.ts';
@@ -21,10 +23,17 @@ type MessageRow = {
   root: number;
   read_at: string | null;
   topic: string | null;
+  options: string | null;
+  recommended: number | null;
+  choice: AnswerMode | null;
+  choice_option: number | null;
+  about: string | null;
+  asked: string | null;
+  heard_at: string | null;
 };
 
 const COLUMNS =
-  'm.id, m.author, m.author_name, m.text, m.at, m.reply_to, m.root, m.read_at, m.topic';
+  'm.id, m.author, m.author_name, m.text, m.at, m.reply_to, m.root, m.read_at, m.topic, m.options, m.recommended, m.choice, m.choice_option, m.about, m.asked, m.heard_at';
 
 export type NewMessage = {
   author: MessageAuthor;
@@ -37,6 +46,11 @@ export type NewMessage = {
   client?: { scope: string; key: string; digest: string } | undefined;
   // Already read: what is not the person's for the secretary to answer (and a topic's record).
   read?: boolean;
+  // A question with options to tap.
+  options?: readonly string[] | undefined;
+  recommended?: number | undefined;
+  // The person's answer to a question: how, and what it records when it is only a trace.
+  choice?: { mode: AnswerMode; option?: number | undefined; about?: string; asked?: string };
 };
 
 // A person's message begins a turn; any other joins the turn of the message it answers, or begins
@@ -51,8 +65,10 @@ export function insertMessage(db: DatabaseSync, message: NewMessage): number {
             | undefined
         )?.root;
   const sql = `INSERT INTO conversation_messages
-    (author, author_name, text, at, reply_to, root, read_at, topic, client_scope, client_key, client_digest)
-    VALUES (:author, :name, :text, :at, :replyTo, :root, :readAt, :topic, :scope, :key, :digest)`;
+    (author, author_name, text, at, reply_to, root, read_at, topic, client_scope, client_key, client_digest,
+     options, recommended, choice, choice_option, about, asked)
+    VALUES (:author, :name, :text, :at, :replyTo, :root, :readAt, :topic, :scope, :key, :digest,
+     :options, :recommended, :choice, :choiceOption, :about, :asked)`;
   const result = db.prepare(sql).run({
     author: message.author,
     name: message.name,
@@ -65,6 +81,15 @@ export function insertMessage(db: DatabaseSync, message: NewMessage): number {
     scope: message.client?.scope ?? null,
     key: message.client?.key ?? null,
     digest: message.client?.digest ?? null,
+    options:
+      message.options === undefined || message.options.length === 0
+        ? null
+        : JSON.stringify(message.options),
+    recommended: message.recommended ?? null,
+    choice: message.choice?.mode ?? null,
+    choiceOption: message.choice?.option ?? null,
+    about: message.choice?.about ?? null,
+    asked: message.choice?.asked ?? null,
   });
   const id = Number(result.lastInsertRowid);
   if (above === undefined) {
@@ -104,12 +129,64 @@ export function messageOfClientKey(
 }
 
 // Sets (or, with the same, keeps) the kind of the turn whose root is `root`, and who set it.
-export function setKind(db: DatabaseSync, root: number, kind: MessageKind, by: KindBy): void {
-  db.prepare('UPDATE conversation_messages SET kind = ?, kind_by = ? WHERE id = ?').run(
-    kind,
-    by,
-    root,
+// `news`: the person changed it, and the secretary has not read that yet (a later setKind by anyone
+// else keeps it until the secretary reads the turn).
+export function setKind(
+  db: DatabaseSync,
+  root: number,
+  kind: MessageKind,
+  by: KindBy,
+  news = false,
+): void {
+  db.prepare(
+    'UPDATE conversation_messages SET kind = ?, kind_by = ?, kind_news = CASE WHEN ? THEN 1 ELSE kind_news END WHERE id = ?',
+  ).run(kind, by, news ? 1 : 0, root);
+}
+
+// The turns whose kind the person changed and the secretary has not read yet, oldest first: the root
+// and the words of the message that began each.
+export function selectKindNews(db: DatabaseSync): { root: number; text: string }[] {
+  return db
+    .prepare('SELECT id AS root, text FROM conversation_messages WHERE kind_news = 1 ORDER BY id')
+    .all() as { root: number; text: string }[];
+}
+
+// The secretary read these turns: their kind is no news any more.
+export function clearKindNews(db: DatabaseSync, roots: readonly number[]): void {
+  const clear = db.prepare('UPDATE conversation_messages SET kind_news = 0 WHERE id = ?');
+  for (const root of roots) clear.run(root);
+}
+
+// The person's messages the secretary's wait returned and it has not read yet: noted once, the
+// first time, so the desk can say it was heard. The ones this call marked.
+export function markHeard(db: DatabaseSync, at: string): number {
+  return Number(
+    db
+      .prepare(
+        "UPDATE conversation_messages SET heard_at = ? WHERE author = 'person' AND read_at IS NULL AND heard_at IS NULL",
+      )
+      .run(at).changes,
   );
+}
+
+// Whether the person has said anything since this message that is no mere trace of an answer given
+// to an agent: a question of the secretary's they spoke after is answered.
+export function answeredSince(db: DatabaseSync, id: number): boolean {
+  return (
+    db
+      .prepare(
+        "SELECT 1 FROM conversation_messages WHERE author = 'person' AND id > ? AND about IS NULL LIMIT 1",
+      )
+      .get(id) !== undefined
+  );
+}
+
+// Every message of a turn, in order.
+export function selectTurn(db: DatabaseSync, root: number): Message[] {
+  const rows = db
+    .prepare(`SELECT ${COLUMNS} FROM conversation_messages m WHERE m.root = ? ORDER BY m.id`)
+    .all(root) as MessageRow[];
+  return hydrate(db, rows);
 }
 
 export function selectRootKind(
@@ -161,9 +238,14 @@ function hydrate(db: DatabaseSync, rows: readonly MessageRow[]): Message[] {
     (
       db
         .prepare(
-          `SELECT id, kind, kind_by FROM conversation_messages WHERE id IN (${roots.map(() => '?').join(',')})`,
+          `SELECT id, kind, kind_by, kind_news FROM conversation_messages WHERE id IN (${roots.map(() => '?').join(',')})`,
         )
-        .all(...roots) as { id: number; kind: MessageKind | null; kind_by: KindBy | null }[]
+        .all(...roots) as {
+        id: number;
+        kind: MessageKind | null;
+        kind_by: KindBy | null;
+        kind_news: number;
+      }[]
     ).map((row) => [row.id, row]),
   );
   const links = linksOf(db, roots);
@@ -184,8 +266,19 @@ function hydrate(db: DatabaseSync, rows: readonly MessageRow[]): Message[] {
       delivery: row.author === 'person' ? (row.read_at === null ? 'pending' : 'read') : null,
       readAt: row.read_at,
       topic: row.topic,
+      options: row.options === null ? [] : (JSON.parse(row.options) as string[]),
+      recommended: row.recommended,
+      choice: choiceOf(row),
+      heardAt: row.heard_at,
+      kindNews: head?.kind_news === 1,
     };
   });
+}
+
+function choiceOf(row: MessageRow): MessageChoice | null {
+  return row.choice === null
+    ? null
+    : { mode: row.choice, option: row.choice_option, about: row.about, asked: row.asked };
 }
 
 export function selectMessage(db: DatabaseSync, id: number): Message | undefined {
@@ -297,7 +390,7 @@ export function selectTurnsOfItem(db: DatabaseSync, item: string): Message[] {
     .prepare(
       `SELECT ${COLUMNS} FROM conversation_messages m
        JOIN conversation_links l ON l.message_id = m.id
-       WHERE l.item_id = ? COLLATE NOCASE ORDER BY m.id`,
+       WHERE l.item_id = ? COLLATE NOCASE AND m.author <> 'secretary' ORDER BY m.id`,
     )
     .all(item) as MessageRow[];
   return hydrate(db, rows);
@@ -322,14 +415,14 @@ export function selectDefaultTurn(db: DatabaseSync): {
   const latest = (
     db
       .prepare(
-        "SELECT MAX(id) AS id FROM conversation_messages WHERE author = 'person' AND topic IS NULL AND read_at IS NOT NULL",
+        "SELECT MAX(id) AS id FROM conversation_messages WHERE author = 'person' AND topic IS NULL AND choice IS NULL AND read_at IS NOT NULL",
       )
       .get() as { id: number | null }
   ).id;
   const unread = (
     db
       .prepare(
-        "SELECT COUNT(*) AS n FROM conversation_messages WHERE author = 'person' AND topic IS NULL AND read_at IS NULL",
+        "SELECT COUNT(*) AS n FROM conversation_messages WHERE author = 'person' AND topic IS NULL AND choice IS NULL AND read_at IS NULL",
       )
       .get() as { n: number }
   ).n;
@@ -337,7 +430,7 @@ export function selectDefaultTurn(db: DatabaseSync): {
     db
       .prepare(
         `SELECT COUNT(*) AS n FROM conversation_messages
-         WHERE author = 'person' AND topic IS NULL AND read_at IS NOT NULL AND kind IS NULL AND id <> :latest`,
+         WHERE author = 'person' AND topic IS NULL AND choice IS NULL AND read_at IS NOT NULL AND kind IS NULL AND id <> :latest`,
       )
       .get({ latest: latest ?? 0 }) as { n: number }
   ).n;

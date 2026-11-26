@@ -19,7 +19,7 @@ import {
   takeBandeja,
 } from './bandeja.ts';
 import { addCollection } from './collections.ts';
-import { postPersonMessage } from './conversation.ts';
+import { listConversation, postPersonMessage } from './conversation.ts';
 import { createItem } from './items.ts';
 import type { Project } from './project.ts';
 import { declareSecretary, secretaryWake, startSecretaryWait } from './secretary.ts';
@@ -411,6 +411,19 @@ describe('the Bandeja', () => {
         'lia asked: "Better how?" Options: 1. Faster · 2. Prettier (recommended) · 3. Smaller',
       );
       expect(text).toContain('The person chose option 2: "Prettier"');
+    });
+
+    it('leaves the answer in the conversation as the person’s own message, read, about the note', () => {
+      ask();
+      answerBandeja(project, { id: 1, question: 1, option: 2 }, clock(5000));
+
+      const [trace] = listConversation(project).messages;
+      expect(trace).toMatchObject({
+        author: 'person',
+        text: 'Prettier',
+        delivery: 'read',
+        choice: { mode: 'option', option: 2, about: 'B-1', asked: 'Better how?' },
+      });
     });
 
     it('takes the person’s own words, or the decision left to the refiner', () => {

@@ -27,6 +27,7 @@ import {
 } from '../store/queries.ts';
 import { askingItems } from './asking.ts';
 import type { Context } from './context.ts';
+import { traceAnswer } from './conversation.ts';
 import { requireItem, requireWritableItem, systemClock } from './items.ts';
 import { assertMayWriteItem, takeItem } from './lease-take.ts';
 import { itemOnBoard, type LiveBoard, liveBoardOf, relayAllowed } from './next.ts';
@@ -166,6 +167,32 @@ export function answerQuestion(ctx: Context, input: PersonAnswer, now = systemCl
     channel: input.channel,
     ...(input.question === undefined ? {} : { question: input.question }),
   };
+  const answered = answeredQuestion(ctx, input, base, now);
+  // What they chose stays in the conversation, where they will look for it.
+  const { answer } = answered;
+  if (answer)
+    traceAnswer(
+      ctx,
+      {
+        about: id,
+        asked: answered.text,
+        text: answer.text,
+        mode: answer.mode,
+        option: answer.option,
+        by: input.actor.name,
+      },
+      now,
+    );
+  return answered;
+}
+
+function answeredQuestion(
+  ctx: Context,
+  input: PersonAnswer,
+  base: Omit<AnswerInput, 'text'> & { question?: number },
+  now: () => string,
+): ItemQuestion {
+  const { id } = input;
   if (input.delegate)
     return recordAnswer(ctx, { ...base, text: DELEGATED }, {}, now, () => ({
       text: DELEGATED,

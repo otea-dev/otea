@@ -321,6 +321,78 @@ describe('the conversation over the API', () => {
     });
   });
 
+  describe('a question of the secretary with options', () => {
+    const asked = () => {
+      declareSecretary(project.db, 'sol');
+      return sayAsSecretary(project, {
+        agent: 'sol',
+        text: 'Note it or leave it?',
+        options: ['Note it', 'Leave it'],
+        recommended: 1,
+      }).message.id;
+    };
+
+    const tap = (id: number, body: unknown, from: 'desk' | 'phone' = 'desk') =>
+      call(`/conversation/messages/${id}/answer`, { method: 'POST', body }, from);
+
+    it('is listed with its options, and a tap from the desk or the phone is the person’s own message, once', async () => {
+      const id = asked();
+      expect((await listed()).messages[0]).toMatchObject({
+        options: ['Note it', 'Leave it'],
+        recommended: 1,
+      });
+
+      const done = await tap(id, { option: 2 }, 'phone');
+
+      expect(done.status).toBe(201);
+      expect(await done.json()).toMatchObject({
+        author: 'person',
+        text: 'Leave it',
+        replyTo: id,
+        delivery: 'pending',
+        choice: { mode: 'option', option: 2 },
+      });
+      expect((await listed()).waiting.count).toBe(1);
+      expect((await tap(id, { option: 1 })).status).toBe(409);
+      expect((await listed()).messages).toHaveLength(2);
+    });
+
+    it('takes the person’s own words, or the decision left to the secretary, and refuses what is no answer', async () => {
+      const id = asked();
+
+      expect((await tap(id, { option: 3 })).status).toBe(422);
+      expect((await tap(id, { text: '  ' })).status).toBe(422);
+      expect((await tap(id, { colour: 'red' })).status).toBe(400);
+      expect((await tap(99, { option: 1 })).status).toBe(404);
+      expect((await tap(id, { delegate: true })).status).toBe(201);
+      expect((await listed()).messages.at(-1)).toMatchObject({
+        choice: { mode: 'delegated' },
+      });
+    });
+
+    it('is never answered by an agent: no session, no answer', async () => {
+      const id = asked();
+      const unsigned = await Promise.resolve(
+        server.app.request(
+          `/p/memory-aaaaaa/api/conversation/messages/${id}/answer`,
+          {
+            method: 'POST',
+            headers: {
+              host: LOCAL_HOST,
+              origin: `http://${LOCAL_HOST}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ option: 1 }),
+          },
+          { incoming: { socket: { remoteAddress: '127.0.0.1' } } },
+        ),
+      );
+
+      expect(unsigned.status).toBe(401);
+      expect((await listed()).messages).toHaveLength(1);
+    });
+  });
+
   it('pages: the newest first, earlier ones with before, later with since', async () => {
     for (let n = 1; n <= 5; n += 1) await post(`m${n}`);
 

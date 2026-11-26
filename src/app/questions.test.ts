@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sequenceIds } from '../core/board/ids.ts';
 import { creatures } from '../core/board/testing.ts';
 import { OteaError } from '../core/errors.ts';
+import { selectMessages, selectPending } from '../store/conversation.ts';
 import { insertEvidence, selectEvents } from '../store/queries.ts';
 import { askingItem } from './asking.ts';
 import { createBoard, publishBoard, saveDraft } from './boards.ts';
@@ -161,6 +162,40 @@ describe('an agent asks the person', () => {
 });
 
 describe('the person answers', () => {
+  it('leaves what they chose in the conversation, read at once, waking nobody', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+    askQuestion(
+      ctx,
+      {
+        id: item.id,
+        text: '¿Caparazón liso o con musgo?',
+        options: ['Liso', 'Con musgo'],
+        recommended: 2,
+        actor: kiln,
+        channel: 'cli',
+      },
+      now,
+    );
+
+    answerQuestion(ctx, { id: item.id, option: 2, actor: you, channel: 'ui' }, now);
+
+    expect(selectMessages(ctx.db, { limit: 10 }).messages).toEqual([
+      expect.objectContaining({
+        author: 'person',
+        text: 'Con musgo',
+        delivery: 'read',
+        choice: {
+          mode: 'option',
+          option: 2,
+          about: item.id,
+          asked: '¿Caparazón liso o con musgo?',
+        },
+      }),
+    ]);
+    expect(selectPending(ctx.db)).toEqual([]);
+  });
+
   it('gives the answer back to the agent that asked, waiting, though its lease ran out meanwhile', () => {
     const ctx = memoryContext();
     const item = working(ctx);

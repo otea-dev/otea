@@ -385,7 +385,7 @@ describe('the conversation', () => {
 
       const said = sayAsSecretary(
         project,
-        { agent: 'sol', text: 'Filed.', links: [dark] },
+        { agent: 'sol', text: 'Filed.', kind: 'request', links: [dark] },
         clock(2000),
       );
       expect(said.message).toMatchObject({ replyTo: sent.id, kind: 'request', links: [dark] });
@@ -407,7 +407,11 @@ describe('the conversation', () => {
       const dark = item('Dark mode');
 
       expect(() =>
-        sayAsSecretary(project, { agent: 'sol', text: 'Filed.', links: [dark] }, clock(3000)),
+        sayAsSecretary(
+          project,
+          { agent: 'sol', text: 'Filed.', kind: 'request', links: [dark] },
+          clock(3000),
+        ),
       ).toThrow(/1 of the person's messages are not read yet.*--reply-to/);
       expect(() =>
         sayAsSecretary(project, { agent: 'sol', text: 'Q.', kind: 'consultation' }, clock(3000)),

@@ -17,6 +17,7 @@ import { syncBoardPresets } from '../app/boards.ts';
 import { briefFor } from '../app/brief.ts';
 import { listCollectionViews, listShownCollectionViews } from '../app/collections.ts';
 import {
+  answerSecretaryQuestion,
   attachmentToServe,
   correctKind,
   listConversation,
@@ -203,6 +204,7 @@ import {
   pinRequest,
   reassignRequest,
   relinkRequest,
+  secretaryAnswerRequest,
   surfaceOf,
   undoRequest,
   updateRequest,
@@ -977,6 +979,20 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         const message = correctKind(project, messageIdOf(c.req.param('id')), kind);
         feed.notify();
         return c.json(message);
+      })
+      // The person's tap on a question of the secretary's: their own message, in reply to it.
+      .post('/conversation/messages/:id/answer', async (c) => {
+        assertWritable(c, auth);
+        const given = await secretaryAnswerRequest(c);
+        const message = answerSecretaryQuestion(
+          project,
+          messageIdOf(c.req.param('id')),
+          given,
+          undefined,
+          HUMAN_IN_UI.actor.name,
+        );
+        feed.notify();
+        return c.json(message, 201);
       })
       // The Bandeja (app/bandeja.ts): the person's rough captures. The person captures and answers
       // only here, signed in, from the UI's own origin: no command or tool of an agent makes an

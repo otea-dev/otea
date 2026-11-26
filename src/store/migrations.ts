@@ -614,6 +614,22 @@ export const MIGRATIONS = [
     PRIMARY KEY (entry_id, n)
   );
   `,
+  // The conversation as a thread (0.8 fix round): a secretary message may carry a question with
+  // options to tap (options, a JSON list, and recommended); the person's answer to a question is a
+  // message of theirs (choice: how they answered; about and asked when it records an answer given
+  // to an agent's question on an item or a Bandeja entry, which wakes nobody); heard_at is when the
+  // secretary's wait returned the message (before it read it); kind_news is a kind the person
+  // changed that the secretary has not read yet.
+  `
+  ALTER TABLE conversation_messages ADD COLUMN options TEXT;
+  ALTER TABLE conversation_messages ADD COLUMN recommended INTEGER;
+  ALTER TABLE conversation_messages ADD COLUMN choice TEXT;
+  ALTER TABLE conversation_messages ADD COLUMN choice_option INTEGER;
+  ALTER TABLE conversation_messages ADD COLUMN about TEXT;
+  ALTER TABLE conversation_messages ADD COLUMN asked TEXT;
+  ALTER TABLE conversation_messages ADD COLUMN heard_at TEXT;
+  ALTER TABLE conversation_messages ADD COLUMN kind_news INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {

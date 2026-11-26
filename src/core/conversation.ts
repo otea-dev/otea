@@ -1,3 +1,4 @@
+import type { AnswerMode } from './board/questions.ts';
 import type { EvidenceKind } from './evidence.ts';
 
 // The conversation (0.8): the project's one chat between the person and its secretary, kept by
@@ -45,6 +46,21 @@ export type MessageFile = {
   sha256: string;
 };
 
+// How the person answered a question: tapped one of its options, wrote their own words, or left the
+// decision to whoever asked (as an agent's question on an item is answered).
+export type { AnswerMode };
+
+// A message of the person's that is an answer to a question. `about` and `asked` are set when it
+// only records an answer given to an agent's question on an item or a Bandeja entry (CAM-1, B-3): a
+// trace in the thread, read at once, that wakes nobody; they are null when it answers a question
+// of the secretary's own, which it wakes.
+export type MessageChoice = {
+  mode: AnswerMode;
+  option: number | null;
+  about: string | null;
+  asked: string | null;
+};
+
 export type Message = {
   id: number;
   author: MessageAuthor;
@@ -68,6 +84,15 @@ export type Message = {
   readAt: string | null;
   // The side topic this message is the record of, when it is (a consultation made by otea topic).
   topic: string | null;
+  // A question of the secretary's with 2 to 4 options to tap (and the one it recommends), and the
+  // person's answer to one (or to an agent's, as a trace).
+  options: string[];
+  recommended: number | null;
+  choice: MessageChoice | null;
+  // The person's messages only: when the secretary's wait returned it, before it read it.
+  heardAt: string | null;
+  // The turn's kind was changed by the person and the secretary has not read that yet.
+  kindNews: boolean;
 };
 
 // The first line of a message, shortened: what lists, wake-ups and backlinks quote.

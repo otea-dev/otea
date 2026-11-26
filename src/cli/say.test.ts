@@ -297,6 +297,92 @@ describe('the conversation from the secretary', () => {
       expect(again.out).toContain('The person set this turn as consultation: that stays.');
     });
 
+    it('a say with no --reply-to is a notice: its --links are its own and the person’s turns keep their kind and links', async () => {
+      const sent = person('retries with backoff?');
+      await otea('conversation', '--as', 'sol');
+      await otea(
+        'say',
+        'A design question.',
+        '--reply-to',
+        String(sent.id),
+        '--consultation',
+        '--as',
+        'sol',
+      );
+      const fix = await item('Retry with backoff');
+
+      const notice = await otea(
+        'say',
+        `${fix} is ready for your review.`,
+        '--links',
+        fix,
+        '--as',
+        'sol',
+      );
+
+      expect(notice.code).toBe(0);
+      expect(
+        conversation().map(({ author, kind, links, replyTo }) => [author, kind, links, replyTo]),
+      ).toEqual([
+        ['person', 'consultation', [], null],
+        ['secretary', 'consultation', [], sent.id],
+        ['secretary', null, [fix], null],
+      ]);
+      const shown = JSON.parse((await otea('show', fix, '--as', 'worker', '--json')).out);
+      expect(shown.fromMessages).toBeUndefined();
+    });
+
+    it('a question with --option and --recommend comes with buttons, and is refused with a bad count', async () => {
+      person('is a boss on floor 3 a good idea?');
+      await otea('conversation', '--as', 'sol');
+
+      const asked = await otea(
+        'say',
+        'What do I do with it?',
+        '--option',
+        'Note it',
+        '--option',
+        'Leave it as an idea',
+        '--recommend',
+        '1',
+        '--as',
+        'sol',
+      );
+
+      expect(asked.code).toBe(0);
+      expect(conversation().at(-1)).toMatchObject({
+        options: ['Note it', 'Leave it as an idea'],
+        recommended: 1,
+      });
+      const one = await otea('say', 'x?', '--option', 'only one', '--as', 'sol');
+      expect(one.code).not.toBe(0);
+      expect(one.err).toContain('2 to 4');
+    });
+
+    it('an item comes from a message or from a Bandeja note, not both', async () => {
+      const sent = person('add dark mode');
+
+      const { code, err } = await otea(
+        'create',
+        '--collection',
+        'tasks',
+        '--title',
+        'Dark mode',
+        '--description',
+        'D',
+        '--from-message',
+        String(sent.id),
+        '--from-bandeja',
+        'B-1',
+        '--as',
+        'sol',
+      );
+
+      expect(code).not.toBe(0);
+      expect(err).toContain('a message or a Bandeja note, not both');
+      expect(JSON.parse((await otea('list', '--as', 'sol', '--json')).out)).toEqual([]);
+    });
+
     it('--from-message is the secretary’s alone, and refused before the item is made', async () => {
       const sent = person('add dark mode');
 
