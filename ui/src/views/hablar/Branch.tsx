@@ -1,9 +1,9 @@
 import { type CSSProperties, type RefObject, useLayoutEffect, useRef, useState } from 'react';
 import type { AnswerWords } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
+import { ShortText } from '../../components/ShortText.tsx';
 import type { Chip } from '../../conversation.ts';
 import { t } from '../../i18n/i18n.ts';
-import { ShortText } from '../../components/ShortText.tsx';
 import { AgentMark, Button, Swap, toast } from '../../kit/index.ts';
 import { NodeGlyph } from '../../lanes/NodeGlyph.tsx';
 import { C } from '../../motion/curves.ts';

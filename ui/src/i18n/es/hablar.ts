@@ -19,7 +19,10 @@ export const hablar = {
   'hablar.waiting': { one: '{count} mensaje esperando', other: '{count} mensajes esperando' },
   'hablar.none.title': 'Todavía no hay secretario',
   'hablar.none.text':
-    'Pídele a tu agente que sea el secretario de este proyecto. En su sesión, que ejecute una vez este comando:',
+    'Abre la sesión de un agente y pégale este texto: desde ahí es tu secretario y te responde aquí.',
+  'hablar.none.copy': 'Copiar el texto del secretario',
+  'hablar.none.copied': 'Copiado',
+  'hablar.none.orRun': 'O que lo imprima él, en su terminal:',
   'hablar.none.after':
     'Mientras tanto puedes escribir: tus mensajes se guardan y los lee cuando llegue.',
   'hablar.empty': 'Todavía no hay nada dicho. Pídele algo, o pregúntale.',

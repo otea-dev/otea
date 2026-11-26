@@ -17,7 +17,10 @@ export const hablar = {
   'hablar.waiting': { one: '{count} message waiting', other: '{count} messages waiting' },
   'hablar.none.title': 'No secretary yet',
   'hablar.none.text':
-    'Ask your agent to be the secretary of this project. In its session it runs this command once:',
+    'Open an agent session and paste it this text: from then on it is your secretary and answers you here.',
+  'hablar.none.copy': 'Copy the secretary text',
+  'hablar.none.copied': 'Copied',
+  'hablar.none.orRun': 'Or have it print the text in its terminal:',
   'hablar.none.after':
     'Meanwhile you can write: your messages are kept and it reads them when it arrives.',
   'hablar.empty': 'Nothing said yet. Ask for something, or ask a question.',

@@ -327,6 +327,11 @@
   font: 400 italic 14.5px / 1.45 var(--serif);
   color: var(--ink-3);
 }
+.hb-nosec .hb-or {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
 .hb-nosec .pj-cmd {
   max-width: 100%;
 }

@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { type AnswerWords, answerSecretaryQuestion, correctTurn } from '../../api.ts';
+import {
+  type AnswerWords,
+  answerSecretaryQuestion,
+  correctTurn,
+  fetchRolePrompt,
+} from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { askingCount } from '../../bandeja.ts';
-import { CopyCommand } from '../../components/CopyCommand.tsx';
+import { useCopy } from '../../components/AgentPrompt.tsx';
+import { CopyCommand, CopyGlyph } from '../../components/CopyCommand.tsx';
 import {
   awayOf,
   cardCounts,
@@ -17,8 +23,9 @@ import {
   turnsOf,
 } from '../../conversation.ts';
 import { momentLabel } from '../../format.ts';
+import { useRemote } from '../../hooks.ts';
 import { t } from '../../i18n/i18n.ts';
-import { toast } from '../../kit/index.ts';
+import { Button, toast } from '../../kit/index.ts';
 import { F, lerp } from '../../motion/curves.ts';
 import { drive } from '../../motion/drive.ts';
 import { reduced } from '../../motion/reduced.ts';
@@ -65,6 +72,13 @@ function scrollBox(box: HTMLElement, top: number | 'foot') {
 // The project has no secretary: what to ask of an agent, and the one command it runs. It stays in
 // sight above the conversation, whatever has been written, since nothing answers until there is one.
 function NoSecretary() {
+  const app = useApp();
+  // The text is read before the tap, so the copy is the tap's own (a browser lends the clipboard
+  // to a click, not to what a request answers later).
+  const load = useCallback((signal: AbortSignal) => fetchRolePrompt('secretary', {}, signal), []);
+  const prompt = useRemote(load, app.version, 'live');
+  const text = prompt.status === 'ready' ? prompt.value.prompt : '';
+  const [copied, copy] = useCopy(text);
   return (
     <div className="hb-nosec" data-enter="fade">
       <div className="hb-nohead">
@@ -72,7 +86,12 @@ function NoSecretary() {
         <h2 className="hb-h">{t('hablar.none.title')}</h2>
       </div>
       <p>{t('hablar.none.text')}</p>
-      <CopyCommand command="otea profile --role secretary" />
+      <Button variant="primary" disabled={text === ''} onClick={copy}>
+        <CopyGlyph />
+        {copied ? t('hablar.none.copied') : t('hablar.none.copy')}
+      </Button>
+      <p className="hb-or">{t('hablar.none.orRun')}</p>
+      <CopyCommand command="otea prompt --role secretary" />
       <p className="hb-after">{t('hablar.none.after')}</p>
     </div>
   );

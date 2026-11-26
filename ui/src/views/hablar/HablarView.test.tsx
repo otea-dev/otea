@@ -7,7 +7,7 @@ import { ago, item, NOW } from '../../derive/fixtures.ts';
 import { setLanguage } from '../../i18n/i18n.ts';
 import { seenAtMount } from '../../kit/pop/toast.tsx';
 import { testApp } from '../../shell/test-app.ts';
-import { type Mounted, mount, press, settle, typeInto } from '../../test-dom.tsx';
+import { buttonNamed, type Mounted, mount, press, settle, typeInto } from '../../test-dom.tsx';
 import { FromTurns } from './FromTurns.tsx';
 import { HablarView } from './HablarView.tsx';
 
@@ -72,6 +72,8 @@ function server(view: ConversationView, o: { failures?: number; hold?: Promise<v
     if (method === 'GET') {
       if (path.endsWith('/conversation')) return json(view);
       if (path.endsWith('/secretary')) return json({ secretary: view.secretary });
+      if (path.endsWith('/agent-prompt'))
+        return json({ kind: 'secretary', prompt: 'Eres el secretario de este proyecto.' });
       return json({ error: { code: 'not_found' } }, 404);
     }
     const body =
@@ -709,11 +711,21 @@ describe('the secretary away, or never there', () => {
     expect(banner).toContain('2 mensajes esperando');
   });
 
-  it('explains how to start one when the project has none, and still lets you write', async () => {
+  // Field study 3: the empty state gave `otea profile --role secretary`, which only declares a role
+  // and brings none of the instructions. What makes an agent a secretary is its text.
+  it('gives the secretary text to copy when the project has none, and still lets you write', async () => {
+    const written: string[] = [];
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText: async (words: string) => void written.push(words) },
+    });
     const { root } = await open(conversation({ secretary: null }));
     const none = q(root, '.hb-nosec') as HTMLElement;
-    expect(text(none)).toContain('Pídele a tu agente que sea el secretario de este proyecto');
-    expect(text(q(none, 'code'))).toBe('otea profile --role secretary');
+    expect(text(none)).toContain('Abre la sesión de un agente y pégale este texto');
+    expect(text(q(none, 'code'))).toBe('otea prompt --role secretary');
+    expect(text(none)).not.toContain('otea profile');
+    await press(buttonNamed(none, 'Copiar el texto del secretario'));
+    expect(written).toEqual(['Eres el secretario de este proyecto.']);
     expect(q<HTMLTextAreaElement>(root, '.hb-input textarea')?.disabled).toBe(false);
   });
 
