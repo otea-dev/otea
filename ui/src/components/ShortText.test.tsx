@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it } from 'vitest';
 import { type App, AppTestProvider } from '../app/context.tsx';
+import { textOf } from '../html-text.ts';
 import { setLanguage } from '../i18n/i18n.ts';
 import { AskBody } from '../views/hablar/Branch.tsx';
 
@@ -36,10 +37,11 @@ const ask = (text: string) =>
 
 describe("an agent's question", () => {
   it('shows its first sentence and folds the rest behind «see more»', () => {
-    const html = ask(WALL);
-    expect(html).toContain('Para publicar la rama necesito que confirmes algo.');
-    expect(html).not.toContain('otea repos add');
-    expect(html).toContain('see more');
+    // What is read on the page: markup attributes (the card's accessible name) are not.
+    const shown = textOf(ask(WALL));
+    expect(shown).toContain('Para publicar la rama necesito que confirmes algo.');
+    expect(shown).not.toContain('otea repos add');
+    expect(shown).toContain('see more');
   });
 
   it('shows a short question whole, with nothing to unfold', () => {
