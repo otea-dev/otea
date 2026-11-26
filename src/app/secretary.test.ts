@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LISTEN_WINDOW_MS } from '../core/agent-status.ts';
 import { UNHEARD_GRACE_MS } from '../core/notify/signals.ts';
 import { selectStretches } from '../store/secretary.ts';
+import { BETWEEN_ITEMS_MS } from './board-workers.ts';
 import { addCollection } from './collections.ts';
 import type { Context } from './context.ts';
 import { createItem } from './items.ts';
+import { claimItem, releaseItem } from './leases.ts';
 import {
   endProcess,
   endWaiter,
@@ -12,6 +14,8 @@ import {
   forgetGoneHarness,
   listAgents,
   noteHarness,
+  renewLeases,
+  seeAgent,
   waitBeat,
 } from './presence.ts';
 import {
@@ -333,6 +337,64 @@ describe('the secretary', () => {
 
         expect(look(UNHEARD_GRACE_MS)).toBeUndefined();
         expect(selectStretches(ctx.db).size).toBe(0);
+      });
+
+      // F2 (field study 3): «nobody is listening» was told while a worker the secretary had
+      // launched was busy, and the secretary launched a second one that did the same item.
+      describe('with a worker of the board at work', () => {
+        const at = (ms: number) => stamp(T0 + ms);
+        const worker = { kind: 'agent' as const, name: 'ana-tasks' };
+
+        it('not while it holds another item of the board, however long its step runs', () => {
+          const busy = newTask(T0);
+          newTask(T0);
+          const look = newWait();
+          claimItem(ctx, { id: busy, actor: worker }, at(0));
+          look(0);
+          // A step of several minutes with no otea call: working, never «nobody».
+          const quiet = UNHEARD_GRACE_MS + 60_000;
+          renewLeases(ctx.db, 'ana-tasks', at(quiet - 30_000));
+          seeAgent(ctx.db, { agent: 'ana-tasks', channel: 'cli', call: true }, at(0));
+
+          expect(look(UNHEARD_GRACE_MS)).toBeUndefined();
+          expect(look(quiet)).toBeUndefined();
+        });
+
+        it('not while it is between two items, just after it handed one off or let it go', () => {
+          const first = newTask(T0);
+          newTask(T0);
+          const look = newWait();
+          claimItem(ctx, { id: first, actor: worker }, at(0));
+          releaseItem(ctx, { id: first, actor: worker }, at(60_000));
+          const sign = () =>
+            seeAgent(
+              ctx.db,
+              { agent: 'ana-tasks', channel: 'cli', call: true },
+              at(UNHEARD_GRACE_MS + 30_000),
+            );
+          look(0);
+          sign();
+
+          expect(look(UNHEARD_GRACE_MS + 30_000)).toBeUndefined();
+        });
+
+        it('but told once it went quiet: only a worker that is still there is waited for', () => {
+          const first = newTask(T0);
+          newTask(T0);
+          const look = newWait();
+          claimItem(ctx, { id: first, actor: worker }, at(0));
+          seeAgent(ctx.db, { agent: 'ana-tasks', channel: 'cli', call: true }, at(1000));
+          releaseItem(ctx, { id: first, actor: worker }, at(1000));
+          // Looked at every half minute for a quarter of an hour; the worker never comes back.
+          let told: number | undefined;
+          for (let ms = 0; ms <= 15 * 60_000 && told === undefined; ms += 30_000) {
+            if (look(ms)?.kind === 'unheard') told = ms;
+          }
+
+          // Not while it was there (its last call, and the window after it), and then it is told.
+          expect(told).toBeGreaterThan(LISTEN_WINDOW_MS);
+          expect(told).toBeLessThanOrEqual(BETWEEN_ITEMS_MS + UNHEARD_GRACE_MS);
+        });
       });
 
       it('begins again when a listener came and went while nobody looked', () => {

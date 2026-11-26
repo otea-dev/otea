@@ -724,6 +724,8 @@ export function listAgents(
         waiting,
         asking: askers.has(name),
         sessionEnded: sessionEnded || ended,
+        quietMs:
+          Date.parse(at) - Math.max(Date.parse(lastSeen), Date.parse(record.actedAt ?? lastSeen)),
       }),
       sessionEnded,
       listening,

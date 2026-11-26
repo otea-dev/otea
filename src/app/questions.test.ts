@@ -16,7 +16,7 @@ import {
   liveBoardOf,
   nextFor,
 } from './next.ts';
-import { endProcess, endWaiter, waitBeat } from './presence.ts';
+import { endProcess, endWaiter, seeAgent, waitBeat } from './presence.ts';
 import { answerQuestion, answerWaiting, askQuestion, noteChatAnswer } from './questions.ts';
 import { restartItem } from './restart.ts';
 import { memoryContext } from './testing.ts';
@@ -318,6 +318,26 @@ describe('the person answers', () => {
       );
       expect(nextFor(ctx, 'scout', {}, now).item).toBe(item.id);
       expect(claimItem(ctx, { id: item.id, actor: scout }, now).lease?.holder).toBe('scout');
+    });
+
+    // F2 (field study 3): the person answered a few minutes after the question, with the asker's
+    // lease about to run out, and the card turned «atascado» in red right after the tap, while the
+    // asker was about to pick the answer up.
+    it('answered while its lease is about to run out, gives it a lease to pick the answer up with', () => {
+      const ctx = memoryContext();
+      const item = working(ctx);
+      waits(ctx);
+      ask(ctx, item.id);
+      tick += 14 * 60;
+      // It called Otea a moment ago (a step with no lease renewal of its own): its session is there.
+      seeAgent(ctx.db, { agent: 'kiln', channel: 'cli', call: true }, now);
+
+      answerQuestion(ctx, { id: item.id, text: 'Con musgo', actor: you, channel: 'ui' }, now);
+      tick += 3 * 60;
+
+      const after = getItem(ctx, item.id, now);
+      expect(after.lease?.holder).toBe('kiln');
+      expect(after.expiredLease).toBeUndefined();
     });
 
     it('answered in Otea, leaves it to whichever agent claims it', () => {

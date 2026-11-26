@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { bandejaAskFacts } from '../app/bandeja.ts';
+import { workersByBoard } from '../app/board-workers.ts';
 import { listItems } from '../app/items.ts';
 import { boardRoundOf, liveBoards } from '../app/next.ts';
 import { notesSummary } from '../app/notes.ts';
@@ -70,11 +71,13 @@ function factsOf(project: Project, now: number): NotifyFacts[] {
   const boards = liveBoards(project);
   const clock = () => new Date(now).toISOString();
   const agents = listAgents(project.db, clock);
-  return listItems(project, {}, clock).map((item) => {
+  const items = listItems(project, {}, clock);
+  const workers = workersByBoard(project.db, items, agents, clock());
+  return items.map((item) => {
     const setAside =
       item.turn === 'agent' ? setAsideOf(selectEvents(project.db, item.id)) : undefined;
     // Unheard now; scan() tells it only once it has stayed so for the grace (settleUnheard).
-    const unheard = unheardOf(item, agents, clock(), setAside !== undefined);
+    const unheard = unheardOf(item, agents, clock(), setAside !== undefined, workers);
     const round = boardRoundOf(project, item, boards);
     const notes = notesSummary(project, item, boards);
     return {

@@ -386,6 +386,18 @@ export function selectEventsOfTypes(db: DatabaseSync, types: readonly string[]):
   return (db.prepare(sql).all(...types) as EventRow[]).map(toEvent);
 }
 
+// What agents did on the boards lately: the newest claims, releases and moves of theirs, with the
+// collection of the item each was on. The newest `limit` events are read, whatever their age.
+export type AgentWork = { agent: string; collection: string; at: string };
+
+export function selectRecentAgentWork(db: DatabaseSync, limit = 400): AgentWork[] {
+  const sql = `SELECT e.actor_name AS agent, i.collection AS collection, e.at AS at
+    FROM (SELECT * FROM events ORDER BY id DESC LIMIT :limit) e
+    JOIN items i ON i.id = e.item_id
+    WHERE e.actor_kind = 'agent' AND e.type IN ('claimed', 'released', 'transitioned')`;
+  return db.prepare(sql).all({ limit }) as AgentWork[];
+}
+
 // limit caps the oldest events after the cursor; latest keeps the newest ones instead (where a feed
 // that starts now begins reading). Either way they come in commit order.
 export type EventFilter = {

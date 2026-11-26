@@ -15,7 +15,7 @@ import {
 } from '../core/board/questions.ts';
 import { OteaError } from '../core/errors.ts';
 import type { Actor } from '../core/item.ts';
-import { activeLease } from '../core/lease.ts';
+import { activeLease, DEFAULT_LEASE_TTL_MS, leaseExpiry } from '../core/lease.ts';
 import { transaction } from '../store/database.ts';
 import {
   appendEvent,
@@ -305,7 +305,11 @@ function recordAnswer(
     const lease = activeLease(item.lease, at);
     // The agent that asked, noting the answer from its own chat, is at work this moment.
     const gone = extra.via !== open.by && !sessionAlive(ctx.db, open.by, () => at);
-    if (!lease && !gone) takeItem(ctx.db, item, { kind: 'agent', name: open.by }, at);
+    // A lease it still holds, about to run out, is renewed too: the answer comes back to it, and a
+    // lease that ends right after the tap would turn the item «atascado» while it picks it up.
+    const renew =
+      lease?.holder === open.by && lease.expiresAt < leaseExpiry(at, DEFAULT_LEASE_TTL_MS);
+    if ((!lease || renew) && !gone) takeItem(ctx.db, item, { kind: 'agent', name: open.by }, at);
     return { question: answered, gone };
   });
 }

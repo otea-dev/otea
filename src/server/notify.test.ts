@@ -1,6 +1,7 @@
 import { createECDH, randomBytes } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { answerBandeja, askOnBandeja, captureToBandeja, takeBandeja } from '../app/bandeja.ts';
+import { BETWEEN_ITEMS_MS } from '../app/board-workers.ts';
 import { addCollection } from '../app/collections.ts';
 import { postPersonMessage, readAsSecretary, sayAsSecretary } from '../app/conversation.ts';
 import { createItem, moveItem } from '../app/items.ts';
@@ -802,7 +803,10 @@ describe('notifications on the server', () => {
         expect(sent).toEqual([]);
       });
 
-      it('is not silenced by an agent working on another item', async () => {
+      // F2 (field study 3): the worker the secretary launched was busy on one item, the rest of the
+      // queue was told as «nobody is listening», and a second worker was launched. A worker at work
+      // on the board comes to the next item when its step ends: that is no silence to tell.
+      it('says nothing of an item while an agent works another one of the board', async () => {
         const busy = { agent: 'busy', channel: 'cli', call: true } as const;
         const stamp = () => new Date(clock).toISOString();
         seeAgent(project.db, busy, stamp);
@@ -810,16 +814,28 @@ describe('notifications on the server', () => {
         expect(listAgents(project.db, stamp).find(({ name }) => name === 'busy')?.status).toBe(
           'working',
         );
-        const id = second();
+        second();
         await pass(1000);
         seeAgent(project.db, busy, stamp);
         await pass(UNHEARD_GRACE_MS);
         await pass(GATHER_MS);
-        expect(sent).toEqual([
-          expect.objectContaining({
-            payload: expect.objectContaining({ url: `/p/memory-aaaaaa/#/i/${id}` }),
-          }),
-        ]);
+        expect(sent).toEqual([]);
+      });
+
+      it('tells it once that agent let the item go and went quiet', async () => {
+        const busy = { agent: 'busy', channel: 'cli', call: true } as const;
+        const stamp = () => new Date(clock).toISOString();
+        seeAgent(project.db, busy, stamp);
+        claimItem(project, { id: first, actor: { kind: 'agent', name: 'busy' } }, at);
+        second();
+        await pass(1000);
+        releaseItem(project, { id: first, actor: { kind: 'agent', name: 'busy' } }, at);
+        // Nothing of it for a long while: it is no worker of the board any more.
+        await pass(BETWEEN_ITEMS_MS + LISTEN_WINDOW_MS);
+        await pass(UNHEARD_GRACE_MS);
+        await pass(GATHER_MS);
+        // Both items wait, and are told as one.
+        expect(sent).toHaveLength(1);
       });
 
       it('does not tell again when a listener lapses and returns within the cooldown', async () => {

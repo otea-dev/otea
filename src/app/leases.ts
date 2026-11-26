@@ -6,6 +6,7 @@ import { activeLease, DEFAULT_LEASE_TTL_MS, heldText, leaseExpiry } from '../cor
 import { turnOf } from '../core/workflow.ts';
 import { transaction } from '../store/database.ts';
 import { appendEvent, clearLease, type ItemRecord, takeLease } from '../store/queries.ts';
+import { crowdedBoard } from './board-workers.ts';
 import type { Context } from './context.ts';
 import { type Item, present, requireWritableItem, systemClock, workflowOf } from './items.ts';
 import { type BaseTips, takeItem } from './lease-take.ts';
@@ -54,6 +55,12 @@ export function claimItem(
     const at = now();
     assertMayClaim(ctx, item, input.actor.name, at);
     const held = activeLease(item.lease, at)?.holder;
+    // A worker beside a live one on the board it works: a board has one (code boards two).
+    const board = liveBoardOf(ctx, item.collection);
+    if (input.actor.kind === 'agent' && board && held !== input.actor.name) {
+      const crowded = crowdedBoard(db, item, input.actor.name, board.def, at);
+      if (crowded) throw crowded;
+    }
     const lease = takeItem(db, item, input.actor, at, input.ttlMs, input.baseTipsOf);
     const claimed = present({ ...item, lease }, workflow, at);
     return held !== undefined && held !== input.actor.name

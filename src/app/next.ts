@@ -113,6 +113,7 @@ import {
   selectRelationsOf,
   selectStateEntries,
 } from '../store/queries.ts';
+import { crowdedBoard } from './board-workers.ts';
 import { collectionNamed } from './collections.ts';
 import type { Context } from './context.ts';
 import { type DraftRequest, draftRequestOf, handInCommand } from './draft-request.ts';
@@ -1145,7 +1146,11 @@ export function offerableTo(ctx: Context, agent: string, now = systemClock) {
     const board = boards.find(({ collection }) => collection === item.collection);
     if (!board) return true;
     const record = requireItem(ctx.db, item.id);
-    return !offered(record) && isTheirs(ctx, board.def, record, agent, at);
+    if (offered(record) || !isTheirs(ctx, board.def, record, agent, at)) return false;
+    // Not an item it could only be refused: a second worker beside a live one waits for nothing
+    // here (crowdedBoard), or its wait would wake it at once, again and again.
+    const mine = activeLease(record.lease, at)?.holder === agent;
+    return mine || crowdedBoard(ctx.db, record, agent, board.def, at) === undefined;
   };
 }
 
@@ -1508,6 +1513,19 @@ export function nextFor(
       };
     }
     const { board } = first;
+    // A second worker beside a live one on the board takes nothing: it is told so, and waits.
+    const crowded =
+      options.claim && !first.held
+        ? crowdedBoard(ctx.db, first.item, agent, board.def, at)
+        : undefined;
+    if (crowded) {
+      return {
+        item: null,
+        collection: options.collection ?? null,
+        text: `${crowded.message}\nWait for work with otea wait --turn agent --unclaimed --as ${agent}, or stop.`,
+        idle: true,
+      };
+    }
     const lease = options.claim
       ? takeItem(
           ctx.db,

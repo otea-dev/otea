@@ -25,6 +25,7 @@ import {
   tellStretch,
   touchStretch,
 } from '../store/secretary.ts';
+import { workersByBoard } from './board-workers.ts';
 import type { Context } from './context.ts';
 import { type Clock, listItems, systemClock } from './items.ts';
 import { boardRoundOf, liveBoards } from './next.ts';
@@ -231,9 +232,11 @@ function unheardNow(
   const at = now();
   const boards = liveBoards(ctx);
   const keys = new Map<string, string>();
-  for (const item of listItems(ctx, {}, now)) {
+  const items = listItems(ctx, {}, now);
+  const workers = workersByBoard(ctx.db, items, agents, at);
+  for (const item of items) {
     const setAside = item.turn === 'agent' ? setAsideOf(selectEvents(ctx.db, item.id)) : undefined;
-    if (!unheardOf(item, agents, at, setAside !== undefined)) continue;
+    if (!unheardOf(item, agents, at, setAside !== undefined, workers)) continue;
     const round = boardRoundOf(ctx, item, boards);
     const facts = { id: item.id, state: item.state, ...(round === undefined ? {} : { round }) };
     keys.set(unheardKey(facts), item.id);
