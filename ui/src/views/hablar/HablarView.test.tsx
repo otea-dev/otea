@@ -515,7 +515,7 @@ describe('a long reply', () => {
     expect(blocks).toHaveLength(2);
     expect(q(root, '.hb-fold')).toBeNull();
     expect(text(q(blocks[0] as HTMLElement, '.hb-bcap'))).toBe(
-      '1. Trabajador de Cambios: pégalo en una sesión nueva.',
+      'Trabajador de Cambios: pégalo en una sesión nueva.',
     );
     expect(blocks[0]?.querySelector('pre')?.textContent).toBe(first);
     await press(buttonNamed(blocks[1] as HTMLElement, 'Copiar'));

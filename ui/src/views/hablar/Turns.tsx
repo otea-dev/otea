@@ -408,7 +408,10 @@ function PasteBlock({ block, n }: { block: TextBlock; n: number }) {
         <span className="hb-bn" aria-hidden="true">
           {n}
         </span>
-        <span className="hb-bcap">{block.caption || t('hablar.block', { n })}</span>
+        {/* The number is the badge's: «1. Trabajador…» reads «Trabajador…» beside it. */}
+        <span className="hb-bcap">
+          {block.caption.replace(/^\d+[.)]\s*/, '') || t('hablar.block', { n })}
+        </span>
         <button type="button" className="hb-bcopy" onClick={copy}>
           <CopyGlyph />
           {copied ? t('hablar.block.copied') : t('hablar.block.copy')}

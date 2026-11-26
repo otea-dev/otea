@@ -56,6 +56,16 @@ describe('a row on the phone', () => {
   });
 });
 
+describe('the docked buttons', () => {
+  // Field study 3: «Devolver a Investigar» read «Devolver a Investiga» at 390 px, cut at the
+  // button's edge, because a button keeps its words on one line.
+  it('lets the words of a move wrap inside the button', () => {
+    const dock = rules(phoneCss, '.p-dock .btn');
+    expect(dock).toMatch(/white-space:\s*normal/);
+    expect(dock).toMatch(/height:\s*auto/);
+  });
+});
+
 describe('the bottom buttons', () => {
   it('draws the bottom bar on the screen’s foot, four tabs wide, clear of the home bar', () => {
     const bar = rules(phone, '.tabbar');
