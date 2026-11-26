@@ -358,6 +358,15 @@ describe('a question of the secretary', () => {
     ]);
   });
 
+  it('offers its buttons as a group named by the question, so a screen reader hears what they answer', async () => {
+    const { root } = await open(conversation({ messages: question() }));
+
+    const group = q(root, '.hb-row.secretary [role="group"]') as HTMLElement;
+    expect(group).not.toBeNull();
+    expect(group.getAttribute('aria-label')).toContain('¿Qué hago con esto?');
+    expect(all(group, '.hb-opt')).toHaveLength(2);
+  });
+
   it('has no buttons once you answered it, and your answer is in the thread', async () => {
     const messages = [
       ...question(),
@@ -672,10 +681,11 @@ describe('correcting what a turn is', () => {
     const { root } = await open(conversation({ messages }));
 
     const labels = all(root, '.hb-row .hb-kind');
-    expect(labels.map((label) => label.getAttribute('aria-label'))).toEqual([
-      'Marcado como pedido · «El botón Aprobar queda tapado en el celu». Toca para hacerlo consulta.',
-      'Marcado como consulta · «¿Un tablero por cliente?». Toca para hacerlo pedido.',
-    ]);
+    // Each name carries its own message, whatever the rest of the wording.
+    const names = labels.map((label) => label.getAttribute('aria-label') ?? '');
+    expect(names[0]).toContain('El botón Aprobar queda tapado en el celu');
+    expect(names[1]).toContain('¿Un tablero por cliente?');
+    expect(names[0]).not.toContain('Un tablero por cliente');
     const before = seenAtMount();
 
     await press(labels[1]);

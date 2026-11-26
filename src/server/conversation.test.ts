@@ -370,6 +370,31 @@ describe('the conversation over the API', () => {
       });
     });
 
+    it('takes no answer past the message limit, nor a body far past it', async () => {
+      const id = asked();
+
+      expect((await tap(id, { text: 'x'.repeat(20_001) })).status).toBe(422);
+      const huge = await call(`/conversation/messages/${id}/answer`, {
+        method: 'POST',
+        body: { text: 'x'.repeat(2_000_000) },
+      });
+      expect(huge.status).toBe(413);
+      expect((await listed()).messages).toHaveLength(1);
+    });
+
+    it('refuses to correct the kind of the secretary’s own notice', async () => {
+      declareSecretary(project.db, 'sol');
+      const notice = sayAsSecretary(project, { agent: 'sol', text: 'FYI.' }).message.id;
+
+      const refused = await call(`/conversation/messages/${notice}/kind`, {
+        method: 'POST',
+        body: { kind: 'request' },
+      });
+
+      expect(refused.status).toBe(422);
+      expect((await listed()).messages[0]?.kind).toBeNull();
+    });
+
     it('is never answered by an agent: no session, no answer', async () => {
       const id = asked();
       const unsigned = await Promise.resolve(

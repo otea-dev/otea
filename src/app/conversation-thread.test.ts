@@ -8,9 +8,11 @@ import {
   answerSecretaryQuestion,
   conversationText,
   correctKind,
+  linkMessageToItem,
   listConversation,
   postPersonMessage,
   readAsSecretary,
+  requireLinkableMessage,
   sayAsSecretary,
   turnsOfItem,
 } from './conversation.ts';
@@ -177,6 +179,117 @@ describe('the conversation as a thread', () => {
 
       expect(same.kindNews).toBe(false);
       expect(secretaryWake(project, startSecretaryWait(clock(3500)), clock(3500))).toBeUndefined();
+    });
+  });
+
+  describe('review round: several open questions, wakes, taps, limits', () => {
+    const ask = (text: string, at: number) =>
+      sayAsSecretary(
+        project,
+        { agent: 'sol', text, options: ['Yes', 'No'], recommended: 1 },
+        clock(at),
+      ).message;
+
+    it('keeps several questions open: each is answered by a tap on it, in any order, and what the person says freely answers none', () => {
+      const q1 = ask('First?', 2000);
+      const q2 = ask('Second?', 2100);
+
+      answerSecretaryQuestion(project, q2.id, { option: 1 }, clock(3000));
+      // A question after another was answered is still open.
+      expect(answerSecretaryQuestion(project, q1.id, { option: 2 }, clock(3100)).replyTo).toBe(
+        q1.id,
+      );
+      expect(() => answerSecretaryQuestion(project, q2.id, { option: 2 }, clock(3200))).toThrow(
+        /already answered/,
+      );
+
+      const q3 = ask('Third?', 4000);
+      post('something else entirely', 4100);
+      expect(answerSecretaryQuestion(project, q3.id, { option: 1 }, clock(4200)).replyTo).toBe(
+        q3.id,
+      );
+    });
+
+    it('stops waking for a changed kind once the secretary acts on that turn, without reading it', () => {
+      const asked = post('would export to Markdown be worth it?', 1000);
+      read(1500);
+      sayAsSecretary(
+        project,
+        { agent: 'sol', text: 'Maybe.', replyTo: asked.id, kind: 'consultation' },
+        clock(2000),
+      );
+      correctKind(project, asked.id, 'request');
+      expect(secretaryWake(project, startSecretaryWait(clock(3000)), clock(3000))?.kind).toBe(
+        'kind_changed',
+      );
+
+      sayAsSecretary(project, { agent: 'sol', text: 'On it.', replyTo: asked.id }, clock(3500));
+
+      expect(secretaryWake(project, startSecretaryWait(clock(4000)), clock(4000))).toBeUndefined();
+      expect(messages().every(({ kindNews }) => !kindNews)).toBe(true);
+    });
+
+    it('stops waking for a changed kind once an item is made from that turn', () => {
+      const asked = post('would export to Markdown be worth it?', 1000);
+      read(1500);
+      sayAsSecretary(
+        project,
+        { agent: 'sol', text: 'Maybe.', replyTo: asked.id, kind: 'consultation' },
+        clock(2000),
+      );
+      correctKind(project, asked.id, 'request');
+
+      linkMessageToItem(project, 'sol', asked.id, item('Export to Markdown'), clock(3000));
+
+      expect(secretaryWake(project, startSecretaryWait(clock(4000)), clock(4000))).toBeUndefined();
+    });
+
+    it('wakes for a changed kind twice at most when the secretary does nothing', () => {
+      const asked = post('would export to Markdown be worth it?', 1000);
+      read(1500);
+      sayAsSecretary(
+        project,
+        { agent: 'sol', text: 'Maybe.', replyTo: asked.id, kind: 'consultation' },
+        clock(2000),
+      );
+      correctKind(project, asked.id, 'request');
+
+      const wakes = [3000, 3100, 3200, 3300].map(
+        (at) => secretaryWake(project, startSecretaryWait(clock(at)), clock(at))?.kind,
+      );
+
+      expect(wakes).toEqual(['kind_changed', 'kind_changed', undefined, undefined]);
+    });
+
+    it('lets the secretary classify and link the person’s tap, by default or by number, and refuses a notice before anything is made', () => {
+      const question = ask('Note it?', 2000);
+      const tap = answerSecretaryQuestion(project, question.id, { option: 1 }, clock(3000));
+      read(3500);
+
+      // The tap is the latest message of the person's: the default turn.
+      const said = sayAsSecretary(
+        project,
+        { agent: 'sol', text: 'Noted.', kind: 'request' },
+        clock(4000),
+      );
+      expect(said.message.replyTo).toBe(tap.id);
+      expect(linkMessageToItem(project, 'sol', tap.id, item('Note it'), clock(4100))).toMatchObject(
+        { kind: 'request' },
+      );
+
+      // A message of the secretary's is no turn of the person's: refused up front.
+      expect(() => requireLinkableMessage(project, 'sol', question.id)).toThrow(/notice/);
+      expect(() => requireLinkableMessage(project, 'sol', tap.id)).not.toThrow();
+    });
+
+    it('refuses to correct the kind of a notice, and an answer past the message limit', () => {
+      const notice = sayAsSecretary(project, { agent: 'sol', text: 'FYI.' }, clock(2000)).message;
+      const question = ask('Note it?', 2100);
+
+      expect(() => correctKind(project, notice.id, 'request')).toThrow(/notice/);
+      expect(() =>
+        answerSecretaryQuestion(project, question.id, { text: 'x'.repeat(20_001) }, clock(3000)),
+      ).toThrow(/at most 20000 characters/);
     });
   });
 

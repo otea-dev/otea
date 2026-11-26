@@ -167,6 +167,28 @@ describe('the thread in time', () => {
     expect(after[0]).toMatchObject({ question: 'open' });
     expect(turnsOf([trace])[0]?.waits).toBeNull();
   });
+
+  // Each question is answered by a reply to it: another question stays open when the person
+  // answers one, or says something else.
+  it('keeps each question open until a reply to that one, whatever else was said', () => {
+    const one = say({ id: 2, author: 'secretary', text: '¿Uno?', options: ['Sí', 'No'] });
+    const two = say({ id: 3, author: 'secretary', text: '¿Dos?', options: ['Sí', 'No'] });
+    const tapTwo = say({
+      id: 4,
+      author: 'person',
+      replyTo: 3,
+      text: 'Sí',
+      choice: { mode: 'option', option: 1, about: null, asked: null },
+    });
+    const free = say({ id: 5, author: 'person', text: 'otra cosa' });
+
+    const rows = rowsOf([one, two, tapTwo, free], turnsOf([one, two, tapTwo, free]));
+
+    expect(rows.flatMap((row) => (row.type === 'reply' ? [row.question] : []))).toEqual([
+      'open',
+      'answered',
+    ]);
+  });
 });
 
 describe('the secretary thinking', () => {

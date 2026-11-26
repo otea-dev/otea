@@ -383,6 +383,31 @@ describe('the conversation from the secretary', () => {
       expect(JSON.parse((await otea('list', '--as', 'sol', '--json')).out)).toEqual([]);
     });
 
+    it('--from-message of a message that is no turn of the person’s is refused before the item is made', async () => {
+      person('hi');
+      await otea('conversation', '--as', 'sol');
+      await otea('say', 'A notice.', '--as', 'sol');
+      const notice = conversation().at(-1)?.id;
+
+      const { code, err } = await otea(
+        'create',
+        '--collection',
+        'tasks',
+        '--title',
+        'Orphan',
+        '--description',
+        'D',
+        '--from-message',
+        String(notice),
+        '--as',
+        'sol',
+      );
+
+      expect(code).not.toBe(0);
+      expect(err).toContain('notice');
+      expect(JSON.parse((await otea('list', '--as', 'sol', '--json')).out)).toEqual([]);
+    });
+
     it('--from-message is the secretary’s alone, and refused before the item is made', async () => {
       const sent = person('add dark mode');
 
