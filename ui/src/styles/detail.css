@@ -1297,7 +1297,8 @@ select.input {
   color: var(--ink-2);
   overflow-wrap: anywhere;
 }
-p.st-body {
+p.st-body,
+p.st-lines {
   white-space: pre-line;
 }
 .st-rest {

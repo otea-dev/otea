@@ -2,7 +2,7 @@ import { type CSSProperties, type RefObject, useLayoutEffect, useRef, useState }
 import type { AnswerWords } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { ShortText } from '../../components/ShortText.tsx';
-import type { Chip } from '../../conversation.ts';
+import { type Chip, splitReply } from '../../conversation.ts';
 import { t } from '../../i18n/i18n.ts';
 import { AgentMark, Button, Swap, toast } from '../../kit/index.ts';
 import { NodeGlyph } from '../../lanes/NodeGlyph.tsx';
@@ -158,10 +158,11 @@ export function AskBody({
     );
   };
   return (
-    // A fieldset is a group: its accessible name is the question the buttons answer.
+    // A fieldset is a group: its accessible name is the question the buttons answer, by its first
+    // sentence (the whole of a long one is read in the page, not at every focus).
     <fieldset
       className="hb-ask"
-      aria-label={text}
+      aria-label={splitReply(text).lead}
       data-answered={said !== null ? '' : undefined}
       data-bare={bare ? '' : undefined}
     >

@@ -44,6 +44,26 @@ describe("an agent's question", () => {
     expect(shown).toContain('see more');
   });
 
+  // The card is a group named by its question: the name is the conclusion, not the wall.
+  it('names the card by the first sentence of the question', () => {
+    const html = ask(WALL);
+    expect(html).toContain('aria-label="Para publicar la rama necesito que confirmes algo."');
+    expect(html).not.toMatch(/aria-label="[^"]*otea repos add/);
+  });
+
+  // A numbered list in an ask is shown from its start, clamped, not cut at «1.».
+  it('clamps a question that is a numbered list instead of cutting it at its first number', () => {
+    const list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      .map((n) => `${n}. Confirma el paso ${n}`)
+      .join('\n');
+    const html = ask(list);
+    const shown = textOf(html);
+    // Every item is in the page (clamped by its height), none hidden behind a cut after «1.».
+    expect(shown).toContain('1. Confirma el paso 1');
+    expect(shown).toContain('10. Confirma el paso 10');
+    expect(html).toContain('st-clamp');
+  });
+
   it('shows a short question whole, with nothing to unfold', () => {
     const html = ask('¿Corto el parpadeo del menú o de la barra?');
     expect(html).toContain('¿Corto el parpadeo del menú o de la barra?');

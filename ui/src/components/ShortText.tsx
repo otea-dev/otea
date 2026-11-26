@@ -36,14 +36,18 @@ export function ShortText({
       {shown ? t('hablar.less') : t('hablar.more')}
     </button>
   );
-  if (markdown && STRUCTURED.test(text)) {
+  if (STRUCTURED.test(text)) {
     const long =
       text.length > FOLD_CHARS * 2 ||
       text.split(/\r?\n/).filter((line) => line.trim() !== '').length > FOLD_LINES * 3;
     return (
       <>
         <div id={id} className={long && !open ? 'st-clamp' : undefined}>
-          <NoteText text={text} className={leadClass} />
+          {markdown ? (
+            <NoteText text={text} className={leadClass} />
+          ) : (
+            <p className={`${leadClass} st-lines`}>{text}</p>
+          )}
         </div>
         {long ? toggle(open) : null}
       </>
