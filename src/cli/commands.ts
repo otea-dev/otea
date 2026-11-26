@@ -5076,24 +5076,16 @@ const conversation: Command = {
 const say: Command = {
   name: 'say',
   summary:
-    'For the secretary: tell the person something in plain text, short, the conclusion first (- reads stdin). Answering a message of theirs: --reply-to <id>, with --request and --links <item ids made>, or --consultation, to classify that turn. News of your own (an item ready for review, something that went wrong) is a message with no --reply-to, with --links <item ids> to point at items. A question: 2 to 4 --option answers they tap, and --recommend the one you would choose',
+    'For the secretary: tell the person something, short, the conclusion first (- reads stdin). To answer a message: --reply-to <id>, with --request --links <item ids made> or --consultation to classify that turn. Your own news (a review ready, a problem): no --reply-to. A question: 2 to 4 --option answers they tap',
   args: ['text'],
   options: {
     file: { multiple: true, placeholder: 'path' },
     'reply-to': { placeholder: 'id' },
     request: { flag: true },
     consultation: { flag: true },
-    links: {
-      placeholder: 'ids',
-      about:
-        'item ids, comma separated: with --reply-to the items the turn produced; with no --reply-to the items a notice mentions',
-    },
-    option: {
-      multiple: true,
-      placeholder: 'text',
-      about: 'a question to the person: 2 to 4 answers they tap',
-    },
-    recommend: { placeholder: 'n', about: 'number (from 1) of the option you recommend' },
+    links: { placeholder: 'ids', about: 'item ids, comma separated' },
+    option: { multiple: true, placeholder: 'text', about: '2 to 4 answers they tap' },
+    recommend: { placeholder: 'n', about: 'number (from 1) of the one you pick' },
   },
   execute: async (input) => {
     const [given = ''] = input.args;
