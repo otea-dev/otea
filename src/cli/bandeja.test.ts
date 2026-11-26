@@ -128,7 +128,7 @@ describe('the Bandeja from the refiner', () => {
       expect(forged.code).not.toBe(0);
       expect(forgedFor.code).not.toBe(0);
       expect(stranger.code).toBe(7);
-      expect(stranger.err).toContain('nobody-yet is not an agent of this project yet');
+      expect(stranger.err).toContain('nobody-yet is not an agent of this project');
       expect(entries()).toEqual([expect.objectContaining({ ref: 'B-1', state: 'waiting' })]);
 
       const server = createMcpServer(COMMANDS, { cwd: repo.dir, agent: 'sol', warn: () => {} });

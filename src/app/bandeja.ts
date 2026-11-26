@@ -242,13 +242,15 @@ export function takeBandeja(
     );
   }
   if (input.on !== undefined && input.on !== agent) {
-    // A real refiner: a valid agent name (never the person's), already known here. One that never
-    // called otea cannot be told apart from a typo, and the entry would be held by nobody.
+    // A real refiner: a valid agent name (never the person's), either already known here or a
+    // subagent of the secretary (<its name>-<role>, how the role text names the ones it launches:
+    // it has not called otea yet when the secretary takes the entry for it). Any other name that
+    // never called otea cannot be told from a typo, and the entry would be held by nobody.
     assertAgentName(input.on);
-    if (!findAgent(project.db, input.on)) {
+    if (!findAgent(project.db, input.on) && !input.on.startsWith(`${agent}-`)) {
       throw new OteaError(
         'forbidden',
-        `${input.on} is not an agent of this project yet: it has not called otea. Launch it first and let it take the entry itself (otea bandeja take ${bandejaRef(id)} --as ${input.on}), or take it yourself`,
+        `${input.on} is not an agent of this project (it has not called otea) nor your subagent (${agent}-<role>). Name the refiner you launch ${agent}-refiner, or let it take the entry itself (otea bandeja take ${bandejaRef(id)} --as ${input.on})`,
       );
     }
   }
