@@ -135,7 +135,9 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // from_bandeja and ask on an entry (measured at 6924).
   // Raised to 7000 for say's options and recommended, so the secretary's question has buttons
   // (measured at 6994).
-  tools: { mcp: 7000 },
+  // Raised to 7150 for land sync, the one step that brings the person's main checkout up to date
+  // (measured at 7144).
+  tools: { mcp: 7150 },
   // Otea's agent guide, the server's instructions: in every MCP agent's context from the start, so
   // it buys only what agents keep getting wrong. Measured at 203. Raised to 270 for the line on
   // declaring the profile every agent and subagent must keep current (measured at 246). Raised to

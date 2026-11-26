@@ -2287,7 +2287,7 @@ function landedBase(
 const landSync: Command = {
   name: 'land sync',
   summary:
-    "After a Done item landed on the remote's base, bring the person's main checkout up to date: a fast-forward of its local base (the board's protected branch, to the remote it is pushed to), and only when that checkout is on the base with no change to a tracked file; otherwise it is left alone and the reply says why. The one step for it: never git pull or merge there yourself",
+    "After a Done item landed, fast-forward the person's main checkout to the remote base, only when it is on that branch with no change to a tracked file; else it is left alone and the reply says why. Never git pull or merge there yourself",
   args: ['id'],
   options: {},
   execute: (input) => {
