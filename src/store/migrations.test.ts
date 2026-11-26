@@ -53,14 +53,14 @@ describe('migrate', () => {
         'unheard_stretches',
       ]),
     );
-    expect(userVersion(db)).toBe(43);
+    expect(userVersion(db)).toBe(44);
   });
 
   it('is idempotent', () => {
     migrate(db);
     migrate(db);
 
-    expect(userVersion(db)).toBe(43);
+    expect(userVersion(db)).toBe(44);
   });
 
   describe('from version 40, which kept a language on the project', () => {

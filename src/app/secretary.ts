@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { OteaError } from '../core/errors.ts';
-import { settleUnheard, unheardKey } from '../core/notify/signals.ts';
+import { UNHEARD_GRACE_MS, unheardKey } from '../core/notify/signals.ts';
 import {
   SECRETARY_SIGNALS,
   type SecretarySignalKind,
@@ -10,21 +10,25 @@ import {
 import { transaction } from '../store/database.ts';
 import { selectEvents } from '../store/queries.ts';
 import {
+  ackReturned,
   countPendingSignals,
   deleteStretch,
+  dropSignal,
+  dropStretch,
   insertSignal,
   insertStretch,
   saveRole,
-  selectNextSignal,
+  selectOpenSignals,
   selectRoles,
   selectStretches,
   takeSignal,
   tellStretch,
+  touchStretch,
 } from '../store/secretary.ts';
 import type { Context } from './context.ts';
 import { type Clock, listItems, systemClock } from './items.ts';
 import { boardRoundOf, liveBoards } from './next.ts';
-import { listAgents, processAlive } from './presence.ts';
+import { type AgentPresence, listAgents, processAlive } from './presence.ts';
 import { setAsideOf } from './set-aside.ts';
 import { unheardOf } from './unheard.ts';
 
@@ -38,11 +42,29 @@ export function secretaryName(db: DatabaseSync): string | undefined {
   return [...selectRoles(db)].find(([, role]) => role === 'secretary')?.[0];
 }
 
+// How long a secretary that stopped calling Otea still holds the role and reads as connected, unless
+// its session is known to have ended: it works for a long while between two waits (a CLI agent has
+// no process to watch then), and the person must not be told it is offline, nor another agent take
+// the role, for that.
+export const SECRETARY_HELD_MS = 30 * 60_000;
+
+const latest = (a: string, b: string | null) => (b !== null && b > a ? b : a);
+
+// Whether the secretary is really gone: not connected, and either its session ended (every process
+// it was heard through is gone) or it was not heard for SECRETARY_HELD_MS.
+function secretaryGone(agent: AgentPresence | undefined, nowMs: number): boolean {
+  if (!agent) return true;
+  if (agent.live) return false;
+  if (agent.sessionEnded) return true;
+  return nowMs - Date.parse(latest(agent.lastSeen, agent.actedAt)) >= SECRETARY_HELD_MS;
+}
+
 export type SecretaryDeclared = { agent: string; role: 'secretary'; replaced: string | null };
 
 // Makes `agent` the project's secretary (otea profile --role secretary, otea connect --role
-// secretary). A second one is refused while the first is connected; one that is gone (its session
-// ended and it was not heard for a while) is replaced, so a restart under a new name takes over.
+// secretary). A second one is refused until the first is really gone (secretaryGone), so a
+// secretary that is busy between two waits is never replaced; a restart under a new name takes over
+// once its old session is known to have ended.
 export function declareSecretary(
   db: DatabaseSync,
   agent: string,
@@ -54,10 +76,10 @@ export function declareSecretary(
     let replaced: string | null = null;
     if (current !== undefined && current !== agent) {
       const there = listAgents(db, now, processes).find(({ name }) => name === current);
-      if (there && there.status !== 'away') {
+      if (!secretaryGone(there, Date.parse(now()))) {
         throw new OteaError(
           'secretary_taken',
-          `${current} is this project's secretary and is connected (${there.status}): a project has one. If that is your own earlier session under another name, wait until it is gone (a few minutes) or use ${current}; otherwise ask the person`,
+          `${current} is this project's secretary and is not gone: a project has one. If that is your own earlier session under another name, use ${current}, or wait until its session is gone (it ends with the session, else after ${SECRETARY_HELD_MS / 60_000} minutes without a sign); otherwise ask the person`,
         );
       }
       saveRole(db, current, null, now());
@@ -79,8 +101,9 @@ export function secretaryStatus(
   if (name === undefined) return undefined;
   const agent = listAgents(db, now, processes).find((each) => each.name === name);
   const pending = countPendingSignals(db);
-  if (!agent?.live) {
-    return { name, state: 'offline', since: agent?.lastSeen ?? null, pending };
+  if (!agent || secretaryGone(agent, Date.parse(now()))) {
+    const since = agent ? latest(agent.lastSeen, agent.actedAt) : null;
+    return { name, state: 'offline', since, pending };
   }
   return { name, state: agent.attending ? 'listening' : 'connected', since: null, pending };
 }
@@ -107,9 +130,11 @@ export type SecretarySignalInput = {
 
 // The one way anything wakes the secretary besides unheard board work: the conversation emits
 // person_message when the person posts (M2), the Bandeja bandeja_item when a capture arrives (M5),
-// and an escalated question escalation. The secretary's wait returns each signal once, oldest
-// first. A signal is a nudge, never the record of the thing: a message keeps its own state, so a
-// signal lost (a wait killed after it returned) only means the secretary reads the conversation.
+// and an escalated question escalation. A wait returns each signal, oldest first, and the secretary
+// acks it by acting (its next otea command that is no secretary wait): until then a later wait
+// returns it again, once more at most, so a response lost with a killed wait is not lost. A signal
+// is a nudge, never the record of the thing; for what has a state of its own (the conversation's
+// pending messages) register a source instead (addSecretarySource).
 export function emitSecretarySignal(
   db: DatabaseSync,
   signal: SecretarySignalInput,
@@ -133,24 +158,71 @@ export type SecretaryWake = {
   text: string;
 };
 
-const SIGNAL_TEXT: Readonly<Record<SecretarySignalKind, (ref?: string, text?: string) => string>> =
-  {
-    person_message: (ref, text) =>
-      `The person wrote to you${ref ? ` (${ref})` : ''}${text ? `: ${text}` : ''}. Read the conversation and answer.`,
-    bandeja_item: (ref, text) =>
-      `The person captured a note in the Bandeja${ref ? ` (${ref})` : ''}${text ? `: ${text}` : ''}. Refine it, or hand it to a refiner.`,
-    escalation: (ref, text) =>
-      `A question is escalated to you${ref ? ` on ${ref}` : ''}${text ? `: ${text}` : ''}. Answer it, or ask the person.`,
+// What a source of wake-ups that keeps its own state tells the wait while something is pending.
+export type SecretaryPending = { kind: SecretarySignalKind; ref?: string; text?: string };
+
+export type SecretarySource = (ctx: Context) => SecretaryPending | undefined;
+
+const sources: SecretarySource[] = [];
+
+// The seam for M2 and M5: a source derives what waits for the secretary from the state of its own
+// records (the person's messages not read yet, the Bandeja items not taken yet) and returns it on
+// every look while it is so, so nothing is lost with a signal. It stops once the secretary's
+// commands (otea conversation, say) change that state. Returns the way to remove it.
+export function addSecretarySource(source: SecretarySource): () => void {
+  sources.push(source);
+  return () => {
+    const at = sources.indexOf(source);
+    if (at >= 0) sources.splice(at, 1);
   };
+}
+
+export const wakeText = (pending: SecretaryPending): string => {
+  const { kind, ref, text } = pending;
+  const about = ref ? ` (${ref})` : '';
+  const said = text ? `: ${text}` : '';
+  if (kind === 'person_message')
+    return `The person wrote to you${about}${said}. Read the conversation and answer.`;
+  if (kind === 'bandeja_item')
+    return `The person captured a note in the Bandeja${about}${said}. Refine it, or hand it to a refiner.`;
+  return `A question is escalated to you${ref ? ` on ${ref}` : ''}${said}. Answer it, or ask the person.`;
+};
+
+// One secretary wait as it runs: when it started (a signal returned to an earlier wait and not acked
+// is returned again to this one; one returned to a wait running now is not) and when it last
+// looked at the boards.
+export type SecretaryWait = { startedAt: string; scannedAt?: number | undefined };
+
+export const startSecretaryWait = (now: Clock = systemClock): SecretaryWait => ({
+  startedAt: now(),
+});
+
+// The secretary acted: whatever its waits returned so far is done with. Run on each otea command of
+// the secretary that is no secretary wait.
+export function ackSecretaryReturns(
+  db: DatabaseSync,
+  agent: string,
+  now: Clock = systemClock,
+): void {
+  if (secretaryName(db) === agent) ackReturned(db, now());
+}
+
+// How often a wait looks at the boards for work nobody hears (a scan reads every item), however
+// many commits other agents make; a stretch nobody looked at for STRETCH_STALE_MS is not trusted,
+// it began when it was seen again; a look is noted at most this often.
+const SCAN_EVERY_MS = 5000;
+const STRETCH_STALE_MS = 5 * 60_000;
+const TOUCH_EVERY_MS = 30_000;
+// A returned signal or stretch is returned again once, never more.
+const MAX_DELIVERIES = 2;
 
 // The items that wait for an agent nobody brings, by the key their stretch is counted under.
 function unheardNow(
   ctx: Context,
+  agents: readonly AgentPresence[],
   now: Clock,
-  processes: (pid: number) => boolean,
 ): Map<string, string> {
   const at = now();
-  const agents = listAgents(ctx.db, now, processes);
   const boards = liveBoards(ctx);
   const keys = new Map<string, string>();
   for (const item of listItems(ctx, {}, now)) {
@@ -163,52 +235,99 @@ function unheardNow(
   return keys;
 }
 
-// Keeps when each unheard stretch began (in the database, so the grace holds across waits, whatever
-// their timeout) and returns the stretches that passed the grace and were not told yet.
-function settleStretches(
+// Board work that stayed unheard for the grace, once per stretch (again, once, to a later wait if
+// the secretary did nothing). Nothing is scanned while a listener waits on the boards, and not more
+// often than SCAN_EVERY_MS.
+function unheardWake(
   ctx: Context,
-  unheard: ReadonlyMap<string, string>,
-  nowMs: number,
-): string[] {
-  const known = selectStretches(ctx.db);
-  const since = new Map<string, number | null>(
-    [...known].map(([key, { since: began }]) => [key, began]),
-  );
-  const past = settleUnheard(since, new Set(unheard.keys()), nowMs, false);
-  for (const key of known.keys()) if (!since.has(key)) deleteStretch(ctx.db, key);
-  for (const [key, began] of since) {
-    if (!known.has(key) && began !== null) insertStretch(ctx.db, key, began);
-  }
-  return [...past].filter((key) => known.get(key)?.told !== true);
-}
-
-// What the secretary's wait returns now, or undefined while nothing needs it: a signal waiting
-// (oldest first), else board work that stayed unheard for the grace (the notifier's, core/notify
-// UNHEARD_GRACE_MS), counted once per stretch. Returning a signal or a stretch takes it.
-export function secretaryWake(
-  ctx: Context,
-  now: Clock = systemClock,
-  processes: (pid: number) => boolean = processAlive,
+  wait: SecretaryWait,
+  now: Clock,
+  processes: (pid: number) => boolean,
 ): SecretaryWake | undefined {
   const nowMs = Date.parse(now());
-  const unheard = unheardNow(ctx, now, processes);
-  const told = settleStretches(ctx, unheard, nowMs);
-  const signal = selectNextSignal(ctx.db);
-  if (signal) {
-    takeSignal(ctx.db, signal.id, now());
-    const { kind, ref, text } = signal;
-    return {
-      kind,
-      ...(ref === null ? {} : { ref }),
-      text: SIGNAL_TEXT[kind](ref ?? undefined, text ?? undefined),
-    };
+  if (wait.scannedAt !== undefined && nowMs - wait.scannedAt < SCAN_EVERY_MS) return undefined;
+  wait.scannedAt = nowMs;
+  const known = selectStretches(ctx.db);
+  const agents = listAgents(ctx.db, now, processes);
+  // Someone listens: nothing is unheard, and no stretch goes on through it.
+  const unheard = agents.some(({ status }) => status === 'listening')
+    ? new Map<string, string>()
+    : unheardNow(ctx, agents, now);
+  for (const [key, stretch] of known) {
+    if (unheard.has(key) && nowMs - stretch.seenAt <= STRETCH_STALE_MS) continue;
+    deleteStretch(ctx.db, key);
+    known.delete(key);
+  }
+  const told: string[] = [];
+  for (const key of unheard.keys()) {
+    const stretch = known.get(key);
+    if (!stretch) {
+      insertStretch(ctx.db, key, nowMs);
+      continue;
+    }
+    if (nowMs - stretch.seenAt >= TOUCH_EVERY_MS) touchStretch(ctx.db, key, nowMs);
+    if (nowMs - stretch.since < UNHEARD_GRACE_MS) continue;
+    if (stretch.toldAt !== null) {
+      // Told already: only again, to a wait that began after, and only if the secretary did not act.
+      if (stretch.acked || stretch.toldAt >= wait.startedAt) continue;
+      if (stretch.tells >= MAX_DELIVERIES) {
+        dropStretch(ctx.db, key, now());
+        continue;
+      }
+    }
+    if (tellStretch(ctx.db, key, stretch.toldAt, now())) told.push(key);
   }
   if (told.length === 0) return undefined;
-  for (const key of told) tellStretch(ctx.db, key, now());
   const items = [...new Set(told.map((key) => unheard.get(key)).filter((id) => id !== undefined))];
   return {
     kind: 'unheard',
     items,
     text: `${items.join(', ')} ${items.length === 1 ? 'waits' : 'wait'} for an agent and nobody is listening. Wake or launch a worker for the board, or tell the person.`,
   };
+}
+
+// The oldest signal this wait is to return, taken atomically (two waits at once never both get it).
+function signalWake(ctx: Context, wait: SecretaryWait, now: Clock): SecretaryWake | undefined {
+  for (const signal of selectOpenSignals(ctx.db)) {
+    if (signal.takenAt !== null) {
+      // Returned to a wait running now (or begun after this one): its own. Returned to an earlier
+      // one and not acted on: again, once more at most.
+      if (signal.takenAt >= wait.startedAt) continue;
+      if (signal.deliveries >= MAX_DELIVERIES) {
+        dropSignal(ctx.db, signal.id, now());
+        continue;
+      }
+    }
+    if (!takeSignal(ctx.db, signal.id, signal.takenAt, now())) continue;
+    const { kind, ref, text } = signal;
+    const pending = {
+      kind,
+      ...(ref === null ? {} : { ref }),
+      ...(text === null ? {} : { text }),
+    };
+    return { kind, ...(ref === null ? {} : { ref }), text: wakeText(pending) };
+  }
+  return undefined;
+}
+
+// What the secretary's wait returns now, or undefined while nothing needs it: a signal (oldest
+// first), what a registered source says is pending, else board work that stayed unheard for the
+// grace (the notifier's, core/notify UNHEARD_GRACE_MS). What it returns stays open until the
+// secretary acts (ackSecretaryReturns); see emitSecretarySignal.
+export function secretaryWake(
+  ctx: Context,
+  wait: SecretaryWait,
+  now: Clock = systemClock,
+  processes: (pid: number) => boolean = processAlive,
+): SecretaryWake | undefined {
+  const signal = signalWake(ctx, wait, now);
+  if (signal) return signal;
+  for (const source of sources) {
+    const pending = source(ctx);
+    if (pending) {
+      const { kind, ref } = pending;
+      return { kind, ...(ref === undefined ? {} : { ref }), text: wakeText(pending) };
+    }
+  }
+  return unheardWake(ctx, wait, now, processes);
 }

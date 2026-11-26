@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createItem } from '../app/items.ts';
 import { listAgents } from '../app/presence.ts';
 import { openProject, type Project } from '../app/project.ts';
-import { emitSecretarySignal, secretaryWake } from '../app/secretary.ts';
+import { emitSecretarySignal, secretaryWake, startSecretaryWait } from '../app/secretary.ts';
 import { UNHEARD_GRACE_MS } from '../core/notify/signals.ts';
 import type { SecretarySignalKind } from '../core/secretary.ts';
 import {
@@ -13,6 +13,7 @@ import {
   seedOnce,
   startCli,
   type TempRepo,
+  until,
 } from './testing.ts';
 
 // The secretary role and its wait (0.8, M1): declared through profile or connect, one per project,
@@ -80,7 +81,7 @@ describe('the secretary and its wait', () => {
       const { code, err } = await otea('profile', '--role', 'secretary', '--as', 'luna');
 
       expect(code).toBe(12);
-      expect(err).toContain("sol is this project's secretary and is connected");
+      expect(err).toContain("sol is this project's secretary and is not gone");
       expect((await otea('whoami', '--as', 'luna')).out).toContain(
         "This project's secretary is sol",
       );
@@ -144,9 +145,39 @@ describe('the secretary and its wait', () => {
 
       expect(await waiting.done).toBe(0);
       expect(waiting.out()).toContain('Bandeja (b-1)');
+      await otea('profile', '--as', 'sol');
       const again = await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1');
       expect(again.code).toBe(13);
       expect(again.err).toContain('Nothing reached the secretary within 1s');
+    });
+
+    it('returns again what a lost wait returned, until the secretary acts with another command', async () => {
+      emit('person_message', 'm-1');
+      // A wait that returned and whose output was lost: nothing acted on it.
+      expect((await otea('wait', '--secretary', '--as', 'sol')).out).toContain('(m-1)');
+
+      const again = await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1');
+      expect(again.code).toBe(0);
+      expect(again.out).toContain('(m-1)');
+
+      // The secretary acts (here: any command of its own), and it is not returned again.
+      await otea('profile', '--as', 'sol');
+      const done = await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1');
+      expect(done.code).toBe(13);
+    });
+
+    it('gives one signal to one of two waits that run at once', async () => {
+      const first = startCli(repo.dir, 'wait', '--secretary', '--as', 'sol');
+      const second = startCli(repo.dir, 'wait', '--secretary', '--as', 'sol');
+      expect(await settled(first)).toBe(false);
+
+      emit('bandeja_item', 'b-1');
+      await until(() => first.out() !== '' || second.out() !== '');
+      await delay(700);
+
+      expect([first.out(), second.out()].filter((out) => out !== '')).toHaveLength(1);
+      await first.stop();
+      await second.stop();
     });
 
     it('returns each source in the order it came', async () => {
@@ -158,6 +189,8 @@ describe('the secretary and its wait', () => {
       for (let n = 0; n < 3; n++) {
         const { out } = await otea('wait', '--secretary', '--as', 'sol', '--json');
         kinds.push(JSON.parse(out).kind);
+        // The secretary acts on each before it waits again.
+        await otea('profile', '--as', 'sol');
       }
 
       expect(kinds).toEqual(['person_message', 'bandeja_item', 'escalation']);
@@ -176,7 +209,9 @@ describe('the secretary and its wait', () => {
             }).id,
         );
         // The first look starts the stretch; it is kept for the next wait to see.
-        expect(inProject((project) => secretaryWake(project))).toBeUndefined();
+        expect(
+          inProject((project) => secretaryWake(project, startSecretaryWait())),
+        ).toBeUndefined();
 
         vi.setSystemTime(Date.now() + UNHEARD_GRACE_MS + 1000);
         const { code, out } = await otea('wait', '--secretary', '--as', 'sol', '--json');

@@ -144,6 +144,7 @@ function inputFor(
     },
     agent,
     channel: 'mcp',
+    command: command.name,
     harness,
     ...(newSession ? { newSession } : {}),
     ...(context.json ? {} : { fieldsAsJson: true }),

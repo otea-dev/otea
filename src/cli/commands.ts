@@ -163,10 +163,12 @@ import {
   UnknownRepo,
 } from '../app/repos.ts';
 import {
+  ackSecretaryReturns,
   declareSecretary,
   requireSecretary,
   secretaryStatus,
   secretaryWake,
+  startSecretaryWait,
 } from '../app/secretary.ts';
 import { startProject } from '../app/start.ts';
 import type { TailscaleCli } from '../app/tailscale.ts';
@@ -437,6 +439,10 @@ function seen(project: Project, input: Input, actor: Actor = input.actor): void 
   });
   // Any call of it keeps what it holds (P1-R3-6).
   renewLeases(project.db, actor.name);
+  // The secretary acting on what its wait returned: any command but another secretary wait.
+  if (input.command !== undefined && !(input.command === 'wait' && input.flag('secretary'))) {
+    ackSecretaryReturns(project.db, actor.name);
+  }
 }
 
 // Runs a command seen as `actor`: noted first, so the command finds it, and forgotten again when it
@@ -2548,9 +2554,10 @@ async function waitForSecretary(input: Input): Promise<Output> {
   const result = await withAgentWhile(input, async (project) => {
     requireSecretary(project.db, me);
     // A board the person publishes while it waits joins the catalog before the check reads its items.
+    const secretaryWait = startSecretaryWait();
     const look = () => {
       syncBoardPresets(project);
-      return secretaryWake(project);
+      return secretaryWake(project, secretaryWait);
     };
     const waited = await listenWhile(project, input, owner, look, options);
     if (!('found' in waited)) return waited;

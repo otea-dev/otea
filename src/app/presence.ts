@@ -41,7 +41,7 @@ import {
   unconfirmProfile,
   upsertAgent,
 } from '../store/queries.ts';
-import { selectRoles } from '../store/secretary.ts';
+import { clearStretchesFor, selectRoles } from '../store/secretary.ts';
 import { askingItems } from './asking.ts';
 import { type Clock, systemClock } from './items.ts';
 
@@ -480,6 +480,8 @@ export function waitBeat(
   const run = () => {
     const at = hearAgent(db, sighting, now);
     markWaiting(db, sighting.agent, at);
+    // A listener on the boards ends every stretch of work nobody heard (the secretary is none).
+    clearStretchesFor(db, sighting.agent);
     keepLeases(db, sighting.agent, at);
     return at;
   };

@@ -198,6 +198,7 @@ function inputFor(command: Command, values: Values, args: string[], io: Io, json
     agent,
     unnamedTerminal: asPerson,
     channel: 'cli',
+    command: command.name,
     harness: CLI_HARNESS,
     signal: io.signal,
     openUrl: io.openUrl,

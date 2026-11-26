@@ -505,6 +505,16 @@ export const MIGRATIONS = [
     told_at TEXT
   );
   `,
+  // The secretary's signals and stretches are returned by a wait and acked once it acted: until
+  // then the next wait returns them again, so one lost with a killed wait is not lost. A stretch
+  // also notes when a look last found it unheard, so one nobody watched for long begins again.
+  `
+  ALTER TABLE secretary_signals ADD COLUMN deliveries INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE secretary_signals ADD COLUMN acked_at TEXT;
+  ALTER TABLE unheard_stretches ADD COLUMN tells INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE unheard_stretches ADD COLUMN acked_at TEXT;
+  ALTER TABLE unheard_stretches ADD COLUMN seen_at INTEGER;
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {
