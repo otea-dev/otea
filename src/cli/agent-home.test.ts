@@ -113,11 +113,11 @@ describe('an agent belongs to the project it works in', () => {
     expect(titleIn(a.dir, 'TASKS-1')).toBe('game task');
   });
 
-  it('refuses a claim and a read-with-a-name there too, and leaves no trace of the agent', async () => {
+  it('refuses a claim there too, lets it read, and never notes it as seen in that project', async () => {
     await agent(a.dir, me)('claim', 'TASKS-1');
 
     expect((await agent(b.dir, me)('claim', 'TASKS-1')).code).not.toBe(0);
-    expect((await agent(b.dir, me)('show', 'TASKS-1')).code).not.toBe(0);
+    expect((await agent(b.dir, me)('show', 'TASKS-1')).code).toBe(0);
 
     expect(holderIn(b.dir, 'TASKS-1')).toBeNull();
     const project = openProject(b.dir);
@@ -126,6 +126,10 @@ describe('an agent belongs to the project it works in', () => {
         .prepare('SELECT count(*) AS n FROM events WHERE actor_name = ?')
         .get(me) as { n: number };
       expect(events.n).toBe(0);
+      const row = project.db.prepare('SELECT acted_at FROM agents WHERE name = ?').get(me) as {
+        acted_at: string | null;
+      };
+      expect(row.acted_at).toBeNull();
     } finally {
       project.db.close();
     }

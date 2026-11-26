@@ -49,20 +49,24 @@ function atWorkIn(
   }
 }
 
-// Notes that `name` runs a command in `project`, and refuses it when the name is at work in
-// another project. Nothing is written for a refused command.
+// Notes that `name` runs a command in `project`. A command that writes (`write`) is refused when
+// the name is at work in another project, and nothing is written for it. One that only reads
+// is let through, but the agent is not taken for one of this project (false: do not note it as
+// seen here).
 export function holdAgentHome(
   project: Pick<Project, 'identity' | 'dataDir'>,
   name: string,
+  mode: 'write' | 'read' = 'write',
   env: Env = process.env,
   now: Clock = systemClock,
-): void {
+): boolean {
   const registry = openRegistry(env);
   try {
     const home = selectAgentHome(registry, name);
     const here = project.identity;
     if (home && home.projectId !== here.id) {
       const there = atWorkIn(registry, home, name, now);
+      if (there && mode === 'read') return false;
       if (there) {
         const holds = there.holding.length > 0 ? `, holding ${there.holding.join(', ')}` : '';
         throw new OteaError(
@@ -76,7 +80,7 @@ export function holdAgentHome(
       home.dataDir === project.dataDir &&
       home.projectName === here.name
     )
-      return;
+      return true;
     upsertAgentHome(registry, {
       name,
       projectId: here.id,
@@ -84,6 +88,7 @@ export function holdAgentHome(
       dataDir: project.dataDir,
       at: now(),
     });
+    return true;
   } finally {
     registry.close();
   }

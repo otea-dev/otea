@@ -333,7 +333,8 @@ describe('mcp', () => {
   it('serves the project --project names when started outside any project', async () => {
     // A project in common storage, the default: the registry finds it by its id.
     const shop = tempGitRepo();
-    const there = cliAt(shop.dir, { OTEA_AGENT: 'claude' });
+    // Its own agent: claude works in the project of this suite's other tests, at the same time.
+    const there = cliAt(shop.dir, { OTEA_AGENT: 'shopkeeper' });
     await there('init', '--template', 'changes');
     await there('create', '--collection', 'Cambios', '--title', 'Docs', '--field', 'Qué quiero=x');
     const id = JSON.parse((await there('projects', 'current', '--json')).out).id;

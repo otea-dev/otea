@@ -300,8 +300,9 @@ describe('otea topic', () => {
     const geo = tempGitRepo();
     const ventas = tempGitRepo();
     try {
-      const inGeo = cliAt(geo.dir, { OTEA_AGENT: 'claude' });
-      const inVentas = cliAt(ventas.dir, { OTEA_AGENT: 'claude' });
+      // Two projects, two agents: the name `claude` is at work in the suite's other projects.
+      const inGeo = cliAt(geo.dir, { OTEA_AGENT: 'geo-claude' });
+      const inVentas = cliAt(ventas.dir, { OTEA_AGENT: 'ventas-claude' });
       await inGeo('init');
       await inVentas('init');
       await cliAt(ventas.dir)('topic', 'on');

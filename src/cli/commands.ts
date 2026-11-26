@@ -483,9 +483,16 @@ function seen(project: Project, input: Input, actor: Actor = input.actor): void 
 // Runs a command seen as `actor`: noted first, so the command finds it, and forgotten again when it
 // was never seen before and the command fails (P2S-R2-3): a failed command is no agent at work, the
 // desk would list it «sin perfil», and whoami would hand its name out.
-function seenWhile<T>(project: Project, input: Input, actor: Actor, run: () => T): T {
-  // An agent at work in another project is refused here, before it is noted or writes anything.
-  if (actor.kind === 'agent') holdAgentHome(project, actor.name);
+function seenWhile<T>(
+  project: Project,
+  input: Input,
+  actor: Actor,
+  run: () => T,
+  mode: 'write' | 'read' = 'write',
+): T {
+  // An agent at work in another project is refused here, before it is noted or writes anything; a
+  // command that only reads goes on, with the agent not noted as seen in this project.
+  if (actor.kind === 'agent' && !holdAgentHome(project, actor.name, mode)) return run();
   const fresh = actor.kind === 'agent' && !findAgent(project.db, actor.name);
   seen(project, input, actor);
   if (!fresh) return run();
@@ -514,13 +521,13 @@ function withAgent<T>(input: Input, use: (project: Project) => T): T {
 // reading without one is not.
 function withReader<T>(input: Input, use: (project: Project) => T): T {
   return withProject(input.cwd, (project) =>
-    seenWhile(project, input, input.reader, () => use(project)),
+    seenWhile(project, input, input.reader, () => use(project), 'read'),
   );
 }
 
 async function withReaderWhile<T>(input: Input, use: (project: Project) => Promise<T>): Promise<T> {
   return withProjectWhile(input.cwd, (project) =>
-    seenWhile(project, input, input.reader, () => use(project)),
+    seenWhile(project, input, input.reader, () => use(project), 'read'),
   );
 }
 
