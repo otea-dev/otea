@@ -61,7 +61,13 @@ import {
   systemClock,
   updateItem,
 } from '../app/items.ts';
-import { keepWaitingCommand, keepWaitingLine, waitAgainLine } from '../app/keep-waiting.ts';
+import {
+  keepWaitingCommand,
+  keepWaitingLine,
+  secretaryWaitAgainLine,
+  secretaryWaitCommand,
+  waitAgainLine,
+} from '../app/keep-waiting.ts';
 import { defaultLang, isLang } from '../app/language.ts';
 import { type Launcher, oteaLauncher, runningRoot, withHome } from '../app/launcher.ts';
 import type { BaseTips } from '../app/lease-take.ts';
@@ -156,6 +162,12 @@ import {
   repoNameAt,
   UnknownRepo,
 } from '../app/repos.ts';
+import {
+  declareSecretary,
+  requireSecretary,
+  secretaryStatus,
+  secretaryWake,
+} from '../app/secretary.ts';
 import { startProject } from '../app/start.ts';
 import type { TailscaleCli } from '../app/tailscale.ts';
 import { approvedTipOf, repeatsLastRound } from '../app/tips.ts';
@@ -178,7 +190,7 @@ import {
 } from '../app/topics.ts';
 import { topicsEverywhere, topicsEverywhereText } from '../app/topics-everywhere.ts';
 import { validateProject } from '../app/validate.ts';
-import { watch } from '../app/watch.ts';
+import { type Watched, type WatchOptions, watch } from '../app/watch.ts';
 import { agentGuideFor, TOPICS_REMINDER, TOPICS_RULE } from '../core/agent-guide.ts';
 import {
   agentPrompt,
@@ -214,6 +226,7 @@ import { type Actor, assertAgentName } from '../core/item.ts';
 import { parseDuration, parseWaitTimeout } from '../core/lease.ts';
 import { profileLine, UNKNOWN } from '../core/profile.ts';
 import { describeRelation, RELATION_KINDS } from '../core/relations.ts';
+import { AGENT_ROLES, ROLE_ABOUT } from '../core/secretary.ts';
 import { timeText } from '../core/time.ts';
 import { TURNS, type Turn } from '../core/workflow.ts';
 import { DEFAULT_PORT } from '../server/hosts.ts';
@@ -937,6 +950,7 @@ const connect: Command = {
     model: { placeholder: 'id' },
     effort: { placeholder: 'level' },
     harness: { placeholder: 'name' },
+    role: { choices: AGENT_ROLES, about: ROLE_ABOUT },
     check: { flag: true },
     cli: { flag: true },
     'no-mcp': { flag: true },
@@ -945,6 +959,10 @@ const connect: Command = {
     const { cwd, option, flag } = input;
     const name = input.agent;
     if (name !== undefined) assertAgentName(name);
+    const role = option('role');
+    if (role !== undefined && (name === undefined || flag('check'))) {
+      throw new UsageError('--role names the role of the agent given with --as, and is no check');
+    }
     if (flag('check')) {
       const checked = withProject(cwd, (project) => mcpCheck(project, name));
       const refreshed = refreshedHookLine(input);
@@ -983,6 +1001,8 @@ const connect: Command = {
         }
         // An agent on the command line only asked for no MCP: the desk has nothing to warn about.
         if (!cliOnly) markMcpAsked(project.db, name, systemClock());
+        // The one secretary of the project: refused while another is connected.
+        if (role !== undefined) declareSecretary(project.db, name);
       }
       return { root: project.root, id: project.identity.id };
     });
@@ -2444,18 +2464,129 @@ const WAIT_ORPHANED =
 // Lease expiry writes nothing, so a wait for unclaimed items also checks again on this timer.
 const LEASE_RECHECK_MS = 1000;
 
+// The secretary's wait also looks for board work that has stayed unheard for the grace, which no
+// write announces: it checks again on this timer.
+const SECRETARY_RECHECK_MS = 5000;
+
+// Runs `look` as a wait: the agent is heard as it waits, so it counts as connected and its profile
+// stays confirmed, from the start and on every beat; a wait that ends (it found something, was
+// stopped or its session ended) stops its agent waiting at once, and one that timed out leaves it,
+// since the agent calls it again.
+async function listenWhile<T>(
+  project: Project,
+  input: Input,
+  owner: ReturnType<typeof watchOwner>,
+  look: () => T | undefined,
+  options: Omit<WatchOptions, 'beat'>,
+): Promise<Watched<T>> {
+  const me = input.actor.name;
+  // When it was last heard: a wait whose session ended stops its agent listening at once.
+  let heardAt: string | undefined;
+  // On the command line its own process is watched: killed with its session, it leaves its
+  // agent counted as gone at once, not a listening window later (P2S-R2-7, P8-R2-7).
+  const waiter = input.channel === 'cli' ? { waiter: process.pid } : {};
+  const heard =
+    input.actor.kind === 'agent'
+      ? waitBeat(project.db, {
+          agent: me,
+          channel: input.channel,
+          harness: input.harness,
+          ...waiter,
+        })
+      : undefined;
+  const beat = heard
+    ? {
+        beat: {
+          everyMs: heard.everyMs,
+          run: () => {
+            heardAt = heard.run();
+          },
+        },
+      }
+    : {};
+  // It listens from the start, not from its first beat.
+  beat.beat?.run();
+  const waited = await watch(project.db, look, { ...options, ...beat }).finally(() => {
+    owner.stop();
+    if (heard && input.channel === 'cli') {
+      // A wait whose session ended (it saw its owner gone) stays noted, as one killed with
+      // it does: its agent's session reads as ended (P3C-R3-11).
+      if (!owner.orphaned()) endWaiter(project.db, me, process.pid);
+      endProcess(project.db, process.pid);
+    }
+  });
+  if (owner.orphaned() && heardAt) endListening(project.db, me, heardAt);
+  // It waits no more once it found something or was stopped; a timeout is called again at once.
+  const timedOut = !('found' in waited) && waited.stopped === 'timeout';
+  if (heardAt && !timedOut) endWaiting(project.db, me, heardAt);
+  return waited;
+}
+
+// The secretary's wait (otea wait --secretary): returns for a message from the person, a Bandeja
+// capture, a question escalated to it, or board work nobody listens to (app/secretary.ts). Only the
+// project's secretary waits this way, and the boards do not count it as listening.
+async function waitForSecretary(input: Input): Promise<Output> {
+  const { option } = input;
+  if (
+    option('turn') !== undefined ||
+    option('collection') !== undefined ||
+    input.flag('unclaimed')
+  ) {
+    throw new UsageError(
+      '--secretary takes no --turn, --collection or --unclaimed: it waits for the person and for the boards nobody listens to',
+    );
+  }
+  const timeout = option('timeout');
+  const timeoutMs = durationFrom('timeout', timeout);
+  const me = input.actor.name;
+  const owner = watchOwner(input.signal);
+  const options = {
+    signal: owner.signal,
+    ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    recheckMs: SECRETARY_RECHECK_MS,
+  };
+  const result = await withAgentWhile(input, async (project) => {
+    requireSecretary(project.db, me);
+    // A board the person publishes while it waits joins the catalog before the check reads its items.
+    const look = () => {
+      syncBoardPresets(project);
+      return secretaryWake(project);
+    };
+    const waited = await listenWhile(project, input, owner, look, options);
+    if (!('found' in waited)) return waited;
+    const wake = waited.found;
+    return {
+      data: { secretary: me, ...wake },
+      text: [wake.text, secretaryWaitAgainLine(me, input.channel)].join('\n'),
+    };
+  });
+  if ('data' in result) return result;
+  if (result.stopped === 'timeout') {
+    const within = /^\d+$/.test(timeout ?? '') ? `${timeout}s` : timeout;
+    throw new CommandFailure(
+      'timeout',
+      `Nothing reached the secretary within ${within}; a timeout is no failure, keep waiting: ${secretaryWaitCommand(me)}`,
+    );
+  }
+  if (owner.orphaned()) throw new CommandFailure('interrupted', WAIT_ORPHANED);
+  throw new CommandFailure('interrupted', 'Interrupted while waiting');
+}
+
 const wait: Command = {
   name: 'wait',
   summary:
-    'Wait until an item is on the turn and print it as a list row, at once if one already is; the one waiting longest in its state comes first. A note from the person on an item you hold, or their answer to your question, wakes it too, saying which',
+    'Wait until an item is on the turn and print it as a list row, at once if one already is; the one waiting longest in its state comes first. A note from the person on an item you hold, or their answer to your question, wakes it too, saying which. --secretary, instead of --turn, is the secretary wait: it wakes for the person, a Bandeja note, an escalated question or board work nobody hears',
   args: [],
   options: {
-    turn: { required: true, choices: ['agent', 'human'] },
+    // Required unless --secretary: checked in execute.
+    turn: { choices: ['agent', 'human'] },
     collection: {},
     unclaimed: { flag: true },
+    secretary: { flag: true },
     timeout: { placeholder: 'duration' },
   },
   execute: async (input) => {
+    if (input.flag('secretary')) return waitForSecretary(input);
     const turn = input.required('turn');
     const timeout = input.option('timeout');
     const timeoutMs = durationFrom('timeout', timeout);
@@ -2509,47 +2640,7 @@ const wait: Command = {
         (input.actor.kind === 'agent' ? topicWaiting(project, me) : undefined) ??
         answerWaiting(project, me) ??
         oldestWaiting(project, filter, undefined, keep());
-      // Waiting is listening: the agent is heard as it waits, so it counts as connected and its
-      // profile stays confirmed.
-      // When it was last heard: a wait whose session ended stops its agent listening at once.
-      let heardAt: string | undefined;
-      // On the command line its own process is watched: killed with its session, it leaves its
-      // agent counted as gone at once, not a listening window later (P2S-R2-7, P8-R2-7).
-      const waiter = input.channel === 'cli' ? { waiter: process.pid } : {};
-      const heard =
-        input.actor.kind === 'agent'
-          ? waitBeat(project.db, {
-              agent: me,
-              channel: input.channel,
-              harness: input.harness,
-              ...waiter,
-            })
-          : undefined;
-      const beat = heard
-        ? {
-            beat: {
-              everyMs: heard.everyMs,
-              run: () => {
-                heardAt = heard.run();
-              },
-            },
-          }
-        : {};
-      // It listens from the start, not from its first beat.
-      beat.beat?.run();
-      const waited = await watch(project.db, check, { ...options, ...beat }).finally(() => {
-        owner.stop();
-        if (heard && input.channel === 'cli') {
-          // A wait whose session ended (it saw its owner gone) stays noted, as one killed with
-          // it does: its agent's session reads as ended (P3C-R3-11).
-          if (!owner.orphaned()) endWaiter(project.db, me, process.pid);
-          endProcess(project.db, process.pid);
-        }
-      });
-      if (owner.orphaned() && heardAt) endListening(project.db, me, heardAt);
-      // It waits no more once it found something or was stopped; a timeout is called again at once.
-      const timedOut = !('found' in waited) && waited.stopped === 'timeout';
-      if (heardAt && !timedOut) endWaiting(project.db, me, heardAt);
+      const waited = await listenWhile(project, input, owner, check, options);
       if (!('found' in waited)) {
         return { ...waited, asked: onItsQuestion() ? askedByAgent(project, me) : [] };
       }
@@ -2745,11 +2836,28 @@ const whoami: Command = {
     return withProject(cwd, (project) => {
       const told = nameTold(project, input, harness);
       const name = told.data.given ? input.agent : (told.data.name ?? told.data.suggested);
-      const drafts = openDraftLines(project, name ?? null);
-      return drafts.length === 0 ? told : { ...told, text: [told.text, ...drafts].join('\n') };
+      const lines = [...openDraftLines(project, name ?? null), ...secretaryLines(project, name)];
+      return lines.length === 0 ? told : { ...told, text: [told.text, ...lines].join('\n') };
     });
   },
 };
+
+// Who the project's secretary is and where it stands, when it has one: the agent told it is the
+// secretary says how to listen.
+function secretaryLines(project: Project, name: string | undefined | null): string[] {
+  const secretary = secretaryStatus(project.db);
+  if (secretary === undefined) return [];
+  const stands =
+    secretary.state === 'offline'
+      ? `offline since ${secretary.since === null ? 'never heard' : timeText(secretary.since)}`
+      : secretary.state;
+  if (secretary.name === name) {
+    return [
+      `You are this project's secretary (${stands}). Listen for the person with ${secretaryWaitCommand(name)}.`,
+    ];
+  }
+  return [`This project's secretary is ${secretary.name} (${stands}).`];
+}
 
 // A board draft a restart may have cut off (p3-company run 2): Otea kept it, and a new session is
 // pointed to it, the command to carry it on with when the name it takes is the one holding it.
@@ -2864,30 +2972,47 @@ const profileCommandSpec: Command = {
     model: { placeholder: 'id' },
     effort: { placeholder: 'level' },
     harness: { placeholder: 'name' },
+    role: { choices: AGENT_ROLES, about: ROLE_ABOUT },
   },
   execute: (input) => {
     const { actor, channel, option } = input;
     const model = option('model');
     const effort = option('effort');
     const given = option('harness');
+    const role = option('role');
     return withAgent(input, (project) => {
+      // The secretary role first: refused (a project has one), nothing else is declared.
+      const roled = role === undefined ? undefined : declareSecretary(project.db, actor.name);
       const known = findProfile(project.db, actor.name);
-      if (model === undefined && effort === undefined && given === undefined) {
-        if (!known) {
-          const text = `${actor.name} has no profile yet: declare it with ${profileCommand(actor.name, channel)}`;
-          return { data: { agent: actor.name, profile: null, confirmed: false }, text };
+      const out = ((): Output => {
+        if (model === undefined && effort === undefined && given === undefined) {
+          if (!known) {
+            const text = `${actor.name} has no profile yet: declare it with ${profileCommand(actor.name, channel)}`;
+            return { data: { agent: actor.name, profile: null, confirmed: false }, text };
+          }
+          const view = profileView(known.profile);
+          return {
+            data: { agent: actor.name, profile: view, confirmed: known.confirmed },
+            text: profileText(actor.name, view, known.confirmed, channel),
+          };
         }
-        const view = profileView(known.profile);
-        return {
-          data: { agent: actor.name, profile: view, confirmed: known.confirmed },
-          text: profileText(actor.name, view, known.confirmed, channel),
-        };
-      }
-      const declared = declareFromOptions(input, project, { model, effort, given });
-      return { data: declared, text: profileText(actor.name, declared.profile, true, channel) };
+        const declared = declareFromOptions(input, project, { model, effort, given });
+        return { data: declared, text: profileText(actor.name, declared.profile, true, channel) };
+      })();
+      if (roled === undefined) return out;
+      return {
+        data: { ...(out.data as object), role: roled.role, replaced: roled.replaced },
+        text: `${out.text}\n${secretaryRoleLine(actor.name, roled.replaced)}`,
+      };
     });
   },
 };
+
+// What declaring the role says: the project's secretary, whom it replaced, and how it listens.
+function secretaryRoleLine(agent: string, replaced: string | null) {
+  const was = replaced === null ? '' : ` (it replaces ${replaced}, which is gone)`;
+  return `${agent} is this project's secretary${was}. Listen for the person with ${secretaryWaitCommand(agent)}, in the background if you can; the secretary never waits with --turn.`;
+}
 
 function profileText(
   agent: string,

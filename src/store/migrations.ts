@@ -483,6 +483,28 @@ export const MIGRATIONS = [
   `
   ALTER TABLE project ADD COLUMN lang TEXT;
   `,
+  // The secretary (0.8): the role an agent declared (at most one agent of the project has
+  // 'secretary', kept by app/secretary.ts), the signals that wake its wait (a message from the
+  // person, a Bandeja capture, an escalated question: returned once, then taken), and when each
+  // stretch of unheard board work began, so the grace holds across waits (app/secretary.ts).
+  `
+  ALTER TABLE agents ADD COLUMN role TEXT;
+
+  CREATE TABLE secretary_signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    ref TEXT,
+    text TEXT,
+    at TEXT NOT NULL,
+    taken_at TEXT
+  );
+
+  CREATE TABLE unheard_stretches (
+    key TEXT PRIMARY KEY,
+    since INTEGER NOT NULL,
+    told_at TEXT
+  );
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {

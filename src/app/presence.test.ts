@@ -294,6 +294,8 @@ describe('agent presence', () => {
           status: 'connected',
           listening: true,
           waiting: false,
+          attending: false,
+          role: null,
           profile: null,
           profileConfirmed: false,
           profileChangedAt: null,

@@ -39,7 +39,7 @@ function released(dir: string): boolean {
 const GIT_BASH = 'C:\\Program Files\\Git\\bin\\bash.exe';
 
 const USAGE =
-  'Usage: otea wait --turn <agent|human> [--collection <collection>] [--unclaimed] [--timeout <duration>]';
+  'Usage: otea wait [--turn <agent|human>] [--collection <collection>] [--unclaimed] [--secretary] [--timeout <duration>]';
 
 describe('wait', () => {
   let repo: TempRepo;

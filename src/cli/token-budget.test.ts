@@ -126,7 +126,8 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // a duration, the board JSON as board_draft's own argument (P8-F2), model and effort on next, and
   // every tool's `additionalProperties`, so a key it does not take is refused by name, not dropped.
   // Raised to 6160 for ask's options and recommended (measured at 6143).
-  tools: { mcp: 6160 },
+  // Raised to 6230 for the secretary: profile's role and wait's secretary (measured at 6215).
+  tools: { mcp: 6230 },
   // Otea's agent guide, the server's instructions: in every MCP agent's context from the start, so
   // it buys only what agents keep getting wrong. Measured at 203. Raised to 270 for the line on
   // declaring the profile every agent and subagent must keep current (measured at 246). Raised to

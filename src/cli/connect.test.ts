@@ -144,7 +144,7 @@ describe('setup for agents', () => {
       const { out } = await otea('connect', '--help');
 
       expect(out).toContain(
-        'otea connect [--as <name>] [--model <id>] [--effort <level>] [--harness <name>] [--check]',
+        'otea connect [--as <name>] [--model <id>] [--effort <level>] [--harness <name>] [--role <secretary>] [--check]',
       );
     });
 

@@ -13,8 +13,7 @@ import {
 import { listAgents } from '../app/presence.ts';
 import type { Project } from '../app/project.ts';
 import { setAsideOf } from '../app/set-aside.ts';
-import { itemUnheard } from '../core/agent-status.ts';
-import { activeLease } from '../core/lease.ts';
+import { unheardOf } from '../app/unheard.ts';
 import { localMinuteOfDay, type Notice, Planner } from '../core/notify/planner.ts';
 import {
   freshSignals,
@@ -67,19 +66,11 @@ function factsOf(project: Project, now: number): NotifyFacts[] {
   const boards = liveBoards(project);
   const clock = () => new Date(now).toISOString();
   const agents = listAgents(project.db, clock);
-  const anyoneWaits = agents.some(({ status }) => status === 'listening');
   return listItems(project, {}, clock).map((item) => {
     const setAside =
       item.turn === 'agent' ? setAsideOf(selectEvents(project.db, item.id)) : undefined;
-    const lease = activeLease(item.lease, clock());
-    const holder = lease ? agents.find(({ name }) => name === lease.holder) : undefined;
     // Unheard now; scan() tells it only once it has stayed so for the grace (settleUnheard).
-    const unheard = itemUnheard({
-      turn: item.turn,
-      setAside: setAside !== undefined,
-      anyoneWaits,
-      holderWorking: holder?.status === 'working',
-    });
+    const unheard = unheardOf(item, agents, clock(), setAside !== undefined);
     const round = boardRoundOf(project, item, boards);
     const notes = notesSummary(project, item, boards);
     return {

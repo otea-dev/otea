@@ -71,6 +71,8 @@ export const EXIT_CODES: Readonly<Record<'ok' | FailureCode, number>> = {
   invalid_profile: 2,
   // No profile declared, or not declared again in this session: otea profile says how.
   profile_required: 2,
+  // The project's secretary is another agent that is connected now.
+  secretary_taken: 12,
   board_conflict: 4,
   // A phone transport that cannot carry a phone yet: Tailscale not ready, the Otea relay.
   transport_unavailable: 20,

@@ -53,6 +53,7 @@ import { projectLanguage } from '../app/project-language.ts';
 import { answerQuestion } from '../app/questions.ts';
 import { linkItems, unlinkItems } from '../app/relations.ts';
 import { reassignItem, restartItem, resumeItem, undoRelease } from '../app/restart.ts';
+import { secretaryStatus } from '../app/secretary.ts';
 import { setAsideOf } from '../app/set-aside.ts';
 import {
   type GuidePairing,
@@ -539,6 +540,8 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       .get('/collections', (c) => c.json(listShownCollectionViews(project)))
       .get('/presets', (c) => c.json(listPresetViews(project)))
       .get('/agents', (c) => c.json({ agents: listAgents(project.db) }))
+      // The project's secretary: connected, listening or offline since when; null while it has none.
+      .get('/secretary', (c) => c.json({ secretary: secretaryStatus(project.db) ?? null }))
       // What to paste into an agent's chat (Conectar un agente, the empty project): the first contact,
       // one more agent joining, or one more board; without a kind, the project's moment.
       .get('/agent-prompt', (c) => {

@@ -5,6 +5,7 @@ import { OteaError } from '../core/errors.ts';
 import { isAgentName } from '../core/item.ts';
 import { activeLease, DEFAULT_LEASE_TTL_MS, leaseExpiry } from '../core/lease.ts';
 import { pathKey } from '../core/path-key.ts';
+import type { AgentRole } from '../core/secretary.ts';
 import {
   clearListening,
   clearWaiter,
@@ -40,6 +41,7 @@ import {
   unconfirmProfile,
   upsertAgent,
 } from '../store/queries.ts';
+import { selectRoles } from '../store/secretary.ts';
 import { askingItems } from './asking.ts';
 import { type Clock, systemClock } from './items.ts';
 
@@ -115,8 +117,14 @@ export type AgentPresence = {
   // Heard listening within LISTEN_WINDOW_MS.
   listening: boolean;
   // Heard waiting in otea wait within LISTEN_WINDOW_MS: what the person does on the desk reaches
-  // it. An agent idle in its chat with its MCP server open listens, but hears nothing.
+  // it. An agent idle in its chat with its MCP server open listens, but hears nothing. Never the
+  // secretary: it waits for the person and for what the boards leave unheard, and is no listener
+  // on the boards, so the desk and the notifier do not count it (`attending`).
   waiting: boolean;
+  // Heard waiting in otea wait, whatever it waits for: `waiting`, or the secretary in its wait.
+  attending: boolean;
+  // The role it declared (otea profile --role), or null: an agent like any other.
+  role: AgentRole | null;
   profile: ProfileView | null;
   profileConfirmed: boolean;
   profileChangedAt: string | null;
@@ -576,6 +584,7 @@ export function listAgents(
   }
   const heard = selectListening(db);
   const waits = selectWaiting(db);
+  const roles = selectRoles(db);
   const listeners = selectListenerProcesses(db);
   const since = (last: string | undefined, window: number) =>
     last !== undefined && Date.parse(at) - Date.parse(last) <= window;
@@ -651,7 +660,10 @@ export function listAgents(
     const declared = declaredOf.get(name);
     const mcp = mcpOf(record);
     const live = !ended && (listening || active || called);
-    const waiting = within(waits.get(name)) && !gone;
+    const attending = within(waits.get(name)) && !gone;
+    const role = roles.get(name) ?? null;
+    // The secretary's wait hears the person, not the boards' desk: it is never a board listener.
+    const waiting = attending && role !== 'secretary';
     const sessionEnded = silenced(name);
     return {
       name,
@@ -672,6 +684,8 @@ export function listAgents(
       sessionEnded,
       listening,
       waiting,
+      attending,
+      role,
       profile: declared ? profileView(declared.profile) : null,
       profileConfirmed: declared?.confirmed ?? false,
       profileChangedAt: profileChangedAt(db, name),
@@ -704,15 +718,17 @@ export function isSubagent(name: string, names: readonly string[]): boolean {
 export function presenceSignature(db: DatabaseSync, now: Clock = systemClock): string {
   const agents = listAgents(db, now).sort((a, b) => a.name.localeCompare(b.name));
   return JSON.stringify(
-    agents.map(({ name, harness, holding, lastSeen, profile, profileConfirmed, waiting, mcp }) => [
-      name,
-      harness,
-      holding,
-      lastSeen,
-      profile,
-      profileConfirmed,
-      waiting,
-      mcp,
+    agents.map((agent) => [
+      agent.name,
+      agent.harness,
+      agent.holding,
+      agent.lastSeen,
+      agent.profile,
+      agent.profileConfirmed,
+      agent.waiting,
+      agent.attending,
+      agent.role,
+      agent.mcp,
     ]),
   );
 }

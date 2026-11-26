@@ -49,16 +49,18 @@ describe('migrate', () => {
         'name_offers',
         'mcp_loads',
         'process_beats',
+        'secretary_signals',
+        'unheard_stretches',
       ]),
     );
-    expect(userVersion(db)).toBe(42);
+    expect(userVersion(db)).toBe(43);
   });
 
   it('is idempotent', () => {
     migrate(db);
     migrate(db);
 
-    expect(userVersion(db)).toBe(42);
+    expect(userVersion(db)).toBe(43);
   });
 
   describe('from version 40, which kept a language on the project', () => {

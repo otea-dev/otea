@@ -7,6 +7,7 @@ import { listTargets } from '../app/notify-targets.ts';
 import { choosePhoneTransport } from '../app/phone.ts';
 import { listAgents, seeAgent, waitBeat } from '../app/presence.ts';
 import type { Project } from '../app/project.ts';
+import { declareSecretary } from '../app/secretary.ts';
 import { fakeTailscale, TAILNET_HOST } from '../app/tailscale-testing.ts';
 import { LISTEN_WINDOW_MS } from '../core/agent-status.ts';
 import type { Actor } from '../core/item.ts';
@@ -532,6 +533,25 @@ describe('notifications on the server', () => {
         await pass(UNHEARD_GRACE_MS);
         await pass(GATHER_MS);
         expect(sent).toEqual([]);
+      });
+
+      it('still tells while only the secretary waits: it is no listener on the boards', async () => {
+        const stamp = () => new Date(clock).toISOString();
+        declareSecretary(project.db, 'sage', stamp);
+        waitBeat(project.db, { agent: 'sage', channel: 'cli', waiter: process.pid }, stamp).run();
+        expect(listAgents(project.db, stamp).find(({ name }) => name === 'sage')).toMatchObject({
+          attending: true,
+          waiting: false,
+        });
+        const id = second();
+        await pass(1000);
+        await pass(UNHEARD_GRACE_MS);
+        await pass(GATHER_MS);
+        expect(sent).toEqual([
+          expect.objectContaining({
+            payload: expect.objectContaining({ url: `/p/memory-aaaaaa/#/i/${id}` }),
+          }),
+        ]);
       });
 
       it('says nothing of an item heard again within the grace', async () => {

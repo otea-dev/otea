@@ -4,8 +4,9 @@ import { ensureRequestsBoard } from '../app/boards.ts';
 import { addCollection, setCollectionIcon } from '../app/collections.ts';
 import { createItem, getItem, moveItem } from '../app/items.ts';
 import { claimItem } from '../app/leases.ts';
-import { CLI_HARNESS, seeAgent } from '../app/presence.ts';
+import { CLI_HARNESS, seeAgent, waitBeat } from '../app/presence.ts';
 import { type Project, setProjectIcon } from '../app/project.ts';
+import { declareSecretary, emitSecretarySignal } from '../app/secretary.ts';
 import { REVIEWS } from '../app/testing.ts';
 import type { Actor } from '../core/item.ts';
 import { parsePreset } from '../core/preset.ts';
@@ -161,6 +162,41 @@ describe('api', () => {
         steps: [],
       });
       expect((await get('/p/memory-aaaaaa/api/agents/ghost')).status).toBe(404);
+    });
+  });
+
+  describe('GET /api/secretary', () => {
+    it('is null while the project has none, then says where its secretary stands', async () => {
+      expect(await (await get('/p/memory-aaaaaa/api/secretary')).json()).toEqual({
+        secretary: null,
+      });
+
+      const now = () => new Date().toISOString();
+      declareSecretary(project.db, 'sol', now);
+      waitBeat(project.db, { agent: 'sol', channel: 'cli', waiter: process.pid }, now).run();
+      emitSecretarySignal(project.db, { kind: 'person_message', ref: 'm-1' }, now);
+
+      expect(await (await get('/p/memory-aaaaaa/api/secretary')).json()).toEqual({
+        secretary: { name: 'sol', state: 'listening', since: null, pending: 1 },
+      });
+      // The agents list carries its role, and it is no listener on the boards.
+      const { agents } = (await (await get('/p/memory-aaaaaa/api/agents')).json()) as {
+        agents: { name: string; role: string | null; status: string }[];
+      };
+      expect(agents.find(({ name }) => name === 'sol')).toMatchObject({
+        role: 'secretary',
+        status: 'connected',
+      });
+    });
+
+    it('says offline since the last time it was heard once it went quiet', async () => {
+      const long = new Date(Date.now() - 60 * 60_000).toISOString();
+      declareSecretary(project.db, 'sol', () => long);
+      seeAgent(project.db, { agent: 'sol', channel: 'cli', harness: CLI_HARNESS }, () => long);
+
+      expect(await (await get('/p/memory-aaaaaa/api/secretary')).json()).toEqual({
+        secretary: { name: 'sol', state: 'offline', since: long, pending: 0 },
+      });
     });
   });
 
