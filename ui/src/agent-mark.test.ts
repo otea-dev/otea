@@ -30,6 +30,16 @@ describe('agentHue', () => {
   });
 });
 
+describe("marksFor: «se» is the secretary's, never an agent's", () => {
+  // Field study 3: the secretary's worker, sec-a-changes, took «se» when «sa» was taken, and its
+  // chips read as the secretary doing the work.
+  it("never gives an agent the secretary's mark", () => {
+    const marks = marksFor(['sec-a', 'sec-a-changes', 'sec-a-refiner', 'secretary', 'seb']);
+    for (const [name, mark] of marks) expect(mark.initials, name).not.toBe('se');
+    expect(new Set([...marks.values()].map((m) => m.initials)).size).toBe(marks.size);
+  });
+});
+
 describe('marksFor: every agent of a project gets a mark of its own', () => {
   it('gives two agents with the same initials different ones', () => {
     const marks = marksFor(['claude-a', 'cli-a']);
