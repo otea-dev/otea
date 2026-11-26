@@ -39,6 +39,7 @@ import {
 } from '../store/bandeja.ts';
 import { transaction } from '../store/database.ts';
 import { findAgent } from '../store/queries.ts';
+import { saveRole, selectRoles } from '../store/secretary.ts';
 import type { Context } from './context.ts';
 import { type MessageFileInput, traceAnswer } from './conversation.ts';
 import { evidenceFile, namedReadPath, storeFile } from './evidence.ts';
@@ -285,7 +286,9 @@ export function takeBandeja(
     // An entry taken for a refiner that has not called otea yet is held only for the handover: its
     // first call (keepHeldEntries) makes it the whole lease, and one that never calls leaves the
     // entry to the secretary again soon.
-    const handover = holder !== agent;
+    // A refiner that already holds it keeps its whole lease: the secretary taking it for them again
+    // never cuts it short.
+    const handover = holder !== agent && !(was.state === 'refining' && was.claimedBy === holder);
     const until = new Date(
       Date.parse(at) + (handover ? BANDEJA_HANDOVER_MS : BANDEJA_LEASE_MS),
     ).toISOString();
@@ -331,6 +334,14 @@ export function takeNextBandeja(
   return undefined;
 }
 
+// The agent that takes the notes in turn is the project's refiner: noted once, so the desk never
+// counts it as a worker connected (it takes no item, and waiting for a note is no listening on the
+// boards). The secretary's own role stays, and so does any other it already has.
+export function noteRefiner(project: Project, agent: string, now: Clock = systemClock): void {
+  if (selectRoles(project.db).has(agent)) return;
+  saveRole(project.db, agent, 'refiner', now());
+}
+
 // The secretary closes an entry that needs no item (a duplicate of one that exists, a note that asks
 // nothing), or the refiner that holds it does; the reason is kept and shown, and the person may
 // reopen it. A filed entry is an item's already.
@@ -353,6 +364,14 @@ export function closeBandeja(
       throw new OteaError(
         'invalid_transition',
         `${entry.ref} is closed already (${entry.closeReason ?? 'no reason given'})`,
+      );
+    }
+    // A question that waits for the person is theirs to answer first: closing would leave it
+    // asking on a closed note.
+    if (entry.state === 'asking') {
+      throw new OteaError(
+        'invalid_transition',
+        `${entry.ref} waits for the person's answer to "${entry.asking?.text ?? ''}": close it after they answer (they tap or write it on the desk)`,
       );
     }
     const holds = entry.state === 'refining' && entry.claimedBy === input.agent;

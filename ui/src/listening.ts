@@ -14,7 +14,7 @@ import type { Item, ItemEvent } from './types.ts';
 // server that does not say, it is taken as yes: the desk never warns of a silence it cannot tell.
 export function anyoneWaits(agents: readonly Agent[] | null | undefined): boolean {
   if (!agents) return true;
-  return agents.some(hearsDesk);
+  return takers(agents).some(hearsDesk);
 }
 
 // Whether a move the person can make here lands the item on an agent: only then does it matter
@@ -40,10 +40,12 @@ export function workingAgents(
     .map((a) => a.name);
 }
 
-// The agents that take items: every one but the secretary, which talks with the person, never takes
-// an item, and so is never the one an item waits in the queue for (field study 3, S2).
+// The agents that take items, the workers: every one but the secretary, which talks with the
+// person, and the refiner, which turns the Bandeja's notes into items and waits for the next note
+// (neither takes an item, so neither is the one an item waits in the queue for, and neither counts
+// as a listener on the boards: field study 3, S2, and the review of F6).
 function takers(agents: readonly Agent[] | null | undefined): Agent[] {
-  return (agents ?? []).filter((a) => a.role !== 'secretary');
+  return (agents ?? []).filter((a) => a.role !== 'secretary' && a.role !== 'refiner');
 }
 
 // Whether one agent is at work: the server's status, the one definition the pill, the menu and the

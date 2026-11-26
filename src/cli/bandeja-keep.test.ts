@@ -1,6 +1,7 @@
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { captureToBandeja, listBandeja, reopenBandeja } from '../app/bandeja.ts';
+import { listAgents } from '../app/presence.ts';
 import { openProject, type Project } from '../app/project.ts';
 import { createMcpServer } from '../mcp/server.ts';
 import { COMMANDS } from './commands.ts';
@@ -126,6 +127,26 @@ describe('the Bandeja: closing, and one refiner taking the next note', () => {
       expect((await otea('bandeja', 'take', '--next', '--as', 'sol')).out).toContain(
         'No note waits',
       );
+    });
+
+    // The desk counts only workers as the ones an item waits for: a refiner waiting on the Bandeja
+    // is neither a listener on the boards nor a worker connected.
+    it('marks the agent that takes the next note as the refiner, and never overrides the secretary', async () => {
+      const roleOf = (name: string) =>
+        inProject((project) => listAgents(project.db).find((agent) => agent.name === name)?.role);
+      capture('first');
+      capture('second');
+
+      await otea('bandeja', 'take', '--next', '--as', 'lia');
+      await otea('bandeja', 'take', '--next', '--as', 'sol');
+
+      expect(roleOf('lia')).toBe('refiner');
+      expect(roleOf('sol')).toBe('secretary');
+      expect(roleOf('max')).toBeNull();
+      // A waiting refiner is no listener on the boards.
+      await otea('bandeja', 'take', '--next', '--wait', '--timeout', '1', '--as', 'max');
+      const max = inProject((project) => listAgents(project.db).find(({ name }) => name === 'max'));
+      expect(max).toMatchObject({ role: 'refiner', waiting: false });
     });
 
     it('takes no id with --next, and no --next with --wait missing it', async () => {

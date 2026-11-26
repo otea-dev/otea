@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { BANDEJA_HANDOVER_MS, BANDEJA_LEASE_MS } from '../core/bandeja.ts';
 import {
+  answerBandeja,
   askOnBandeja,
   captureToBandeja,
   closeBandeja,
@@ -77,6 +78,19 @@ describe('the Bandeja without a refiner session', () => {
       expect(wake(1000 + BANDEJA_HANDOVER_MS + MIN)).toBeUndefined();
     });
 
+    it('never cuts the lease of a refiner that already holds it: taking it for them again keeps the whole lease', () => {
+      capture('an idea');
+      takeBandeja(project, { id: 1, agent: 'sol', on: 'sol-refiner' }, clock(1000));
+      keepHeldEntries(project, 'sol-refiner', clock(MIN));
+
+      takeBandeja(project, { id: 1, agent: 'sol', on: 'sol-refiner' }, clock(2 * MIN));
+
+      expect(requireEntry(project, 1, clock(2 * MIN)).claimUntil).toBe(
+        new Date(T0 + 2 * MIN + BANDEJA_LEASE_MS).toISOString(),
+      );
+      expect(wake(2 * MIN + BANDEJA_HANDOVER_MS + MIN)).toBeUndefined();
+    });
+
     it('lets the secretary refine it itself once it came back', () => {
       capture('an idea');
       takeBandeja(project, { id: 1, agent: 'sol', on: 'sol-refiner' }, clock(1000));
@@ -118,6 +132,15 @@ describe('the Bandeja without a refiner session', () => {
       );
       // Asked and not answered: nothing waits for it.
       expect(takeNextBandeja(project, { agent: 'lia' }, clock(4000))).toBeUndefined();
+
+      // The person taps an option: the note waits again, and the refiner gets it back with the
+      // answer, ahead of a note that came in meanwhile.
+      capture('a newer note', 4500);
+      answerBandeja(project, { id: 1, question: 1, option: 2 }, clock(5000));
+      const back = takeNextBandeja(project, { agent: 'lia' }, clock(6000));
+      expect(back?.entry).toMatchObject({ ref: 'B-1', state: 'refining', claimedBy: 'lia' });
+      expect(back?.entry.questions[0]?.answer).toMatchObject({ text: 'Prettier', mode: 'option' });
+      expect(takeNextBandeja(project, { agent: 'lia' }, clock(6500))?.entry.ref).toBe('B-1');
     });
 
     it('never takes a note another refiner holds, nor a closed or filed one', () => {
@@ -160,6 +183,26 @@ describe('the Bandeja without a refiner session', () => {
         expect.objectContaining({ ref: 'B-1', state: 'closed' }),
       ]);
       expect(() => takeBandeja(project, { id: 1, agent: 'lia' }, clock(4000))).toThrow(/closed/);
+    });
+
+    it('is refused while a question waits for the person: it is closed after they answer', () => {
+      capture('make it better');
+      takeBandeja(project, { id: 1, agent: 'lia' }, clock(1500));
+      askOnBandeja(
+        project,
+        { id: 1, agent: 'lia', text: 'Better how?', options: ['Faster', 'Prettier'] },
+        clock(1600),
+      );
+
+      expect(() =>
+        closeBandeja(project, { id: 1, agent: 'sol', reason: 'dup' }, clock(2000)),
+      ).toThrow(/waits for the person's answer to "Better how\?"/);
+      expect(requireEntry(project, 1, clock(2000)).state).toBe('asking');
+
+      answerBandeja(project, { id: 1, question: 1, option: 1 }, clock(3000));
+      expect(closeBandeja(project, { id: 1, agent: 'sol', reason: 'dup' }, clock(4000)).state).toBe(
+        'closed',
+      );
     });
 
     it('lets the refiner that holds it close it, and frees its hold', () => {

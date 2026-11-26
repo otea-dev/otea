@@ -80,10 +80,10 @@ export const common = {
   'agent.status.connected': 'connected',
   'agent.status.silent': 'no signal',
   'agent.status.away': 'away',
-  'listen.noAgents': 'no agent is connected',
-  'listen.noAgentsLead': 'No agent is connected.',
+  'listen.noAgents': 'no worker is connected',
+  'listen.noAgentsLead': 'No worker is connected.',
   'listen.noAgentsNotice':
-    'No agent is connected: this waits here until one connects and takes the next step.',
+    'No worker is connected: this waits here until one connects and takes the next step.',
   'listen.busy': { one: 'queued: {agent} is working', other: 'queued: {count} agents are working' },
   'listen.busyLead': {
     one: '{agent} is working on another item; it will see this when it waits again.',

@@ -37,9 +37,10 @@ export type Agent = {
   // What it is doing now, as the server words it for every surface (src/core/agent-status.ts).
   // Absent from an older server.
   status?: AgentStatus;
-  // The role it declared (otea profile --role): the secretary talks with the person and never takes
+  // The role it has: the secretary (declared with otea profile --role) talks with the person, and the
+  // refiner (noted when it takes the Bandeja's notes in turn) turns them into items; neither takes
   // an item. Absent from an older server.
-  role?: 'secretary' | null;
+  role?: 'secretary' | 'refiner' | null;
 };
 
 // What an agent declares it runs as, as declared, with the family its model groups under.

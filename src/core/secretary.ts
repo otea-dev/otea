@@ -5,12 +5,16 @@
 
 export const AGENT_ROLES = ['secretary'] as const;
 
-export type AgentRole = (typeof AGENT_ROLES)[number];
+// The role an agent has: the one it declares (the secretary), or the refiner, which Otea notes on
+// its own for the agent that takes the Bandeja's notes in turn (`otea bandeja take --next`). Neither
+// takes an item, so the desk never counts them as a worker (the queue says «ningún trabajador»).
+export type AgentRole = (typeof AGENT_ROLES)[number] | 'refiner';
 
 // What the --role option says, in the help and in the MCP tools.
 export const ROLE_ABOUT = 'secretary: the one agent per project that talks with the person';
 
-export function isAgentRole(value: string): value is AgentRole {
+// A role an agent may declare (--role): the refiner's is never declared, Otea notes it.
+export function isAgentRole(value: string): value is (typeof AGENT_ROLES)[number] {
   return (AGENT_ROLES as readonly string[]).includes(value);
 }
 

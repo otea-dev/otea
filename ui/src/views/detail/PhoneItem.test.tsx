@@ -139,7 +139,7 @@ describe('reviewing an item on the phone', () => {
     expect(dock(render(onward, true, listening))).toContain('data-unheard=""');
     expect(dock(render(onward, true, listening))).toContain('<b>Nadie está escuchando.</b>');
     expect(dock(render(onward))).toContain('data-unheard="calm"');
-    expect(dock(render(onward))).toContain('Ningún agente conectado');
+    expect(dock(render(onward))).toContain('Ningún trabajador conectado');
     const closing = review.transitions.filter(({ turn }) => turn !== 'agent');
     expect(render({ ...review, transitions: closing })).not.toContain('data-unheard');
     const busy = { name: 'Mender', harness: null, holding: ['ERR-300'], lastSeen: ago(10) };

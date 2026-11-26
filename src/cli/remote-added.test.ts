@@ -201,6 +201,29 @@ describe('a remote added after init, said before the push', () => {
     expect(claim.out).toContain(`otea repos add --name "${name}"`);
   });
 
+  // The address in the question is the person's to read: no user, password, token, query or
+  // fragment, and nothing in it that a shell reads inside the double quotes of the command.
+  it.each([
+    ['https://u:p@ss@github.com/acme/keys.git', 'github.com/acme/keys'],
+    ['https://user:tok@github.com/acme/keys.git?token=abc123#frag', 'github.com/acme/keys'],
+    ['git@github.com:acme/keys.git', 'github.com/acme/keys'],
+    ['ssh://deploy:pw@git.example.org:2222/team/keys.git', 'git.example.org:2222/team/keys'],
+    ['https://github.com/acme/$HOME/"quoted`tick`.git', 'github.com/acme/HOME/quotedtick'],
+  ])('shows %s to the person as %s', async (url, shown) => {
+    git('remote', 'add', 'origin', url);
+
+    const claim = await otea('claim', 'TOD-1');
+
+    const asked = claim.out.match(/otea ask TOD-1 "([^"]+)"((?: --option "[^"]+")+)/);
+    expect(asked, claim.out).not.toBeNull();
+    expect(asked?.[1]).toContain(`connected this project to ${shown}. Is that`);
+    for (const secret of ['u:p', 'ss@', 'tok', 'token', 'abc123', 'frag', 'pw', 'deploy']) {
+      expect(claim.out).not.toContain(secret);
+    }
+    // Nothing inside the question can end the quote or run in a shell.
+    expect(asked?.[1]).not.toMatch(/[$`\\]/);
+  });
+
   it('keeps it in the data a program reads, not only in the text', async () => {
     git('remote', 'add', 'origin', 'https://github.com/acme/keys.git');
 

@@ -221,11 +221,18 @@ export function remoteAddedLine(
   return `${base}. Ask them in plain words, with options to tap, never the command: otea ask ${ask.item} "${question}" --option "Yes, it is the same project" --option "No, it is another copy: do not push there" --recommend 1 --as ${ask.as}. When they say yes, run once in ${top}: ${command}, then push again; when they say no, do not push, and tell the secretary (otea escalate ${ask.item} "<what you found>" --as ${ask.as}).`;
 }
 
-// A remote address as a person reads it: host and path, with no password or user (a token can sit in
-// an https address), no scheme and no .git.
-function plainRemote(url: string): string {
-  const bare = url.replace(/^[a-z+]+:\/\//i, '').replace(/^[^/@]*@/, '');
-  return bare.replace(/^([^:/]+):(?!\d+\/)/, '$1/').replace(/\.git$/, '');
+// A remote address as a person reads it: host and path, with no scheme, user or password (a token
+// can sit in an https address, and a password may hold an @: everything up to the last @ before the
+// host goes), no query or fragment, no .git, and only characters that can end neither the quotes of
+// the command it is put in nor be read by a shell.
+export function plainRemote(url: string): string {
+  const rest = url.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
+  const at = rest.search(/[/?#]/);
+  const authority = (at < 0 ? rest : rest.slice(0, at)).replace(/^.*@/, '');
+  const tail = (at < 0 ? '' : rest.slice(at)).replace(/[?#].*$/, '');
+  return `${authority.replace(/^([^:/]+):(?!\d+$)/, '$1/')}${tail}`
+    .replace(/\.git$/, '')
+    .replace(/[^\w.~:/+%-]/g, '');
 }
 
 // Registers the repo checked out at `path`, under `name` or its folder's name; a repo already

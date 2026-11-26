@@ -34,6 +34,7 @@ import {
   keepHeldEntries,
   listBandeja,
   listText,
+  noteRefiner,
   requireBandejaHold,
   requireEntry,
   takeBandeja,
@@ -5363,6 +5364,7 @@ const bandejaTake: Command = {
     const again = bandejaTakeNextCommand(actor.name);
     if (!waits) {
       return withAgent(input, (project) => {
+        noteRefiner(project, actor.name);
         const held = takeNextBandeja(project, { agent: actor.name });
         if (held === undefined) {
           return {
@@ -5378,6 +5380,7 @@ const bandejaTake: Command = {
     const timeoutMs = durationFrom('timeout', timeout);
     const owner = watchOwner(input.signal);
     const result = await withAgentWhile(input, async (project) => {
+      noteRefiner(project, actor.name);
       const waited = await listenWhile(
         project,
         input,

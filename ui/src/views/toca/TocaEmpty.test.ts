@@ -79,7 +79,7 @@ describe('Te toca on the phone (mobile mock 1)', () => {
       }),
     );
     expect(html).toContain('class="noagents"');
-    expect(html).toContain('No agent connected');
+    expect(html).toContain('No worker connected');
     expect(html).toContain('One item is on an agent’s turn');
     const live = { name: 'kiln', harness: null, holding: [], lastSeen: 'x', live: true };
     expect(

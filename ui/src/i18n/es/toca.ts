@@ -108,7 +108,7 @@ export const toca = {
   'next.once': 'No volverá a aparecer en este dispositivo.',
 
   // Sin agentes conectados
-  'toca.noAgents.title': 'Ningún agente conectado',
+  'toca.noAgents.title': 'Ningún trabajador conectado',
   'toca.noAgents.waiting': {
     one: 'Un ítem está en turno de un agente y espera a que alguien lo tome. Conecta un agente y empezará por él.',
     other:

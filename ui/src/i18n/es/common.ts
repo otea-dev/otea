@@ -84,10 +84,10 @@ export const common = {
   'agent.status.connected': 'conectado',
   'agent.status.silent': 'sin señal',
   'agent.status.away': 'ausente',
-  'listen.noAgents': 'ningún agente conectado',
-  'listen.noAgentsLead': 'Ningún agente conectado.',
+  'listen.noAgents': 'ningún trabajador conectado',
+  'listen.noAgentsLead': 'Ningún trabajador conectado.',
   'listen.noAgentsNotice':
-    'Ningún agente conectado: esto espera aquí hasta que uno se conecte y tome el siguiente paso.',
+    'Ningún trabajador conectado: esto espera aquí hasta que uno se conecte y tome el siguiente paso.',
   'listen.busy': {
     one: 'en cola: {agent} está trabajando',
     other: 'en cola: {count} agentes trabajando',

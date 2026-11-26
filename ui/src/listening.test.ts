@@ -217,7 +217,25 @@ describe('hearing', () => {
   it('says no agent is connected, not that nobody listens, when there is none', () => {
     expect(hearing([], [], NOW)).toEqual({ kind: 'nobody' });
     expect(hearing([agent('a', { live: false })], [], NOW)).toEqual({ kind: 'nobody' });
-    expect(unheardWords([], true)).toEqual({ text: 'no agent is connected', calm: true });
+    expect(unheardWords([], true)).toEqual({ text: 'no worker is connected', calm: true });
+  });
+
+  // Review of F6: a refiner waiting on the Bandeja, like the secretary, takes no item: with only
+  // those connected the queue says no worker is there.
+  it('counts only workers: a refiner or the secretary alone leaves the queue with no worker connected', () => {
+    const refiner = agent('ref', { role: 'refiner', status: 'connected' });
+    const secretary = agent('sec', { role: 'secretary', status: 'listening', waiting: true });
+    expect(connectedAgents([refiner])).toEqual([]);
+    expect(hearing([refiner, secretary], [], NOW)).toEqual({ kind: 'nobody' });
+    expect(noAgents([refiner, secretary])).toBe(true);
+    expect(unheardLead([], [refiner, secretary], 'TASK-1')).toBe('No worker is connected.');
+    // A worker beside them is the one named.
+    const worker = agent('w', { status: 'connected' });
+    expect(hearing([refiner, worker], [], NOW)).toEqual({ kind: 'connected', agents: ['w'] });
+    // Nor does either keep an item from being unheard.
+    expect(
+      anyoneWaits([agent('ref', { role: 'refiner', status: 'listening', waiting: true })]),
+    ).toBe(false);
   });
 });
 
