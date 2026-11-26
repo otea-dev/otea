@@ -747,6 +747,10 @@ function orderLine(order: { pin?: number; rank?: number }): string {
   return `It is number ${order.rank} in the order the person fixed on the Matrix.`;
 }
 
+// The one heading of a step's text that is the board's own words said back: the step's last
+// instructions, in the language the board speaks (the others name Otea's own commands and fields).
+export const BEFORE_HAND_IN = { en: 'Before you hand it off', es: 'Antes de entregarlo' } as const;
+
 function section(title: string, lines: readonly string[]): string[] {
   return lines.length === 0 ? [] : ['', title, ...lines];
 }
@@ -910,7 +914,7 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
   lines.push(...section('Branch', branchLines(def, step, position, input)));
   if (!reviewing && !input.brief)
     lines.push(
-      ...section('Before you hand it off', [
+      ...section(BEFORE_HAND_IN[langOf(def)], [
         ...indent(mentionText(def, step.instructions.before)),
         ...groupRules(def, step, input),
       ]),
@@ -1643,7 +1647,7 @@ export function boardText(def: BoardDefinition): string {
       '',
       `${index + 1}. ${step.name}: ${whoDoes(step)}${whoReviews(step)}`,
       ...say('When you take it', step.instructions.take),
-      ...say('Before you hand it off', step.instructions.before),
+      ...say(BEFORE_HAND_IN[langOf(def)], step.instructions.before),
       ...(step.reviewer === 'none' ? [] : say('When you review it', step.instructions.review)),
     );
   });

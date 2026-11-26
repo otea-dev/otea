@@ -94,6 +94,17 @@ const base = {
 };
 
 describe('nextText', () => {
+  // Field study 3: a worker on a Spanish board read the one English heading of its step's
+  // instructions, among the board's own words in Spanish.
+  it("names the step's last instructions in the board's language", () => {
+    const at = { ...base, position: { step: 'sconcept', phase: 'doing' as const }, missing: [] };
+    expect(nextText(def, at)).toContain('\nAntes de entregarlo\n');
+    expect(nextText(def, at)).not.toContain('Before you hand it off');
+    expect(boardText(def)).toContain('Antes de entregarlo');
+    const english = { ...def, title: 'Title' };
+    expect(nextText(english, at)).toContain('\nBefore you hand it off\n');
+  });
+
   it('names the item it is part of, and where to read it', () => {
     const text = nextText(def, {
       ...base,
@@ -200,7 +211,7 @@ describe('nextText', () => {
         '      what goes here: 3 vistas',
         '  · Barro: required when Bioma is Pantano',
         '',
-        'Before you hand it off',
+        'Antes de entregarlo',
         '  Adjunta el Arte conceptual.',
         '',
         'Next',
@@ -620,7 +631,7 @@ describe('boardText', () => {
         '1. Concepto: any agent does it; the person reviews it',
         '   When you take it',
         '     Pinta desde la Descripción.',
-        '   Before you hand it off',
+        '   Antes de entregarlo',
         '     Adjunta el Arte conceptual.',
         '',
         '2. Animar: any agent does it; another agent reviews it, never the one that did it',
