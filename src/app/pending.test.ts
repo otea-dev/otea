@@ -12,6 +12,7 @@ import { addCollection } from './collections.ts';
 import { answerSecretaryQuestion, postPersonMessage, sayAsSecretary } from './conversation.ts';
 import { createItem } from './items.ts';
 import { claimItem } from './leases.ts';
+import { landWaitOf } from './next.ts';
 import { pendingOf, pendingText } from './pending.ts';
 import type { Project } from './project.ts';
 import { askQuestion } from './questions.ts';
@@ -222,6 +223,76 @@ describe('what waits for the person', () => {
       }),
     ]);
     expect(pendingText(pending)).toContain(`${first} holds the queue`);
+  });
+
+  // F4 review round: the desk reads this on every change; git is asked about the branches once
+  // while nothing that decides who waits for whom has changed.
+  it('asks git which item the waiting ones wait for once, while nothing changed', () => {
+    let tick = 0;
+    const now = () => new Date(Date.UTC(2026, 10, 19, 9, 0, tick++)).toISOString();
+    const def = instantiate(requireTemplate('mainline'), 'es', {}, undefined, { keep: true });
+    publishAs(project, def, 'bmain', now);
+    const make = (title: string) => {
+      const { id } = createItem(
+        project,
+        { collection: def.name, title, fields: { want: 'x' }, actor: you },
+        now,
+      );
+      updateItemState(project.db, id, 'doit', now());
+      return id;
+    };
+    const first = make('first');
+    make('second');
+    updateItemState(project.db, first, 'doit__review', now());
+    let asked = 0;
+    const landWait: typeof landWaitOf = (ctx, item, at) => {
+      asked += 1;
+      return landWaitOf(ctx, item, at);
+    };
+
+    const one = pendingOf(project, now, { landWait });
+    const after = asked;
+    const two = pendingOf(project, now, { landWait });
+
+    expect(one.blocks).toHaveLength(1);
+    expect(after).toBeGreaterThan(0);
+    expect(asked).toBe(after);
+    expect(two.blocks).toEqual(one.blocks);
+    // A change of what decides it (the review is settled) is a new look, not the kept one.
+    updateItemState(project.db, first, 'done', now());
+    expect(pendingOf(project, now, { landWait }).blocks).toEqual([]);
+  });
+
+  it('can leave the queue blocks out: the cheap count at the foot of a wait', () => {
+    let asked = 0;
+    createItem(project, { collection: 'reviews', title: 'CSS', actor: agent('kiln') }, clock(1000));
+
+    const pending = pendingOf(project, clock(MIN), {
+      blocks: false,
+      landWait: () => {
+        asked += 1;
+        return undefined;
+      },
+    });
+
+    expect(pending.count).toBe(1);
+    expect(pending.blocks).toEqual([]);
+    expect(asked).toBe(0);
+  });
+
+  // F3 left a question open until a message replies to it: the person's own words in reply close it.
+  it('closes a question of the secretary the person answers in their own words', () => {
+    const wrote = postPersonMessage(project, { text: 'idea?' }, clock(1000)).message;
+    const said = sayAsSecretary(
+      project,
+      { agent: 'sol', text: 'Write it down?', replyTo: wrote.id, options: ['Yes', 'No'] },
+      clock(2000),
+    ).message;
+    expect(pendingOf(project, clock(MIN)).count).toBe(1);
+
+    answerSecretaryQuestion(project, said.id, { text: 'Not now, maybe next week' }, clock(2 * MIN));
+
+    expect(pendingOf(project, clock(3 * MIN)).count).toBe(0);
   });
 
   it('says the secretary is offline and how many things wait for it', () => {

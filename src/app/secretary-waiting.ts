@@ -2,6 +2,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { messageSnippet } from '../core/conversation.ts';
 import { REPLY_WINDOW_MS, type SecretaryFacts } from '../core/notify/signals.ts';
 import { countPending, selectRepliesSince } from '../store/conversation.ts';
+import { selectOpenEscalations } from '../store/secretary.ts';
 import { type Clock, systemClock } from './items.ts';
 import { secretaryStatus } from './secretary.ts';
 
@@ -24,8 +25,15 @@ export function addWaitingSource(source: WaitingSource): () => void {
   };
 }
 
+// What agents escalated and the secretary has not acted on waits for it as well: an absent
+// secretary is told («te esperan N»), and the person sees the escalations themselves.
+function escalated(db: DatabaseSync): Waiting {
+  const open = selectOpenEscalations(db);
+  return { count: open.length, since: open[0]?.at ?? null };
+}
+
 export function secretaryWaiting(db: DatabaseSync): Waiting {
-  const all = [countPending(db), ...sources.map((source) => source(db))];
+  const all = [countPending(db), escalated(db), ...sources.map((source) => source(db))];
   const since = all
     .map((each) => each.since)
     .filter((at): at is string => at !== null)

@@ -142,6 +142,29 @@ describe('what waits for the person, from the secretary', () => {
       expect(woke.text).toContain('otea say');
     });
 
+    // F4 review round: an away secretary relays nothing; the person reads it in Te toca and Te
+    // espera, and the worker is told so.
+    it('tells the worker the person sees it directly when the secretary is offline', async () => {
+      const id = await item();
+      const longAgo = new Date(Date.now() - 45 * 60_000).toISOString();
+      inProject((project) =>
+        project.db
+          .prepare(
+            "UPDATE agents SET last_seen = ?, acted_at = ?, listening_at = NULL WHERE name = 'sol'",
+          )
+          .run(longAgo, longAgo),
+      );
+
+      const said = await otea('escalate', id, 'The push failed twice.', '--as', 'worker');
+
+      expect(said.code).toBe(0);
+      expect(said.out).toContain('offline');
+      expect(said.out).toContain('the person will see it directly');
+      const shown = await otea('pending', '--as', 'worker');
+      expect(shown.out).toContain('worker says');
+      expect(shown.out).toContain('The push failed twice.');
+    });
+
     it('takes a note of the Bandeja as the place it is about', async () => {
       inProject((project) => captureToBandeja(project, { text: 'a duplicate of CAM-1' }));
 

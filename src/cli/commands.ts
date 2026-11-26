@@ -2770,7 +2770,7 @@ async function waitForSecretary(input: Input): Promise<Output> {
     if (!('found' in waited)) return waited;
     const wake = waited.found;
     // What waits for the person, counted now: the notice «ready for review» never rests on memory.
-    const waits = pendingLine(pendingOf(project));
+    const waits = pendingLine(pendingOf(project, undefined, { blocks: false }));
     return {
       data: { secretary: me, ...wake },
       text: [wake.text, ...(waits ? [waits] : []), secretaryWaitAgainLine(me, input.channel)].join(
@@ -5128,7 +5128,7 @@ const conversation: Command = {
         ...(page === undefined ? {} : { limit: page }),
       });
       const { paths, problems, ...rest } = read;
-      const waits = pendingLine(pendingOf(project), actor.name);
+      const waits = pendingLine(pendingOf(project, undefined, { blocks: false }), actor.name);
       const messages = read.messages.map((message) => ({
         ...message,
         attachments: message.attachments.map((file) => {
@@ -5240,9 +5240,14 @@ const escalate: Command = {
     const [id = '', text = ''] = input.args;
     return withAgent(input, (project) => {
       const sent = escalateToSecretary(project, { agent: input.actor.name, about: id, text });
+      const told =
+        sent.secretaryState === 'offline'
+          ? `${sent.secretary} is offline: the person will see it directly, in Te toca and in Hablar, until it is back.`
+          : `${sent.secretary} tells the person in Hablar.`;
+      const again = sent.already ? ' (It was waiting already: nothing new was sent.)' : '';
       return {
         data: sent,
-        text: `Told ${sent.secretary} about ${sent.about}: it tells the person in Hablar. Go on with what you can; ask them yourself (otea ask) only for a decision that is theirs.`,
+        text: `Told ${sent.secretary} about ${sent.about}${again}. ${told} Go on with what you can; ask them yourself (otea ask) only for a decision that is theirs.`,
       };
     });
   },

@@ -9,10 +9,13 @@ import type { SecretaryState } from './secretary.ts';
 //   review     an item reached their review (or a step they decide)
 //   step       a step of their own on a board: theirs to do
 //   stuck      an agent's lease ran out and nobody took the item again
+//   escalation an agent told the secretary something the person must know (otea escalate) and the
+//              secretary is away: the person reads it themselves
 export const PENDING_KINDS = [
   'question',
   'bandeja',
   'secretary',
+  'escalation',
   'review',
   'step',
   'stuck',
@@ -82,7 +85,7 @@ export function pendingCounts(entries: readonly PendingEntry[]): Record<PendingK
 
 // What waits for them that is no item: the Bandeja's and the secretary's questions. The desk adds
 // them to the items on its own turn (Te toca's number).
-export const OFF_ITEM: readonly PendingKind[] = ['bandeja', 'secretary'];
+export const OFF_ITEM: readonly PendingKind[] = ['bandeja', 'secretary', 'escalation'];
 
 export function offItem(entries: readonly PendingEntry[]): PendingEntry[] {
   return entries.filter(({ kind }) => OFF_ITEM.includes(kind));

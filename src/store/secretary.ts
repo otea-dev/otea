@@ -62,6 +62,15 @@ export function selectOpenSignals(db: DatabaseSync): SignalRecord[] {
   return db.prepare(sql).all() as SignalRecord[];
 }
 
+// What agents escalated that the secretary has not acted on yet, oldest first.
+export function selectOpenEscalations(
+  db: DatabaseSync,
+): { id: number; ref: string | null; text: string; at: string }[] {
+  const sql = `SELECT id, ref, COALESCE(text, '') AS text, at FROM secretary_signals
+    WHERE kind = 'escalation' AND acked_at IS NULL ORDER BY id`;
+  return db.prepare(sql).all() as { id: number; ref: string | null; text: string; at: string }[];
+}
+
 export function countPendingSignals(db: DatabaseSync): number {
   const sql = 'SELECT COUNT(*) AS n FROM secretary_signals WHERE acked_at IS NULL';
   return Number((db.prepare(sql).get() as { n: number }).n);
