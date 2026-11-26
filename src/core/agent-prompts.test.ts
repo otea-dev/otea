@@ -439,6 +439,42 @@ describe('the role prompts', () => {
       expect(text).toContain('.otea/tmp/');
       expect(text).toContain('MSYS_NO_PATHCONV=1');
     });
+
+    // Field study 3 (F4): «what waits for me today» left a review out because the secretary told it
+    // from memory, and its «ready to review» notices came late or never.
+    it(`has the secretary read what waits for the person from otea pending, never from memory (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, { name: 'ana' });
+      const rule = text.split('\n').find((line) => /^9\. /.test(line)) ?? '';
+      expect(rule).toContain('otea pending --as ana');
+      expect(rule).toMatch(
+        lang === 'es' ? /¿Qué me espera hoy\?/ : /what is waiting for me today/i,
+      );
+      expect(rule).toMatch(lang === 'es' ? /nunca de memoria/ : /never from memory/);
+      // It tells me what became mine: a notice, with the items, counted from pending.
+      expect(rule).toMatch(lang === 'es' ? /revisión/ : /review/);
+      expect(rule).toMatch(lang === 'es' ? /ocupa toda la cola/ : /holds the whole queue/);
+    });
+
+    it(`has the secretary tell me an escalation in Hablar at once (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, { name: 'ana' });
+      const rule = text.split('\n').find((line) => /^10\. /.test(line)) ?? '';
+      expect(rule).toContain('`escalation`');
+      expect(rule).toContain('Hablar');
+      expect(rule).toContain('otea say "<');
+      expect(rule).toContain('--links');
+    });
+
+    it(`has a worker and a refiner escalate to the secretary what I must know (${lang})`, () => {
+      for (const text of [
+        rolePrompt('worker', lang, { board: 'Cambios', name: 'ana' }),
+        rolePrompt('refiner', lang, { name: 'ana-ref' }),
+      ]) {
+        expect(text).toContain('otea escalate <');
+        expect(text).toMatch(lang === 'es' ? /el secretario/ : /the secretary/);
+        // Never only in its own terminal.
+        expect(text).toContain('terminal');
+      }
+    });
   }
 
   it('gives a secretary its name when told, and is written in the language asked', () => {
