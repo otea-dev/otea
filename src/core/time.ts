@@ -26,6 +26,8 @@ export function clockText(now: number, zone?: string): string {
   const offset =
     parts('shortOffset')
       .find(({ type }) => type === 'timeZoneName')
-      ?.value.replace('GMT', 'UTC') ?? 'UTC';
+      // Newer ICU writes a zero offset as «GMT+0», older as «GMT»: both read «UTC».
+      ?.value.replace(/^GMT(?:[+-]0+(?::00)?)?$/, 'GMT')
+      .replace('GMT', 'UTC') ?? 'UTC';
   return `${time} (${offset}, ${named})`;
 }
