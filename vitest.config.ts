@@ -6,6 +6,8 @@ import { configDefaults, defineConfig } from 'vitest/config';
 // a beforeEach that only runs five commands. They get their own.
 const SPAWNS_PROCESSES = [
   'src/cli/**/*.test.ts',
+  // One story: a real server and CLI agents (git repo, waits) end to end.
+  'src/e2e/**/*.test.ts',
   'src/mcp/**/*.test.ts',
   'src/app/project.test.ts',
   'src/app/git-common-dir.test.ts',

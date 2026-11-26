@@ -12,6 +12,7 @@ import { type ItemRecord, selectItems } from '../store/queries.ts';
 import type { Context } from './context.ts';
 import { mirrorTopicTurn } from './conversation.ts';
 import { requireItem, systemClock } from './items.ts';
+import { secretaryName } from './secretary.ts';
 
 // Side topics: questions the person asks an agent off the work at hand. Each is a short
 // conversation, so none is left hanging in a chat: the person's question, the agent's answer (a
@@ -101,6 +102,13 @@ export function topicsOn(ctx: Context): boolean {
     | { enabled: number }
     | undefined;
   return row?.enabled === 1;
+}
+
+// Whether agents are told to record topics (the guide's rule, the reminders): the switch is on and
+// the project has no secretary. With one, a question the person asks it is a consultation it saves
+// (`otea say --consultation`), and no other agent records topics.
+export function topicsGuided(ctx: Context): boolean {
+  return topicsOn(ctx) && secretaryName(ctx.db) === undefined;
 }
 
 export function setTopicsOn(ctx: Context, on: boolean): void {

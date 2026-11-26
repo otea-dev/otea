@@ -365,6 +365,47 @@ describe('otea topic', () => {
     }
   });
 
+  // 0.8: a question the person asks the secretary is a consultation it saves (otea say
+  // --consultation), so with a secretary declared no agent is told to record topics: not in the
+  // guide, not in next, not in what wait wakes an agent for. Without one nothing changes.
+  it('tells no agent to record topics once the project has a secretary', async () => {
+    const { repo, otea } = fresh();
+    const person = cliAt(repo.dir);
+    await otea(
+      'profile',
+      '--model',
+      'claude-opus-5-5',
+      '--effort',
+      'high',
+      '--harness',
+      'claude-code',
+    );
+    await otea(
+      'create',
+      '--collection',
+      'Cambios',
+      '--title',
+      'Arreglar el build',
+      '--field',
+      'Qué quiero=x',
+    );
+    await person('topic', 'on');
+    // Topics on and nobody the secretary: the rule is there, in the guide and in what wakes it.
+    expect((await otea('board')).out).toContain('otea topic add');
+    expect((await otea('wait', '--turn', 'agent', '--timeout', '5s')).out).toContain(
+      'otea topic add',
+    );
+
+    await cliAt(repo.dir)('profile', '--role', 'secretary', '--as', 'sol');
+    expect((await otea('board')).out).not.toContain('otea topic add');
+    expect((await otea('next')).out).not.toContain('otea topic');
+    expect((await otea('wait', '--turn', 'agent', '--timeout', '5s')).out).not.toContain(
+      'otea topic',
+    );
+    // The topics the person already has stay readable.
+    expect((await person('topic', 'list')).code).toBe(0);
+  });
+
   it('reminds an agent that otea wait wakes to record side questions while topics are on', async () => {
     const { repo, otea } = fresh();
     await otea(

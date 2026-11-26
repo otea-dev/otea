@@ -209,6 +209,7 @@ import {
   setTopicsOn,
   topicsAwaiting,
   topicsAwaitingText,
+  topicsGuided,
   topicsListText,
   topicsOn,
   topicText,
@@ -1432,7 +1433,7 @@ ${text}`;
 // one whose client shows no instructions) to read it once; one board gives it no second time.
 // --json keeps the data alone.
 const withAgentGuide = (project: Project, text: string) =>
-  `${agentGuideFor(topicsOn(project))}\n\n${text}`;
+  `${agentGuideFor(topicsGuided(project))}\n\n${text}`;
 
 const boardName = (record: BoardRecord) => (record.live ?? record.draft)?.definition.name ?? '';
 
@@ -1827,7 +1828,7 @@ const TOPICS_TEXT = TOPICS_RULE.replace(/^\d+\. Topics are on\. /, '');
 // What otea wait woke an agent for, with the topics reminder while topics are on: an agent in a
 // chat reads it between the person's messages, where side questions come.
 function withTopicsReminder(project: Project, actor: Actor, output: Output): Output {
-  if (actor.kind !== 'agent' || !topicsOn(project)) return output;
+  if (actor.kind !== 'agent' || !topicsGuided(project)) return output;
   const data =
     output.data !== null && typeof output.data === 'object'
       ? { ...(output.data as object), reminder: TOPICS_REMINDER }
@@ -1841,8 +1842,10 @@ function withTopicsReminder(project: Project, actor: Actor, output: Output): Out
 // rule is in the guide, and in the whole next.
 function topicLines(project: Project, agent: string, brief = false): string[] {
   if (!topicsOn(project)) return [];
+  // With a secretary, no agent is told to record topics; a person's note on a topic still waits.
+  const guided = topicsGuided(project);
   const awaiting = topicsAwaitingText(topicsAwaiting(project, agent));
-  if (brief) return awaiting === undefined ? [] : [awaiting];
+  if (brief || !guided) return awaiting === undefined ? [] : [awaiting];
   const rule = `Topics are on. ${TOPICS_TEXT}`;
   return awaiting === undefined ? [rule] : [awaiting, rule];
 }
@@ -2701,9 +2704,9 @@ const wait: Command = {
       };
       // Topics the person turns on while an agent waits wake it once with their rule: its session
       // began without it, and an agent at work reads it in next.
-      const topicsBefore = topicsOn(project);
+      const topicsBefore = topicsGuided(project);
       const topicsTurnedOn = () =>
-        input.actor.kind === 'agent' && !topicsBefore && topicsOn(project)
+        input.actor.kind === 'agent' && !topicsBefore && topicsGuided(project)
           ? { topics: 'on', text: `The person turned topics on. ${TOPICS_TEXT}` }
           : undefined;
       // An agent waiting on the agent turn while its own question waits for the person waits for
@@ -4400,7 +4403,7 @@ const mcp: Command = {
       // Whether the project keeps side topics, read once: the guide the agent gets says so.
       const topics = (() => {
         try {
-          return withProject(cwd, (project) => topicsOn(project));
+          return withProject(cwd, (project) => topicsGuided(project));
         } catch {
           return false;
         }
