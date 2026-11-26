@@ -56,32 +56,9 @@ describe('a row on the phone', () => {
   });
 });
 
-describe('the docked buttons', () => {
-  // Field study 3: «Devolver a Investigar» read «Devolver a Investiga» at 390 px, cut at the
-  // button's edge, because a button keeps its words on one line.
-  it('lets the words of a move wrap inside the button', () => {
-    const dock = rules(phoneCss, '.p-dock .btn');
-    expect(dock).toMatch(/white-space:\s*normal/);
-    expect(dock).toMatch(/height:\s*auto/);
-  });
-});
-
+// The bottom bar's size and the docked buttons' wrapping are measured in a real browser (the
+// layout is not computed in a test DOM); a regex over their rules would only restate them.
 describe('the bottom buttons', () => {
-  it('draws the bottom bar on the screen’s foot, four tabs wide, clear of the home bar', () => {
-    const bar = rules(phone, '.tabbar');
-    expect(bar).toMatch(/position:\s*fixed/);
-    expect(bar).toMatch(/bottom:\s*0/);
-    expect(bar).toMatch(/grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
-    expect(bar).toMatch(/env\(safe-area-inset-bottom/);
-    expect(bar).toMatch(/border-top:\s*1px solid var\(--rule\)/);
-    expect(rules(phoneCss, '.tabbar')).toMatch(/display:\s*none/);
-    expect(rules(phone, '.tabbar .tab')).toMatch(/min-height:\s*56px/);
-    const disc = rules(phone, '.tabbar .disc');
-    expect(disc).toMatch(/width:\s*40px/);
-    expect(disc).toMatch(/border-radius:\s*50%/);
-    expect(disc).toMatch(/background:\s*var\(--ink\)/);
-  });
-
   it('gives the step chips on a board a thumb’s height', () => {
     expect(rules(phone, '.stepchips button')).toMatch(/min-height:\s*44px/);
   });
