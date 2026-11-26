@@ -301,6 +301,16 @@ export function HablarView({
             {convo.status === 'ready' && convo.waiting.count > 0 ? (
               <b className="hb-wait">{t('hablar.waiting', { count: convo.waiting.count })}</b>
             ) : null}
+            {secretary ? (
+              <>
+                <p className="hb-back">
+                  {t('hablar.away.back', {
+                    command: `otea wait --secretary --as ${secretary.name}`,
+                  })}
+                </p>
+                <CopyCommand command={`otea prompt --role secretary --as ${secretary.name}`} />
+              </>
+            ) : null}
           </div>
         ) : null}
         <div className="hb-chat" ref={scroller}>

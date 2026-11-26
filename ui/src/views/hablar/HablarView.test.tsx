@@ -315,6 +315,19 @@ describe('the secretary thinking', () => {
     expect(q(root, '.hb-away')).not.toBeNull();
   });
 
+  // F2 (field study 3): the offline notice said it was away and gave no way back.
+  it('tells the person how to bring it back, by its own name, when it is away', async () => {
+    const { root } = await open(
+      conversation({
+        messages: read,
+        secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 1 },
+      }),
+    );
+    const away = q(root, '.hb-away');
+    expect(text(away)).toContain('otea wait --secretary --as quill');
+    expect(text(away)).toContain('otea prompt --role secretary --as quill');
+  });
+
   it('marks a message it has not read yet as waiting', async () => {
     const { root } = await open(
       conversation({ messages: [say({ id: 1, author: 'person', delivery: 'pending' })] }),

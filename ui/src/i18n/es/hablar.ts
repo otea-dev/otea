@@ -14,6 +14,8 @@ export const hablar = {
   'hablar.status.offline': '{name} está desconectado',
   'hablar.away': 'Tu secretario está desconectado desde {since}. Tus mensajes lo esperan.',
   'hablar.awayUnknown': 'Tu secretario está desconectado. Tus mensajes lo esperan.',
+  'hablar.away.back':
+    'Para traerlo de vuelta: si su sesión sigue abierta, pídele a tu agente que ejecute {command}. Si la cerraste, abre una nueva y pega lo que imprime esto:',
   'hablar.waiting': { one: '{count} mensaje esperando', other: '{count} mensajes esperando' },
   'hablar.none.title': 'Todavía no hay secretario',
   'hablar.none.text':

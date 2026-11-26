@@ -12,6 +12,8 @@ export const hablar = {
   'hablar.status.offline': '{name} is offline',
   'hablar.away': 'Your secretary has been offline since {since}. Your messages wait for it.',
   'hablar.awayUnknown': 'Your secretary is offline. Your messages wait for it.',
+  'hablar.away.back':
+    'To bring it back: if its session is still open, ask your agent to run {command}. If you closed it, open a new one and paste what this prints:',
   'hablar.waiting': { one: '{count} message waiting', other: '{count} messages waiting' },
   'hablar.none.title': 'No secretary yet',
   'hablar.none.text':
