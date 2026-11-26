@@ -1,12 +1,11 @@
 import { type ClipboardEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { postMessage } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
+import { Thumb } from '../../components/IntakeFiles.tsx';
 import { SUGGESTIONS } from '../../conversation.ts';
 import { t } from '../../i18n/i18n.ts';
 import {
-  extensionOf,
   type FileDraft,
-  isImage,
   MAX_FILE_MB,
   MAX_FILES,
   sizeLabel,
@@ -31,27 +30,6 @@ function newKey(): string {
 
 let seq = 0;
 const draftKey = () => `hb-file-${++seq}`;
-
-// A picked image shows itself; anything else shows its extension.
-function Thumb({ file }: { file: File }) {
-  const [url, setUrl] = useState<string>();
-  const image = isImage(file.name);
-  useEffect(() => {
-    if (!image) return undefined;
-    const made = URL.createObjectURL(file);
-    setUrl(made);
-    return () => URL.revokeObjectURL(made);
-  }, [file, image]);
-  return (
-    <span className="hb-dthumb" aria-hidden="true">
-      {url?.startsWith('blob:') ? (
-        <img src={url} alt="" />
-      ) : (
-        <span>{extensionOf(file.name) || '·'}</span>
-      )}
-    </span>
-  );
-}
 
 export function Composer({ onSent }: { onSent: () => void }) {
   const app = useApp();

@@ -19,7 +19,7 @@ const ROLE_LABEL = {
 } as const;
 
 // A picked image shows itself; anything else shows its extension.
-function Thumb({ file }: { file: File }) {
+export function Thumb({ file }: { file: File }) {
   const [url, setUrl] = useState<string>();
   const image = isImage(file.name);
   useEffect(() => {
