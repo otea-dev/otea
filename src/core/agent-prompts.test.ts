@@ -399,8 +399,9 @@ describe('the role prompts', () => {
       expect(text).toContain('git worktree add .otea/worktrees/<');
       expect(text).toContain('.otea/tmp/<');
       expect(text).toContain('MSYS_NO_PATHCONV=1');
-      expect(text).toContain('D:/folder');
-      expect(text).toContain('/d/folder');
+      const folder = lang === 'es' ? 'carpeta' : 'folder';
+      expect(text).toContain(`D:/${folder}`);
+      expect(text).toContain(`/d/${folder}`);
     });
 
     it(`keeps a refiner's files inside the project and reads attachments where Otea prints them (${lang})`, () => {

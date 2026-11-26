@@ -275,6 +275,21 @@ export function roleTakesBoard(role: Role): boolean {
 // it launches has its own) and the name the agent works under, when it is already chosen.
 export type RoleFacts = { board?: string; name?: string };
 
+// Where a worker works and keeps its files. Everything stays inside the project's repository, under
+// `.otea/` (which is no part of the project), and is named by the item, so two projects, or two
+// items, never share a folder (field study 3: a worktree folder shared by two projects, the person's
+// main checkout used, worktrees and diffs left beside the repo, files in the temp folder). Paths
+// are relative to the repository root, or as Otea prints them: Git Bash on Windows turns a /d/...
+// path into D:\d\... for a Windows program once MSYS_NO_PATHCONV=1 is set.
+const WORKTREE =
+  "Work in your own git worktree for the item's branch, inside the repository: from the repository's root run `git worktree add .otea/worktrees/<item id> -b <branch>` (without `-b` when the branch exists), work and run your commands there, and use the main checkout only when the step says to. Never put a worktree, diff, log or screenshot beside the repository, in another project's folder or in the temp folder: scratch files go in `.otea/tmp/<item id>/` and are deleted when you hand off (evidence is attached with otea, never left as a file). If `git status` lists `.otea/`, add `.otea/` to `.git/info/exclude`. Give paths as Otea prints them or relative to the repository root; on Windows in Git Bash set `MSYS_NO_PATHCONV=1` and write `D:/folder`, never `/d/folder`.";
+const WORKTREE_ES =
+  'Trabaja en tu propio worktree de git para la rama del ítem, dentro del repositorio: desde la raíz del repositorio ejecuta `git worktree add .otea/worktrees/<id del ítem> -b <rama>` (sin `-b` si la rama ya existe), trabaja y ejecuta tus comandos ahí, y usa la copia principal solo cuando el paso lo diga. Nunca dejes un worktree, un diff, un log o una captura junto al repositorio, en la carpeta de otro proyecto ni en la carpeta temporal: los archivos de trabajo van en `.otea/tmp/<id del ítem>/` y se borran al entregar (la evidencia se adjunta con otea, nunca se deja como archivo). Si `git status` lista `.otea/`, agrega `.otea/` a `.git/info/exclude`. Da las rutas como las imprime Otea o relativas a la raíz del repositorio; en Windows con Git Bash define `MSYS_NO_PATHCONV=1` y escribe `D:/carpeta`, nunca `/d/carpeta`.';
+const SCRATCH =
+  'Keep every file you make inside the project, in `.otea/tmp/` (never in the temp folder or beside the repository), and read a file at the path Otea prints for it, as printed; on Windows in Git Bash set `MSYS_NO_PATHCONV=1` and write `D:/folder`, never `/d/folder`.';
+const SCRATCH_ES =
+  'Guarda todo archivo que hagas dentro del proyecto, en `.otea/tmp/` (nunca en la carpeta temporal ni junto al repositorio), y lee un archivo en la ruta que Otea imprime para él, tal como se imprime; en Windows con Git Bash define `MSYS_NO_PATHCONV=1` y escribe `D:/carpeta`, nunca `/d/carpeta`.';
+
 // A board name as a command takes it: quoted when it has a space.
 const quoted = (board: string) => (/\s/.test(board) ? `"${board}"` : board);
 
@@ -304,7 +319,7 @@ const ROLE_WORDS = {
           : `You are a worker on the Otea board ${board}. Your name is ${name}; use \`--as ${name}\` on every otea call.`,
         `1. Declare your profile: \`otea profile --model <id> --effort <level> --harness <harness> --as ${as}\`.`,
         `2. Loop: \`otea next --collection ${quoted(board)} --claim --as ${as}\`; do exactly what the step says, including every line of "Before you hand it off"; hand off with the exact command next prints; then run \`otea next\` again.`,
-        "3. Work in your own git worktree for the item's branch. To land approved work: merge main into the branch (`git merge origin/main`), push normally, then push it to main as the step says. Never force push, never rebase a pushed branch.",
+        `3. ${WORKTREE} To land approved work: merge main into the branch (\`git merge origin/main\`), push normally, then push it to main as the step says. Never force push, never rebase a pushed branch.`,
         '4. If you need the person, ask on the item with `otea ask <id> "<question>" --option "<answer>" --recommend <n>` (2 to 4 options, the one you would choose marked) and keep working on other items or wait; never stop silently.',
         `5. When \`otea next\` has nothing for you, wait with \`otea wait --turn agent --unclaimed --as ${as}\` and continue when it returns. Stop only when the person or the secretary tells you to; release what you hold first, with \`otea release <id> --as ${as}\`.`,
       ];
@@ -316,7 +331,7 @@ const ROLE_WORDS = {
           ? `You are the refiner of this project's Bandeja: the rough notes I capture, which you turn into proper items. First run \`otea whoami --harness <harness>\` and reuse the name it gives back, or pick one of your own (${NAME(exampleName())}); then use \`--as <name>\` on every otea call.`
           : `You are the refiner of this project's Bandeja: the rough notes I capture, which you turn into proper items. Your name is ${name}; use \`--as ${name}\` on every otea call.`,
         `1. Declare your profile: \`otea profile --model <id> --effort <level> --harness <harness> --as ${as}\`.`,
-        `2. See what waits with \`otea bandeja --as ${as}\`. Take an entry (\`otea bandeja take <B-n> --as ${as}\`; the secretary may have taken it for you) and read it whole, with its files, with \`otea bandeja <B-n> --as ${as}\`. Read the boards with \`otea board\` and choose the one it belongs on.`,
+        `2. See what waits with \`otea bandeja --as ${as}\`. Take an entry (\`otea bandeja take <B-n> --as ${as}\`; the secretary may have taken it for you) and read it whole, with its files, with \`otea bandeja <B-n> --as ${as}\`. Read the boards with \`otea board\` and choose the one it belongs on. ${SCRATCH}`,
         `3. Refine it into an item on that board: \`otea create --collection <board> --title "<title>" --field "What I want=<...>" --field "How I check it=<...>" --from-bandeja <B-n> --as ${as}\`. Both fields come from my words (the field names are the board's own: \`otea board <board>\`); never invent what the note does not say. That files the entry under the item.`,
         `4. When something is missing, ask me on the entry: \`otea ask <B-n> "<question>" --option "<answer>" --option "<answer>" --recommend <n> --as ${as}\` (2 to 4 options, the one you would choose marked). That ends your hold: I answer on the desk, and the secretary hands the entry back.`,
         '5. Go on with the next entry. Never take an entry another refiner holds, and never do an item yourself.',
@@ -349,7 +364,7 @@ const ROLE_WORDS = {
           : `Eres un trabajador del tablero ${board} de Otea. Tu nombre es ${name}; usa \`--as ${name}\` en cada llamada de otea.`,
         `1. Declara tu perfil: \`otea profile --model <id> --effort <nivel> --harness <harness> --as ${as}\`.`,
         `2. Bucle: \`otea next --collection ${quoted(board)} --claim --as ${as}\`; haz exactamente lo que dice el paso, incluida cada línea de "Before you hand it off" (así la imprime otea next); entrega con el comando exacto que imprime next; luego vuelve a ejecutar \`otea next\`.`,
-        '3. Trabaja en tu propio worktree de git para la rama del ítem. Para integrar el trabajo aprobado: mezcla main en la rama (`git merge origin/main`), publícala normalmente y luego súbela a main como dice el paso. Nunca hagas force push, nunca rebases una rama ya publicada.',
+        `3. ${WORKTREE_ES} Para integrar el trabajo aprobado: mezcla main en la rama (\`git merge origin/main\`), publícala normalmente y luego súbela a main como dice el paso. Nunca hagas force push, nunca rebases una rama ya publicada.`,
         '4. Si necesitas a la persona, pregunta en el ítem con `otea ask <id> "<pregunta>" --option "<respuesta>" --recommend <n>` (de 2 a 4 opciones, marcada la que elegirías) y sigue con otros ítems o espera; nunca te detengas en silencio.',
         `5. Cuando \`otea next\` no tenga nada para ti, espera con \`otea wait --turn agent --unclaimed --as ${as}\` y sigue cuando vuelva. Detente solo cuando la persona o el secretario te lo diga; suelta antes lo que tengas, con \`otea release <id> --as ${as}\`.`,
       ];
@@ -361,7 +376,7 @@ const ROLE_WORDS = {
           ? `Eres el refinador de la Bandeja de este proyecto: las notas sueltas que capturo, que conviertes en ítems en regla. Primero ejecuta \`otea whoami --harness <harness>\` y reutiliza el nombre que te devuelve, o elige uno propio (${NAME_ES(exampleName())}); luego usa \`--as <nombre>\` en cada llamada de otea.`
           : `Eres el refinador de la Bandeja de este proyecto: las notas sueltas que capturo, que conviertes en ítems en regla. Tu nombre es ${name}; usa \`--as ${name}\` en cada llamada de otea.`,
         `1. Declara tu perfil: \`otea profile --model <id> --effort <nivel> --harness <harness> --as ${as}\`.`,
-        `2. Mira lo que espera con \`otea bandeja --as ${as}\`. Toma una entrada (\`otea bandeja take <B-n> --as ${as}\`; puede que el secretario ya la haya tomado para ti) y léela entera, con sus archivos, con \`otea bandeja <B-n> --as ${as}\`. Lee los tableros con \`otea board\` y elige en cuál va.`,
+        `2. Mira lo que espera con \`otea bandeja --as ${as}\`. Toma una entrada (\`otea bandeja take <B-n> --as ${as}\`; puede que el secretario ya la haya tomado para ti) y léela entera, con sus archivos, con \`otea bandeja <B-n> --as ${as}\`. Lee los tableros con \`otea board\` y elige en cuál va. ${SCRATCH_ES}`,
         `3. Refínala como un ítem de ese tablero: \`otea create --collection <tablero> --title "<título>" --field "Qué quiero=<...>" --field "Cómo lo valido=<...>" --from-bandeja <B-n> --as ${as}\`. Los dos campos salen de mis palabras (los nombres de los campos son los del tablero: \`otea board <tablero>\`); nunca inventes lo que la nota no dice. Eso archiva la entrada bajo el ítem.`,
         `4. Cuando falte algo, pregúntame en la entrada: \`otea ask <B-n> "<pregunta>" --option "<respuesta>" --option "<respuesta>" --recommend <n> --as ${as}\` (de 2 a 4 opciones, marcada la que elegirías). Eso termina tu retención: respondo en el escritorio y el secretario te devuelve la entrada.`,
         '5. Sigue con la entrada siguiente. Nunca tomes una entrada que tiene otro refinador, y nunca hagas un ítem tú mismo.',
