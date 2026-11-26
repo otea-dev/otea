@@ -518,8 +518,9 @@ export const MIGRATIONS = [
   // The conversation (0.8): the messages between the person and the secretary, ordered by id; the
   // files that came with them (stored once under evidence/, by hash); and the items each turn
   // produced (message_id is the turn's first message, its root). A person's message has read_at
-  // null until the secretary read it. client_key lets a phone send again what it never heard back
-  // about without a second message.
+  // null until the secretary read it. client_key (kept per client_scope, the device or the desk's
+  // session, with a digest of what was sent) lets a phone send again what it never heard back about
+  // without a second message; the same key with other content is refused.
   `
   CREATE TABLE conversation_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -533,7 +534,10 @@ export const MIGRATIONS = [
     kind_by TEXT,
     read_at TEXT,
     topic TEXT,
-    client_key TEXT UNIQUE
+    client_scope TEXT,
+    client_key TEXT,
+    client_digest TEXT,
+    UNIQUE (client_scope, client_key)
   );
   CREATE INDEX conversation_unread ON conversation_messages (author, read_at);
   CREATE INDEX conversation_topic ON conversation_messages (topic);

@@ -33,7 +33,8 @@ export type NewMessage = {
   at: string;
   replyTo?: number | undefined;
   topic?: string | undefined;
-  clientKey?: string | undefined;
+  // Who sent it (the device, or the desk's session), the key it sent it under and a digest of it.
+  client?: { scope: string; key: string; digest: string } | undefined;
   // Already read: what is not the person's for the secretary to answer (and a topic's record).
   read?: boolean;
 };
@@ -50,8 +51,8 @@ export function insertMessage(db: DatabaseSync, message: NewMessage): number {
             | undefined
         )?.root;
   const sql = `INSERT INTO conversation_messages
-    (author, author_name, text, at, reply_to, root, read_at, topic, client_key)
-    VALUES (:author, :name, :text, :at, :replyTo, :root, :readAt, :topic, :clientKey)`;
+    (author, author_name, text, at, reply_to, root, read_at, topic, client_scope, client_key, client_digest)
+    VALUES (:author, :name, :text, :at, :replyTo, :root, :readAt, :topic, :scope, :key, :digest)`;
   const result = db.prepare(sql).run({
     author: message.author,
     name: message.name,
@@ -61,7 +62,9 @@ export function insertMessage(db: DatabaseSync, message: NewMessage): number {
     root: above ?? null,
     readAt: message.read ? message.at : null,
     topic: message.topic ?? null,
-    clientKey: message.clientKey ?? null,
+    scope: message.client?.scope ?? null,
+    key: message.client?.key ?? null,
+    digest: message.client?.digest ?? null,
   });
   const id = Number(result.lastInsertRowid);
   if (above === undefined) {
@@ -86,11 +89,18 @@ export function insertLink(db: DatabaseSync, root: number, item: string, at: str
   ).run(root, item, at);
 }
 
-export function messageOfClientKey(db: DatabaseSync, key: string): number | undefined {
-  const row = db.prepare('SELECT id FROM conversation_messages WHERE client_key = ?').get(key) as
-    | { id: number }
-    | undefined;
-  return row?.id;
+// The message a client already sent under this key, for this device or session, and the digest of
+// what it sent.
+export function messageOfClientKey(
+  db: DatabaseSync,
+  scope: string,
+  key: string,
+): { id: number; digest: string | null } | undefined {
+  return db
+    .prepare(
+      'SELECT id, client_digest AS digest FROM conversation_messages WHERE client_scope = ? AND client_key = ?',
+    )
+    .get(scope, key) as { id: number; digest: string | null } | undefined;
 }
 
 // Sets (or, with the same, keeps) the kind of the turn whose root is `root`, and who set it.
@@ -284,9 +294,35 @@ export function latestOfTopic(db: DatabaseSync, topic: string): number | undefin
   return row.id ?? undefined;
 }
 
-export function latestPersonMessage(db: DatabaseSync): number | undefined {
-  const row = db
-    .prepare("SELECT MAX(id) AS id FROM conversation_messages WHERE author = 'person'")
-    .get() as { id: number | null };
-  return row.id ?? undefined;
+// What a say that classifies or links with no --reply-to would aim at: the latest of the person's
+// messages that the secretary already read (never a topic's record), and what makes that a guess:
+// messages not read yet, and other read turns not classified.
+export function selectDefaultTurn(db: DatabaseSync): {
+  latest: number | undefined;
+  unread: number;
+  otherUnclassified: number;
+} {
+  const latest = (
+    db
+      .prepare(
+        "SELECT MAX(id) AS id FROM conversation_messages WHERE author = 'person' AND topic IS NULL AND read_at IS NOT NULL",
+      )
+      .get() as { id: number | null }
+  ).id;
+  const unread = (
+    db
+      .prepare(
+        "SELECT COUNT(*) AS n FROM conversation_messages WHERE author = 'person' AND topic IS NULL AND read_at IS NULL",
+      )
+      .get() as { n: number }
+  ).n;
+  const others = (
+    db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM conversation_messages
+         WHERE author = 'person' AND topic IS NULL AND read_at IS NOT NULL AND kind IS NULL AND id <> :latest`,
+      )
+      .get({ latest: latest ?? 0 }) as { n: number }
+  ).n;
+  return { latest: latest ?? undefined, unread: Number(unread), otherUnclassified: Number(others) };
 }

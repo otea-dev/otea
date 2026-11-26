@@ -1,12 +1,13 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MAX_EVIDENCE_BYTES } from '../core/evidence.ts';
 import { addCollection } from './collections.ts';
 import {
   attachmentPaths,
   attachmentToServe,
+  conversationText,
   correctKind,
   fromMessageLine,
   linkMessageToItem,
@@ -113,12 +114,55 @@ describe('the conversation', () => {
     });
 
     it('keeps a message sent again (a phone that never heard back) once', () => {
-      const first = postPersonMessage(project, { text: 'hello', clientKey: 'k-1' }, clock(1000));
-      const again = postPersonMessage(project, { text: 'hello', clientKey: 'k-1' }, clock(2000));
+      const key = { scope: 'desk', key: 'k-1' };
+      const first = postPersonMessage(project, { text: 'hello', clientKey: key }, clock(1000));
+      const again = postPersonMessage(project, { text: 'hello', clientKey: key }, clock(2000));
 
       expect(first.replayed).toBe(false);
       expect(again).toMatchObject({ replayed: true, message: { id: first.message.id } });
       expect(listConversation(project).messages).toHaveLength(1);
+    });
+
+    it('refuses the same key with another message, and keeps each device’s keys apart', () => {
+      const first = postPersonMessage(
+        project,
+        { text: 'hello', clientKey: { scope: 'device:a', key: 'k-1' } },
+        clock(1000),
+      );
+
+      expect(() =>
+        postPersonMessage(
+          project,
+          { text: 'something else', clientKey: { scope: 'device:a', key: 'k-1' } },
+          clock(2000),
+        ),
+      ).toThrow(/already sent another message/);
+      // Same words and key from another device: its own message, not the first one's.
+      const other = postPersonMessage(
+        project,
+        { text: 'something else', clientKey: { scope: 'device:b', key: 'k-1' } },
+        clock(3000),
+      );
+      expect(other).toMatchObject({ replayed: false });
+      expect(other.message.id).not.toBe(first.message.id);
+      expect(listConversation(project).messages).toHaveLength(2);
+    });
+
+    it('tells a resend from another message by its files too', () => {
+      const key = { scope: 'desk', key: 'k-2' };
+      const files = [{ filename: 'a.txt', bytes: Buffer.from('one') }];
+      postPersonMessage(project, { text: 'x', files, clientKey: key }, clock(1000));
+
+      expect(
+        postPersonMessage(project, { text: 'x', files, clientKey: key }, clock(2000)).replayed,
+      ).toBe(true);
+      expect(() =>
+        postPersonMessage(
+          project,
+          { text: 'x', files: [{ filename: 'a.txt', bytes: Buffer.from('two') }], clientKey: key },
+          clock(3000),
+        ),
+      ).toThrow(/already sent another message/);
     });
 
     it('refuses an empty message, one too long, and a reply to nothing', () => {
@@ -185,6 +229,68 @@ describe('the conversation', () => {
         }),
       ).toThrow(/at most 10 files/);
       expect(listConversation(project).messages).toHaveLength(1);
+    });
+
+    it('are opened under a safe name when the one they came with is not (device names, a lone space, a very long name), the original kept to show', () => {
+      const long = `${'long-'.repeat(60)}.png`;
+      const names = ['CON.txt', 'nul', ' ', 'report. ', 'a*b?.txt', long];
+      const sent = post('odd names', 1000, {
+        files: names.map((filename) => ({ filename, bytes: Buffer.from(filename) })),
+      });
+
+      expect(sent.attachments.map(({ name }) => name)).toEqual([
+        'CON.txt',
+        'nul',
+        'file',
+        'report.',
+        'a*b?.txt',
+        `${long.slice(0, 200 - 4 - 1)}….png`,
+      ]);
+      const read = readAsSecretary(project, { agent: 'sol' }, clock(2000));
+      expect(read.problems.size).toBe(0);
+      const opened = sent.attachments.map(({ id }) => basename(read.paths.get(id) ?? ''));
+      expect(opened.slice(0, 5)).toEqual(['_CON.txt', '_nul', 'file', 'report', 'a_b_.txt']);
+      expect(opened[5]?.length).toBeLessThanOrEqual(120);
+      expect(opened[5]?.endsWith('.png')).toBe(true);
+      for (const [index, { id }] of sent.attachments.entries()) {
+        expect(readFileSync(read.paths.get(id) ?? '', 'utf8')).toBe(names[index]);
+      }
+    });
+
+    it('that cannot be opened at a path never cost the message: it is read, the file noted', () => {
+      const sent = post('two files', 1000, {
+        files: [
+          { filename: 'gone.txt', bytes: Buffer.from('gone') },
+          { filename: 'fine.txt', bytes: Buffer.from('fine') },
+        ],
+      });
+      const [gone, fine] = sent.attachments;
+      rmSync(attachmentToServe(project, String(gone?.id)).path);
+
+      const read = readAsSecretary(project, { agent: 'sol' }, clock(2000));
+
+      expect(read.fresh).toEqual([sent.id]);
+      expect(listConversation(project).messages[0]?.delivery).toBe('read');
+      expect(read.problems.get(gone?.id ?? 0)).toMatch(/missing/);
+      expect(readFileSync(read.paths.get(fine?.id ?? 0) ?? '', 'utf8')).toBe('fine');
+      const text = conversationText('sol', read);
+      expect(text).toContain('attached: gone.txt (log, 4 B) (no path: the stored file is missing)');
+      expect(text).toContain(`: ${read.paths.get(fine?.id ?? 0)}`);
+      expect(text).toContain('1 file(s) could not be made available');
+    });
+
+    it('whose folder cannot be made are noted too, not thrown', () => {
+      const sent = post('a file', 1000, {
+        files: [{ filename: 'a.txt', bytes: Buffer.from('a') }],
+      });
+      // Where the files go is taken by a file: the disk refuses.
+      writeFileSync(join(project.dataDir, 'files'), 'in the way');
+
+      const read = readAsSecretary(project, { agent: 'sol' }, clock(2000));
+
+      expect(read.fresh).toEqual([sent.id]);
+      expect(read.problems.size).toBe(1);
+      expect(read.paths.size).toBe(0);
     });
 
     it('never take a path out of the file’s name', () => {
@@ -255,8 +361,9 @@ describe('the conversation', () => {
       expect(turnsOfItem(project, item('Unrelated'))).toEqual([]);
     });
 
-    it('take the person’s latest message when it says no reply-to, and refuse a link to no item', () => {
+    it('take the person’s latest read message when it says no reply-to, and refuse a link to no item', () => {
       const sent = post('add dark mode');
+      readAsSecretary(project, { agent: 'sol' }, clock(1500));
       const dark = item('Dark mode');
 
       const said = sayAsSecretary(
@@ -274,6 +381,76 @@ describe('the conversation', () => {
         ),
       ).toThrow(/TASKS-99/);
       expect(listConversation(project).messages).toHaveLength(2);
+    });
+
+    it('refuse to guess the turn while a later message of the person is not read yet', () => {
+      const first = post('add dark mode', 1000);
+      readAsSecretary(project, { agent: 'sol' }, clock(1500));
+      post('and make the font bigger', 2000);
+      const dark = item('Dark mode');
+
+      expect(() =>
+        sayAsSecretary(project, { agent: 'sol', text: 'Filed.', links: [dark] }, clock(3000)),
+      ).toThrow(/1 of the person's messages are not read yet.*--reply-to/);
+      expect(() =>
+        sayAsSecretary(project, { agent: 'sol', text: 'Q.', kind: 'consultation' }, clock(3000)),
+      ).toThrow(/--reply-to/);
+      // Naming the turn is never a guess.
+      const said = sayAsSecretary(
+        project,
+        { agent: 'sol', text: 'Filed.', links: [dark], replyTo: first.id },
+        clock(3000),
+      );
+      expect(said.message).toMatchObject({ replyTo: first.id, kind: 'request' });
+      expect(turnsOfItem(project, dark)).toEqual([expect.objectContaining({ id: first.id })]);
+    });
+
+    it('refuse to guess between several read turns not classified yet', () => {
+      post('one', 1000);
+      post('two', 2000);
+      readAsSecretary(project, { agent: 'sol' }, clock(2500));
+
+      expect(() =>
+        sayAsSecretary(project, { agent: 'sol', text: 'x', kind: 'request' }, clock(3000)),
+      ).toThrow(/2 read messages are not classified.*--reply-to/);
+
+      sayAsSecretary(
+        project,
+        { agent: 'sol', text: 'x', kind: 'consultation', replyTo: 1 },
+        clock(3100),
+      );
+      // One turn left unclassified: no doubt which.
+      expect(
+        sayAsSecretary(project, { agent: 'sol', text: 'y', kind: 'request' }, clock(3200)).message
+          .replyTo,
+      ).toBe(2);
+    });
+
+    it('never aim at a topic’s record when the person has said nothing else', () => {
+      const agent = { kind: 'agent' as const, name: 'kiln' };
+      addTopic(
+        project,
+        { question: 'Which license?', actor: { kind: 'human', name: 'human' } },
+        clock(1000),
+      );
+      answerTopic(project, { id: 'TEM-1', summary: 'MIT.', actor: agent }, clock(2000));
+
+      expect(() =>
+        sayAsSecretary(project, { agent: 'sol', text: 'x', kind: 'request' }, clock(3000)),
+      ).toThrow(/no message of the person to classify/);
+
+      // And a real message of the person is the target, whatever the topics came after.
+      const sent = post('add dark mode', 4000);
+      addTopic(
+        project,
+        { question: 'And the font?', actor: { kind: 'human', name: 'human' } },
+        clock(5000),
+      );
+      readAsSecretary(project, { agent: 'sol' }, clock(5500));
+      expect(
+        sayAsSecretary(project, { agent: 'sol', text: 'Filed.', kind: 'request' }, clock(6000))
+          .message.replyTo,
+      ).toBe(sent.id);
     });
 
     it('link an item made from a message (create --from-message), and make the turn a request', () => {

@@ -251,6 +251,11 @@ describe('the conversation from the secretary', () => {
 
     it('make a consultation of a question the secretary answers', async () => {
       const sent = person('why is the lease 15 minutes?');
+      // Unread, it is no sure target: the secretary reads it first.
+      const refused = await otea('say', 'It covers a long build.', '--consultation', '--as', 'sol');
+      expect(refused.code).toBe(8);
+      expect(refused.err).toContain('--reply-to');
+      await otea('conversation', '--as', 'sol');
 
       const said = await otea('say', 'It covers a long build.', '--consultation', '--as', 'sol');
 
@@ -276,6 +281,7 @@ describe('the conversation from the secretary', () => {
 
     it('keep the person’s correction when the secretary says the turn again', async () => {
       const sent = person('what about dark mode?');
+      await otea('conversation', '--as', 'sol');
       await otea('say', 'Filed.', '--request', '--as', 'sol');
       // The person taps "consulta" on the desk.
       inProject((project) =>

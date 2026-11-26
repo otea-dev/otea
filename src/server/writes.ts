@@ -349,6 +349,13 @@ export function clientKeyOf(c: Context): string | undefined {
   return key;
 }
 
+// Whose idempotency keys these are: each paired device has its own, and the desk's browser is one
+// more, so one client's key never answers another's.
+export function keyScopeOf(c: Context): string {
+  const client = clientOf(c);
+  return client.kind === 'device' ? `device:${client.device.id}` : 'desk';
+}
+
 const LinkBody = z.object({ kind: z.string().min(1), other: z.string().min(1) });
 
 // A relation from the item in the path: `kind` as `otea link` takes it, `other` the item it points to.

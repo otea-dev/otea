@@ -32,7 +32,6 @@ import {
   typeOfItem,
 } from '../app/collections.ts';
 import {
-  attachmentPaths,
   conversationText,
   fromMessageLine,
   linkMessageToItem,
@@ -4936,17 +4935,20 @@ const conversation: Command = {
         ...(from === undefined ? {} : { since: from }),
         ...(page === undefined ? {} : { limit: page }),
       });
+      const { paths, problems, ...rest } = read;
       const messages = read.messages.map((message) => ({
         ...message,
-        attachments: message.attachments.map((file) => ({
-          ...file,
-          path: attachmentPaths(project, message).get(file.id),
-        })),
+        attachments: message.attachments.map((file) => {
+          const path = paths.get(file.id);
+          const problem = problems.get(file.id);
+          return {
+            ...file,
+            ...(path === undefined ? {} : { path }),
+            ...(problem === undefined ? {} : { pathProblem: problem }),
+          };
+        }),
       }));
-      return {
-        data: { ...read, messages },
-        text: conversationText(project, actor.name, read),
-      };
+      return { data: { ...rest, messages }, text: conversationText(actor.name, read) };
     });
   },
 };

@@ -177,6 +177,7 @@ import {
   clientKeyOf,
   createRequest,
   HUMAN_IN_UI,
+  keyScopeOf,
   kindRequest,
   linkRequest,
   MAX_CREATE_BYTES,
@@ -931,7 +932,10 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
           const { message, replayed } = postPersonMessage(project, {
             ...request,
             by: HUMAN_IN_UI.actor.name,
-            ...(clientKey === undefined ? {} : { clientKey }),
+            // Each device keeps its own keys; the desk's browser is one more client.
+            ...(clientKey === undefined
+              ? {}
+              : { clientKey: { scope: keyScopeOf(c), key: clientKey } }),
           });
           feed.notify();
           // Sent again (a phone that never heard back): the message the first send made.

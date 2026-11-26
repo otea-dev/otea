@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -23,6 +23,13 @@ import {
   publishPair,
   saveDraft,
 } from './boards.ts';
+import {
+  attachmentToServe,
+  listConversation,
+  postPersonMessage,
+  sayAsSecretary,
+  turnsOfItem,
+} from './conversation.ts';
 import { evidenceFile } from './evidence.ts';
 import { createItem, getItem, listItems, moveItem, showItem, updateItem } from './items.ts';
 import { claimItem, heartbeatItem } from './leases.ts';
@@ -30,6 +37,7 @@ import { liveBoards, nextFor } from './next.ts';
 import { leaveNote } from './notes.ts';
 import type { Project } from './project.ts';
 import { linkItems } from './relations.ts';
+import { declareSecretary } from './secretary.ts';
 import { memoryContext, projectOf } from './testing.ts';
 import { addTopic, answerTopic, convertTopic, linkTopic, requireTopic } from './topics.ts';
 
@@ -307,6 +315,44 @@ describe('deleteBoardForever', () => {
     // What happened on the other board stays in its history, the link to the deleted item too.
     expect(selectEvents(project.db, other)).toHaveLength(otherEvents);
     expect(listArchivedBoards(project)).toEqual([]);
+  });
+
+  it('keeps a file the conversation holds by hash, and lets the conversation go on without the deleted items', () => {
+    declareSecretary(project.db, 'sol', now);
+    const board = criaturas();
+    const id = add('Ciervo');
+    const kept = add('Rosa');
+    const bytes = Buffer.from('one file, two owners');
+    const { message } = postPersonMessage(
+      project,
+      { text: 'a deer and a rose', files: [{ filename: 'deer.txt', bytes }] },
+      now,
+    );
+    sayAsSecretary(
+      project,
+      { agent: 'sol', text: 'Made both.', replyTo: message.id, kind: 'request', links: [id, kept] },
+      now,
+    );
+    // The same bytes are an item's evidence too.
+    const sha = message.attachments[0]?.sha256 ?? '';
+    project.db
+      .prepare(
+        `INSERT INTO evidence (item_id, role, kind, filename, content_type, size, sha256,
+          created_at, actor_kind, actor_name, channel)
+         VALUES (?, 'result', 'log', 'deer.txt', 'text/plain', 1, ?, 't', 'agent', 'kiln', 'cli')`,
+      )
+      .run(id, sha);
+    archiveBoard(project, board, { by: you }, now);
+
+    deleteBoardForever(project, board, { confirm: 'Criaturas' });
+
+    expect(existsSync(evidenceFile(project.dataDir, sha))).toBe(true);
+    expect(
+      readFileSync(attachmentToServe(project, String(message.attachments[0]?.id)).path),
+    ).toEqual(bytes);
+    const turn = listConversation(project).messages;
+    expect(turn.map(({ links }) => links)).toEqual([[], []]);
+    expect(turnsOfItem(project, id)).toEqual([]);
   });
 
   it('deletes items topics point to: their topics lose the link, a converted one opens again', () => {

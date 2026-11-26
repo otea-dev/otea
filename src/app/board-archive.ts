@@ -302,6 +302,8 @@ export function deleteBoardForever(
         db.prepare('DELETE FROM events WHERE item_id = ?').run(item);
         db.prepare('DELETE FROM item_priority WHERE item_id = ?').run(item);
         forgetTopicItem(project, item, at);
+        // The turn that produced it stays in the conversation; it just no longer lists the item.
+        db.prepare('DELETE FROM conversation_links WHERE item_id = ?').run(item);
         db.prepare('DELETE FROM items WHERE id = ?').run(item);
       }
       deleteDraft(db, board.id);
@@ -311,10 +313,13 @@ export function deleteBoardForever(
     }
     return { deleted: boards.map((board) => board.id) };
   });
-  // A file stays while any other item's evidence names it; one left over is harmless, so a file
-  // that cannot be removed now is not an error.
+  // A file stays while any other item's evidence or any conversation attachment names it (both
+  // keep files by hash); one left over is harmless, so a file that cannot be removed now is not an
+  // error.
   for (const sha of files) {
     if (db.prepare('SELECT 1 FROM evidence WHERE sha256 = ? LIMIT 1').get(sha)) continue;
+    if (db.prepare('SELECT 1 FROM conversation_attachments WHERE sha256 = ? LIMIT 1').get(sha))
+      continue;
     rmSync(evidenceFile(project.dataDir, sha), { force: true });
   }
   syncBoardPresets(project);

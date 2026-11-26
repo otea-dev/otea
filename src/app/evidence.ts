@@ -19,6 +19,7 @@ import {
   evidenceTypeOf,
   MAX_EVIDENCE_BYTES,
   MAX_EVIDENCE_MB,
+  safeFileName,
 } from '../core/evidence.ts';
 import type { Actor } from '../core/item.ts';
 import type { Layout } from '../core/modules.ts';
@@ -78,7 +79,7 @@ export function namedReadPath(
 ): string | undefined {
   const stored = evidenceFile(dataDir, evidence.sha256);
   if (!existsSync(stored)) return undefined;
-  const name = basename(evidence.filename).replace(/[<>:"/\\|?*]/g, '_') || 'file';
+  const name = safeFileName(basename(evidence.filename.replaceAll('\\', '/')));
   const named = join(dataDir, 'files', folder, name);
   if (existsSync(named)) return named;
   mkdirSync(dirname(named), { recursive: true });

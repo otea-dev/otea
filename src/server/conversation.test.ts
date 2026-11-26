@@ -175,6 +175,28 @@ describe('the conversation over the API', () => {
     expect((await listed()).messages).toHaveLength(1);
   });
 
+  it('refuses the key of another message with a conflict, and keeps each device’s keys apart', async () => {
+    const headers = { 'idempotency-key': 'phone-1' };
+    await call('/conversation/messages', { method: 'POST', body: { text: 'hi' }, headers });
+
+    const other = await call('/conversation/messages', {
+      method: 'POST',
+      body: { text: 'another thing' },
+      headers,
+    });
+    expect(other.status).toBe(409);
+    expect(await other.text()).toContain('already sent another message');
+
+    // The phone sends its own message under the same key: not the desk's.
+    const phone = await call(
+      '/conversation/messages',
+      { method: 'POST', body: { text: 'another thing' }, headers },
+      'phone',
+    );
+    expect(phone.status).toBe(201);
+    expect((await listed()).messages.map(({ text }) => text)).toEqual(['hi', 'another thing']);
+  });
+
   describe('an agent can never post as the person', () => {
     const attempt = (init: Init) =>
       Promise.resolve(

@@ -22,11 +22,11 @@ import {
   insertLink,
   insertMessage,
   latestOfTopic,
-  latestPersonMessage,
   markRead,
   messageOfClientKey,
   type NewFile,
   type Page,
+  selectDefaultTurn,
   selectMessage,
   selectMessages,
   selectPending,
@@ -72,11 +72,23 @@ function checkedText(text: string, files: readonly MessageFileInput[]): string {
   return trimmed;
 }
 
+// The most a name to show keeps; longer is cut, its extension kept.
+const MAX_NAME = 200;
+
+function cutName(name: string): string {
+  const dot = name.lastIndexOf('.');
+  const extension = dot > 0 && name.length - dot <= 16 ? name.slice(dot) : '';
+  return `${name.slice(0, MAX_NAME - extension.length - 1)}…${extension}`;
+}
+
 function checkedFiles(files: readonly MessageFileInput[]): MessageFileInput[] {
   if (files.length > MAX_MESSAGE_FILES) invalid(`Send at most ${MAX_MESSAGE_FILES} files`);
   return files.map(({ filename, bytes }) => {
-    const name = basename(filename.replaceAll('\\', '/'));
-    if (name === '' || name === '.' || name === '..') invalid('Each file needs a name');
+    // The name to show: as it came, its folder dropped, a lone space or a very long one made fit.
+    // The path an agent opens is made safe apart from it (core/evidence.ts safeFileName).
+    const shown = basename(filename.replaceAll('\\', '/')).trim();
+    if (shown === '.' || shown === '..') invalid('Each file needs a name');
+    const name = shown === '' ? 'file' : shown.length > MAX_NAME ? cutName(shown) : shown;
     if (bytes.length > MAX_EVIDENCE_BYTES) {
       throw new OteaError(
         'evidence_too_large',
@@ -127,7 +139,9 @@ export type PostInput = {
   // The message it answers or follows up.
   replyTo?: number;
   // A phone that sends again what it never heard back about gets the first message, not a second.
-  clientKey?: string;
+  // The key counts per `scope` (the device, or the desk's session); the same key with another
+  // message is refused, not answered with the first.
+  clientKey?: { scope: string; key: string };
   // The person's name as the desk shows it.
   by?: string;
 };
@@ -141,10 +155,36 @@ export function postPersonMessage(
 ): { message: Message; replayed: boolean } {
   const files = checkedFiles(input.files ?? []);
   const text = checkedText(input.text, files);
-  if (input.clientKey !== undefined) {
-    const sent = messageOfClientKey(project.db, input.clientKey);
-    const message = sent === undefined ? undefined : selectMessage(project.db, sent);
-    if (message) return { message, replayed: true };
+  const client =
+    input.clientKey === undefined
+      ? undefined
+      : {
+          ...input.clientKey,
+          digest: createHash('sha256')
+            .update(
+              JSON.stringify([
+                text,
+                input.replyTo ?? null,
+                files.map(({ filename, bytes }) => [
+                  filename,
+                  createHash('sha256').update(bytes).digest('hex'),
+                ]),
+              ]),
+            )
+            .digest('hex'),
+        };
+  if (client !== undefined) {
+    const sent = messageOfClientKey(project.db, client.scope, client.key);
+    if (sent !== undefined) {
+      if (sent.digest !== client.digest) {
+        throw new OteaError(
+          'already_exists',
+          'This Idempotency-Key already sent another message: send this one under a new key',
+        );
+      }
+      const message = selectMessage(project.db, sent.id);
+      if (message) return { message, replayed: true };
+    }
   }
   if (input.replyTo !== undefined) requireMessage(project, input.replyTo);
   const at = now();
@@ -155,7 +195,7 @@ export function postPersonMessage(
       text,
       at,
       ...(input.replyTo === undefined ? {} : { replyTo: input.replyTo }),
-      ...(input.clientKey === undefined ? {} : { clientKey: input.clientKey }),
+      client,
     });
     keepFiles(project, made, files);
     return made;
@@ -201,13 +241,25 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
   const files = checkedFiles(input.files ?? []);
   const text = checkedText(input.text, files);
   const links = [...new Set((input.links ?? []).map((id) => id.trim()).filter((id) => id !== ''))];
-  // Classifying or linking is about a turn of the person's: the latest one unless it says which.
+  // Classifying or linking is about a turn of the person's. Without --reply-to it is the latest
+  // message already read, and only when that is no guess: another message not read yet, or another
+  // read turn not classified, and the secretary says which (a reply to the wrong turn would tie the
+  // items to it).
   const classifies = input.kind !== undefined || links.length > 0;
-  const replyTo = input.replyTo ?? (classifies ? latestPersonMessage(project.db) : undefined);
+  let replyTo = input.replyTo;
   if (classifies && replyTo === undefined) {
-    invalid(
-      'There is no message of the person to classify or link: say it with no --request, --consultation or --links',
-    );
+    const { latest, unread, otherUnclassified } = selectDefaultTurn(project.db);
+    if (unread > 0 || otherUnclassified > 0) {
+      invalid(
+        `Which message does this classify or link? ${unread > 0 ? `${unread} of the person's messages are not read yet` : `${otherUnclassified + 1} read messages are not classified`}: say it with --reply-to <id> (otea conversation shows the numbers)`,
+      );
+    }
+    if (latest === undefined) {
+      invalid(
+        'There is no message of the person to classify or link: say it with no --request, --consultation or --links',
+      );
+    }
+    replyTo = latest;
   }
   if (replyTo !== undefined) requireMessage(project, replyTo);
   for (const id of links) requireItem(project.db, id);
@@ -313,6 +365,10 @@ export type Read = {
   // The person's messages this look marked as read.
   fresh: number[];
   more: boolean;
+  // The path each attachment can be opened at, and why one has none: worked out before anything is
+  // marked read, so a file that cannot be made available never costs the secretary its message.
+  paths: Map<number, string>;
+  problems: Map<number, string>;
 };
 
 // The secretary reads the conversation, which marks the person's messages it returns as read. Without
@@ -345,6 +401,8 @@ export function readAsSecretary(
         more = after.more;
       }
     }
+    // The files first: the messages are marked read only once they are in hand.
+    const { paths, problems } = openablePaths(project, messages);
     const fresh = markRead(
       project.db,
       messages
@@ -356,7 +414,7 @@ export function readAsSecretary(
     const read = messages.map((message) =>
       marked.has(message.id) ? { ...message, delivery: 'read' as const, readAt: now() } : message,
     );
-    return { messages: read, fresh, more };
+    return { messages: read, fresh, more, paths, problems };
   });
 }
 
@@ -370,9 +428,10 @@ function sizeText(bytes: number): string {
 // The messages as the secretary reads them: plain text, each with its number, who wrote it and
 // when, the kind and the items of its turn, and each file with a path it can open.
 export function messagesText(
-  project: Project,
   messages: readonly Message[],
   fresh: ReadonlySet<number>,
+  paths: ReadonlyMap<number, string>,
+  problems: ReadonlyMap<number, string>,
 ): string {
   return messages
     .map((message) => {
@@ -387,10 +446,12 @@ export function messagesText(
               `${message.kind}${message.links.length === 0 ? '' : ` -> ${message.links.join(', ')}`}`,
             ]),
       ];
-      const paths = attachmentPaths(project, message);
       const files = message.attachments.map((file) => {
         const path = paths.get(file.id);
-        return `  attached: ${file.name} (${file.kind}, ${sizeText(file.size)})${path === undefined ? '' : `: ${path}`}`;
+        const problem = problems.get(file.id);
+        const where =
+          path === undefined ? ` (no path: ${problem ?? 'not available'})` : `: ${path}`;
+        return `  attached: ${file.name} (${file.kind}, ${sizeText(file.size)})${where}`;
       });
       return [
         `[${message.id}] ${heads.join(', ')}`,
@@ -402,7 +463,7 @@ export function messagesText(
 }
 
 // What `otea conversation` prints: what is new, the talk before it, and how to answer.
-export function conversationText(project: Project, agent: string, read: Read): string {
+export function conversationText(agent: string, read: Read): string {
   const fresh = new Set(read.fresh);
   const last = read.messages.at(-1);
   const heading =
@@ -419,7 +480,14 @@ export function conversationText(project: Project, agent: string, read: Read): s
         ];
   return [
     heading,
-    ...(read.messages.length === 0 ? [] : [messagesText(project, read.messages, fresh)]),
+    ...(read.messages.length === 0
+      ? []
+      : [messagesText(read.messages, fresh, read.paths, read.problems)]),
+    ...(read.problems.size === 0
+      ? []
+      : [
+          `${read.problems.size} file(s) could not be made available at a path; they are still on the desk, and the person can send them again.`,
+        ]),
     ...more,
     ...answer,
   ].join('\n');
@@ -531,14 +599,31 @@ export function attachmentToServe(
 
 // A path an agent can open for each attachment of a message: the stored file under the name it came
 // with, in files/m<its number>/.
-export function attachmentPaths(project: Project, message: Message): Map<number, string> {
+// A file that cannot be made available (the stored copy is gone, the disk refuses) is a problem noted
+// for it, never an error that stops the rest.
+export function openablePaths(
+  project: Project,
+  messages: readonly Message[],
+): { paths: Map<number, string>; problems: Map<number, string> } {
   const paths = new Map<number, string>();
-  for (const file of message.attachments) {
-    const path = namedReadPath(project.dataDir, `m${file.id}`, {
-      sha256: file.sha256,
-      filename: file.name,
-    });
-    if (path !== undefined) paths.set(file.id, path);
+  const problems = new Map<number, string>();
+  for (const message of messages) {
+    for (const file of message.attachments) {
+      try {
+        const path = namedReadPath(project.dataDir, `m${file.id}`, {
+          sha256: file.sha256,
+          filename: file.name,
+        });
+        if (path === undefined) problems.set(file.id, 'the stored file is missing');
+        else paths.set(file.id, path);
+      } catch (error) {
+        problems.set(file.id, error instanceof Error ? error.message : String(error));
+      }
+    }
   }
-  return paths;
+  return { paths, problems };
+}
+
+export function attachmentPaths(project: Project, message: Message): Map<number, string> {
+  return openablePaths(project, [message]).paths;
 }
