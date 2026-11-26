@@ -189,4 +189,42 @@ describe('noticeText', () => {
     expect(long.body.length).toBeLessThanOrEqual(100);
     expect(long.body.endsWith('…')).toBe(true);
   });
+
+  describe('a question on a Bandeja note', () => {
+    const ask: Notice = {
+      kind: 'ask',
+      item: 'B-3',
+      title: 'El botón Aprobar queda tapado',
+      by: 'lia',
+      text: '¿Solo Aprobar o todas?',
+      options: ['Solo Aprobar', 'Todas'],
+    };
+
+    it('says it with its options, and opens Hablar at the note, not an item', () => {
+      expect(noticeText(ask, 'es')).toEqual({
+        title: 'lia te pregunta · B-3',
+        body: '¿Solo Aprobar o todas?\n1) Solo Aprobar  2) Todas',
+        tag: 'otea-bandeja-B-3',
+        url: '/#/hablar/B-3',
+        item: null,
+      });
+      expect(noticeText(ask, 'en').title).toBe('lia asks you · B-3');
+    });
+
+    it('names the note and not the question when the person hid the text', () => {
+      const {
+        text: _text,
+        options: _options,
+        ...hidden
+      } = ask as Notice & {
+        text?: string;
+        options?: string[];
+      };
+      expect(noticeText(hidden as Notice, 'es')).toMatchObject({
+        title: 'lia te pregunta',
+        body: 'B-3 · El botón Aprobar queda tapado',
+        url: '/#/hablar/B-3',
+      });
+    });
+  });
 });

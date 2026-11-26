@@ -1,5 +1,5 @@
 import { type ClipboardEvent, type FormEvent, useEffect, useRef, useState } from 'react';
-import { postCapture } from '../api.ts';
+import { postCapture, Unheard } from '../api.ts';
 import { useApp } from '../app/context.tsx';
 import { t } from '../i18n/i18n.ts';
 import {
@@ -11,6 +11,9 @@ import {
   withFiles,
 } from '../intake-files.ts';
 import { Icon } from '../kit/index.ts';
+import { clearNoteDraft, keepNoteDraft, readNoteDraft } from '../note-draft.ts';
+import { QUEUE_MAX_MB } from '../offline/capture-queue.ts';
+import { enqueue, type Queued, queueAvailable } from '../offline/queue-store.ts';
 import { Thumb } from './IntakeFiles.tsx';
 
 // The quick capture, free text (Nuevo ítem, «Nota rápida»): what you want written down, and files
@@ -34,13 +37,15 @@ export function NoteCapture({
   autoFocus = false,
   hint,
 }: {
-  // It landed in the Bandeja.
-  onSent: () => void;
+  // It landed in the Bandeja, or waits on this device for the PC to answer (queued).
+  onSent: (how: 'sent' | 'queued') => void;
   autoFocus?: boolean;
   hint?: string | undefined;
 }) {
   const app = useApp();
-  const [text, setText] = useState('');
+  const project = app.project?.id;
+  // The words a send that failed left behind come back, a reload too.
+  const [text, setText] = useState(() => readNoteDraft(project) ?? '');
   const [drafts, setDrafts] = useState<FileDraft[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,12 +55,14 @@ export function NoteCapture({
   // under it; any change makes a new send.
   const attempt = useRef<{ sig: string; key: string } | null>(null);
   const alive = useRef(true);
-  useEffect(
-    () => () => {
+  // Set on every mount: StrictMode runs the effect, its cleanup and the effect again, and the ref
+  // must say the page is alive after that.
+  useEffect(() => {
+    alive.current = true;
+    return () => {
       alive.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
   useEffect(() => {
     if (autoFocus) field.current?.focus({ preventScroll: true });
   }, [autoFocus]);
@@ -70,7 +77,7 @@ export function NoteCapture({
     setDrafts((was) => withFiles(was, files, 'single', draftKey));
   };
 
-  const send = (event?: FormEvent) => {
+  const send = async (event?: FormEvent) => {
     event?.preventDefault();
     if (!ready) return;
     const sig = JSON.stringify([
@@ -79,23 +86,67 @@ export function NoteCapture({
     ]);
     if (attempt.current?.sig !== sig) attempt.current = { sig, key: newKey() };
     const { key } = attempt.current;
+    const files = drafts.map(({ file }) => file);
     setBusy(true);
     setError(null);
-    postCapture({ text: words, files: drafts.map(({ file }) => file) }, key).then(
-      () => {
-        attempt.current = null;
-        if (!alive.current) return;
-        setText('');
-        setDrafts([]);
-        setBusy(false);
-        onSent();
-      },
-      (failure: unknown) => {
-        if (!alive.current) return;
-        setBusy(false);
-        setError(failure instanceof Error ? failure.message : String(failure));
-      },
-    );
+    // It is over: the box is empty, and the words kept for a failed send are no longer needed.
+    const done = (how: 'sent' | 'queued') => {
+      attempt.current = null;
+      clearNoteDraft(project);
+      if (!alive.current) return;
+      setText('');
+      setDrafts([]);
+      setBusy(false);
+      onSent(how);
+    };
+    // What goes wrong is said here, with the words kept (and on the phone for a reload): never a
+    // button left busy with no word.
+    const fail = (message: string) => {
+      keepNoteDraft(project, words);
+      if (!alive.current) return;
+      setBusy(false);
+      setError(message);
+    };
+    // The PC does not answer: the note waits on the phone, files included, and goes when it does.
+    const keep = async () => {
+      let kept: Queued;
+      try {
+        kept = await enqueue({
+          id: key,
+          at: Date.now(),
+          ...(project ? { project } : {}),
+          board: '',
+          type: '',
+          fields: {},
+          note: {
+            text: words,
+            files: await Promise.all(
+              files.map(async (file) => ({
+                name: file.name,
+                type: file.type,
+                bytes: await file.arrayBuffer(),
+              })),
+            ),
+          },
+        });
+      } catch {
+        return fail(t('phone.capture.unreadable'));
+      }
+      if (!kept.ok) {
+        return fail(
+          kept.reason === 'full' ? t('offline.full', { mb: QUEUE_MAX_MB }) : t('offline.storage'),
+        );
+      }
+      done('queued');
+    };
+    try {
+      if (app.sync.offline && queueAvailable()) return await keep();
+      await postCapture({ text: words, files }, key);
+      done('sent');
+    } catch (failure) {
+      if (failure instanceof Unheard && queueAvailable()) return keep();
+      fail(failure instanceof Error ? failure.message : String(failure));
+    }
   };
 
   const onPaste = (event: ClipboardEvent<HTMLFormElement>) => {
@@ -177,7 +228,9 @@ export function NoteCapture({
           {t('hablar.readOnly')}
         </p>
       ) : (
-        <p className="bn-hint">{t('bandeja.lands')}</p>
+        <p className="bn-hint">
+          {app.sync.offline && queueAvailable() ? t('bandeja.queues') : t('bandeja.lands')}
+        </p>
       )}
     </form>
   );

@@ -1,5 +1,6 @@
 import { createECDH, randomBytes } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { answerBandeja, askOnBandeja, captureToBandeja, takeBandeja } from '../app/bandeja.ts';
 import { addCollection } from '../app/collections.ts';
 import { postPersonMessage, readAsSecretary, sayAsSecretary } from '../app/conversation.ts';
 import { createItem, moveItem } from '../app/items.ts';
@@ -502,6 +503,90 @@ describe('notifications on the server', () => {
           payload: expect.objectContaining({ title: 'memory · claude lo dejó para después' }),
         }),
       ]);
+    });
+
+    describe('a question on a Bandeja note', () => {
+      const stamp = () => new Date(clock).toISOString();
+      const ask = () => {
+        const { entry } = captureToBandeja(
+          project,
+          { text: 'El botón Aprobar queda tapado en el celu' },
+          stamp,
+        );
+        takeBandeja(project, { id: entry.id, agent: 'lia' }, stamp);
+        askOnBandeja(
+          project,
+          {
+            id: entry.id,
+            agent: 'lia',
+            text: '¿Solo Aprobar o todas las acciones fijas?',
+            options: ['Solo Aprobar', 'Todas'],
+          },
+          stamp,
+        );
+        return entry.id;
+      };
+
+      it('tells the person like an item’s question, with its options, and opens Hablar at the note', async () => {
+        await pass(1000);
+        ask();
+        await pass(1000);
+        await pass(GATHER_MS);
+        expect(sent).toEqual([
+          {
+            subscription: expect.objectContaining({ endpoint: endpoint() }),
+            payload: {
+              title: 'memory · lia te pregunta · B-1',
+              body: '¿Solo Aprobar o todas las acciones fijas?\n1) Solo Aprobar  2) Todas',
+              tag: 'otea-bandeja-B-1',
+              url: '/p/memory-aaaaaa/#/hablar/B-1',
+              item: null,
+            },
+          },
+        ]);
+        // Told once; answered, it is gone and nothing more is said.
+        await pass(ITEM_COOLDOWN_MS * 2);
+        await pass(GATHER_MS);
+        expect(sent).toHaveLength(1);
+      });
+
+      it('respects the phone’s ask switch, and keeps the question out when the person hid the text', async () => {
+        const { cookie } = await pair();
+        await subscribe(cookie, 2);
+        await choose(cookie, { ask: false });
+        const second = await pair();
+        await subscribe(second.cookie, 3);
+        await choose(second.cookie, { askText: false });
+        await pass(1000);
+        ask();
+        await pass(1000);
+        await pass(GATHER_MS);
+
+        const by = (n: number) =>
+          sent.find(({ subscription }) => subscription.endpoint === endpoint(n));
+        expect(by(2)).toBeUndefined();
+        expect(by(1)?.payload.title).toBe('memory · lia te pregunta · B-1');
+        expect(by(3)?.payload).toMatchObject({
+          title: 'memory · lia te pregunta',
+          url: '/p/memory-aaaaaa/#/hablar/B-1',
+        });
+        expect(JSON.stringify(by(3)?.payload)).not.toContain('Solo Aprobar');
+      });
+
+      it('tells nothing for a note that is only waiting, or already answered', async () => {
+        await pass(1000);
+        const id = ask();
+        await pass(1000);
+        await pass(GATHER_MS);
+        sent.length = 0;
+        answerBandeja(project, { id, option: 1 }, stamp);
+        await pass(1000);
+        await pass(GATHER_MS);
+        captureToBandeja(project, { text: 'another one' }, stamp);
+        await pass(1000);
+        await pass(GATHER_MS);
+        expect(sent).toEqual([]);
+      });
     });
 
     describe('the secretary', () => {

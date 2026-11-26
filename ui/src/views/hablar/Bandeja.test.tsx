@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type App, AppTestProvider } from '../../app/context.tsx';
 import type { BandejaEntry } from '../../bandeja.ts';
@@ -7,8 +8,9 @@ import { ago, item, NOW } from '../../derive/fixtures.ts';
 import { setLanguage } from '../../i18n/i18n.ts';
 import { testApp } from '../../shell/test-app.ts';
 import { type Mounted, mount, press, settle, typeInto } from '../../test-dom.tsx';
-import { Bandeja } from './Bandeja.tsx';
+import { Bandeja, useBandeja } from './Bandeja.tsx';
 import { FromBandeja } from './FromBandeja.tsx';
+import { HablarView } from './HablarView.tsx';
 
 // The Bandeja as a person meets it: the quick note (text and files, no board form) that lands in
 // it, and the list beside «Lo que salió» with each note's state, a question answered with a tap,
@@ -33,6 +35,12 @@ function entry(o: Partial<BandejaEntry> & { id: number }): BandejaEntry {
   };
 }
 
+// The Bandeja as Hablar draws it: its notes read by the page that holds it.
+function Live({ lit }: { lit?: string }) {
+  const notes = useBandeja();
+  return <Bandeja {...notes} lit={lit} />;
+}
+
 type Call = { method: string; path: string; headers: Record<string, string>; body: unknown };
 
 // The server as the page reaches it: the entries it reads, and every write with its headers.
@@ -50,6 +58,14 @@ function server(entries: BandejaEntry[], o: { failures?: number } = {}) {
       });
     const path = new URL(url, 'http://127.0.0.1').pathname;
     if (method === 'GET') {
+      if (path.endsWith('/conversation')) {
+        return json({
+          messages: [],
+          more: false,
+          secretary: null,
+          waiting: { count: 0, since: null },
+        });
+      }
       return path.endsWith('/bandeja')
         ? json({ entries })
         : json({ error: { code: 'not_found' } }, 404);
@@ -160,6 +176,29 @@ describe('the quick note', () => {
     expect(calls[1]?.headers['idempotency-key']).toBe(calls[0]?.headers['idempotency-key']);
   });
 
+  it('still finishes a send under StrictMode, which mounts, unmounts and mounts it again', async () => {
+    const calls = server([]);
+    const sent = vi.fn();
+    // StrictMode at the root, as main.tsx has it: React replays a mounted effect only from there.
+    page = mount(
+      <StrictMode>
+        <AppTestProvider value={testApp({ now: NOW })}>
+          <NoteCapture onSent={sent} />
+        </AppTestProvider>
+      </StrictMode>,
+    );
+    await settle();
+    const root = page.root;
+    await typeInto(q(root, '.bn-text'), 'una idea');
+
+    await press(q(root, '.bn-save'));
+
+    expect(calls).toHaveLength(1);
+    expect(sent).toHaveBeenCalledWith('sent');
+    expect(q<HTMLTextAreaElement>(root, '.bn-text')?.value).toBe('');
+    expect(q<HTMLButtonElement>(root, '.bn-save')?.getAttribute('aria-busy')).not.toBe('true');
+  });
+
   it('does not write for a browser that may only read', async () => {
     const calls = server([]);
     const root = await show(<NoteCapture onSent={() => undefined} />, {
@@ -195,7 +234,7 @@ describe('the Bandeja beside what came out', () => {
   it('shows each note with its state: waiting, being refined, asking you, filed with a link to the item', async () => {
     server(list);
     const openItem = vi.fn();
-    const root = await show(<Bandeja />, { openItem, all: [item({ id: 'CAM-12' })] });
+    const root = await show(<Live />, { openItem, all: [item({ id: 'CAM-12' })] });
 
     const rows = all(root, '.bn-row');
     // What asks you comes first.
@@ -216,7 +255,7 @@ describe('the Bandeja beside what came out', () => {
 
   it('answers a question on a note with one tap on its option, and says what you answered', async () => {
     const calls = server(list);
-    const root = await show(<Bandeja />);
+    const root = await show(<Live />);
 
     const options = all(root, '.bn-row[data-state="asking"] .hb-opt');
     expect(options.map((option) => text(option))).toEqual(['Más rápido', 'Más lindorecomendada']);
@@ -236,7 +275,7 @@ describe('the Bandeja beside what came out', () => {
 
   it('leaves the decision to the refiner, or takes your own words', async () => {
     const calls = server(list);
-    const root = await show(<Bandeja />);
+    const root = await show(<Live />);
 
     await press(all(root, '.bn-row[data-state="asking"] .hb-foot button')[1]);
 
@@ -245,9 +284,37 @@ describe('the Bandeja beside what came out', () => {
 
   it('is not there while the Bandeja is empty', async () => {
     server([]);
-    const root = await show(<Bandeja />);
+    const root = await show(<Live />);
 
     expect(q(root, '.bn-box')).toBeNull();
+  });
+});
+
+describe('Hablar with the Bandeja', () => {
+  const asking = entry({
+    id: 3,
+    state: 'asking',
+    text: 'make it better',
+    asking: { question: 1, by: 'lia', at: ago(3), text: '¿Mejor en qué?', options: ['a', 'b'] },
+  });
+
+  it('counts the notes that wait for your answer in the tab of what came out', async () => {
+    server([entry({ id: 1 }), asking, entry({ id: 4, state: 'filed', item: 'CAM-1' })]);
+    const root = await show(<HablarView />);
+
+    const tabs = all(root, '[role=tab]').map((tab) => text(tab));
+    // Nothing came out of the conversation yet; one note asks you. Waiting and filed notes do not
+    // call for you.
+    expect(tabs).toEqual(['Conversación', 'Lo que salió · 1']);
+  });
+
+  it('opens at a note a notice linked to: the tab that holds it shows, and the note lights', async () => {
+    server([entry({ id: 1 }), asking]);
+    const root = await show(<HablarView bandeja="B-3" />);
+
+    expect(q(root, '.hb')?.getAttribute('data-tab')).toBe('out');
+    expect(q(root, '#bn-B-3')?.hasAttribute('data-lit')).toBe(true);
+    expect(q(root, '#bn-B-1')?.hasAttribute('data-lit')).toBe(false);
   });
 });
 

@@ -13,7 +13,7 @@ export type ViewRoute =
   | { view: 'settings' }
   | { view: 'performance' }
   | { view: 'preferences' }
-  | { view: 'hablar'; turn?: number; topic?: string }
+  | { view: 'hablar'; turn?: number; topic?: string; bandeja?: string }
   | { view: 'lan'; over?: 'settings' }
   | { view: 'studio'; page: StudioPage }
   | { view: 'modules'; name?: string }
@@ -52,9 +52,10 @@ export const PERFORMANCE_HASH = `#${PERFORMANCE}`;
 export const PREFERENCES_HASH = `#${PREFERENCES}`;
 
 // Hablar: the conversation with the project's secretary, open at a turn (the number of the message
-// that began it) or at the consultation a side topic became (TEM-3).
-export function hablarHash(at: { turn?: number; topic?: string } = {}): string {
+// that began it), at the consultation a side topic became (TEM-3) or at a Bandeja note (B-3).
+export function hablarHash(at: { turn?: number; topic?: string; bandeja?: string } = {}): string {
   if (at.turn !== undefined) return `#${HABLAR}/${at.turn}`;
+  if (at.bandeja) return `#${HABLAR}/${encodeURIComponent(at.bandeja)}`;
   return at.topic ? `#${HABLAR}/${encodeURIComponent(at.topic)}` : `#${HABLAR}`;
 }
 
@@ -109,8 +110,10 @@ export function routeFromHash(hash: string): Route {
   if (path === HABLAR || path.startsWith(`${HABLAR}/`)) {
     const at = decode(path.slice(HABLAR.length + 1));
     if (!at) return { view: 'hablar' };
-    return /^[1-9]\d*$/.test(at)
-      ? { view: 'hablar', turn: Number(at) }
+    if (/^[1-9]\d*$/.test(at)) return { view: 'hablar', turn: Number(at) };
+    // B-3 is a Bandeja note (core/bandeja.ts); the prefix is reserved, so it is no topic's.
+    return /^b-[1-9]\d*$/i.test(at)
+      ? { view: 'hablar', bandeja: at.toUpperCase() }
       : { view: 'hablar', topic: at };
   }
   if (path === ATASCO || path.startsWith(`${ATASCO}/`)) {

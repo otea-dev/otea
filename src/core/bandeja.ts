@@ -60,7 +60,11 @@ export type BandejaEntry = {
   filedAt: string | null;
 };
 
-export const bandejaRef = (id: number): string => `B-${id}`;
+// The id prefix of an entry. No board may have it (prefixFor in core/item.ts refuses), so B-3 is
+// never an item.
+export const BANDEJA_PREFIX = 'B';
+
+export const bandejaRef = (id: number): string => `${BANDEJA_PREFIX}-${id}`;
 
 // An entry as a person or an agent writes it: 3, #3, b3 or B-3.
 export function bandejaIdOf(text: string): number {
@@ -74,8 +78,8 @@ export function bandejaIdOf(text: string): number {
   return id;
 }
 
-// Whether a name given for an item or an entry is a Bandeja entry: B-3 (an item's id has a board
-// prefix and a number, and no board is called B).
+// Whether a name given for an item or an entry is a Bandeja entry: B-3. An item's id is a board's
+// prefix and a number, and the prefix B is reserved, so the two never meet.
 export function isBandejaRef(text: string): boolean {
   return /^b-\d+$/i.test(text.trim());
 }

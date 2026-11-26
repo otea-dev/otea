@@ -1,7 +1,7 @@
 import { PHONE_QUERY } from '../hooks.ts';
 import { t } from '../i18n/i18n.ts';
 import { toast } from '../kit/pop/toast.tsx';
-import type { Flushed } from './capture-queue.ts';
+import { type Flushed, titleOf } from './capture-queue.ts';
 
 // The quiet notes of the installed app: a new version took over, and the queue went out.
 
@@ -28,13 +28,13 @@ export function announceFlushed(out: Flushed): void {
   if (first) {
     const msg =
       out.made.length === 1
-        ? t('offline.sentOne', { title: first.capture.fields.title ?? '', id: first.item })
+        ? t('offline.sentOne', { title: titleOf(first.capture), id: first.item })
         : t('offline.sentMany', { n: out.made.length });
     setTimeout(() => toast({ msg, ...at() }), 0);
   }
   const [refused] = out.refused;
   if (refused) {
-    const msg = t('offline.refused', { title: refused.fields.title ?? '' });
+    const msg = t('offline.refused', { title: titleOf(refused) });
     setTimeout(() => toast({ msg, ...at() }), out.made.length > 0 ? 2500 : 0);
   }
 }

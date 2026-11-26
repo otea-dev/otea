@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { correctTurn } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
+import { askingCount } from '../../bandeja.ts';
 import { CopyCommand } from '../../components/CopyCommand.tsx';
 import {
   awayOf,
@@ -20,6 +21,7 @@ import { F, lerp } from '../../motion/curves.ts';
 import { drive } from '../../motion/drive.ts';
 import { reduced } from '../../motion/reduced.ts';
 import type { Item } from '../../types.ts';
+import { useBandeja } from './Bandeja.tsx';
 import { Composer } from './Composer.tsx';
 import { SecretaryMark } from './SecretaryMark.tsx';
 import { Side } from './Side.tsx';
@@ -76,13 +78,20 @@ function NoSecretary() {
 export function HablarView({
   turn,
   topic,
+  bandeja,
 }: {
   turn?: number | undefined;
   topic?: string | undefined;
+  // A Bandeja note to open at (B-3): the column or the tab shows, and the note lights.
+  bandeja?: string | undefined;
 }) {
   const app = useApp();
   const convo = useConversation();
-  const [tab, setTab] = useState<'chat' | 'out'>('chat');
+  const notes = useBandeja();
+  // What needs you in the Bandeja counts beside what came out: a question waits for your tap.
+  const asking = askingCount(notes.entries ?? []);
+  const [tab, setTab] = useState<'chat' | 'out'>(bandeja === undefined ? 'chat' : 'out');
+  const [litNote, setLitNote] = useState<string | undefined>();
   const [filter, setFilter] = useState<Filter>('all');
   const [found, setFound] = useState<number | undefined>();
   const [target, setTarget] = useState<{ root: number; n: number } | undefined>();
@@ -102,6 +111,26 @@ export function HablarView({
   );
   const counts = useMemo(() => cardCounts(turns, items, app.now), [turns, items, app.now]);
   const away = awayOf(secretary);
+
+  // A link to a Bandeja note (a notice): the tab that holds it shows, the note scrolls into view and
+  // lights for a moment, once its entries are read.
+  const noteAsked = useRef<string | undefined>(undefined);
+  const notesReady = notes.entries !== undefined;
+  useEffect(() => {
+    if (bandeja === undefined) noteAsked.current = undefined;
+    if (!notesReady || bandeja === undefined || noteAsked.current === bandeja) return;
+    noteAsked.current = bandeja;
+    setTab('out');
+    setLitNote(bandeja);
+    const frame = requestAnimationFrame(() =>
+      document.getElementById(`bn-${bandeja}`)?.scrollIntoView({ block: 'center' }),
+    );
+    const timer = setTimeout(() => setLitNote(undefined), 2400);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
+  }, [bandeja, notesReady]);
 
   // Goes to a turn: the conversation shows, scrolls there and the turn lights for a moment.
   const goTo = useCallback((root: number) => {
@@ -257,7 +286,7 @@ export function HablarView({
             aria-selected={tab === 'out'}
             onClick={() => setTab('out')}
           >
-            {t('hablar.out.count', { count: counts.all })}
+            {t('hablar.out.count', { count: counts.all + asking })}
           </button>
         </div>
         {none ? <NoSecretary /> : null}
@@ -330,6 +359,7 @@ export function HablarView({
           onFilter={setFilter}
           onGo={goTo}
           now={app.now}
+          bandeja={{ ...notes, lit: litNote }}
         />
       </aside>
     </div>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bandejaSignalsOf,
   freshSignals,
   type NotifyFacts,
   SECRETARY_WAIT_MS,
@@ -229,5 +230,37 @@ describe('freshSignals', () => {
   it('keeps what was not there the last time', () => {
     expect(freshSignals(new Set(), yours)).toEqual(yours);
     expect(freshSignals(new Set(yours.map(({ key }) => key)), yours)).toEqual([]);
+  });
+});
+
+describe('bandejaSignalsOf', () => {
+  const ask = {
+    ref: 'B-3',
+    snippet: 'El botón Aprobar queda tapado',
+    question: 1,
+    by: 'lia',
+    text: '¿Solo Aprobar o todas?',
+    options: ['Solo Aprobar', 'Todas'],
+  };
+
+  it('tells each unanswered question as an ask, under a key of its own that changes with the question', () => {
+    expect(bandejaSignalsOf([ask])).toEqual([
+      {
+        key: 'bandeja:B-3:q1',
+        kind: 'ask',
+        item: 'B-3',
+        title: 'El botón Aprobar queda tapado',
+        by: 'lia',
+        text: '¿Solo Aprobar o todas?',
+        options: ['Solo Aprobar', 'Todas'],
+      },
+    ]);
+    expect(bandejaSignalsOf([{ ...ask, question: 2 }])[0]?.key).toBe('bandeja:B-3:q2');
+    expect(bandejaSignalsOf([])).toEqual([]);
+  });
+
+  it('leaves out the options a question has none of', () => {
+    const [signal] = bandejaSignalsOf([{ ...ask, options: undefined }]);
+    expect(signal).not.toHaveProperty('options');
   });
 });

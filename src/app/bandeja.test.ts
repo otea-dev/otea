@@ -2,7 +2,8 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { BANDEJA_LEASE_MS } from '../core/bandeja.ts';
+import { BANDEJA_LEASE_MS, isBandejaRef } from '../core/bandeja.ts';
+import { saveRole } from '../store/secretary.ts';
 import {
   answerBandeja,
   askOnBandeja,
@@ -133,6 +134,18 @@ describe('the Bandeja', () => {
     });
   });
 
+  describe('the id B-3', () => {
+    it('is never an item: no board may take the prefix B, whatever its name', () => {
+      for (const name of ['B', 'b', 'B!', ' b ']) {
+        expect(() => addCollection(project, { name }), name).toThrow(/keeps for its entries/);
+      }
+      // A longer name that starts with it is fine.
+      expect(addCollection(project, { name: 'Bugs' }).prefix).toBe('BUGS');
+      expect(isBandejaRef('B-3')).toBe(true);
+      expect(isBandejaRef('BUGS-3')).toBe(false);
+    });
+  });
+
   describe('while the secretary is away', () => {
     it('counts the captures nobody took among what waits for it, beside the person’s messages', () => {
       // Real time: the notifier asks at the moment it looks.
@@ -222,6 +235,24 @@ describe('the Bandeja', () => {
         /Only the project's secretary takes an entry for a refiner/,
       );
 
+      // For a refiner that is no agent here (a typo, or one that never called otea), nothing is held.
+      expect(() => takeBandeja(project, { id: 1, agent: 'sol', on: 'lia' }, clock(1500))).toThrow(
+        /lia is not an agent of this project yet/,
+      );
+      expect(requireEntry(project, 1, clock(1500)).state).toBe('waiting');
+      // The person's name is no refiner at all.
+      expect(() => takeBandeja(project, { id: 1, agent: 'sol', on: 'human' }, clock(1500))).toThrow(
+        /human/,
+      );
+      expect(() =>
+        takeBandeja(project, { id: 1, agent: 'sol', on: 'Not A Name' }, clock(1500)),
+      ).toThrow();
+      expect(requireEntry(project, 1, clock(1500))).toMatchObject({
+        state: 'waiting',
+        claimedBy: null,
+      });
+
+      saveRole(project.db, 'lia', null, clock(1600)());
       const held = takeBandeja(project, { id: 1, agent: 'sol', on: 'lia' }, clock(2000));
       expect(held.entry.claimedBy).toBe('lia');
       expect(wake(3000)).toBeUndefined();

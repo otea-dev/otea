@@ -19,6 +19,13 @@ export type QueuedPhoto = {
   module?: string;
 };
 
+// A file that came with a quick note.
+export type QueuedFile = { name: string; type: string; bytes: ArrayBuffer };
+
+// A quick note (Nuevo ítem · Nota rápida): free text and files, sent to the Bandeja instead of
+// being created on a board. Its board, type and fields are empty.
+export type QueuedNote = { text: string; files: QueuedFile[] };
+
 export type QueuedCapture = {
   // Made on the phone; the Idempotency-Key of every send.
   id: string;
@@ -27,6 +34,7 @@ export type QueuedCapture = {
   board: string;
   type: string;
   fields: Record<string, string>;
+  note?: QueuedNote;
   photo?: QueuedPhoto;
   // The project it was made for (its identity id): the PC refuses it when another project answers
   // on this address now.
@@ -56,7 +64,19 @@ export const QUEUE_MAX_MB = 100;
 export const QUEUE_MAX_BYTES = QUEUE_MAX_MB * 1024 * 1024;
 
 export function sizeOf(capture: QueuedCapture): number {
-  return (capture.photo?.bytes.byteLength ?? 0) + JSON.stringify(capture.fields).length;
+  const note = capture.note;
+  const noted = note
+    ? note.text.length + note.files.reduce((n, f) => n + f.bytes.byteLength, 0)
+    : 0;
+  return (capture.photo?.bytes.byteLength ?? 0) + JSON.stringify(capture.fields).length + noted;
+}
+
+// What names a capture to the person: an item's title, or a note's first line (or its files).
+export function titleOf(capture: QueuedCapture): string {
+  if (!capture.note) return capture.fields.title ?? '';
+  const line = (capture.note.text.trim().split(/\r?\n/)[0] ?? '').trim();
+  if (line !== '') return line.length <= 80 ? line : `${line.slice(0, 79).trimEnd()}…`;
+  return capture.note.files.map((file) => file.name).join(', ');
 }
 
 export function fits(queued: readonly QueuedCapture[], next: QueuedCapture): boolean {
@@ -116,6 +136,7 @@ export function serialFlush(run: () => Promise<Flushed>): () => Promise<Flushed>
 // The request a capture becomes: the same create the sheet sends when the PC answers (a form when
 // it has a photo), with its id as the Idempotency-Key.
 export function captureRequest(capture: QueuedCapture): { init: RequestInit; url: string } {
+  if (capture.note) return noteRequest(capture, capture.note);
   const payload = { collection: capture.board, type: capture.type, fields: capture.fields };
   const headers: Record<string, string> = {
     accept: 'application/json',
@@ -145,6 +166,33 @@ export function captureRequest(capture: QueuedCapture): { init: RequestInit; url
   return { url, init: { method: 'POST', headers, body: form } };
 }
 
+// A quick note's request: the Bandeja's capture route, JSON or, with files, a form.
+function noteRequest(capture: QueuedCapture, note: QueuedNote): { init: RequestInit; url: string } {
+  const headers: Record<string, string> = {
+    accept: 'application/json',
+    'idempotency-key': capture.id,
+    ...(capture.project ? { [PROJECT]: capture.project } : {}),
+  };
+  const url = capture.project
+    ? `/p/${encodeURIComponent(capture.project)}/api/bandeja`
+    : apiUrl('/api/bandeja');
+  if (note.files.length === 0) {
+    return {
+      url,
+      init: {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ text: note.text }),
+      },
+    };
+  }
+  const form = new FormData();
+  form.append('message', JSON.stringify({ text: note.text }));
+  for (const file of note.files)
+    form.append('file', new Blob([file.bytes], { type: file.type }), file.name);
+  return { url, init: { method: 'POST', headers, body: form } };
+}
+
 // Not heard: no answer, the door's own (nothing behind Tailscale serve), a timeout or too many
 // requests, or a phone the PC no longer knows (paired again, it sends then). Anything else the PC
 // said is its answer: a refusal kept with its words.
@@ -163,7 +211,11 @@ export function sendWith(fetcher: typeof fetch): Sender {
     const body: unknown = await response.json().catch(() => undefined);
     if (response.ok) {
       const id = (body as { id?: unknown } | undefined)?.id;
-      return typeof id === 'string' ? { kind: 'made', item: id } : { kind: 'unheard' };
+      if (typeof id === 'string') return { kind: 'made', item: id };
+      // A note made an entry of the Bandeja, numbered: B-3.
+      return capture.note && typeof id === 'number'
+        ? { kind: 'made', item: `B-${id}` }
+        : { kind: 'unheard' };
     }
     const message = (body as { error?: { message?: unknown } } | undefined)?.error?.message;
     return {

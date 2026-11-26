@@ -117,11 +117,19 @@ describe('the Bandeja from the refiner', () => {
 
     it('makes no entry: nothing on the command line or in MCP captures as the person', async () => {
       const add = await otea('bandeja', 'add', 'file this', '--as', 'sol');
-      const forged = await otea('bandeja', 'take', 'B-1', '--as', 'human');
-
       expect(add.code).not.toBe(0);
-      expect(forged.code).not.toBe(0);
       expect(entries()).toEqual([]);
+
+      // The person's name takes nothing, nor is it a refiner the secretary takes for.
+      capture('a real capture');
+      const forged = await otea('bandeja', 'take', 'B-1', '--as', 'human');
+      const forgedFor = await otea('bandeja', 'take', 'B-1', '--for', 'human', '--as', 'sol');
+      const stranger = await otea('bandeja', 'take', 'B-1', '--for', 'nobody-yet', '--as', 'sol');
+      expect(forged.code).not.toBe(0);
+      expect(forgedFor.code).not.toBe(0);
+      expect(stranger.code).toBe(7);
+      expect(stranger.err).toContain('nobody-yet is not an agent of this project yet');
+      expect(entries()).toEqual([expect.objectContaining({ ref: 'B-1', state: 'waiting' })]);
 
       const server = createMcpServer(COMMANDS, { cwd: repo.dir, agent: 'sol', warn: () => {} });
       const client = new Client({ name: 'test', version: '0' });

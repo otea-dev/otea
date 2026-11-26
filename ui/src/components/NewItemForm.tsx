@@ -472,8 +472,8 @@ export function NewItemForm({ board, parent, onCancel, onCreated }: NewItemFormP
       {canNote && mode === 'note' ? (
         <NoteCapture
           autoFocus
-          onSent={() => {
-            toast({ msg: t('bandeja.saved') });
+          onSent={(how) => {
+            toast({ msg: t(how === 'queued' ? 'bandeja.queued' : 'bandeja.saved') });
             onCancel();
           }}
         />

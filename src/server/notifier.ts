@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { bandejaAskFacts } from '../app/bandeja.ts';
 import { listItems } from '../app/items.ts';
 import { boardRoundOf, liveBoards } from '../app/next.ts';
 import { notesSummary } from '../app/notes.ts';
@@ -17,6 +18,7 @@ import { setAsideOf } from '../app/set-aside.ts';
 import { unheardOf } from '../app/unheard.ts';
 import { localMinuteOfDay, type Notice, Planner } from '../core/notify/planner.ts';
 import {
+  bandejaSignalsOf,
   freshSignals,
   type NotifyFacts,
   secretarySignalsOf,
@@ -155,6 +157,8 @@ export function createNotifier(
           secretaryFacts(project.db, () => new Date(at).toISOString()),
           at,
         ),
+        // A refiner's question on a Bandeja note waits for the person as an item's does.
+        ...bandejaSignalsOf(bandejaAskFacts(project, () => new Date(at).toISOString())),
       ];
     } catch {
       return;

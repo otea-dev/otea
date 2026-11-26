@@ -111,6 +111,31 @@ export function secretarySignalsOf(facts: SecretaryFacts | undefined, now: numbe
   return out;
 }
 
+// A question a refiner asked the person on a Bandeja entry (otea ask B-3), still unanswered. It is
+// told as an item's question is: the same `ask` kind, so the person's switch, the text preference,
+// quiet hours and muting apply; its `item` is the entry's ref (B-3), and it opens Hablar's Bandeja.
+export type BandejaAskFacts = {
+  ref: string;
+  // The first line of the note captured.
+  snippet: string;
+  question: number;
+  by: string;
+  text: string;
+  options?: string[] | undefined;
+};
+
+export function bandejaSignalsOf(asks: readonly BandejaAskFacts[]): Signal[] {
+  return asks.map(({ ref, snippet, question, by, text, options }) => ({
+    key: `bandeja:${ref}:q${question}`,
+    kind: 'ask',
+    item: ref,
+    title: snippet,
+    by,
+    ...(text === '' ? {} : { text }),
+    ...(options === undefined || options.length === 0 ? {} : { options }),
+  }));
+}
+
 const active = (lease: Lease | null, now: number) =>
   lease !== null && Date.parse(lease.expiresAt) > now;
 

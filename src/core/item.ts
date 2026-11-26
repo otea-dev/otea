@@ -1,3 +1,4 @@
+import { BANDEJA_PREFIX } from './bandeja.ts';
 import { OteaError } from './errors.ts';
 
 export type Actor = { kind: 'human' | 'agent'; name: string };
@@ -52,6 +53,14 @@ const ID_PATTERN = /^([A-Z0-9]+)-([1-9][0-9]*)$/;
 export function prefixFor(collectionName: string): string {
   const prefix = collectionName.toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!prefix) throw new OteaError('invalid_name', `"${collectionName}" has no usable characters`);
+  // B-3 is a Bandeja entry (core/bandeja.ts): no board may take the prefix, or an id would be two
+  // things.
+  if (prefix === BANDEJA_PREFIX) {
+    throw new OteaError(
+      'invalid_name',
+      `"${collectionName}" would give its items the prefix ${BANDEJA_PREFIX}, which the Bandeja keeps for its entries (B-3): give the board a longer name`,
+    );
+  }
   return prefix;
 }
 

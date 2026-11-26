@@ -133,6 +133,13 @@
 .bn-row[data-state="filed"] {
   background: transparent;
 }
+.bn-row[data-lit] {
+  border-color: color-mix(in oklch, var(--you) 70%, var(--rule));
+  box-shadow: 0 0 0 3px var(--tint);
+  transition:
+    box-shadow 240ms var(--o-drift),
+    border-color 240ms var(--o-drift);
+}
 .bn-meta {
   display: flex;
   align-items: baseline;

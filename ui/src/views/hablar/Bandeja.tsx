@@ -51,10 +51,12 @@ function Row({
   entry,
   now,
   onAnswered,
+  lit,
 }: {
   entry: BandejaEntry;
   now: number;
   onAnswered: () => void;
+  lit: boolean;
 }) {
   const app = useApp();
   const asking = entry.asking;
@@ -64,7 +66,12 @@ function Row({
     item: entry.item ?? '',
   });
   return (
-    <li className="bn-row" data-state={entry.state}>
+    <li
+      className="bn-row"
+      id={`bn-${entry.ref}`}
+      data-state={entry.state}
+      data-lit={lit || undefined}
+    >
       <div className="bn-meta">
         <span className="bn-ref">{entry.ref}</span>
         <time dateTime={entry.at}>{noteTime(entry.at, now)}</time>
@@ -103,9 +110,16 @@ function Row({
   );
 }
 
-export function Bandeja() {
+export type BandejaProps = {
+  // Undefined while they are being read.
+  entries: BandejaEntry[] | undefined;
+  reload: () => void;
+  // The note a link opened at (B-3): it lights for a moment.
+  lit?: string | undefined;
+};
+
+export function Bandeja({ entries, reload, lit }: BandejaProps) {
   const app = useApp();
-  const { entries, reload } = useBandeja();
   const [all, setAll] = useState(false);
   const sorted = useMemo(() => ordered(entries ?? []), [entries]);
   const open = sorted.filter(({ state }) => state !== 'filed');
@@ -121,7 +135,13 @@ export function Bandeja() {
       <p className="bn-dek">{t('bandeja.dek')}</p>
       <ul className="bn-list">
         {[...open, ...shown].map((entry) => (
-          <Row key={entry.id} entry={entry} now={app.now} onAnswered={reload} />
+          <Row
+            key={entry.id}
+            entry={entry}
+            now={app.now}
+            onAnswered={reload}
+            lit={lit === entry.ref}
+          />
         ))}
       </ul>
       {filed.length > FILED_SHOWN ? (

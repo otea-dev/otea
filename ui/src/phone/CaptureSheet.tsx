@@ -530,8 +530,8 @@ export function CaptureSheet() {
         <div ref={noteBox}>
           <NoteCapture
             key={cap.seq}
-            onSent={() => {
-              toast({ msg: t('bandeja.saved'), at: 'top' });
+            onSent={(how) => {
+              toast({ msg: t(how === 'queued' ? 'bandeja.queued' : 'bandeja.saved'), at: 'top' });
               closeCapture();
             }}
           />

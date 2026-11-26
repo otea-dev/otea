@@ -138,6 +138,9 @@ describe('selection', () => {
     expect(routeFromHash('#/hablar')).toEqual({ view: 'hablar' });
     expect(routeFromHash('#/hablar/12')).toEqual({ view: 'hablar', turn: 12 });
     expect(routeFromHash('#/hablar/TEM-3')).toEqual({ view: 'hablar', topic: 'TEM-3' });
+    expect(routeFromHash('#/hablar/B-3')).toEqual({ view: 'hablar', bandeja: 'B-3' });
+    expect(routeFromHash('#/hablar/b-12')).toEqual({ view: 'hablar', bandeja: 'B-12' });
+    expect(hablarHash({ bandeja: 'B-3' })).toBe('#/hablar/B-3');
     expect(hablarHash()).toBe('#/hablar');
     expect(hablarHash({ turn: 12 })).toBe('#/hablar/12');
     expect(hablarHash({ topic: 'TEM-3' })).toBe('#/hablar/TEM-3');

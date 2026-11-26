@@ -1,3 +1,4 @@
+import { isBandejaRef } from '../bandeja.ts';
 import type { Notice } from './planner.ts';
 import type { NotifyKind } from './signals.ts';
 
@@ -39,6 +40,9 @@ export const itemUrl = (id: string) => `/#/i/${encodeURIComponent(id)}`;
 // Hablar, open at a turn (the number of the person's message that began it) when there is one.
 export const hablarUrl = (turn?: number) =>
   turn === undefined ? '/#/hablar' : `/#/hablar/${turn}`;
+
+// Hablar, open at a Bandeja entry's row (B-3).
+export const bandejaUrl = (ref: string) => `/#/hablar/${encodeURIComponent(ref)}`;
 
 const clean = (text: string | undefined) => text?.replace(/[\p{Cc}\p{Cf}\s]+/gu, ' ').trim();
 
@@ -147,6 +151,18 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
   // A question goes in the notice itself, with the item's id in the title.
   const question = notice.kind === 'ask' ? clean(notice.text) : undefined;
   const title = question ? `${said} · ${notice.item}` : said;
+  // A question on a Bandeja note (B-3) is no item's: Hablar opens, at that note.
+  if (notice.kind === 'ask' && isBandejaRef(notice.item)) {
+    return {
+      title,
+      body: question
+        ? withOptions(short(question, MAX_QUESTION), notice.options)
+        : short(`${notice.item} · ${notice.title}`),
+      tag: `otea-bandeja-${notice.item}`,
+      url: bandejaUrl(notice.item),
+      item: null,
+    };
+  }
   return {
     title,
     // Its options follow the question, only while the question is shown (the person may hide it).

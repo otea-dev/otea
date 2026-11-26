@@ -4,7 +4,7 @@ import { t } from '../../i18n/i18n.ts';
 import { AgentMark, Seg } from '../../kit/index.ts';
 import { NodeGlyph } from '../../lanes/NodeGlyph.tsx';
 import { noteTime } from '../detail/notes.ts';
-import { Bandeja } from './Bandeja.tsx';
+import { Bandeja, type BandejaProps } from './Bandeja.tsx';
 
 // «Lo que salió»: what the conversation produced, a card each. A request lists its items with how
 // each stands (and says «te pregunta» when an agent waits for your answer); a consultation shows
@@ -76,6 +76,7 @@ export function Side({
   onFilter,
   onGo,
   now,
+  bandeja,
 }: {
   cards: readonly Card[];
   counts: Record<Filter, number>;
@@ -83,12 +84,14 @@ export function Side({
   onFilter: (filter: Filter) => void;
   onGo: (root: number) => void;
   now: number;
+  // The Bandeja's notes as the page read them, and the one lit by a link.
+  bandeja: BandejaProps;
 }) {
   return (
     <div className="hb-out">
       <h2 className="hb-h">{t('hablar.out')}</h2>
       <p className="hb-hdek">{t('hablar.out.dek')}</p>
-      <Bandeja />
+      <Bandeja {...bandeja} />
       <Seg
         className="hb-filter"
         label={t('hablar.filter')}

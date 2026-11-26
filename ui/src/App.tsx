@@ -111,7 +111,7 @@ function View({ route }: { route: Route }): ReactNode {
     case 'preferences':
       return <PreferencesView />;
     case 'hablar':
-      return <HablarView turn={route.turn} topic={route.topic} />;
+      return <HablarView turn={route.turn} topic={route.topic} bandeja={route.bandeja} />;
     case 'studio':
       return <BoardStudio page={route.page} canWrite={app.session.canConfigure} />;
     case 'modules':

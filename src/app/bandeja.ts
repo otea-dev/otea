@@ -13,6 +13,8 @@ import { checkOptions, DELEGATED } from '../core/board/questions.ts';
 import { MAX_MESSAGE_CHARS, MAX_MESSAGE_FILES, messageSnippet } from '../core/conversation.ts';
 import { OteaError } from '../core/errors.ts';
 import { evidenceTypeOf, MAX_EVIDENCE_BYTES, MAX_EVIDENCE_MB } from '../core/evidence.ts';
+import { assertAgentName } from '../core/item.ts';
+import type { BandejaAskFacts } from '../core/notify/signals.ts';
 import { timeText } from '../core/time.ts';
 import {
   answerQuestionRow,
@@ -33,6 +35,7 @@ import {
   selectEntryRows,
 } from '../store/bandeja.ts';
 import { transaction } from '../store/database.ts';
+import { findAgent } from '../store/queries.ts';
 import type { Context } from './context.ts';
 import type { MessageFileInput } from './conversation.ts';
 import { evidenceFile, namedReadPath, storeFile } from './evidence.ts';
@@ -192,6 +195,24 @@ export function requireEntry(ctx: Context, id: number, now: Clock = systemClock)
   return entry;
 }
 
+// The questions that wait for the person on a Bandeja note, for the notifier (one per entry).
+export function bandejaAskFacts(ctx: Context, now: Clock = systemClock): BandejaAskFacts[] {
+  return listBandeja(ctx, {}, now).flatMap(({ ref, text, asking }) =>
+    asking === null
+      ? []
+      : [
+          {
+            ref,
+            snippet: messageSnippet(text),
+            question: asking.question,
+            by: asking.by,
+            text: asking.text,
+            options: asking.options,
+          },
+        ],
+  );
+}
+
 // The entries as the desk and `otea bandeja` show them: those not filed yet (oldest first), then
 // the last `filed` filed ones (newest first).
 export function listBandeja(
@@ -219,6 +240,17 @@ export function takeBandeja(
       'forbidden',
       `Only the project's secretary takes an entry for a refiner it launched (--for); take it yourself with --as ${input.on}`,
     );
+  }
+  if (input.on !== undefined && input.on !== agent) {
+    // A real refiner: a valid agent name (never the person's), already known here. One that never
+    // called otea cannot be told apart from a typo, and the entry would be held by nobody.
+    assertAgentName(input.on);
+    if (!findAgent(project.db, input.on)) {
+      throw new OteaError(
+        'forbidden',
+        `${input.on} is not an agent of this project yet: it has not called otea. Launch it first and let it take the entry itself (otea bandeja take ${bandejaRef(id)} --as ${input.on}), or take it yourself`,
+      );
+    }
   }
   return transaction(project.db, () => {
     const at = now();
