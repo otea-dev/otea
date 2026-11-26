@@ -391,6 +391,23 @@ describe('the role prompts', () => {
       );
       expect(text).not.toMatch(/coordinador|coordinator/i);
     });
+
+    // Field study 3: workers worked in the person's main checkout, left worktrees and evidence
+    // files beside the repo, wrote to the temp folder, and Git Bash turned /d/... into D:\d\...
+    it(`fixes where a worker works and keeps its files, with the Windows Git Bash rule (${lang})`, () => {
+      const text = rolePrompt('worker', lang, { board: 'Cambios', name: 'ana' });
+      expect(text).toContain('git worktree add .otea/worktrees/<');
+      expect(text).toContain('.otea/tmp/<');
+      expect(text).toContain('MSYS_NO_PATHCONV=1');
+      expect(text).toContain('D:/folder');
+      expect(text).toContain('/d/folder');
+    });
+
+    it(`keeps a refiner's files inside the project and reads attachments where Otea prints them (${lang})`, () => {
+      const text = rolePrompt('refiner', lang, { name: 'ana-ref' });
+      expect(text).toContain('.otea/tmp/');
+      expect(text).toContain('MSYS_NO_PATHCONV=1');
+    });
   }
 
   it('gives a secretary its name when told, and is written in the language asked', () => {
