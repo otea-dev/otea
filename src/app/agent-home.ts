@@ -1,7 +1,13 @@
 import { existsSync } from 'node:fs';
+import type { DatabaseSync } from 'node:sqlite';
 import { OteaError } from '../core/errors.ts';
 import { openDatabase } from '../store/database.ts';
-import { selectAgentHome, upsertAgentHome } from '../store/registry.ts';
+import {
+  type AgentHome,
+  selectAgentHome,
+  selectProjectPaths,
+  upsertAgentHome,
+} from '../store/registry.ts';
 import { openRegistry } from './home.ts';
 import { type Clock, systemClock } from './items.ts';
 import { listAgents } from './presence.ts';
@@ -16,11 +22,20 @@ import { databasePath, type Env, type Project } from './project.ts';
 // to. Kept in the Otea home with the registry, since no project knows the others.
 
 // Whether `name` is at work in the project whose data sits in `dataDir`: connected or listening,
-// or quiet with an item on a live lease. A project whose data is gone, or cannot be read, holds
-// nobody.
-function atWorkIn(dataDir: string, name: string, now: Clock): { holding: string[] } | undefined {
-  const path = databasePath(dataDir);
+// or quiet with an item on a live lease. A project whose data is gone, whose folders are all gone
+// (a registered project whose repo was deleted), or that cannot be read, holds nobody.
+function atWorkIn(
+  registry: DatabaseSync,
+  home: AgentHome,
+  name: string,
+  now: Clock,
+): { holding: string[] } | undefined {
+  const path = databasePath(home.dataDir);
   if (!existsSync(path)) return undefined;
+  const folders = selectProjectPaths(registry).filter(
+    ({ projectId }) => projectId === home.projectId,
+  );
+  if (folders.length > 0 && !folders.some((folder) => existsSync(folder.path))) return undefined;
   try {
     const db = openDatabase(path);
     try {
@@ -47,7 +62,7 @@ export function holdAgentHome(
     const home = selectAgentHome(registry, name);
     const here = project.identity;
     if (home && home.projectId !== here.id) {
-      const there = atWorkIn(home.dataDir, name, now);
+      const there = atWorkIn(registry, home, name, now);
       if (there) {
         const holds = there.holding.length > 0 ? `, holding ${there.holding.join(', ')}` : '';
         throw new OteaError(

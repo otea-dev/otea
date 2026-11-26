@@ -75,6 +75,7 @@ const QUIET: Readonly<Record<string, unknown>> = {
   opened: { evidence: [] },
   drift: { drift: null },
   'merged-outside': { merged: null },
+  'local-behind': { behind: null },
   'diff-tip': { off: null },
   topics: { linked: [], suggested: [] },
   boards: { boards: [] },

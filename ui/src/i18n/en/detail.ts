@@ -749,6 +749,21 @@ export const detail = {
   'bi.branch.landedOwn': 'pushed in {step}',
   'bi.branch.closed': 'no longer pushed',
   'bi.branch.noPush': 'no pushes in {step}',
+  'bi.branch.behind.ready': {
+    one: 'Landed on {remote}, but your local {base} is {count} commit behind: run git pull --ff-only in {checkout}',
+    other:
+      'Landed on {remote}, but your local {base} is {count} commits behind: run git pull --ff-only in {checkout}',
+  },
+  'bi.branch.behind.changes': {
+    one: 'Landed on {remote}, but your local {base} is {count} commit behind: {checkout} has changes of yours, so nothing was touched; run git pull --ff-only there when you can',
+    other:
+      'Landed on {remote}, but your local {base} is {count} commits behind: {checkout} has changes of yours, so nothing was touched; run git pull --ff-only there when you can',
+  },
+  'bi.branch.behind.elsewhere': {
+    one: 'Landed on {remote}, but your local {base} is {count} commit behind: {checkout} is on {on}, so nothing was touched; switch to {base} and run git pull --ff-only',
+    other:
+      'Landed on {remote}, but your local {base} is {count} commits behind: {checkout} is on {on}, so nothing was touched; switch to {base} and run git pull --ff-only',
+  },
   'bi.branch.drift':
     'Someone pushed commits to the branch after the handoff: {list}. Approving approves only what was handed off, {handed}.',
   'bi.branch.driftBy': '{commit} by {author}',

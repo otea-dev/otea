@@ -339,6 +339,7 @@ import {
   removeGitHook,
 } from './hooks.ts';
 import { baseTipsOf, landedCommitRefusal } from './landed-commit.ts';
+import { type LocalBehind, localBehindOf, localBehindText } from './local-behind.ts';
 import { mergedOutside, mergedOutsideLine } from './merged-outside.ts';
 import { boardsOf, eventData, itemCollections, itemData, readableEvent } from './names.ts';
 import { watchOwner } from './owner.ts';
@@ -2263,6 +2264,16 @@ function landedBase(
   return approved && landedIn(cwd, approved.commit, onto) ? onto : undefined;
 }
 
+// Whether the item just handed off landed on the remote's base while the person's main checkout
+// stayed behind. A notice never fails a handoff: where git cannot tell, it says nothing.
+function localBehindAfter(cwd: string, id: string): LocalBehind | undefined {
+  try {
+    return withProject(cwd, (project) => localBehindOf(project, id));
+  } catch {
+    return undefined;
+  }
+}
+
 const handoffCommand: Command = {
   name: 'handoff',
   summary:
@@ -2297,14 +2308,24 @@ const handoffCommand: Command = {
     // exact commands, so it neither stops after one nor says it waits with no wait running
     // (P3C-R3-9).
     const next = waitAgainLine(input.actor.name, input.channel);
+    // Landed on the remote while the person's local base stayed behind: said plainly, to hand on.
+    const behind = localBehindAfter(input.cwd, input.args[0] ?? '');
+    const landedLine = behind ? localBehindText(input.args[0] ?? '', behind) : undefined;
     return {
       data: {
         ...(moved.data as object),
         next,
         ...(warning ? { warning } : {}),
         ...(said ? { unchanged: said } : {}),
+        ...(behind ? { localBehind: behind } : {}),
       },
-      text: [moved.text, ...(said ? [said] : []), ...(warning ? [warning] : []), next].join('\n'),
+      text: [
+        moved.text,
+        ...(said ? [said] : []),
+        ...(warning ? [warning] : []),
+        ...(landedLine ? [landedLine] : []),
+        next,
+      ].join('\n'),
     };
   },
 };

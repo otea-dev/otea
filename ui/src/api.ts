@@ -1,5 +1,6 @@
 import type { MergeOnly } from '../../src/app/merge-only.ts';
 import type { Overlap } from '../../src/app/overlap.ts';
+import type { LocalBehind } from '../../src/cli/local-behind.ts';
 import type { MergedOutside } from '../../src/cli/merged-outside.ts';
 import { withoutUndone } from '../../src/core/board/history.ts';
 import type { PerformanceView } from '../../src/core/board/performance.ts';
@@ -317,6 +318,17 @@ export async function fetchMergedOutside(
   const url = `/api/items/${encodeURIComponent(id)}/merged-outside`;
   const body = (await (await get(url, signal)).json()) as { merged: MergedOutside | null };
   return body.merged;
+}
+
+// Whether what a Done item landed is on the remote's base while the person's local one is behind
+// (src/cli/local-behind.ts): null otherwise.
+export async function fetchLocalBehind(
+  id: string,
+  signal: AbortSignal,
+): Promise<LocalBehind | null> {
+  const url = `/api/items/${encodeURIComponent(id)}/local-behind`;
+  const body = (await (await get(url, signal)).json()) as { behind: LocalBehind | null };
+  return body.behind;
 }
 
 // Whether the attached diff of an item in review comes from another tip than the one handed off

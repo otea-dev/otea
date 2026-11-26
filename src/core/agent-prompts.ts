@@ -319,7 +319,7 @@ const ROLE_WORDS = {
           : `You are a worker on the Otea board ${board}. Your name is ${name}; use \`--as ${name}\` on every otea call.`,
         `1. Declare your profile: \`otea profile --model <id> --effort <level> --harness <harness> --as ${as}\`.`,
         `2. Loop: \`otea next --collection ${quoted(board)} --claim --as ${as}\`; do exactly what the step says, including every line of "Before you hand it off"; hand off with the exact command next prints; then run \`otea next\` again.`,
-        `3. ${WORKTREE} To land approved work: merge main into the branch (\`git merge origin/main\`), push normally, then push it to main as the step says. Never force push, never rebase a pushed branch.`,
+        `3. ${WORKTREE} To land approved work: merge main into the branch (\`git merge origin/main\`), push normally, then push it to main as the step says. Never force push, never rebase a pushed branch. Once it landed, bring the person's main checkout up to date only if it is on the base branch with no changes (\`git -C <main checkout> merge --ff-only origin/main\`); otherwise leave it alone and pass on what the handoff prints about their local main being behind.`,
         '4. If you need the person, ask on the item with `otea ask <id> "<question>" --option "<answer>" --recommend <n>` (2 to 4 options, the one you would choose marked) and keep working on other items or wait; never stop silently.',
         `5. When \`otea next\` has nothing for you, wait with \`otea wait --turn agent --unclaimed --as ${as}\` and continue when it returns. Stop only when the person or the secretary tells you to; release what you hold first, with \`otea release <id> --as ${as}\`.`,
       ];
@@ -364,7 +364,7 @@ const ROLE_WORDS = {
           : `Eres un trabajador del tablero ${board} de Otea. Tu nombre es ${name}; usa \`--as ${name}\` en cada llamada de otea.`,
         `1. Declara tu perfil: \`otea profile --model <id> --effort <nivel> --harness <harness> --as ${as}\`.`,
         `2. Bucle: \`otea next --collection ${quoted(board)} --claim --as ${as}\`; haz exactamente lo que dice el paso, incluida cada línea de "Before you hand it off" (así la imprime otea next); entrega con el comando exacto que imprime next; luego vuelve a ejecutar \`otea next\`.`,
-        `3. ${WORKTREE_ES} Para integrar el trabajo aprobado: mezcla main en la rama (\`git merge origin/main\`), publícala normalmente y luego súbela a main como dice el paso. Nunca hagas force push, nunca rebases una rama ya publicada.`,
+        `3. ${WORKTREE_ES} Para integrar el trabajo aprobado: mezcla main en la rama (\`git merge origin/main\`), publícala normalmente y luego súbela a main como dice el paso. Nunca hagas force push, nunca rebases una rama ya publicada. Una vez integrado, pon al día la copia principal de la persona solo si está en la rama base y sin cambios (\`git -C <copia principal> merge --ff-only origin/main\`); si no, déjala como está y pasa lo que imprime la entrega sobre su main local atrasado.`,
         '4. Si necesitas a la persona, pregunta en el ítem con `otea ask <id> "<pregunta>" --option "<respuesta>" --recommend <n>` (de 2 a 4 opciones, marcada la que elegirías) y sigue con otros ítems o espera; nunca te detengas en silencio.',
         `5. Cuando \`otea next\` no tenga nada para ti, espera con \`otea wait --turn agent --unclaimed --as ${as}\` y sigue cuando vuelva. Detente solo cuando la persona o el secretario te lo diga; suelta antes lo que tengas, con \`otea release <id> --as ${as}\`.`,
       ];

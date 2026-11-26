@@ -533,6 +533,50 @@ function isAncestor(cwd: string, ancestor: string, of: string): boolean {
   }
 }
 
+// An item landed on the remote's base while the main checkout's own base stayed where it was (an
+// agent pushed `HEAD:main` from a worktree): `behind` commits the remote has that the local base
+// lacks. `state`: whether git can bring the checkout up to date at once (`ready`: it is on the
+// base with no change to a tracked file), or it is left alone (`changes`, or checked out
+// `elsewhere`, named in `on`).
+export type LocalBehind = {
+  base: string;
+  remote: string;
+  behind: number;
+  checkout: string;
+  state: 'ready' | 'changes' | 'elsewhere';
+  on?: string;
+};
+
+// Whether `commit` (what landed) is in the remote's `base`, as this repo last saw it, and not in
+// the local `base` of the checkout at `checkout`; undefined otherwise, and with no remote.
+export function localBehind(
+  checkout: string,
+  base: string,
+  commit: string,
+): LocalBehind | undefined {
+  const remote = remoteName(checkout, base);
+  if (!remote) return undefined;
+  const there = commitOf(checkout, `refs/remotes/${remote}`);
+  const here = commitOf(checkout, `refs/heads/${base}`);
+  if (!there || !here || here === there) return undefined;
+  const holds = (ref: string) =>
+    isAncestor(checkout, commit, ref) || landedIn(checkout, commit, ref);
+  if (!holds(there) || holds(here)) return undefined;
+  const behind = Number(git(checkout, 'rev-list', '--count', `${here}..${there}`));
+  if (!(behind > 0)) return undefined;
+  const on = checkedOutBranch(checkout);
+  const changed = git(checkout, 'status', '--porcelain', '--untracked-files=no') !== '';
+  const state = on !== base ? 'elsewhere' : changed ? 'changes' : 'ready';
+  return {
+    base,
+    remote,
+    behind,
+    checkout,
+    state,
+    ...(on !== undefined && on !== base ? { on } : {}),
+  };
+}
+
 // Where `branch` (here, or else on origin) is in `base` already: `merged` when the base as the
 // remote has it holds it (as this checkout last saw it), or the local base does in a repo with no
 // remote; `local` when only the local base holds it, with the remote base it is not in yet

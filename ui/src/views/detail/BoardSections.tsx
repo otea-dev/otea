@@ -26,6 +26,7 @@ import {
   type HandRow,
   type ItemLinks,
   type LinkedView,
+  localBehindSaid,
   partsCount,
   type Round,
   type RoundNote,
@@ -35,6 +36,7 @@ import {
 } from './board-item.ts';
 import { type DiffFilesOff, type DiffOffTip, diffFilesText, diffOffTipText } from './diff-tip.ts';
 import { type Drift, driftText } from './drift.ts';
+import type { LocalBehind } from './local-behind.ts';
 import { type MergeOnly, mergeOnlyText } from './merge-only.ts';
 import type { MergedOutside } from './merged-outside.ts';
 import { type Overlap, overlapTexts } from './overlaps.ts';
@@ -350,8 +352,11 @@ export function BranchLine({
   overlaps = [],
   merge = null,
   waits,
+  behind = null,
 }: {
   strip: BranchStrip | null;
+  // A Done item landed on the remote's base while the local one stayed behind.
+  behind?: LocalBehind | null;
   drift?: Drift | null;
   outside?: MergedOutside | null;
   off?: DiffOffTip | null;
@@ -363,21 +368,27 @@ export function BranchLine({
   // Why it waits to land after another item (src/app/land-order.ts), as the PC words it.
   waits?: string | undefined;
 }) {
-  if (!strip) return null;
-  const said = branchSaid(strip, outside);
-  const line = (
+  if (!strip && !behind) return null;
+  const line = strip ? (
     <div className={`bstrip ${strip.tone}`} data-c title={t('bi.branch.label')}>
       <Icon name="branch" />
       <span className="mono">{strip.value}</span>
       {strip.repo ? <span className="pvtag">{t('bi.branch.in', { repo: strip.repo })}</span> : null}
       <span className="sep">·</span>
-      <span className="bsaid">{said}</span>
+      <span className="bsaid">{branchSaid(strip, outside)}</span>
     </div>
-  );
-  if (!drift && !off && !files && !same && !merge && !waits && overlaps.length === 0) return line;
+  ) : null;
+  if (!behind && !drift && !off && !files && !same && !merge && !waits && overlaps.length === 0)
+    return line;
   return (
     <>
       {line}
+      {behind ? (
+        <div className="bstrip drift" data-c role="status">
+          <Icon name="warn" />
+          <span>{localBehindSaid(behind)}</span>
+        </div>
+      ) : null}
       {drift ? (
         <div className="bstrip drift" data-c role="status">
           <Icon name="warn" />

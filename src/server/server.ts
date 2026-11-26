@@ -94,6 +94,7 @@ import {
 import { topicsEverywhere } from '../app/topics-everywhere.ts';
 import { undoMove } from '../app/undo.ts';
 import { waiveEvidence } from '../app/waive.ts';
+import { localBehindOf } from '../cli/local-behind.ts';
 import { mergedOutside } from '../cli/merged-outside.ts';
 import { OTEA_VERSION } from '../cli/version.ts';
 import {
@@ -824,6 +825,11 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         const merged = mergedOutside(project, project.root, getItem(project, c.req.param('id')));
         return c.json({ merged: merged?.land ? merged : null });
       })
+      // A Done item whose work reached the remote's base while the person's main checkout stayed
+      // behind (an agent landed from a worktree): the page says so, with how to catch up.
+      .get('/items/:id/local-behind', (c) =>
+        c.json({ behind: localBehindOf(project, c.req.param('id')) ?? null }),
+      )
       // The attached diff of an item in review, when it does not come from the tip its handoff
       // recorded (P1-R3-1): the desk says so before the person approves.
       .get('/items/:id/diff-tip', async (c) =>

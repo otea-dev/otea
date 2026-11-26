@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { isClosed, NOTE_REF, positionOf } from '../../../../src/core/board/engine.ts';
-import { SAME, stepById } from '../../../../src/core/board/model.ts';
+import { DONE, SAME, stepById } from '../../../../src/core/board/model.ts';
 import { waitsOf } from '../../actions.ts';
 import type { NoteAnchorInput } from '../../api.ts';
 import { typeOfItem, useApp } from '../../app/context.tsx';
@@ -79,6 +79,7 @@ import { boardFactsOf, factsOf, standAgentOf, standOf } from './facts.ts';
 import { pressInView, toastOf } from './frame.ts';
 import { History } from './History.tsx';
 import { historyOf } from './history.ts';
+import { useLocalBehind } from './local-behind.ts';
 import { useMergeOnly } from './merge-only.ts';
 import { useMergedOutside } from './merged-outside.ts';
 import { draftWaitsOf, type MoveChoice, planMoves } from './moves.ts';
@@ -217,6 +218,12 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   const drift = useDrift(item.id, strip?.key === 'frozen', item.updatedAt);
   // In its land step: whether git shows it merged outside Otea already (P1-R3-9).
   const outside = useMergedOutside(item.id, strip?.key === 'landing', item.updatedAt);
+  // Done: whether what landed is on the remote's base and the local one is behind it.
+  const behind = useLocalBehind(
+    item.id,
+    isClosed(position) && position.closed === DONE,
+    item.updatedAt,
+  );
   // While the person reviews it: whether the attached diff comes from another tip (P1-R3-1).
   const off = useDiffOffTip(item.id, strip?.key === 'frozen', item.updatedAt);
   // And whether it names other files than the work handed off changes (P1-F2).
@@ -853,6 +860,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                   {/* Its branch and where it stands: «fusionada» once merged, as on the desk (WF-3). */}
                   <BranchLine
                     strip={strip}
+                    behind={behind}
                     drift={drift}
                     outside={outside}
                     off={off}
@@ -1175,6 +1183,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
               </div>
               <BranchLine
                 strip={strip}
+                behind={behind}
                 drift={drift}
                 outside={outside}
                 off={off}

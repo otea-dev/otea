@@ -1,3 +1,4 @@
+import type { LocalBehind } from '../../../../src/cli/local-behind.ts';
 import type { MergedOutside } from '../../../../src/cli/merged-outside.ts';
 import type { ItemChoice } from '../../../../src/core/board/choices.ts';
 import {
@@ -394,6 +395,16 @@ export function branchStrip(
   return gateAt(def, position, 'push').allowed
     ? { tone: 'ok', key: 'push', value, ...repo, step }
     : { tone: 'off', key: 'noPush', value, ...repo, step };
+}
+
+// A Done item whose work landed on the remote's base while the person's local one stayed behind
+// (an agent pushed from a worktree): says so, with the way to catch up.
+export function localBehindSaid(behind: LocalBehind): string {
+  const { remote, base, checkout } = behind;
+  const count = behind.behind;
+  if (behind.state === 'elsewhere')
+    return t('bi.branch.behind.elsewhere', { count, remote, base, checkout, on: behind.on ?? '' });
+  return t(`bi.branch.behind.${behind.state}`, { count, remote, base, checkout });
 }
 
 // The branch line's words after the branch: may it be pushed, is it held in review, how it lands

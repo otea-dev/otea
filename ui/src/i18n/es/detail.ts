@@ -757,6 +757,21 @@ export const detail = {
   'bi.branch.landedOwn': 'subida en {step}',
   'bi.branch.closed': 'ya no se sube',
   'bi.branch.noPush': 'sin subidas en {step}',
+  'bi.branch.behind.ready': {
+    one: 'Subido a {remote}, pero tu {base} local va {count} commit atrasado: en {checkout} ejecuta git pull --ff-only',
+    other:
+      'Subido a {remote}, pero tu {base} local va {count} commits atrasado: en {checkout} ejecuta git pull --ff-only',
+  },
+  'bi.branch.behind.changes': {
+    one: 'Subido a {remote}, pero tu {base} local va {count} commit atrasado: {checkout} tiene cambios tuyos, así que no se tocó; ejecuta git pull --ff-only ahí cuando puedas',
+    other:
+      'Subido a {remote}, pero tu {base} local va {count} commits atrasado: {checkout} tiene cambios tuyos, así que no se tocó; ejecuta git pull --ff-only ahí cuando puedas',
+  },
+  'bi.branch.behind.elsewhere': {
+    one: 'Subido a {remote}, pero tu {base} local va {count} commit atrasado: {checkout} está en {on}, así que no se tocó; cambia a {base} y ejecuta git pull --ff-only',
+    other:
+      'Subido a {remote}, pero tu {base} local va {count} commits atrasado: {checkout} está en {on}, así que no se tocó; cambia a {base} y ejecuta git pull --ff-only',
+  },
   'bi.branch.drift':
     'Alguien subió commits a la rama después de la entrega: {list}. Aprobar aprueba solo lo entregado, {handed}.',
   'bi.branch.driftBy': '{commit} de {author}',
