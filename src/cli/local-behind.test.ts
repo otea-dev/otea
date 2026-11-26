@@ -18,6 +18,8 @@ describe('an item that landed while the local main stayed behind', () => {
   let origin: string;
   let otea: Cli;
   let tree: string;
+  // The remote the agent pushes to: origin, unless a test renames it.
+  let remote = 'origin';
 
   const git = (cwd: string, ...args: string[]) =>
     execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
@@ -62,11 +64,12 @@ describe('an item that landed while the local main stayed behind', () => {
     writeFileSync(join(tree, file), `${file}\n`);
     git(tree, 'add', file);
     git(tree, 'commit', '-q', '-m', file);
-    git(tree, 'push', '-q', 'origin', 'HEAD:main');
+    git(tree, 'push', '-q', remote, 'HEAD:main');
     return git(tree, 'rev-parse', '--short', 'HEAD');
   };
 
   beforeEach(async () => {
+    remote = 'origin';
     repo = tempGitRepo();
     origin = mkdtempSync(join(tmpdir(), 'otea-origin-'));
     tree = mkdtempSync(join(tmpdir(), 'otea-tree-'));
@@ -157,5 +160,82 @@ describe('an item that landed while the local main stayed behind', () => {
     expect(done.out).toContain('1 commit behind');
     expect(done.out).toContain('changes');
     expect(done.out).toContain('left alone');
+  });
+
+  // The step that brings the person's main up to date is Otea's, enforced in code: it never
+  // touches a checkout that is on another branch or has changes of the person's.
+  describe('otea land sync', () => {
+    // An item landed from the worktree, Done, the local main one commit behind.
+    const landed = async (): Promise<string> => {
+      const id = await landing('Regar');
+      expect((await otea('claim', id)).code).toBe(0);
+      const commit = landFromWorktree('regar.py');
+      expect((await otea('update', id, '--field', `Commit subido=${commit}`)).code).toBe(0);
+      expect((await otea('handoff', id)).code).toBe(0);
+      return id;
+    };
+    const heads = () => ({
+      local: git(repo.dir, 'rev-parse', 'main'),
+      remote: git(repo.dir, 'rev-parse', `${remote}/main`),
+    });
+
+    it('fast-forwards the main checkout when it is on the base with no changes', async () => {
+      const id = await landed();
+      expect(heads().local).not.toBe(heads().remote);
+
+      const synced = await otea('land', 'sync', id);
+
+      expect(synced.code, synced.err).toBe(0);
+      expect(synced.out).toContain('up to date');
+      expect(heads().local).toBe(heads().remote);
+      // Nothing left to do: a second run says so.
+      expect((await otea('land', 'sync', id)).out).toContain('nothing to bring');
+    });
+
+    it('leaves a checkout with changes of the person alone, and says so', async () => {
+      const id = await landed();
+      const before = heads().local;
+      writeFileSync(join(repo.dir, 'bot.py'), 'print(2)\n');
+
+      const synced = await otea('land', 'sync', id);
+
+      expect(synced.code, synced.err).toBe(0);
+      expect(synced.out).toContain('left alone');
+      expect(heads().local).toBe(before);
+    });
+
+    it('leaves a checkout on another branch alone', async () => {
+      const id = await landed();
+      const before = heads().local;
+      git(repo.dir, 'switch', '-q', '-c', 'otra-rama');
+
+      const synced = await otea('land', 'sync', id);
+
+      expect(synced.code, synced.err).toBe(0);
+      expect(synced.out).toContain('otra-rama');
+      expect(synced.out).toContain('left alone');
+      expect(git(repo.dir, 'rev-parse', 'main')).toBe(before);
+    });
+
+    it('takes the remote the base is pushed to, not a fixed origin/main', async () => {
+      git(repo.dir, 'remote', 'rename', 'origin', 'upstream');
+      remote = 'upstream';
+      const id = await landed();
+
+      const synced = await otea('land', 'sync', id);
+
+      expect(synced.code, synced.err).toBe(0);
+      expect(synced.out).toContain('upstream/main');
+      expect(git(repo.dir, 'rev-parse', 'main')).toBe(git(repo.dir, 'rev-parse', 'upstream/main'));
+    });
+
+    it('asks nothing of an item that is not Done', async () => {
+      const id = await landing('Regar');
+
+      const synced = await otea('land', 'sync', id);
+
+      expect(synced.code).not.toBe(0);
+      expect(synced.err).toContain('not Done');
+    });
   });
 });

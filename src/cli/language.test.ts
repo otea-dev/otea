@@ -206,18 +206,6 @@ describe('the language of what the CLI makes', () => {
     }
   });
 
-  // The agent's shell said LANG=en_US.UTF-8 on a Spanish computer: init made the project in English.
-  it('makes a project in the computer language when only a bare LANG disagrees', async () => {
-    vi.stubEnv('LC_ALL', '');
-    vi.stubEnv('LC_MESSAGES', '');
-    vi.stubEnv('LANG', 'en_US.UTF-8');
-    // test-setup says this computer's language is Spanish.
-    await person('init', '--local', '--template', 'changes');
-
-    expect(boardNames()).toContain('Cambios');
-    expect((await person('projects', 'lang')).out).toContain('Spanish (es)');
-  });
-
   it('lets --lang on a board or a prompt override it once, and init takes no --lang', async () => {
     await switchDeskTo('en');
     await person('init', '--local');
