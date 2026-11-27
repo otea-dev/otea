@@ -23,14 +23,21 @@ export type AgentsMdAction = 'created' | 'added' | 'updated' | 'unchanged';
 
 export type AgentsMdResult = { path: string; action: AgentsMdAction };
 
+// Whether the file's lines end in CRLF (Windows checks AGENTS.md out that way with
+// core.autocrlf=true): the block then follows, so it is never written in two endings.
+const usesCrlf = (text: string) =>
+  (text.match(/\r\n/g) ?? []).length > (text.match(/(?<!\r)\n/g) ?? []).length;
+
 function withBlock(current: string): string {
+  const eol = usesCrlf(current) ? '\r\n' : '\n';
+  const block = AGENTS_BLOCK.replaceAll('\n', eol);
   const begin = current.indexOf(BEGIN);
   const end = current.indexOf(END, begin);
   if (begin >= 0 && end >= 0) {
-    return `${current.slice(0, begin)}${AGENTS_BLOCK}${current.slice(end + END.length)}`;
+    return `${current.slice(0, begin)}${block}${current.slice(end + END.length)}`;
   }
-  const separator = current.endsWith('\n') ? '\n' : '\n\n';
-  return `${current}${separator}${AGENTS_BLOCK}\n`;
+  const separator = current.endsWith('\n') ? eol : `${eol}${eol}`;
+  return `${current}${separator}${block}${eol}`;
 }
 
 // Adds the block to AGENTS.md at the project root, or replaces the one already there: running it
