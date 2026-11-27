@@ -228,10 +228,12 @@ describe('noticeText', () => {
       };
       expect(noticeText(offline, 'es')).toMatchObject({
         title: 'Tu secretario está desconectado',
-        body: 'Te esperan 3 mensajes',
+        body: 'Tus 3 mensajes esperan respuesta',
         url: '/#/hablar',
       });
-      expect(noticeText({ ...offline, count: 1 }, 'en').body).toBe('1 message waits for you');
+      expect(noticeText({ ...offline, count: 1 }, 'es').body).toBe('Tu mensaje espera respuesta');
+      expect(noticeText({ ...offline, count: 1 }, 'en').body).toBe('Your message awaits a reply');
+      expect(noticeText(offline, 'en').body).toBe('Your 3 messages await a reply');
     });
   });
 

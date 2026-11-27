@@ -56,7 +56,8 @@ const WORDS = {
     secretary_reply: (by: string) => `${by || 'Tu secretario'} te respondió`,
     secretary_offline: () => 'Tu secretario está desconectado',
     replyBody: 'Abre Hablar para leerlo',
-    offlineBody: (n: number) => (n === 1 ? 'Te espera 1 mensaje' : `Te esperan ${n} mensajes`),
+    offlineBody: (n: number) =>
+      n === 1 ? 'Tu mensaje espera respuesta' : `Tus ${n} mensajes esperan respuesta`,
     hablar: 'Hablar',
     group: {
       turn: (n: number) => `${n} cosas te tocan`,
@@ -82,7 +83,7 @@ const WORDS = {
     secretary_offline: () => 'Your secretary is offline',
     replyBody: 'Open Talk to read it',
     offlineBody: (n: number) =>
-      n === 1 ? '1 message waits for you' : `${n} messages wait for you`,
+      n === 1 ? 'Your message awaits a reply' : `Your ${n} messages await a reply`,
     hablar: 'Talk',
     group: {
       turn: (n: number) => `${n} things are yours`,

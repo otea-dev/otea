@@ -735,7 +735,7 @@ describe('notifications on the server', () => {
             expect.objectContaining({
               payload: {
                 title: 'memory · Tu secretario está desconectado',
-                body: 'Te esperan 2 mensajes',
+                body: 'Tus 2 mensajes esperan respuesta',
                 tag: 'otea-hablar-offline-memory-aaaaaa',
                 url: '/p/memory-aaaaaa/#/hablar',
                 item: null,
