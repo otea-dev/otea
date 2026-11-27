@@ -793,10 +793,36 @@ describe('the secretary thinking', () => {
     }),
   ];
 
+  // At work between two waits: it is not in its wait, so it may be holding the message.
+  const working = { name: 'quill', state: 'connected' as const, since: null, pending: 0 };
+
   it('says «leído · pensando…» on its lane while it holds a turn it read and has not answered', async () => {
-    const { root } = await open(conversation({ messages: read }));
+    const { root } = await open(conversation({ messages: read, secretary: working }));
     expect(text(q(root, '.hb-thinking'))).toBe('leído · pensando…');
     expect(q(root, '.nd.secretary[data-busy]')).not.toBeNull();
+  });
+
+  // U6 (field study 4): «escuchando» and «leído · pensando…» for twenty minutes. A secretary in its
+  // wait holds nothing: its wait brings the message back, and if it has not, the desk says so.
+  it('never says «pensando…» to a secretary that listens, and says it has not answered once it stays', async () => {
+    const listening = { name: 'quill', state: 'listening' as const, since: null, pending: 0 };
+    const { root } = await open(
+      conversation({
+        messages: [
+          say({
+            id: 1,
+            author: 'person',
+            delivery: 'read',
+            readAt: ago(0.5),
+            heardAt: ago(0.5),
+            text: '¿Tailscale o el relay?',
+          }),
+        ],
+        secretary: listening,
+      }),
+    );
+    expect(q(root, '.hb-thinking .bar')).toBeNull();
+    expect(text(q(root, '.hb-silent'))).toContain('El secretario no ha respondido aún.');
   });
 
   // The secretary's wait returned the message: the person sees it arrived at once, before it is read.
@@ -804,6 +830,7 @@ describe('the secretary thinking', () => {
     const { root } = await open(
       conversation({
         messages: [say({ id: 1, author: 'person', delivery: 'pending', heardAt: ago(0) })],
+        secretary: working,
       }),
     );
     expect(text(q(root, '.hb-thinking'))).toBe('leído · pensando…');
