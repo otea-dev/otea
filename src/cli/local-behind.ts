@@ -37,11 +37,18 @@ export function localBehindOf(project: Project, id: string): LocalBehind | undef
 // What the agent hands on to the person, in plain words.
 export function localBehindText(id: string, behind: LocalBehind): string {
   const commits = `${behind.behind} commit${behind.behind === 1 ? '' : 's'}`;
+  // Nothing here is one more command away: the local base has commits of its own the remote lacks,
+  // so it is the person's to untangle (an agent never merges or resets there).
+  if (behind.state === 'diverged') {
+    return `${id} landed on ${behind.remote}, but your local ${behind.base} (the checkout at ${behind.checkout}) and ${behind.remote} have diverged: ${behind.remote} has ${commits} yours lacks, and your ${behind.base} has commits of its own that ${behind.remote} lacks, so it was left alone and no fast-forward can bring it up to date. Look at git log ${behind.remote}..${behind.base} and decide with the person (a merge or a rebase is theirs to choose).`;
+  }
   const how =
     behind.state === 'ready'
       ? `otea land sync ${id} brings it up to date (or git pull --ff-only in ${behind.checkout})`
       : behind.state === 'changes'
         ? `that checkout has changes of its own, so it was left alone: run git pull --ff-only there when you can`
-        : `that checkout is on ${behind.on ?? 'another branch'}, so it was left alone: git switch ${behind.base} and git pull --ff-only when you can`;
+        : behind.state === 'collides'
+          ? `${behind.paths?.join(', ') ?? 'a file'} would replace ${behind.paths?.length === 1 ? 'a file' : 'files'} you keep out of git in that checkout, so it was left alone: move ${behind.paths?.length === 1 ? 'it' : 'them'} aside, then run git pull --ff-only there`
+          :`that checkout is on ${behind.on ?? 'another branch'}, so it was left alone: git switch ${behind.base} and git pull --ff-only when you can`;
   return `${id} landed on ${behind.remote}, but your local ${behind.base} is ${commits} behind it (the checkout at ${behind.checkout}): ${how}.`;
 }

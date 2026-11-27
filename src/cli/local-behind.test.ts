@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -214,6 +214,50 @@ describe('an item that landed while the local main stayed behind', () => {
       expect(synced.code, synced.err).toBe(0);
       expect(synced.out).toContain('otra-rama');
       expect(synced.out).toContain('left alone');
+      expect(git(repo.dir, 'rev-parse', 'main')).toBe(before);
+    });
+
+    // Cold review G2: a local main with commits of its own was "ready", and the reply sent the
+    // person to run the command that had just failed.
+    it('says plainly that a local main with commits of its own has diverged, with no command that cannot work', async () => {
+      const id = await landed();
+      writeFileSync(join(repo.dir, 'mine.txt'), 'mine\n');
+      git(repo.dir, 'add', 'mine.txt');
+      git(repo.dir, 'commit', '-q', '-m', 'mine');
+      const before = heads().local;
+
+      const synced = await otea('land', 'sync', id, '--json');
+
+      expect(synced.code, synced.err).toBe(0);
+      const data = JSON.parse(synced.out);
+      expect(data.synced).toBe(false);
+      expect(data.localBehind.state).toBe('diverged');
+      expect(data.text ?? '').not.toContain('land sync');
+      const plain = await otea('land', 'sync', id);
+      expect(plain.out).toContain('diverged');
+      expect(plain.out).toContain('left alone');
+      expect(plain.out).not.toMatch(/otea land sync|git pull/);
+      expect(heads().local).toBe(before);
+    });
+
+    // A tracked file arriving where the person keeps a git-ignored one (an .env) would overwrite it:
+    // git replaces ignored files silently.
+    it('leaves the checkout alone when an incoming file would overwrite an ignored local one', async () => {
+      writeFileSync(join(repo.dir, '.gitignore'), 'local.cfg\n');
+      writeFileSync(join(repo.dir, 'local.cfg'), 'mine, never in git\n');
+      const id = await landing('Regar');
+      expect((await otea('claim', id)).code).toBe(0);
+      const commit = landFromWorktree('local.cfg');
+      expect((await otea('update', id, '--field', `Commit subido=${commit}`)).code).toBe(0);
+      expect((await otea('handoff', id)).code).toBe(0);
+      const before = heads().local;
+
+      const synced = await otea('land', 'sync', id);
+
+      expect(synced.code, synced.err).toBe(0);
+      expect(synced.out).toContain('local.cfg');
+      expect(synced.out).toContain('left alone');
+      expect(readFileSync(join(repo.dir, 'local.cfg'), 'utf8')).toBe('mine, never in git\n');
       expect(git(repo.dir, 'rev-parse', 'main')).toBe(before);
     });
 

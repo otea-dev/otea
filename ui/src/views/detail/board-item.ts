@@ -404,7 +404,13 @@ export function localBehindSaid(behind: LocalBehind): string {
   const count = behind.behind;
   if (behind.state === 'elsewhere')
     return t('bi.branch.behind.elsewhere', { count, remote, base, checkout, on: behind.on ?? '' });
-  return t(`bi.branch.behind.${behind.state}`, { count, remote, base, checkout });
+  return t(`bi.branch.behind.${behind.state}`, {
+    count,
+    remote,
+    base,
+    checkout,
+    paths: (behind.paths ?? []).join(', '),
+  });
 }
 
 // The branch line's words after the branch: may it be pushed, is it held in review, how it lands

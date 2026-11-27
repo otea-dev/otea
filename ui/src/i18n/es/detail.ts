@@ -772,6 +772,10 @@ export const detail = {
     other:
       'Subido a {remote}, pero tu {base} local va {count} commits atrasado: {checkout} está en {on}, así que no se tocó; cambia a {base} y ejecuta git pull --ff-only',
   },
+  'bi.branch.behind.diverged':
+    'Subido a {remote}, pero tu {base} local y {remote} se separaron: tu {base} tiene commits propios, así que no se tocó y ningún pull puede ponerlo al día; mira git log {remote}..{base} en {checkout} y decide cómo unirlos',
+  'bi.branch.behind.collides':
+    'Subido a {remote}, pero {paths} reemplazaría lo que guardas fuera de git en {checkout}, así que no se tocó; muévelo a un lado y ejecuta git pull --ff-only ahí',
   'bi.branch.drift':
     'Alguien subió commits a la rama después de la entrega: {list}. Aprobar aprueba solo lo entregado, {handed}.',
   'bi.branch.driftBy': '{commit} de {author}',

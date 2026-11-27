@@ -764,6 +764,10 @@ export const detail = {
     other:
       'Landed on {remote}, but your local {base} is {count} commits behind: {checkout} is on {on}, so nothing was touched; switch to {base} and run git pull --ff-only',
   },
+  'bi.branch.behind.diverged':
+    'Landed on {remote}, but your local {base} and {remote} have diverged: your {base} has commits of its own, so nothing was touched and no pull can bring it up to date; look at git log {remote}..{base} in {checkout} and decide how to join them',
+  'bi.branch.behind.collides':
+    'Landed on {remote}, but {paths} would replace what you keep out of git in {checkout}, so nothing was touched; move it aside, then run git pull --ff-only there',
   'bi.branch.drift':
     'Someone pushed commits to the branch after the handoff: {list}. Approving approves only what was handed off, {handed}.',
   'bi.branch.driftBy': '{commit} by {author}',

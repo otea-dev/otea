@@ -536,26 +536,58 @@ function isAncestor(cwd: string, ancestor: string, of: string): boolean {
 // An item landed on the remote's base while the main checkout's own base stayed where it was (an
 // agent pushed `HEAD:main` from a worktree): `behind` commits the remote has that the local base
 // lacks. `state`: whether git can bring the checkout up to date at once (`ready`: it is on the
-// base with no change to a tracked file), or it is left alone (`changes`, or checked out
-// `elsewhere`, named in `on`).
+// base with no change to a tracked file), or it is left alone: `changes`, checked out `elsewhere`
+// (named in `on`), `diverged` (the local base has commits of its own the remote lacks, so no
+// fast-forward can bring it up: that is the person's to untangle) or `collides` (a file arriving
+// from the remote would replace one the person keeps out of git here, named in `paths`).
 export type LocalBehind = {
   base: string;
   remote: string;
   behind: number;
   checkout: string;
-  state: 'ready' | 'changes' | 'elsewhere';
+  state: 'ready' | 'changes' | 'elsewhere' | 'diverged' | 'collides';
   on?: string;
+  paths?: string[];
 };
 
+// How many ignored paths are named when a fast-forward would replace them.
+const COLLISION_NAMED = 3;
+
+// The files that arrive with the remote's base (added there, not in the local base) where the
+// checkout holds an ignored file or folder of its own: a fast-forward writes over those without a
+// word (an .env, a local config). Empty when none does.
+function collidingPaths(checkout: string, from: string, to: string): string[] {
+  const split = (text: string) => text.split('\0').filter(Boolean);
+  const incoming = split(git(checkout, 'diff', '--name-only', '-z', '--diff-filter=A', from, to));
+  if (incoming.length === 0) return [];
+  const ignored = split(
+    git(
+      checkout,
+      '--no-optional-locks',
+      'ls-files',
+      '-z',
+      '--others',
+      '--ignored',
+      '--exclude-standard',
+      '--directory',
+    ),
+  );
+  return incoming.filter((path) =>
+    ignored.some((mine) => (mine.endsWith('/') ? path.startsWith(mine) : path === mine)),
+  );
+}
+
 // Brings the checkout's local base up to the remote's by a fast-forward and nothing else, and only
-// while the checkout is on that base with no change to a tracked file (asked again here: it may
-// have changed since it was read). Whether it moved.
+// while the checkout is on that base with no change to a tracked file and no ignored file of its
+// own in the way (asked again here: it may have changed since it was read). Whether it moved.
 export function fastForward(behind: LocalBehind): boolean {
   const { checkout, base, remote } = behind;
   if (checkedOutBranch(checkout) !== base) return false;
   if (git(checkout, '--no-optional-locks', 'status', '--porcelain', '--untracked-files=no') !== '')
     return false;
   try {
+    if (collidingPaths(checkout, `refs/heads/${base}`, `refs/remotes/${remote}`).length > 0)
+      return false;
     git(checkout, 'merge', '--ff-only', '--quiet', `refs/remotes/${remote}`);
     return true;
   } catch {
@@ -585,7 +617,21 @@ export function localBehind(
   // (or their editor's) may be using at that moment.
   const changed =
     git(checkout, '--no-optional-locks', 'status', '--porcelain', '--untracked-files=no') !== '';
-  const state = on !== base ? 'elsewhere' : changed ? 'changes' : 'ready';
+  // The local base has commits of its own the remote lacks: nothing fast-forwards it.
+  const diverged = !isAncestor(checkout, here, there);
+  const colliding =
+    diverged || on !== base || changed
+      ? []
+      : collidingPaths(checkout, `refs/heads/${base}`, `refs/remotes/${remote}`);
+  const state = diverged
+    ? 'diverged'
+    : on !== base
+      ? 'elsewhere'
+      : changed
+        ? 'changes'
+        : colliding.length > 0
+          ? 'collides'
+          : 'ready';
   return {
     base,
     remote,
@@ -593,6 +639,7 @@ export function localBehind(
     checkout,
     state,
     ...(on !== undefined && on !== base ? { on } : {}),
+    ...(state === 'collides' ? { paths: colliding.slice(0, COLLISION_NAMED) } : {}),
   };
 }
 
