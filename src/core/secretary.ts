@@ -54,6 +54,8 @@ export type SecretaryWakeKind = SecretarySignalKind | 'unheard';
 //   connected  heard, but not waiting: it hears nothing until it waits again
 //   offline    not connected; `since` is when it was last heard
 // `pending`: signals emitted and not yet returned by a wait (what waits for it).
+// `session`: the process of the harness session the secretary runs in (the one its declaration noted
+// or its MCP server), while that session runs; the name alone proves nothing (S2).
 export type SecretaryState = 'listening' | 'connected' | 'offline';
 
 export type SecretaryStatus = {
@@ -61,4 +63,5 @@ export type SecretaryStatus = {
   state: SecretaryState;
   since: string | null;
   pending: number;
+  session?: number;
 };

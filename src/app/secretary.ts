@@ -11,7 +11,7 @@ import {
 } from '../core/secretary.ts';
 import { bumpKindNews, bumpOwed, markHeard, resetOwed, selectOwed } from '../store/conversation.ts';
 import { joinTransaction } from '../store/database.ts';
-import { selectEvents } from '../store/queries.ts';
+import { selectEvents, selectListener, selectListenerProcesses } from '../store/queries.ts';
 import {
   ackReturned,
   countPendingSignals,
@@ -119,7 +119,27 @@ export function secretaryStatus(
     const since = agent ? lastHeard(agent) : null;
     return { name, state: 'offline', since, pending };
   }
-  return { name, state: agent.attending ? 'listening' : 'connected', since: null, pending };
+  const session = sessionOf(db, name, processes);
+  return {
+    name,
+    state: agent.attending ? 'listening' : 'connected',
+    since: null,
+    pending,
+    ...(session === undefined ? {} : { session }),
+  };
+}
+
+// The process of the harness session the secretary's name is bound to while it runs: its MCP server,
+// else the harness its declaration or wait noted (app/session-bound.ts notedSession says the same).
+function sessionOf(
+  db: DatabaseSync,
+  name: string,
+  alive: (pid: number) => boolean,
+): number | undefined {
+  const heard = selectListener(db, name);
+  if (heard?.session && alive(heard.session)) return heard.session;
+  const harness = selectListenerProcesses(db).get(name)?.harness;
+  return harness != null && alive(harness) ? harness : undefined;
 }
 
 // `otea wait --secretary`, `otea conversation` and `otea say` are only for the project's secretary:

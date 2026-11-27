@@ -1,3 +1,4 @@
+import type { DatabaseSync } from 'node:sqlite';
 import { noteHarness } from '../app/presence.ts';
 import { openProject, type Project } from '../app/project.ts';
 import { secretaryName } from '../app/secretary.ts';
@@ -107,6 +108,13 @@ export function secretaryElsewhere(agent: string): string {
   return `${agent} is this project's secretary and runs in another session: this command is not from it. If you are the secretary, it is that session; if that one ended, take over from yours once its process is gone. Otherwise use your own name (otea whoami) and ask the secretary through otea escalate`;
 }
 
+// What a declaration of the secretary role is told when another session already declared it (the
+// session noted for the name runs, or won the declaration at the same moment): one session is the
+// secretary, the others are refused whole, nothing of theirs kept.
+export function secretaryDeclaredElsewhere(agent: string): string {
+  return `${agent} is this project's secretary, declared by another session, and runs in another session: this declaration is not from it. If you are the secretary, it is that session; if that one ended, declare again from yours once its process is gone. Otherwise use your own name (otea whoami)`;
+}
+
 // The session the command is bound to, if it acts as the secretary or on an item its own session
 // leased and that session runs.
 function boundOf(project: Project, input: Input, agent: string): Bound | undefined {
@@ -116,7 +124,12 @@ function boundOf(project: Project, input: Input, agent: string): Bound | undefin
     SECRETARY_ACTS.has(command) || declares || (command === 'wait' && input.flag('secretary'));
   if (secretaryAct && secretaryName(project.db) === agent) {
     const noted = notedSession(project.db, agent);
-    if (noted !== undefined) return { noted, refusal: secretaryElsewhere(agent) };
+    if (noted !== undefined) {
+      return {
+        noted,
+        refusal: declares ? secretaryDeclaredElsewhere(agent) : secretaryElsewhere(agent),
+      };
+    }
   }
   if (!LEASE_ACTS.has(command)) return undefined;
   const id = input.args[0];
@@ -165,10 +178,10 @@ export function judgeCaller(
 }
 
 // Throws when the command acts under a name bound to another session; otherwise notes what it
-// found, and returns what to do once the command succeeded (note the harness of a declaration).
-export async function guardSession(input: Input): Promise<(() => Promise<void>) | undefined> {
+// found (the harness a declaration runs under, for noteDeclaringHarness).
+export async function guardSession(input: Input): Promise<void> {
   const agent = input.agent;
-  if (agent === undefined) return undefined;
+  if (agent === undefined) return;
   let bound: Bound | undefined;
   let declares = false;
   let reading: Noted | undefined;
@@ -210,24 +223,30 @@ export async function guardSession(input: Input): Promise<(() => Promise<void>) 
     }
   }
   // A secretary's declaration notes the harness it runs under, so its binding stands before any
-  // wait of anyone's: an impersonator's first wait cannot take the role before the real one.
-  // Over MCP the server is the session, noted when it hears the name.
-  if (declares && input.channel === 'cli') return () => noteCallerAs(input, agent);
-  return undefined;
+  // wait of anyone's: an impersonator's first wait cannot take the role before the real one. The
+  // harness is read here (a listing takes long); the declaration notes it in its own transaction
+  // (declaredHarnessOf), where sessions that declare together find one winner. Over MCP the server
+  // is the session, noted when it hears the name.
+  if (declares && input.channel === 'cli') {
+    const caller = await callerOf();
+    if (caller?.pid !== undefined && caller.pid !== process.pid) {
+      declaring.set(input, { pid: caller.pid, known: caller.known, started: caller.started });
+    }
+  }
 }
 
-async function noteCallerAs(input: Input, agent: string): Promise<void> {
-  const caller = await callerOf();
-  if (caller?.pid === undefined || caller.pid === process.pid) return;
-  try {
-    const project = openProject(input.cwd);
-    try {
-      noteHarness(project.db, agent, caller.pid, undefined, caller.known, caller.started);
-    } finally {
-      project.db.close();
-    }
-  } catch {
-    // The project is gone: nothing to note it for.
+// The harness a declaration of the secretary role runs under, when the guard could read it.
+type Declaring = { pid: number; known: boolean; started: number | undefined };
+const declaring = new WeakMap<Input, Declaring>();
+
+// Notes the harness of the secretary's declaration, inside the declaration's own transaction: the
+// first session to note it for the name wins, and the others are refused with nothing of theirs
+// kept (the transaction rolls back), like the sessions that wait together (presence.ts noteHarness).
+export function noteDeclaringHarness(db: DatabaseSync, input: Input, agent: string): void {
+  const harness = declaring.get(input);
+  if (harness === undefined) return;
+  if (!noteHarness(db, agent, harness.pid, undefined, harness.known, harness.started)) {
+    throw new OteaError('forbidden', secretaryDeclaredElsewhere(agent));
   }
 }
 
@@ -236,10 +255,8 @@ export function sessionBound(command: Command): Command {
   return {
     ...command,
     execute: async (input) => {
-      const after = await guardSession(input);
-      const output = await command.execute(input);
-      await after?.();
-      return output;
+      await guardSession(input);
+      return command.execute(input);
     },
   };
 }

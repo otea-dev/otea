@@ -372,6 +372,7 @@ import { saysWhereItLives, unreachedWhere } from './reach.ts';
 import { readServeFile, removeServeFile, serverVersionNote, writeServeFile } from './serve-file.ts';
 import {
   isFromAnotherSession,
+  noteDeclaringHarness,
   secretaryElsewhere,
   sessionBound,
   sessionVerdictOf,
@@ -3284,12 +3285,14 @@ function secretaryLines(project: Project, name: string | undefined | null): stri
     secretary.state === 'offline'
       ? `offline since ${secretary.since === null ? 'never heard' : timeText(secretary.since)}`
       : secretary.state;
+  // The session the name is bound to: a name alone proves nothing, so it is told which one is it.
+  const bound = secretary.session === undefined ? '' : `, session ${secretary.session}`;
   if (secretary.name === name) {
     return [
-      `You are this project's secretary (${stands}). Listen for the person with ${secretaryWaitCommand(name)}; read what they wrote with otea conversation --as ${name}, answer with otea say.`,
+      `You are this project's secretary (${stands}${bound}). Listen for the person with ${secretaryWaitCommand(name)}; read what they wrote with otea conversation --as ${name}, answer with otea say.`,
     ];
   }
-  return [`This project's secretary is ${secretary.name} (${stands}).`];
+  return [`This project's secretary is ${secretary.name} (${stands}${bound}).`];
 }
 
 // A board draft a restart may have cut off (p3-company run 2): Otea kept it, and a new session is
@@ -3418,6 +3421,9 @@ const profileCommandSpec: Command = {
       // has one), or an option that is wrong, leaves nothing declared.
       transaction(project.db, () => {
         const roled = role === undefined ? undefined : declareSecretary(project.db, actor.name);
+        // One declaration wins when several sessions declare the same name together: the others
+        // are refused here, and the transaction leaves nothing of theirs (session-guard.ts).
+        if (roled !== undefined) noteDeclaringHarness(project.db, input, actor.name);
         const known = findProfile(project.db, actor.name);
         const out = ((): Output => {
           if (model === undefined && effort === undefined && given === undefined) {
