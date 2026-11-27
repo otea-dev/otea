@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { requestChangedText } from '../core/board/request-changed.ts';
 import { OteaError } from '../core/errors.ts';
 import { UNHEARD_GRACE_MS, unheardKey } from '../core/notify/signals.ts';
 import { quoteAgent } from '../core/quote.ts';
@@ -30,7 +31,7 @@ import {
 } from '../store/secretary.ts';
 import { workersByBoard } from './board-workers.ts';
 import type { Context } from './context.ts';
-import { type Clock, listItems, systemClock } from './items.ts';
+import { type Clock, getItem, listItems, requestChangedOf, systemClock } from './items.ts';
 import { boardRoundOf, liveBoards } from './next.ts';
 import { type AgentPresence, listAgents, processAlive } from './presence.ts';
 import { setAsideOf } from './set-aside.ts';
@@ -327,6 +328,19 @@ function unheardWake(
   };
 }
 
+// What the secretary adds to the wake of a delivery whose request changed after the handoff (the
+// review screen warns the person the same; the secretary says it in its line).
+function requestChangedIn(ctx: Context, id: string): string {
+  try {
+    const item = getItem(ctx, id);
+    const changed = requestChangedOf(ctx, item, item.events);
+    return changed ? `\n${requestChangedText(changed)} Tell me so in your line.` : '';
+  } catch {
+    // The item is gone: nothing to add.
+    return '';
+  }
+}
+
 // The oldest signal this wait is to return, taken atomically (two waits at once never both get it).
 function signalWake(ctx: Context, wait: SecretaryWait, now: Clock): SecretaryWake | undefined {
   for (const signal of selectOpenSignals(ctx.db)) {
@@ -348,7 +362,8 @@ function signalWake(ctx: Context, wait: SecretaryWait, now: Clock): SecretaryWak
       ...(ref === null ? {} : { ref }),
       ...(text === null ? {} : { text }),
     };
-    return { kind, ...(ref === null ? {} : { ref }), text: wakeText(pending) };
+    const changed = kind === 'ready_for_review' && ref !== null ? requestChangedIn(ctx, ref) : '';
+    return { kind, ...(ref === null ? {} : { ref }), text: `${wakeText(pending)}${changed}` };
   }
   return undefined;
 }

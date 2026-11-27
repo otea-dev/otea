@@ -229,6 +229,7 @@ export const board = {
   'boardView.quietCard': 'reserva vencida {time}',
   'boardView.round': 'ronda {n}',
   'boardView.approvedUnmerged': 'Aprobado, sin fusionar',
+  'boardView.approvedLanding': 'Aprobado · falta integrar',
   'boardView.merged': 'rama fusionada',
   'boardView.queued': 'en cola',
   'boardView.blocked': {

@@ -224,6 +224,7 @@ export const board = {
   'boardView.quietCard': 'lease expired {time}',
   'boardView.round': 'round {n}',
   'boardView.approvedUnmerged': 'Approved, not merged yet',
+  'boardView.approvedLanding': 'Approved · not landed yet',
   'boardView.merged': 'branch merged',
   'boardView.queued': 'queued',
   'boardView.blocked': { one: 'waits for {count} blocker', other: 'waits for {count} blockers' },

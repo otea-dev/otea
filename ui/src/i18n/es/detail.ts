@@ -443,6 +443,12 @@ export const detail = {
   'sheet.stand.kids': 'Espera a sus hijos.',
   'sheet.stand.working': '{agent} lo está haciendo.',
   'sheet.stand.workingAsks': '{agent} lo tiene, pero espera tu respuesta en {item}.',
+  'sheet.stand.landing':
+    'Aprobado, pero todavía no está integrado: hasta que un agente lo integre no está hecho.',
+  'sheet.stand.bounced':
+    'Volvió a su paso porque, ya aprobado, chocó con otro cambio que se integró antes: «{why}». Se revisa de nuevo.',
+  'sheet.stand.bouncedPlain':
+    'Volvió a su paso porque, ya aprobado, chocó con otro cambio que se integró antes. Se revisa de nuevo.',
   'sheet.stand.reopened': 'Se reabrió: «{why}». {agent} lo retoma.',
   'sheet.stand.reopenedWaits': 'Se reabrió: «{why}». Espera a un agente.',
   'sheet.stand.workingRound': '{agent} lo está haciendo en la ronda {round}.',
@@ -804,6 +810,20 @@ export const detail = {
   'bi.branch.overlapOpen':
     '{item} toca los mismos archivos que {other} ({files}), que también está abierto: el que se integre segundo debe fusionar main primero y puede chocar.',
   'bi.branch.overlapMore': 'y {n} más',
+  'bi.branch.overlapGroup': {
+    one: '{item} comparte archivos con {count} cambio abierto más ({others}): el que se integre segundo debe fusionar main primero y puede chocar.',
+    other:
+      '{item} comparte archivos con {count} cambios abiertos más ({others}): el que se integre segundo debe fusionar main primero y puede chocar.',
+  },
+  'bi.branch.overlapFirst': {
+    one: ' Ese se integra primero.',
+    other: ' {count} de ellos se integran primero.',
+  },
+  'bi.branch.overlapEach': 'qué archivos',
+  'bi.changed.lead':
+    'El pedido cambió después de esta entrega ({by}, {time}). El diff y la rama responden al pedido anterior: devolverla es lo seguro.',
+  'bi.changed.line': '{field}: antes {from} · ahora {to}',
+  'bi.changed.empty': 'vacío',
   'bi.branch.mergeOnly':
     'Desde el commit que aprobaste ({since}), esta ronda solo fusiona main en {branch}. La fusión misma cambió {files}: todo lo de este diff es nuevo y aún sin revisar, incluso los archivos que no chocaron. Lo demás es lo que aprobaste, y lo que trajo main aterrizó con su propia revisión. Aprobar toma {tip} tal como está.',
   'bi.branch.mergeOnlyClean':

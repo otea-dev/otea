@@ -258,6 +258,7 @@ import {
 } from '../core/board/model.ts';
 import { DROPPED_NAME, wayByName } from '../core/board/next.ts';
 import { attachedPart, fieldsByName, partByName, stateName } from '../core/board/reading.ts';
+import { requestChangedText } from '../core/board/request-changed.ts';
 import type { Lang } from '../core/board/template-words.ts';
 import { isSetKey, LANGS, LISTED_KEYS, TEMPLATE_SETS, TEMPLATES } from '../core/board/templates.ts';
 import { parseDiagram } from '../core/diagram.ts';
@@ -1461,6 +1462,8 @@ const show: Command = {
         fromBandeja === undefined
           ? undefined
           : `Refined from the Bandeja, ${fromBandeja.ref}: "${fromBandeja.snippet}". Read the whole note with otea bandeja ${fromBandeja.ref}.`,
+        // U5: the request was rewritten while its delivery waits for review.
+        shown.requestChanged ? requestChangedText(shown.requestChanged) : undefined,
         mergedOutsideLine(project, input.cwd, shown),
         stray?.text,
         ...(mergeOnly ? [mergeOnlyText(shown.id, mergeOnly)] : []),

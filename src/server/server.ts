@@ -46,7 +46,7 @@ import type { Launcher } from '../app/launcher.ts';
 import { deskSignature, livenessSignature } from '../app/liveness.ts';
 import { memoryMachine } from '../app/machine.ts';
 import { mergeOnlyOf } from '../app/merge-only.ts';
-import { boardRoundOf, landWaitOf, liveBoards, rowFactsOf } from '../app/next.ts';
+import { boardRoundOf, landWaitOf, liveBoardOf, liveBoards, rowFactsOf } from '../app/next.ts';
 import { editNote, leaveNote, notesSummary, notesView, withdrawNote } from '../app/notes.ts';
 import { listTargets } from '../app/notify-targets.ts';
 import { markOpened, openedFiles } from '../app/opened.ts';
@@ -75,6 +75,7 @@ import { linkItems, unlinkItems } from '../app/relations.ts';
 import { reassignItem, restartItem, resumeItem, undoRelease } from '../app/restart.ts';
 import { secretaryStatus } from '../app/secretary.ts';
 import { setAsideOf } from '../app/set-aside.ts';
+import { stepFactsOf } from '../app/step-facts.ts';
 import {
   type GuidePairing,
   NO_TAILSCALE,
@@ -720,7 +721,14 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
             const row = rowFactsOf(project, item, boards);
             const enteredAt = entered.get(item.id);
             // Set aside for later by an agent (otea release --later): by whom, so the desk says so.
-            const setAside = setAsideOf(selectEvents(project.db, item.id));
+            const events = selectEvents(project.db, item.id);
+            const setAside = setAsideOf(events);
+            // Approved and waiting to land, or taken back by a conflict (src/app/step-facts.ts).
+            const steps = stepFactsOf(
+              boards.find((board) => board.collection === item.collection)?.def,
+              item,
+              events,
+            );
             // Held by an agent whose question waits for you on another item (P7-R3-9).
             const holderAsks = holderAsksOf(asking, item, at);
             // Approved and waiting for another to land first (src/app/land-order.ts).
@@ -728,6 +736,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
             return {
               ...item,
               ...row,
+              ...steps,
               ...(landsAfter === undefined ? {} : { landsAfter }),
               ...(setAside === undefined ? {} : { setAside }),
               ...(holderAsks === undefined ? {} : { holderAsks }),
@@ -810,6 +819,10 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
         }
         const setAside = setAsideOf(item.events);
         if (setAside) item = { ...item, setAside };
+        item = {
+          ...item,
+          ...stepFactsOf(liveBoardOf(project, item.collection)?.def, item, item.events),
+        };
         const holderAsks = holderAsksOf(askingItems(project.db), item, new Date().toISOString());
         if (holderAsks) item = { ...item, holderAsks };
         // The turns of the conversation it came from: the page links back to them.

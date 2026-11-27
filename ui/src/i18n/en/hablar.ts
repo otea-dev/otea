@@ -35,6 +35,8 @@ export const hablar = {
   'hablar.chose.delegated': 'You left the decision to whoever asked',
   'hablar.chose.on': 'on {about}',
   'hablar.out.taking': 'the secretary is taking it',
+  'hablar.out.leftover':
+    'Now a consultation: what was already created stays open until your secretary sets it aside or you discard it.',
   'hablar.block': 'Text to paste',
   'hablar.block.copy': 'Copy',
   'hablar.block.copied': 'Copied',
@@ -52,6 +54,9 @@ export const hablar = {
   'hablar.st.queued': 'queued',
   'hablar.st.waiting': 'waiting',
   'hablar.st.stuck': 'stuck',
+  'hablar.st.aside': 'set aside',
+  'hablar.st.landing': 'approved · not landed yet',
+  'hablar.st.bounced': 'back after a conflict',
   'hablar.st.done': 'done',
   'hablar.st.dropped': 'discarded',
   'hablar.st.yours': 'your turn',

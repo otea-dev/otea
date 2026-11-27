@@ -162,14 +162,23 @@ button.lk2:hover {
   flex: 1 1 0;
   min-width: 0;
 }
-/* a round that only merges main: what the merge changed by hand, folded under the line */
-.bstrip.merge details {
+/* a round that only merges main: what the merge changed by hand, folded under the line; the open
+   changes that share files, each folded under their one line; what a rewritten request said */
+.bstrip.drift details {
   flex: 1 1 100%;
   min-width: 0;
 }
-.bstrip.merge summary {
+.bstrip.drift summary {
   cursor: pointer;
   color: var(--ink-2);
+}
+.bstrip.drift ul {
+  flex: 1 1 100%;
+  min-width: 0;
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
 }
 .bstrip.merge pre {
   margin: 8px 0 0;

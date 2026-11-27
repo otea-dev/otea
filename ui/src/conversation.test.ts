@@ -454,6 +454,27 @@ describe('what a request produced', () => {
     expect(chipOf('DOC', items, NOW)).toMatchObject({ look: null, state: 'hablar.st.draft' });
   });
 
+  // U4 and U1 (field study 4): a set-aside item read «en cola», an approved one read as if it were
+  // done or still queued, and one taken back after a conflict said nothing of why.
+  it('says set aside, approved and not landed, and back after a conflict, never queued', () => {
+    const aside = item({
+      id: 'CAM-16',
+      turn: 'agent',
+      setAside: { by: 'worker', at: ago(5) },
+    });
+    const landing = item({ id: 'CAM-17', turn: 'agent', landing: true });
+    const bounced = item({
+      id: 'CAM-18',
+      turn: 'agent',
+      bounced: { by: 'worker', at: ago(5), reason: 'conflicts with CAM-17' },
+    });
+    const items = byId(aside, landing, bounced);
+
+    expect(chipOf('CAM-16', items, NOW).state).toBe('hablar.st.aside');
+    expect(chipOf('CAM-17', items, NOW).state).toBe('hablar.st.landing');
+    expect(chipOf('CAM-18', items, NOW).state).toBe('hablar.st.bounced');
+  });
+
   it('lists the chips in the order the secretary linked them, and the questions that wait', () => {
     const items = byId(working, queued, asking);
     const [turn] = turnsOf([
@@ -540,6 +561,33 @@ describe('what came out, in cards', () => {
       expect.objectContaining({ root: 1, kind: 'request', chips: [], taking: true }),
     ]);
     expect(cardCounts(corrected, items, NOW).request).toBe(1);
+  });
+
+  // A request the person corrects to a consultation after items were made from it (U4 field study
+  // 4): the card keeps those items in sight and says they are still open, instead of listing only
+  // an answer while CAM-10 sits in the queue unseen.
+  it('keeps the items of a request corrected to a consultation, saying they are still open', () => {
+    const corrected = turnsOf([
+      say({ id: 1, author: 'person', text: 'agrega DELETE /orders/:id' }),
+      say({
+        id: 2,
+        author: 'secretary',
+        replyTo: 1,
+        root: 1,
+        kind: 'consultation',
+        kindBy: 'person',
+        links: ['CAM-13'],
+        text: 'Anotado como cambio.',
+      }),
+    ]);
+
+    expect(cardsOf(corrected, items, NOW)).toEqual([
+      expect.objectContaining({
+        kind: 'consultation',
+        leftover: true,
+        chips: [expect.objectContaining({ id: 'CAM-13' })],
+      }),
+    ]);
   });
 
   it('filters by kind and counts each', () => {

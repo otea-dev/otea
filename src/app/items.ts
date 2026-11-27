@@ -2,6 +2,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { authorizeMove, type Channel, type Move, type Performer } from '../core/authority.ts';
 import { guardedBranch } from '../core/board/model.ts';
 import { openQuestion } from '../core/board/questions.ts';
+import { type RequestChanged, requestChangedAfterHandoff } from '../core/board/request-changed.ts';
 import { OteaError } from '../core/errors.ts';
 import { assertCanLeave, type FieldValues, intake, revise } from '../core/fields.ts';
 import { assertStandsAlone } from '../core/hierarchy.ts';
@@ -309,7 +310,29 @@ export type ItemView = ItemWithEvents & {
   board?: BoardBlock;
   // On an archived board: read-only; the board by its name and its hidden id.
   archived?: { board: string; id: string };
+  // While it waits for the person: its request was rewritten after the delivery was handed in.
+  requestChanged?: RequestChanged;
 };
+
+// While the item waits for the person: what changed in its request after the delivery was handed
+// in, each field by its name on the board (the title as `title`).
+export function requestChangedOf(
+  ctx: Context,
+  item: Pick<Item, 'collection' | 'turn'>,
+  events: Parameters<typeof requestChangedAfterHandoff>[0],
+): RequestChanged | undefined {
+  if (item.turn !== 'human') return undefined;
+  const changed = requestChangedAfterHandoff(events);
+  const parts = liveBoardOf(ctx, item.collection)?.def.parts;
+  if (!changed || !parts) return changed;
+  return {
+    ...changed,
+    changes: changed.changes.map((change) => ({
+      ...change,
+      field: parts[change.field]?.name ?? change.field,
+    })),
+  };
+}
 
 export function showItem(
   ctx: Context,
@@ -323,6 +346,7 @@ export function showItem(
   const children = childrenOf(ctx, item.id, at);
   const { gates: stateGates, ...offered } = itemMoves(type, item.state, item.fields, performer);
   const gates = withBranchGates(ctx, item, stateGates);
+  const changed = requestChangedOf(ctx, item, item.events);
   const moves = {
     ...offered,
     transitions: boardMoves(ctx, item, offered.transitions),
@@ -350,6 +374,7 @@ export function showItem(
     ...(children.length > 0 ? { children: childrenSummary(children) } : {}),
     ...(gates === undefined ? {} : { gates }),
     ...(board === undefined ? {} : { board }),
+    ...(changed === undefined ? {} : { requestChanged: changed }),
   };
 }
 

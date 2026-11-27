@@ -459,7 +459,6 @@ function Thinking() {
 
 type EntryProps = {
   row: RowOf;
-  thinking: boolean;
   items: ReadonlyMap<string, Item>;
   now: number;
   fresh: (key: string) => boolean;
@@ -472,20 +471,10 @@ type EntryProps = {
 };
 
 // One message of the thread, where it was said. The turn it belongs to only lends it what it
-// shares: the kind label (on the person's message until the secretary has answered, then on its
-// first reply) and the branch of items that came out of it (under that first reply).
-function Entry({
-  row,
-  thinking,
-  items,
-  now,
-  fresh,
-  found,
-  begins,
-  onKind,
-  onGo,
-  onAnswer,
-}: EntryProps) {
+// shares: the kind label (always on the person's own first message: it is what they said that the
+// kind sorts, never what the secretary answered) and the branch of items that came out of it
+// (under that first reply).
+function Entry({ row, items, now, fresh, found, begins, onKind, onGo, onAnswer }: EntryProps) {
   const { message, turn } = row;
   const label = <KindLabel turn={turn} onKind={onKind} />;
   let body: ReactNode;
@@ -493,11 +482,7 @@ function Entry({
     const first = turn.person[0]?.id === message.id;
     body = (
       <Row lane="you" bodyKey={`m${message.id}`} fresh={fresh(`m${message.id}`)}>
-        <PersonMessage
-          message={message}
-          now={now}
-          extra={first && turn.replies.length === 0 && !thinking ? label : null}
-        />
+        <PersonMessage message={message} now={now} extra={first ? label : null} />
       </Row>
     );
   } else if (row.type === 'choice') {
@@ -515,13 +500,7 @@ function Entry({
         fresh={fresh(`r${message.id}`)}
         className={chips.length > 0 ? 'has-branch' : undefined}
       >
-        <Reply
-          message={message}
-          now={now}
-          head={row.head ? label : null}
-          answers={row.answers}
-          onGo={onGo}
-        />
+        <Reply message={message} now={now} head={null} answers={row.answers} onGo={onGo} />
         {row.question === 'open' ? (
           <AskBody
             bare
@@ -745,7 +724,6 @@ export function Turns({
           <Entry
             key={row.message.id}
             row={row}
-            thinking={row.turn.root === thinking}
             items={items}
             now={app.now}
             fresh={fresh}

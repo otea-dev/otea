@@ -46,6 +46,7 @@ import {
   LinksSection,
   PartOfLine,
   PartsSection,
+  RequestChangedLine,
   RoundNotes,
   WaitChecklist,
 } from './BoardSections.tsx';
@@ -419,6 +420,8 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
     reopened: onBoard?.reopened?.why,
     byYou: !!closedBy?.doneByPerson,
     aside: item.setAside?.by,
+    landing: item.landing,
+    bounced: item.bounced ? item.bounced.reason : undefined,
     asksOn: item.holderAsks,
     gone: gone
       ? { agent: gone.name, ended: gone.sessionEnded === true, quiet: quietFor(gone.lastSeen, now) }
@@ -893,6 +896,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
               checks={
                 <>
                   {/* Its branch and where it stands: «fusionada» once merged, as on the desk (WF-3). */}
+                  <RequestChangedLine changed={item.requestChanged} />
                   <BranchLine
                     strip={strip}
                     behind={behind}
@@ -1217,6 +1221,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                   />
                 ) : null}
               </div>
+              <RequestChangedLine changed={item.requestChanged} />
               <BranchLine
                 strip={strip}
                 behind={behind}

@@ -1,5 +1,6 @@
 import type { AgentStatus } from '../../src/core/agent-status.ts';
 import type { FromBandeja } from '../../src/core/bandeja.ts';
+import type { RequestChanged } from '../../src/core/board/request-changed.ts';
 import type { FromMessage } from '../../src/core/conversation.ts';
 import type { Layout } from '../../src/core/modules.ts';
 import type { NotifyPrefs } from '../../src/core/notify/planner.ts';
@@ -64,6 +65,12 @@ export type Item = {
   // While an agent has it set aside for later (otea release --later, app/set-aside.ts): that agent
   // and when. Its next and wait leave the item out until it lifts (Retomar, or what the person does).
   setAside?: { by: string; at: string };
+  // Approved by you and waiting for an agent to land it in its base (src/app/step-facts.ts): it is
+  // not done until it lands, so its card says «aprobado · falta integrar».
+  landing?: true;
+  // Taken back to its doing step by an agent after it was approved (a conflict once another change
+  // landed first): who, when, and the reason it gave.
+  bounced?: { by: string; at: string; reason: string | null };
   // Held by an agent whose own question waits for your answer on another item (P7-R3-9): that
   // agent and the item; the desk says it waits there, not that it is on this one.
   holderAsks?: { by: string; item: string };
@@ -172,6 +179,8 @@ export type ItemView = Omit<ItemWithEvents, 'relations'> & {
   fromMessages?: FromMessage[];
   // The Bandeja entry it was refined from, when it was.
   fromBandeja?: FromBandeja;
+  // While it waits for the person: its request was rewritten after the delivery was handed in.
+  requestChanged?: RequestChanged;
 };
 
 // canManageDevices: this computer's signed-in browser, the only one that pairs and revokes devices.

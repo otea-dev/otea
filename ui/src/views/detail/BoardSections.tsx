@@ -1,8 +1,9 @@
 import { type ReactNode, useId, useState } from 'react';
+import type { RequestChanged } from '../../../../src/core/board/request-changed.ts';
 import { useApp } from '../../app/context.tsx';
 import { NoteText } from '../../components/NoteText.tsx';
 import { Prof } from '../../components/Prof.tsx';
-import { itemWord } from '../../format.ts';
+import { itemWord, momentLabel } from '../../format.ts';
 import { listOr, t, tx } from '../../i18n/i18n.ts';
 import {
   Button,
@@ -39,7 +40,7 @@ import { type Drift, driftText } from './drift.ts';
 import type { LocalBehind } from './local-behind.ts';
 import { type MergeOnly, mergeOnlyText } from './merge-only.ts';
 import type { MergedOutside } from './merged-outside.ts';
-import { type Overlap, overlapTexts } from './overlaps.ts';
+import { type Overlap, overlapNotice } from './overlaps.ts';
 import { type RoundSame, roundSameText } from './round-same.ts';
 
 // The item page of a Studio board (the mock's itemHtml, 75-cover.js): what its step waits for in
@@ -431,13 +432,57 @@ export function BranchLine({
           )}
         </div>
       ) : null}
-      {overlapTexts(item, overlaps).map((text) => (
-        <div key={text} className="bstrip drift" data-c role="status">
-          <Icon name="warn" />
-          <span>{text}</span>
-        </div>
-      ))}
+      <OverlapLine item={item} overlaps={overlaps} />
     </>
+  );
+}
+
+// Every other open change that shares files, said once: a line, and the files of each folded.
+function OverlapLine({ item, overlaps }: { item: string; overlaps: readonly Overlap[] }) {
+  const notice = overlapNotice(item, overlaps);
+  if (!notice) return null;
+  return (
+    <div className="bstrip drift" data-c role="status">
+      <Icon name="warn" />
+      <span>{notice.text}</span>
+      {notice.each.length === 0 ? null : (
+        <details>
+          <summary>{t('bi.branch.overlapEach')}</summary>
+          <ul>
+            {notice.each.map((text) => (
+              <li key={text}>{text}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+// «El pedido cambió después de esta entrega»: the request was rewritten while its delivery waits for
+// review, so the diff and the branch answer the earlier one. Says what changed (U5, field study 4).
+export function RequestChangedLine({ changed }: { changed?: RequestChanged | undefined }) {
+  const app = useApp();
+  if (!changed) return null;
+  const shown = (value: string | null) =>
+    value === null
+      ? t('bi.changed.empty')
+      : `«${value.length > 90 ? `${value.slice(0, 90)}…` : value}»`;
+  return (
+    <div className="bstrip drift changed" data-c role="status">
+      <Icon name="warn" />
+      <span>
+        {t('bi.changed.lead', {
+          by: changed.by,
+          time: momentLabel(changed.changedAt, app.now),
+        })}
+      </span>
+      <ul>
+        {changed.changes.map(({ field, from, to }) => (
+          <li key={field}>{t('bi.changed.line', { field, from: shown(from), to: shown(to) })}</li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

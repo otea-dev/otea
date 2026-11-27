@@ -37,6 +37,8 @@ export const hablar = {
   'hablar.chose.delegated': 'Dejaste la decisión a quien preguntó',
   'hablar.chose.on': 'en {about}',
   'hablar.out.taking': 'el secretario lo está tomando',
+  'hablar.out.leftover':
+    'Ahora es una consulta: lo que ya se había creado sigue abierto hasta que tu secretario lo aparte o lo descartes.',
   'hablar.block': 'Texto para pegar',
   'hablar.block.copy': 'Copiar',
   'hablar.block.copied': 'Copiado',
@@ -54,6 +56,9 @@ export const hablar = {
   'hablar.st.queued': 'en cola',
   'hablar.st.waiting': 'en espera',
   'hablar.st.stuck': 'atascado',
+  'hablar.st.aside': 'apartado',
+  'hablar.st.landing': 'aprobado · falta integrar',
+  'hablar.st.bounced': 'volvió por un choque',
   'hablar.st.done': 'hecho',
   'hablar.st.dropped': 'descartado',
   'hablar.st.yours': 'te toca',

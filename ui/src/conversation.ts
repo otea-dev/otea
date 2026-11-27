@@ -314,6 +314,9 @@ export type StateWord =
   | 'hablar.st.queued'
   | 'hablar.st.waiting'
   | 'hablar.st.stuck'
+  | 'hablar.st.aside'
+  | 'hablar.st.landing'
+  | 'hablar.st.bounced'
   | 'hablar.st.done'
   | 'hablar.st.dropped'
   | 'hablar.st.yours'
@@ -326,11 +329,20 @@ export function chipOf(id: string, items: ReadonlyMap<string, Item>, now: number
     return { id, look: null, title: '', agent: null, state: 'hablar.st.draft', asks: false };
   const look = lookOf(item, now);
   const asks = item.asks !== undefined && item.turn === 'human';
+  // A set-aside item is not queued, an approved one is not done until it lands, and one an agent took
+  // back after approving it says why it is on its step again (H2, field study 4).
+  const waits = item.turn === 'agent' && !activeLease(item.lease, now);
   const state: StateWord = asks
     ? 'hablar.st.asks'
     : look === 'yours'
       ? 'hablar.st.yours'
-      : (`hablar.st.${look}` as StateWord);
+      : waits && item.setAside
+        ? 'hablar.st.aside'
+        : item.landing
+          ? 'hablar.st.landing'
+          : item.bounced && look !== 'working'
+            ? 'hablar.st.bounced'
+            : (`hablar.st.${look}` as StateWord);
   return {
     id,
     look,
@@ -369,7 +381,12 @@ export type Card = {
   asks: boolean;
   // A request you set yourself that nothing came out of yet: the secretary is taking it.
   taking: boolean;
+  // A consultation (you corrected it from a request) whose items are still open: the card says
+  // they are waiting for the secretary to set them aside.
+  leftover: boolean;
 };
+
+const isOpenLook = (look: Look): boolean => look !== 'done' && look !== 'dropped';
 
 export function titleOf(turn: Turn): string {
   const first = turn.person[0] ?? turn.messages[0];
@@ -392,7 +409,9 @@ export function cardsOf(
     if (kind === null || (filter !== 'all' && kind !== filter)) continue;
     const taking = kind === 'request' && turn.links.length === 0 && turn.kindBy === 'person';
     if (kind === 'request' && turn.links.length === 0 && !taking) continue;
-    const chips = kind === 'request' ? branchOf(turn, items, now) : [];
+    // What came out of a turn stays with it when the person corrects a request to a consultation:
+    // those items exist, and the card says they are still there (`leftover`).
+    const chips = branchOf(turn, items, now);
     const reply = turn.replies[0];
     cards.push({
       root: turn.root,
@@ -403,6 +422,9 @@ export function cardsOf(
       chips,
       asks: chips.some((chip) => chip.asks),
       taking,
+      leftover:
+        kind === 'consultation' &&
+        chips.some((chip) => chip.look !== null && isOpenLook(chip.look)),
     });
   }
   return cards.reverse();

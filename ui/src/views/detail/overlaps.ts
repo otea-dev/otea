@@ -28,6 +28,27 @@ export function overlapTexts(item: string, overlaps: readonly Overlap[]): string
   );
 }
 
+// What the review says of them all: one notice, not a box per item (U5, field study 4). One overlap
+// reads as its own sentence; several read as a line naming them, with each one's files folded.
+export type OverlapNotice = { text: string; each: string[] };
+
+export function overlapNotice(item: string, overlaps: readonly Overlap[]): OverlapNotice | null {
+  const each = overlapTexts(item, overlaps);
+  const [first] = each;
+  if (first === undefined) return null;
+  if (each.length === 1) return { text: first, each: [] };
+  const landing = overlaps.filter((overlap) => overlap.landing).length;
+  const group = t('bi.branch.overlapGroup', {
+    item,
+    count: overlaps.length,
+    others: overlaps.map(({ id }) => id).join(', '),
+  });
+  return {
+    text: landing === 0 ? group : `${group}${t('bi.branch.overlapFirst', { count: landing })}`,
+    each,
+  };
+}
+
 // The overlaps of the item while `asking` (it waits for the person's review); none otherwise, and
 // while the PC has not answered. Asked once on entering the review, not on every change of the
 // item: the PC reads what the handoff recorded until a branch moves.

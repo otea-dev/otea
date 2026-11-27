@@ -312,6 +312,15 @@ describe('the conversation as a thread in time', () => {
     ]);
   });
 
+  // U1 (field study 4): the chip that corrects a turn's kind sat on the secretary's answer once it
+  // had answered, so it read as the answer's own. It is on what the person said, always.
+  it('keeps the kind label on the person’s own message, never on the secretary’s reply', async () => {
+    const { root } = await open(conversation({ messages: thread() }), { all: [working, queued] });
+
+    expect(all(root, '.hb-row.you .hb-kind')).toHaveLength(2);
+    expect(all(root, '.hb-row.secretary .hb-kind')).toHaveLength(0);
+  });
+
   it('shows an agent’s question at the foot of the conversation, below what was said after it', async () => {
     const messages = [
       ...request(['CAM-14']),

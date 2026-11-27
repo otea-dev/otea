@@ -436,6 +436,11 @@ export const detail = {
   'sheet.stand.kids': 'Waiting for its children.',
   'sheet.stand.working': '{agent} is on it.',
   'sheet.stand.workingAsks': '{agent} has it, but waits for your answer on {item}.',
+  'sheet.stand.landing': 'Approved, but not landed yet: until an agent lands it, it is not done.',
+  'sheet.stand.bounced':
+    'It came back to its step because, once approved, it conflicted with another change that landed first: “{why}”. It goes through review again.',
+  'sheet.stand.bouncedPlain':
+    'It came back to its step because, once approved, it conflicted with another change that landed first. It goes through review again.',
   'sheet.stand.reopened': 'Reopened: “{why}”. {agent} takes it up again.',
   'sheet.stand.reopenedWaits': 'Reopened: “{why}”. It waits for an agent.',
   'sheet.stand.workingRound': '{agent} is on it, in round {round}.',
@@ -796,6 +801,20 @@ export const detail = {
   'bi.branch.overlapOpen':
     '{item} touches the same files as {other} ({files}), which is open too: whichever lands second must merge main first and may meet a conflict.',
   'bi.branch.overlapMore': 'and {n} more',
+  'bi.branch.overlapGroup': {
+    one: '{item} shares files with {count} other open change ({others}): whichever lands second must merge main first and may meet a conflict.',
+    other:
+      '{item} shares files with {count} other open changes ({others}): whichever lands second must merge main first and may meet a conflict.',
+  },
+  'bi.branch.overlapFirst': {
+    one: ' It lands first.',
+    other: ' {count} of them land first.',
+  },
+  'bi.branch.overlapEach': 'which files',
+  'bi.changed.lead':
+    'The request changed after this was handed in ({by}, {time}). The diff and the branch answer the earlier request: sending it back is the safe move.',
+  'bi.changed.line': '{field}: was {from} · now {to}',
+  'bi.changed.empty': 'empty',
   'bi.branch.mergeOnly':
     'Since the commit you approved ({since}) this round only merges main into {branch}. The merge itself changed {files}: everything in this diff is new and not reviewed yet, including files that did not conflict. The rest is what you approved, and what main brought in landed through its own review. Approving takes {tip} as it is.',
   'bi.branch.mergeOnlyClean':
