@@ -259,7 +259,7 @@ describe('change preset', () => {
     expect(relay(id, 'executing', undefined, 'codex')).toMatchObject({ state: 'executing' });
     expect(
       showItem(ctx, web, { actor: claude, channel: 'cli' }, at).relayable.map(({ to }) => to),
-    ).toEqual(['ready', 'dropped']);
+    ).toEqual(['ready']);
   });
 
   it('gates a repo task: push while worked on, frozen in review, merge once approved', () => {

@@ -274,12 +274,10 @@ describe('items', () => {
       expect(shown.missing).toEqual([]);
     });
 
-    it('adds the human decisions an agent may relay from the current state', () => {
+    it('offers no relay of a drop: that is the person’s tap, never a relayed sentence', () => {
       createItem(ctx, task('First'));
 
-      expect(showItem(ctx, 'TASKS-1', { actor: bot, channel: 'cli' }).relayable).toEqual([
-        { to: 'discarded', by: 'human', reasonRequired: true, turn: 'none', closes: 'discarded' },
-      ]);
+      expect(showItem(ctx, 'TASKS-1', { actor: bot, channel: 'cli' }).relayable).toEqual([]);
     });
 
     it('lists the fields an incomplete item still needs', () => {
