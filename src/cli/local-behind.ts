@@ -37,6 +37,7 @@ export function localBehindOf(project: Project, id: string): LocalBehind | undef
 // What the agent hands on to the person, in plain words.
 export function localBehindText(id: string, behind: LocalBehind): string {
   const commits = `${behind.behind} commit${behind.behind === 1 ? '' : 's'}`;
+  if (behind.local) return localOnlyText(id, behind, commits);
   // Nothing here is one more command away: the local base has commits of its own the remote lacks,
   // so it is the person's to untangle (an agent never merges or resets there).
   if (behind.state === 'diverged') {
@@ -51,4 +52,22 @@ export function localBehindText(id: string, behind: LocalBehind): string {
           ? `${behind.paths?.join(', ') ?? 'a file'} would replace ${behind.paths?.length === 1 ? 'a file' : 'files'} you keep out of git in that checkout, so it was left alone: move ${behind.paths?.length === 1 ? 'it' : 'them'} aside, then run git pull --ff-only there`
           : `that checkout is on ${behind.on ?? 'another branch'}, so it was left alone: git switch ${behind.base} and git pull --ff-only when you can`;
   return `${id} landed on ${behind.remote}, but your local ${behind.base} is ${commits} behind it (the checkout at ${behind.checkout}): ${how}.`;
+}
+
+// The same, for a repo with no remote: the work landed in a worktree's branch, and nothing was
+// pushed anywhere, so the person's base is behind the landed commit itself.
+function localOnlyText(id: string, behind: LocalBehind, commits: string): string {
+  const where = `your local ${behind.base} (the checkout at ${behind.checkout})`;
+  if (behind.state === 'diverged') {
+    return `${id} landed in its branch, but ${where} has commits of its own that the landed work does not hold, so it was left alone and no fast-forward can bring it up to date. Look at git log and decide with the person (a merge or a rebase is theirs to choose).`;
+  }
+  const how =
+    behind.state === 'ready'
+      ? `otea land sync ${id} brings it up to date`
+      : behind.state === 'changes'
+        ? 'that checkout has changes of its own, so it was left alone: bring it up to date yourself when you can (git merge --ff-only)'
+        : behind.state === 'collides'
+          ? `${behind.paths?.join(', ') ?? 'a file'} would replace ${behind.paths?.length === 1 ? 'a file' : 'files'} you keep out of git in that checkout, so it was left alone: move ${behind.paths?.length === 1 ? 'it' : 'them'} aside first`
+          : `that checkout is on ${behind.on ?? 'another branch'}, so it was left alone: switch to ${behind.base} when you can`;
+  return `${id} landed in its branch (nothing is pushed: this repository has no remote), but ${where} is ${commits} behind it: ${how}.`;
 }

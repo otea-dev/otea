@@ -65,6 +65,7 @@ import {
   holdApproval,
   type ItemBoardBlock,
   linksOf,
+  noRemoteOf,
   ownStepOf,
   railStep,
   roundStartOf,
@@ -219,7 +220,10 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   const stepId = isClosed(position) ? null : position.step;
   const waits = live && links && stepId ? waitRows(live, stepId, links) : [];
   const strip = live
-    ? branchStrip(live, item.state, item.fields, { merged: !!block?.merged })
+    ? branchStrip(live, item.state, item.fields, {
+        merged: !!block?.merged,
+        local: noRemoteOf(item),
+      })
     : null;
   // While the person reviews it: what a clone without Otea's hook pushed since the handoff.
   const drift = useDrift(item.id, strip?.key === 'frozen', item.updatedAt);

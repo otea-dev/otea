@@ -283,3 +283,147 @@ describe('an item that landed while the local main stayed behind', () => {
     });
   });
 });
+
+// Field study 5, V7: a repo with no remote at all. The work landed in a worktree's branch and the
+// item is Done; nothing was pushed, so the person's own base is behind the landed commit. `otea
+// land sync` brings it up to date with the same checks as with a remote, and says plainly when it
+// cannot, so no worker ever asks the person whether to update their folder.
+describe('otea land sync in a repo with no remote', () => {
+  let repo: ReturnType<typeof tempGitRepo>;
+  let tree: string;
+  let otea: Cli;
+
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+      cwd,
+      stdio: 'pipe',
+      encoding: 'utf8',
+    }).trim();
+
+  // An item of Código, Done, whose Commit subido names a commit made in the worktree.
+  const landed = async (file: string): Promise<string> => {
+    const created = await otea(
+      'create',
+      '--collection',
+      'Código',
+      '--title',
+      'Regar',
+      '--field',
+      'Qué quiero=x',
+      '--field',
+      'Rama=main',
+      '--json',
+    );
+    const id: string = JSON.parse(created.out).id;
+    writeFileSync(join(tree, file), `${file}\n`);
+    git(tree, 'add', '-f', file);
+    git(tree, 'commit', '-q', '-m', file);
+    const commit = git(tree, 'rev-parse', '--short', 'HEAD');
+    expect((await otea('update', id, '--field', `Commit subido=${commit}`)).code).toBe(0);
+    const project = openProject(repo.dir);
+    try {
+      updateItemState(project.db, id, 'done', '2026-11-19T10:00:00Z');
+    } finally {
+      project.db.close();
+    }
+    return id;
+  };
+
+  beforeEach(async () => {
+    repo = tempGitRepo();
+    tree = mkdtempSync(join(tmpdir(), 'otea-tree-'));
+    otea = cliAt(repo.dir, { OTEA_AGENT: 'lu' });
+    const person = cliAt(repo.dir);
+    await person('init', '--template', 'none');
+    expect((await person('board', 'add', 'Código', '--template', 'mainline')).code).toBe(0);
+    declareProfiles(repo.dir, 'lu');
+    writeFileSync(join(repo.dir, 'bot.py'), 'print(1)\n');
+    git(repo.dir, 'add', 'bot.py');
+    git(repo.dir, 'commit', '-q', '-m', 'first');
+    git(repo.dir, 'branch', '-M', 'main');
+    rmSync(tree, { recursive: true, force: true });
+    git(repo.dir, 'worktree', 'add', '-q', '--detach', tree);
+  });
+
+  afterEach(() => {
+    try {
+      git(repo.dir, 'worktree', 'remove', '--force', tree);
+    } catch {}
+    repo.remove();
+    rmSync(tree, { recursive: true, force: true, maxRetries: 10 });
+  });
+
+  const main = () => git(repo.dir, 'rev-parse', 'main');
+
+  it('fast-forwards the person’s main to the landed commit when it is on main with no changes', async () => {
+    const id = await landed('regar.py');
+    expect(main()).not.toBe(git(tree, 'rev-parse', 'HEAD'));
+
+    const synced = await otea('land', 'sync', id);
+
+    expect(synced.code, synced.err).toBe(0);
+    expect(synced.out).toContain('up to date');
+    expect(main()).toBe(git(tree, 'rev-parse', 'HEAD'));
+    expect(readFileSync(join(repo.dir, 'regar.py'), 'utf8').trim()).toBe('regar.py');
+    // Nothing left to do: a second run says so.
+    expect((await otea('land', 'sync', id)).out).toContain('nothing to bring');
+  });
+
+  it('leaves a checkout with changes of the person alone, and says why', async () => {
+    const id = await landed('regar.py');
+    const before = main();
+    writeFileSync(join(repo.dir, 'bot.py'), 'print(2)\n');
+
+    const synced = await otea('land', 'sync', id);
+
+    expect(synced.code, synced.err).toBe(0);
+    expect(synced.out).toContain('left alone');
+    expect(synced.out).toContain('changes');
+    expect(main()).toBe(before);
+    expect(readFileSync(join(repo.dir, 'bot.py'), 'utf8')).toBe('print(2)\n');
+  });
+
+  it('leaves a checkout on another branch alone, naming it', async () => {
+    const id = await landed('regar.py');
+    const before = main();
+    git(repo.dir, 'switch', '-q', '-c', 'otra-rama');
+
+    const synced = await otea('land', 'sync', id);
+
+    expect(synced.out).toContain('otra-rama');
+    expect(synced.out).toContain('left alone');
+    expect(main()).toBe(before);
+  });
+
+  it('says a main with commits of its own has diverged, and moves nothing', async () => {
+    const id = await landed('regar.py');
+    writeFileSync(join(repo.dir, 'mine.txt'), 'mine\n');
+    git(repo.dir, 'add', 'mine.txt');
+    git(repo.dir, 'commit', '-q', '-m', 'mine');
+    const before = main();
+
+    const synced = await otea('land', 'sync', id, '--json');
+
+    const data = JSON.parse(synced.out);
+    expect(data.synced).toBe(false);
+    expect(data.localBehind.state).toBe('diverged');
+    expect(main()).toBe(before);
+  });
+
+  it('leaves the checkout alone when an incoming file would overwrite an ignored local one', async () => {
+    writeFileSync(join(repo.dir, '.gitignore'), 'local.cfg\n');
+    writeFileSync(join(repo.dir, 'local.cfg'), 'mine, never in git\n');
+    git(repo.dir, 'add', '.gitignore');
+    git(repo.dir, 'commit', '-q', '-m', 'ignore');
+    git(tree, 'checkout', '-q', '--detach', 'main');
+    const id = await landed('local.cfg');
+    const before = main();
+
+    const synced = await otea('land', 'sync', id);
+
+    expect(synced.out).toContain('local.cfg');
+    expect(synced.out).toContain('left alone');
+    expect(readFileSync(join(repo.dir, 'local.cfg'), 'utf8')).toBe('mine, never in git\n');
+    expect(main()).toBe(before);
+  });
+});

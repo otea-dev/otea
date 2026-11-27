@@ -553,9 +553,16 @@ function isAncestor(cwd: string, ancestor: string, of: string): boolean {
 // (named in `on`), `diverged` (the local base has commits of its own the remote lacks, so no
 // fast-forward can bring it up: that is the person's to untangle) or `collides` (a file arriving
 // from the remote would replace one the person keeps out of git here, named in `paths`).
+//
+// With no remote at all (`local`): the item landed in a worktree branch, and nothing was pushed
+// anywhere; `behind` counts the commits of the landed tip the local base lacks, `remote` is empty
+// and `target` is the commit to fast-forward to (the landed tip itself).
 export type LocalBehind = {
   base: string;
   remote: string;
+  // What a fast-forward merges: the remote's base (the default), or with no remote the landed commit.
+  target?: string;
+  local?: true;
   behind: number;
   checkout: string;
   state: 'ready' | 'changes' | 'elsewhere' | 'diverged' | 'collides';
@@ -595,13 +602,13 @@ function collidingPaths(checkout: string, from: string, to: string): string[] {
 // own in the way (asked again here: it may have changed since it was read). Whether it moved.
 export function fastForward(behind: LocalBehind): boolean {
   const { checkout, base, remote } = behind;
+  const target = behind.target ?? `refs/remotes/${remote}`;
   if (checkedOutBranch(checkout) !== base) return false;
   if (git(checkout, '--no-optional-locks', 'status', '--porcelain', '--untracked-files=no') !== '')
     return false;
   try {
-    if (collidingPaths(checkout, `refs/heads/${base}`, `refs/remotes/${remote}`).length > 0)
-      return false;
-    git(checkout, 'merge', '--ff-only', '--quiet', `refs/remotes/${remote}`);
+    if (collidingPaths(checkout, `refs/heads/${base}`, target).length > 0) return false;
+    git(checkout, 'merge', '--ff-only', '--quiet', target);
     return true;
   } catch {
     return false;
@@ -609,20 +616,41 @@ export function fastForward(behind: LocalBehind): boolean {
 }
 
 // Whether `commit` (what landed) is in the remote's `base`, as this repo last saw it, and not in
-// the local `base` of the checkout at `checkout`; undefined otherwise, and with no remote.
+// the local `base` of the checkout at `checkout`; with no remote at all, whether it is not in the
+// local base yet (the item landed in a worktree's branch and nothing was pushed). Undefined
+// otherwise.
 export function localBehind(
   checkout: string,
   base: string,
   commit: string,
 ): LocalBehind | undefined {
   const remote = remoteName(checkout, base);
-  if (!remote) return undefined;
-  const there = commitOf(checkout, `refs/remotes/${remote}`);
   const here = commitOf(checkout, `refs/heads/${base}`);
+  if (!remote) {
+    // A remote the base has no branch on is no case of this: only a repo with none at all.
+    if (git(checkout, 'remote') !== '') return undefined;
+    const tip = commitOf(checkout, commit);
+    if (!tip || !here || tip === here || isAncestor(checkout, tip, here)) return undefined;
+    return behindState(checkout, base, here, tip, tip, '', true);
+  }
+  const there = commitOf(checkout, `refs/remotes/${remote}`);
   if (!there || !here || here === there) return undefined;
   const holds = (ref: string) =>
     isAncestor(checkout, commit, ref) || landedIn(checkout, commit, ref);
   if (!holds(there) || holds(here)) return undefined;
+  return behindState(checkout, base, here, there, `refs/remotes/${remote}`, remote, false);
+}
+
+// How far the local base is from `there` and what stands in the way of a fast-forward to `target`.
+function behindState(
+  checkout: string,
+  base: string,
+  here: string,
+  there: string,
+  target: string,
+  remote: string,
+  local: boolean,
+): LocalBehind | undefined {
   const behind = Number(git(checkout, 'rev-list', '--count', `${here}..${there}`));
   if (!(behind > 0)) return undefined;
   const on = checkedOutBranch(checkout);
@@ -630,12 +658,12 @@ export function localBehind(
   // (or their editor's) may be using at that moment.
   const changed =
     git(checkout, '--no-optional-locks', 'status', '--porcelain', '--untracked-files=no') !== '';
-  // The local base has commits of its own the remote lacks: nothing fast-forwards it.
+  // The local base has commits of its own the target lacks: nothing fast-forwards it.
   const diverged = !isAncestor(checkout, here, there);
   const colliding =
     diverged || on !== base || changed
       ? []
-      : collidingPaths(checkout, `refs/heads/${base}`, `refs/remotes/${remote}`);
+      : collidingPaths(checkout, `refs/heads/${base}`, target);
   const state = diverged
     ? 'diverged'
     : on !== base
@@ -648,6 +676,8 @@ export function localBehind(
   return {
     base,
     remote,
+    target,
+    ...(local ? { local: true as const } : {}),
     behind,
     checkout,
     state,

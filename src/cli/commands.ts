@@ -2380,7 +2380,7 @@ function landedBase(
 const landSync: Command = {
   name: 'land sync',
   summary:
-    "After a Done item landed, fast-forward the person's main checkout to the remote base, only when it is on that branch with no change to a tracked file; else it is left alone and the reply says why. Never git pull or merge there yourself",
+    "After a Done item landed, fast-forward the person's main checkout to the remote base (with no remote, to what landed), only when it is on that branch with no change to a tracked file; else it is left alone and the reply says why. Never git pull or merge there yourself",
   args: ['id'],
   options: {},
   execute: (input) => {
@@ -2398,14 +2398,14 @@ const landSync: Command = {
       if (!behind) {
         return {
           data: { item: id, synced: false, behind: null },
-          text: `${id}: nothing to bring up to date: the local base already holds what landed, or there is no remote to compare it with.`,
+          text: `${id}: nothing to bring up to date: the local base already holds what landed, or nothing says what landed.`,
         };
       }
       if (fastForward(behind)) {
         const commits = `${behind.behind} commit${behind.behind === 1 ? '' : 's'}`;
         return {
           data: { item: id, synced: true, localBehind: behind },
-          text: `${id}: your local ${behind.base} in ${behind.checkout} is up to date (fast-forwarded ${commits} to ${behind.remote}).`,
+          text: `${id}: your local ${behind.base} in ${behind.checkout} is up to date (fast-forwarded ${commits} to ${behind.local ? `what ${id} landed` : behind.remote}).`,
         };
       }
       return {

@@ -360,14 +360,19 @@ export type BranchStrip = {
   base?: string;
   // Its branch is the base itself (a main-only board): an agent pushes it, nothing is merged.
   own?: true;
+  // The repo has no remote: nothing is pushed, what lands is the person's own folder.
+  local?: true;
 };
+
+// Whether the handoff the review approves was made in a repo with no remote.
+export const noRemoteOf = (item: ItemLike): boolean => handedTip(item)?.local === true;
 
 export function branchStrip(
   def: BoardDefinition,
   state: string,
   fields: Readonly<Record<string, string>>,
-  // Whether its branch was marked merged once Done (otea merged).
-  o: { merged?: boolean } = {},
+  // Whether its branch was marked merged once Done (otea merged), and whether the repo has no remote.
+  o: { merged?: boolean; local?: boolean } = {},
 ): BranchStrip | null {
   const branch = guardedBranch(def);
   const value = branch ? fields[branch.id]?.trim() : undefined;
@@ -391,7 +396,15 @@ export function branchStrip(
   if (position.phase !== 'doing') return { tone: 'frozen', key: 'frozen', value, ...repo, step };
   // In the land step an agent merges it and pushes the base, which the page says before it does.
   if (isLandStep(def, position.step) && branch.guard.base)
-    return { tone: 'ok', key: 'landing', value, ...repo, step, base: branch.guard.base };
+    return {
+      tone: 'ok',
+      key: 'landing',
+      value,
+      ...repo,
+      step,
+      base: branch.guard.base,
+      ...(o.local ? { local: true as const } : {}),
+    };
   return gateAt(def, position, 'push').allowed
     ? { tone: 'ok', key: 'push', value, ...repo, step }
     : { tone: 'off', key: 'noPush', value, ...repo, step };
@@ -402,6 +415,14 @@ export function branchStrip(
 export function localBehindSaid(behind: LocalBehind): string {
   const { remote, base, checkout } = behind;
   const count = behind.behind;
+  // No remote: the work landed in its branch, nothing was pushed.
+  if (behind.local)
+    return t(`bi.branch.behindLocal.${behind.state}`, {
+      base,
+      checkout,
+      on: behind.on ?? '',
+      paths: (behind.paths ?? []).join(', '),
+    });
   if (behind.state === 'elsewhere')
     return t('bi.branch.behind.elsewhere', { count, remote, base, checkout, on: behind.on ?? '' });
   return t(`bi.branch.behind.${behind.state}`, {
@@ -428,7 +449,9 @@ export function branchSaid(strip: BranchStrip, outside?: MergedOutside | null): 
     return t('bi.branch.mergedOutside', { base: outside.base, step: outside.land ?? step });
   if (strip.key === 'landing')
     return strip.own
-      ? t('bi.branch.landingOwn', { base: strip.base ?? '' })
+      ? t(strip.local ? 'bi.branch.landingOwnLocal' : 'bi.branch.landingOwn', {
+          base: strip.base ?? '',
+        })
       : t('bi.branch.landing', { base: strip.base ?? '', step });
   if (strip.key === 'landed' && strip.own) return t('bi.branch.landedOwn', { step });
   if (strip.key === 'noPush' || strip.key === 'landed')

@@ -759,6 +759,17 @@ export const detail = {
   // «next», never «now»: with no worker connected the line under it says nobody has taken it yet.
   'bi.branch.landing': 'an agent lands it in {base} next, as the {step} step says',
   'bi.branch.landingOwn': 'an agent pushes {base} to the remote next',
+  'bi.branch.landingOwnLocal': 'an agent brings {base} up to date in your folder next',
+  'bi.branch.behindLocal.ready':
+    'Landed in its branch (nothing is pushed: no remote), but your local {base} does not have it yet:it brings {checkout} up to date when an agent runs otea land sync',
+  'bi.branch.behindLocal.changes':
+    'Landed in its branch (nothing is pushed: no remote), but your local {base} does not have it yet:{checkout} has changes of yours, so nothing was touched',
+  'bi.branch.behindLocal.elsewhere':
+    'Landed in its branch (nothing is pushed: no remote), but your local {base} does not have it yet:{checkout} is on {on}, so nothing was touched; switch to {base} when you can',
+  'bi.branch.behindLocal.diverged':
+    'Landed in its branch (nothing is pushed: no remote), but your local {base} has commits of its own, so nothing was touched; look at git log in {checkout} and decide how to join them',
+  'bi.branch.behindLocal.collides':
+    'Landed in its branch (nothing is pushed: no remote), but {paths} would replace what you keep out of git in {checkout}, so nothing was touched; move it aside first',
   'bi.branch.mergedLocal': 'in your local {base}; push it (git push {push} {base})',
   'bi.branch.mergedOutside':
     'in {base} already, merged outside Otea: an agent closes the {step} step',

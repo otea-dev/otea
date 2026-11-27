@@ -766,6 +766,17 @@ export const detail = {
   'bi.branch.landed': 'integrada en {step}',
   'bi.branch.landing': 'un agente la integra en {base} a continuación, como dice el paso {step}',
   'bi.branch.landingOwn': 'un agente sube {base} al remoto a continuación',
+  'bi.branch.landingOwnLocal': 'un agente pone {base} al día en tu carpeta a continuación',
+  'bi.branch.behindLocal.ready':
+    'Integrado en su rama (no se sube nada: no hay remoto), pero tu {base} local aún no lo tiene:un agente pone {checkout} al día con otea land sync',
+  'bi.branch.behindLocal.changes':
+    'Integrado en su rama (no se sube nada: no hay remoto), pero tu {base} local aún no lo tiene:{checkout} tiene cambios tuyos, así que no se tocó',
+  'bi.branch.behindLocal.elsewhere':
+    'Integrado en su rama (no se sube nada: no hay remoto), pero tu {base} local aún no lo tiene:{checkout} está en {on}, así que no se tocó; cambia a {base} cuando puedas',
+  'bi.branch.behindLocal.diverged':
+    'Integrado en su rama (no se sube nada: no hay remoto), pero tu {base} local tiene commits propios, así que no se tocó; mira git log en {checkout} y decide cómo unirlos',
+  'bi.branch.behindLocal.collides':
+    'Integrado en su rama (no se sube nada: no hay remoto), pero {paths} reemplazaría lo que guardas fuera de git en {checkout}, así que no se tocó; muévelo antes',
   'bi.branch.mergedLocal': 'está en tu {base} local; súbelo (git push {push} {base})',
   'bi.branch.mergedOutside':
     'ya está en {base}, integrada fuera de Otea: un agente cierra el paso {step}',

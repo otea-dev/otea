@@ -335,6 +335,34 @@ describe('branchStrip: the protected branch where the item stands', () => {
     // Its branch the base itself (a main-only board): pushed, never merged (P2S-R3-2).
     const onMain = { ...fields, fbranch: 'main' };
     expect(branchStrip(landing, 'sland', onMain)).toMatchObject({ key: 'landing', own: true });
+    // With no remote there is nothing to push: it says the folder is brought up to date (field
+    // study 5, V7), never «sube main al remoto».
+    const local = branchStrip(landing, 'sland', onMain, { local: true });
+    expect(local).toMatchObject({ key: 'landing', own: true, local: true });
+    if (!local) throw new Error('no strip');
+    expect(branchSaid(local)).toBe('an agent brings main up to date in your folder next');
+    setLanguage('es');
+    expect(branchSaid(local)).toBe('un agente pone main al día en tu carpeta a continuación');
+    expect(branchSaid(local)).not.toMatch(/remoto/);
+    setLanguage('en');
+  });
+
+  it('says a Done item landed in a repo with no remote is not in the person’s main yet', () => {
+    const behind = {
+      base: 'main',
+      remote: '',
+      target: 'abc1234',
+      local: true as const,
+      behind: 1,
+      checkout: 'D:/proyecto',
+      state: 'ready' as const,
+    };
+    expect(localBehindSaid(behind)).toContain('no remote');
+    expect(localBehindSaid(behind)).toContain('otea land sync');
+    setLanguage('es');
+    expect(localBehindSaid(behind)).toContain('no hay remoto');
+    expect(localBehindSaid(behind)).not.toContain('git pull');
+    setLanguage('en');
   });
 
   it('is nothing on a board without a protected branch, or before the branch is named', () => {
