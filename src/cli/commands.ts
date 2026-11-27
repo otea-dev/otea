@@ -25,13 +25,13 @@ import {
 } from '../app/agents.ts';
 import {
   askOnBandeja,
-  isBandejaTarget,
   bandejaOfItem,
   bandejaPaths,
   closeBandeja,
   entryText,
   fileBandeja,
   type Held,
+  isBandejaTarget,
   keepHeldEntries,
   listBandeja,
   listText,

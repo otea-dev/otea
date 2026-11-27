@@ -85,7 +85,9 @@ describe("Otea's agent guide", () => {
     const rule = (n: number) =>
       AGENT_GUIDE.split('\n').find((line) => line.startsWith(`${n}. `)) ?? '';
     expect(rule(13)).toMatch(/If you are it.*skip rules 3, 6 and 12.*otea wait --secretary/);
-    expect(rule(4)).toContain('"Before you hand it off" ("Antes de entregarlo" on a Spanish board)');
+    expect(rule(4)).toContain(
+      '"Before you hand it off" ("Antes de entregarlo" on a Spanish board)',
+    );
     expect(rule(3)).toContain(`past ${SILENT_AFTER_MS / 60_000} min`);
     expect(SILENT_AFTER_MS).toBe(7.5 * 60_000);
   });

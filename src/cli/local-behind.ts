@@ -49,6 +49,6 @@ export function localBehindText(id: string, behind: LocalBehind): string {
         ? `that checkout has changes of its own, so it was left alone: run git pull --ff-only there when you can`
         : behind.state === 'collides'
           ? `${behind.paths?.join(', ') ?? 'a file'} would replace ${behind.paths?.length === 1 ? 'a file' : 'files'} you keep out of git in that checkout, so it was left alone: move ${behind.paths?.length === 1 ? 'it' : 'them'} aside, then run git pull --ff-only there`
-          :`that checkout is on ${behind.on ?? 'another branch'}, so it was left alone: git switch ${behind.base} and git pull --ff-only when you can`;
+          : `that checkout is on ${behind.on ?? 'another branch'}, so it was left alone: git switch ${behind.base} and git pull --ff-only when you can`;
   return `${id} landed on ${behind.remote}, but your local ${behind.base} is ${commits} behind it (the checkout at ${behind.checkout}): ${how}.`;
 }

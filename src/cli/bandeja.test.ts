@@ -214,7 +214,17 @@ describe('the Bandeja from the refiner', () => {
       await boardNamedB();
       await otea('claim', 'B-1', '--as', 'lia');
 
-      const asked = await otea('ask', 'B-1', 'Which one?', '--option', 'A', '--option', 'B', '--as', 'lia');
+      const asked = await otea(
+        'ask',
+        'B-1',
+        'Which one?',
+        '--option',
+        'A',
+        '--option',
+        'B',
+        '--as',
+        'lia',
+      );
 
       expect(asked.err).toBe('');
       expect(asked.code).toBe(0);
@@ -223,7 +233,17 @@ describe('the Bandeja from the refiner', () => {
       expect((await otea('show', 'B-1', '--as', 'lia')).out).toContain('Which one?');
 
       // The note is still reached by its own id where no item has it.
-      const noteAsked = await otea('ask', 'B-2', 'Better how?', '--option', 'A', '--option', 'B', '--as', 'lia');
+      const noteAsked = await otea(
+        'ask',
+        'B-2',
+        'Better how?',
+        '--option',
+        'A',
+        '--option',
+        'B',
+        '--as',
+        'lia',
+      );
       expect(noteAsked.code).toBe(3);
       expect(noteAsked.err).toContain('B-2 is not in the Bandeja');
     });

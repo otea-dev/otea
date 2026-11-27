@@ -6,6 +6,13 @@ import { creatures } from '../core/board/testing.ts';
 import { findBoard, listVersions } from '../store/boards.ts';
 import { findCollection, listCollections, selectEvents } from '../store/queries.ts';
 import {
+  bandejaOfItem,
+  captureToBandeja,
+  fileBandeja,
+  requireEntry,
+  takeBandeja,
+} from './bandeja.ts';
+import {
   archiveBoard,
   archivePlan,
   deleteBoardForever,
@@ -13,13 +20,6 @@ import {
   listArchivedBoards,
   unarchiveBoard,
 } from './board-archive.ts';
-import {
-  bandejaOfItem,
-  captureToBandeja,
-  fileBandeja,
-  requireEntry,
-  takeBandeja,
-} from './bandeja.ts';
 import {
   createBoard,
   createBoardSet,
