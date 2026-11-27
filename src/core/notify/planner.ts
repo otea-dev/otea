@@ -65,8 +65,24 @@ export type GroupNotice = {
   count: number;
   // What the items have in common, or mixed.
   of: NotifyKind | 'mixed';
-  items: { item: string; title: string; kind: NotifyKind }[];
+  items: { item: string; title: string; kind: NotifyKind; bandeja?: true }[];
+  // How many things wait for the person now, as `otea pending` counts them: a mixed burst says it
+  // instead of its own count of notices (the server fills it in; text.ts falls back to the notices
+  // other than the secretary's replies).
+  waiting?: number;
 };
+
+// A burst of these items: one kind, or mixed.
+export function groupOf(items: GroupNotice['items']): GroupNotice {
+  const kinds = new Set(items.map(({ kind }) => kind));
+  const [same] = kinds;
+  return {
+    kind: 'group',
+    count: items.length,
+    of: kinds.size === 1 && same ? same : 'mixed',
+    items,
+  };
+}
 
 export type Notice = ItemNotice | GroupNotice;
 
@@ -120,7 +136,7 @@ function noticeOf(signal: Signal, prefs: NotifyPrefs): ItemNotice {
 }
 
 // What a signal is about: an item, or a Bandeja note that may have the same id as one.
-const aboutOf = ({ item, bandeja }: Pick<Signal, 'item' | 'bandeja'>): string =>
+export const aboutOf = ({ item, bandeja }: Pick<Signal, 'item' | 'bandeja'>): string =>
   bandeja ? `bandeja:${item}` : item;
 
 export class Planner {
@@ -187,15 +203,15 @@ export class Planner {
     this.sentAt = now;
     const [only] = ready;
     if (ready.length === 1 && only) return [noticeOf(only, prefs)];
-    const kinds = new Set(ready.map(({ kind }) => kind));
-    const [same] = kinds;
     return [
-      {
-        kind: 'group',
-        count: ready.length,
-        of: kinds.size === 1 && same ? same : 'mixed',
-        items: ready.map(({ item, title, kind }) => ({ item, title, kind })),
-      },
+      groupOf(
+        ready.map(({ item, title, kind, bandeja }) => ({
+          item,
+          title,
+          kind,
+          ...(bandeja ? { bandeja: true as const } : {}),
+        })),
+      ),
     ];
   }
 }

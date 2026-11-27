@@ -124,6 +124,60 @@ describe('noticeText', () => {
     );
   });
 
+  // Field study 7: «5 cosas te esperan» while `otea pending` said 3. A mixed burst counts what
+  // waits for the person (the number `pending` gives), and names the secretary's replies apart.
+  it('counts what waits in a mixed burst as pending does, and names secretary replies apart', () => {
+    const mixed: Notice = {
+      kind: 'group',
+      count: 5,
+      of: 'mixed',
+      waiting: 3,
+      items: [
+        { item: 'A-1', title: 'One', kind: 'turn' },
+        { item: 'A-2', title: 'Two', kind: 'ask' },
+        { item: 'A-3', title: 'Three', kind: 'stuck' },
+        { item: 'hablar:1', title: '', kind: 'secretary_reply' },
+        { item: 'hablar:2', title: '', kind: 'secretary_reply' },
+      ],
+    };
+    expect(noticeText(mixed, 'es').title).toBe(
+      '3 cosas te esperan y 2 respuestas de tu secretario',
+    );
+    expect(noticeText(mixed, 'en', { id: 'p', name: 'tienda' }).title).toBe(
+      '3 things wait for you and 2 replies from your secretary in tienda',
+    );
+    const one: Notice = {
+      ...mixed,
+      count: 2,
+      waiting: 1,
+      items: [
+        { item: 'A-1', title: 'One', kind: 'turn' },
+        { item: 'hablar:1', title: '', kind: 'secretary_reply' },
+      ],
+    };
+    expect(noticeText(one, 'es').title).toBe('1 cosa te espera y una respuesta de tu secretario');
+    expect(noticeText(one, 'en').title).toBe(
+      '1 thing waits for you and a reply from your secretary',
+    );
+  });
+
+  it('without a count from pending, a mixed burst counts its notices except the secretary replies', () => {
+    const mixed: Notice = {
+      kind: 'group',
+      count: 4,
+      of: 'mixed',
+      items: [
+        { item: 'A-1', title: 'One', kind: 'turn' },
+        { item: 'A-2', title: 'Two', kind: 'ask' },
+        { item: 'hablar:1', title: '', kind: 'secretary_reply' },
+        { item: 'hablar:2', title: '', kind: 'secretary_reply' },
+      ],
+    };
+    expect(noticeText(mixed, 'es').title).toBe(
+      '2 cosas te esperan y 2 respuestas de tu secretario',
+    );
+  });
+
   it('names Hablar once when a burst is the secretary talking, not once per message', () => {
     const group: Notice = {
       kind: 'group',

@@ -612,6 +612,7 @@ describe('notifications on the server', () => {
         const id = ask();
         await pass(1000);
         await pass(GATHER_MS);
+        const tag = sent[0]?.payload.tag;
         sent.length = 0;
         answerBandeja(project, { id, option: 1 }, stamp);
         await pass(1000);
@@ -619,7 +620,8 @@ describe('notifications on the server', () => {
         captureToBandeja(project, { text: 'another one' }, stamp);
         await pass(1000);
         await pass(GATHER_MS);
-        expect(sent).toEqual([]);
+        // The answered question's notice is closed on the phone; nothing else is told.
+        expect(sent.map(({ payload }) => payload)).toEqual([{ close: tag }]);
       });
     });
 
@@ -720,6 +722,81 @@ describe('notifications on the server', () => {
         await pass(1000);
         await pass(GATHER_MS);
         expect(sent.map(({ subscription }) => subscription.endpoint)).toEqual([endpoint(1)]);
+      });
+
+      // Field study 7: «5 cosas te esperan» while `otea pending` said 3.
+      it('counts a mixed burst as pending does: what waits, with the secretary’s replies named apart', async () => {
+        await watching();
+        toReview(first);
+        toReview(newTask('Two'));
+        toReview(newTask('Three'));
+        say('Bien.', person('¿Cómo va?').id);
+        say('Y además esto.', person('¿Y lo otro?').id);
+        await pass(1000);
+        await pass(GATHER_MS);
+        expect(sent).toHaveLength(1);
+        expect(sent[0]?.payload.title).toBe(
+          '3 cosas te esperan y 2 respuestas de tu secretario en memory',
+        );
+      });
+
+      describe('a notice that stops being true', () => {
+        const approve = (id: string) =>
+          moveItem(
+            project,
+            { id, to: 'done', actor: { kind: 'human', name: 'ana' }, channel: 'ui' },
+            at,
+          );
+
+        it('is closed on the phone once the item left review, with no visible notice of its own', async () => {
+          await watching();
+          toReview(first);
+          await pass(1000);
+          await pass(GATHER_MS);
+          expect(sent).toHaveLength(1);
+          const tag = sent[0]?.payload.tag;
+          approve(first);
+          await pass(1000);
+          expect(sent).toHaveLength(2);
+          expect(sent[1]).toEqual({
+            subscription: expect.objectContaining({ endpoint: endpoint() }),
+            payload: { close: tag },
+          });
+          await pass(GATHER_MS);
+          expect(sent).toHaveLength(2);
+        });
+
+        it('replaces the group notice with the count of what still waits, then closes it', async () => {
+          await watching();
+          const ids = [first, newTask('Two'), newTask('Three')];
+          for (const id of ids) toReview(id);
+          await pass(1000);
+          await pass(GATHER_MS);
+          expect(sent).toHaveLength(1);
+          const tag = sent[0]?.payload.tag;
+          expect(sent[0]?.payload.title).toBe('3 cosas te tocan en memory');
+
+          approve(ids[0] as string);
+          await pass(1000);
+          expect(sent[1]?.payload).toMatchObject({
+            title: '2 cosas te tocan en memory',
+            body: 'Two · Three',
+            tag,
+          });
+
+          approve(ids[1] as string);
+          await pass(1000);
+          expect(sent[2]?.payload).toMatchObject({
+            title: '1 cosa te toca en memory',
+            body: 'Three',
+            tag,
+          });
+
+          approve(ids[2] as string);
+          await pass(1000);
+          expect(sent[3]?.payload).toEqual({ close: tag });
+          expect(sent).toHaveLength(4);
+        });
       });
 
       describe('when it is offline with messages waiting', () => {

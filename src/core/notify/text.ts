@@ -60,16 +60,23 @@ const WORDS = {
       n === 1 ? 'Tu mensaje espera respuesta' : `Tus ${n} mensajes esperan respuesta`,
     hablar: 'Hablar',
     group: {
-      turn: (n: number) => `${n} cosas te tocan`,
-      ask: (n: number) => `${n} preguntas te esperan`,
+      // One is left when the others stopped waiting and the burst's notice is replaced.
+      turn: (n: number) => (n === 1 ? '1 cosa te toca' : `${n} cosas te tocan`),
+      ask: (n: number) => (n === 1 ? '1 pregunta te espera' : `${n} preguntas te esperan`),
       replied: (n: number) => `${n} notas contestadas`,
-      stuck: (n: number) => `${n} cosas se atascaron`,
+      stuck: (n: number) => (n === 1 ? '1 cosa se atascó' : `${n} cosas se atascaron`),
       aside: (n: number) => `${n} cosas apartadas`,
-      unheard: (n: number) => `${n} cosas esperan y no hay ningún agente conectado`,
+      unheard: (n: number) =>
+        n === 1
+          ? '1 cosa espera y no hay ningún agente conectado'
+          : `${n} cosas esperan y no hay ningún agente conectado`,
       secretary_reply: (n: number) => `${n} respuestas de tu secretario`,
       secretary_offline: () => 'Tu secretario está desconectado',
-      mixed: (n: number) => `${n} cosas te esperan`,
+      mixed: (n: number) => (n === 1 ? '1 cosa te espera' : `${n} cosas te esperan`),
     },
+    // The secretary's replies in a burst, named apart from what waits.
+    alsoReplies: (n: number) =>
+      n === 1 ? ' y una respuesta de tu secretario' : ` y ${n} respuestas de tu secretario`,
     in: (title: string, project: string) => `${title} en ${project}`,
   },
   en: {
@@ -86,16 +93,21 @@ const WORDS = {
       n === 1 ? 'Your message awaits a reply' : `Your ${n} messages await a reply`,
     hablar: 'Talk',
     group: {
-      turn: (n: number) => `${n} things are yours`,
-      ask: (n: number) => `${n} questions wait for you`,
+      turn: (n: number) => (n === 1 ? '1 thing is yours' : `${n} things are yours`),
+      ask: (n: number) => (n === 1 ? '1 question waits for you' : `${n} questions wait for you`),
       replied: (n: number) => `${n} notes answered`,
-      stuck: (n: number) => `${n} things got stuck`,
+      stuck: (n: number) => (n === 1 ? '1 thing got stuck' : `${n} things got stuck`),
       aside: (n: number) => `${n} things set aside`,
-      unheard: (n: number) => `${n} things wait and no agent is connected`,
+      unheard: (n: number) =>
+        n === 1
+          ? '1 thing waits and no agent is connected'
+          : `${n} things wait and no agent is connected`,
       secretary_reply: (n: number) => `${n} replies from your secretary`,
       secretary_offline: () => 'Your secretary is offline',
-      mixed: (n: number) => `${n} things wait for you`,
+      mixed: (n: number) => (n === 1 ? '1 thing waits for you' : `${n} things wait for you`),
     },
+    alsoReplies: (n: number) =>
+      n === 1 ? ' and a reply from your secretary' : ` and ${n} replies from your secretary`,
     in: (title: string, project: string) => `${title} in ${project}`,
   },
 } as const satisfies Record<
@@ -107,6 +119,7 @@ const WORDS = {
     hablar: string;
   } & Record<Exclude<NotifyKind, 'turn'>, (by: string) => string> & {
       group: Record<NotifyKind | 'mixed', (n: number) => string>;
+      alsoReplies: (n: number) => string;
       in: (title: string, project: string) => string;
     }
 >;
@@ -124,7 +137,15 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
       .filter((part) => part !== undefined)
       .join('-');
   if (notice.kind === 'group') {
-    const title = words.group[notice.of](notice.count);
+    // A mixed burst says how many things wait for the person (what `otea pending` counts), not how
+    // many notices it gathers; the secretary's replies are named apart, never counted as waiting.
+    const replies = notice.items.filter(({ kind }) => kind === 'secretary_reply').length;
+    const title =
+      notice.of === 'mixed' && replies > 0 && replies < notice.items.length
+        ? words.group.mixed(notice.waiting ?? notice.count - replies) + words.alsoReplies(replies)
+        : words.group[notice.of](
+            notice.of === 'mixed' ? (notice.waiting ?? notice.count) : notice.count,
+          );
     return {
       title: project ? words.in(title, project.name) : title,
       // Items with no title of their own are the secretary talking: Hablar is named once.

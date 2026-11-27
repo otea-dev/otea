@@ -108,3 +108,31 @@ export async function openFromClick(target: string, clients: ClientsLike): Promi
   }
   best.postMessage({ type: 'open', url: target });
 }
+
+// A push that only closes a notice: what it told stopped being true (the question was answered, the
+// item left review), so it leaves the person's shade instead of waiting to be tapped for nothing.
+// The PC sends `{ close: <tag> }`.
+export function closeTag(payload: unknown): string | undefined {
+  const tag = text((payload as { close?: unknown } | null | undefined)?.close);
+  return tag === undefined || tag === '' ? undefined : tag;
+}
+
+type Closable = { close(): void };
+
+export type ShadeLike = {
+  getNotifications(filter: { tag: string }): Promise<readonly Closable[]>;
+  showNotification(title: string, options: { tag: string; silent: true }): Promise<void>;
+};
+
+// Closes the notices shown under `tag`. A browser requires a visible notice for every push and
+// shows its own «updated in the background» otherwise, so when the person had already dismissed it,
+// a silent one under the same tag is shown and closed at once: nothing stays on the screen.
+export async function closeShown(tag: string, shade: ShadeLike): Promise<void> {
+  const open = await shade.getNotifications({ tag });
+  if (open.length === 0) {
+    await shade.showNotification('Otea', { tag, silent: true });
+    for (const each of await shade.getNotifications({ tag })) each.close();
+    return;
+  }
+  for (const each of open) each.close();
+}

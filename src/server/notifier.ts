@@ -12,16 +12,26 @@ import {
   listTargets,
   type NotifyTarget,
 } from '../app/notify-targets.ts';
+import { pendingOf } from '../app/pending.ts';
 import { listAgents } from '../app/presence.ts';
 import type { Project } from '../app/project.ts';
 import { secretaryFacts } from '../app/secretary-waiting.ts';
 import { setAsideOf } from '../app/set-aside.ts';
 import { unheardOf } from '../app/unheard.ts';
-import { localMinuteOfDay, type Notice, Planner } from '../core/notify/planner.ts';
+import {
+  aboutOf,
+  type GroupNotice,
+  groupOf,
+  type ItemNotice,
+  localMinuteOfDay,
+  type Notice,
+  Planner,
+} from '../core/notify/planner.ts';
 import {
   bandejaSignalsOf,
   freshSignals,
   type NotifyFacts,
+  type NotifyKind,
   secretarySignalsOf,
   settleUnheard,
   signalsOf,
@@ -67,6 +77,31 @@ export type NotifierOptions = {
 
 const TICK_MS = 5000;
 
+// What stops being true leaves the person's shade: a question answered, an item no longer in their
+// review. The kinds whose notice says «this waits for you»; a reply, a note answered or an item set
+// aside is news that stays until read.
+const WAITS: ReadonlySet<NotifyKind> = new Set(['turn', 'ask', 'stuck', 'unheard']);
+
+// A notice a device was shown that may need closing, and when it was sent.
+type Shown = { notice: ItemNotice | GroupNotice; at: number };
+
+// How long a record of a shown notice is kept: past it the phone's own shade has dropped it.
+const SHOWN_FOR_MS = 24 * 60 * 60_000;
+
+// The things a notice is about, as `aboutOf` names them.
+const aboutThe = (notice: ItemNotice | GroupNotice): { key: string; kind: NotifyKind }[] =>
+  notice.kind === 'group'
+    ? notice.items.map(({ item, kind, bandeja }) => ({
+        key: aboutOf(bandeja ? { item, bandeja } : { item }),
+        kind,
+      }))
+    : [
+        {
+          key: aboutOf(notice.bandeja ? { item: notice.item, bandeja: true } : notice),
+          kind: notice.kind,
+        },
+      ];
+
 function factsOf(project: Project, now: number): NotifyFacts[] {
   const boards = liveBoards(project);
   const clock = () => new Date(now).toISOString();
@@ -100,7 +135,17 @@ export function createNotifier(
   // A burst says it in its own words ("3 cosas te tocan en tienda-web").
   const { id, name } = project.identity;
   const words = (notice: Notice, lang: NoticeLang): NoticeText => {
-    const text = noticeText(notice, lang, { id, name });
+    // A mixed burst says how many things wait for the person as `otea pending` counts them.
+    let said = notice;
+    if (notice.kind === 'group' && notice.of === 'mixed') {
+      try {
+        const waiting = pendingOf(project, undefined, { blocks: false }).count;
+        if (waiting > 0) said = { ...notice, waiting };
+      } catch (error) {
+        options.log?.(`Otea notices: what waits could not be counted: ${String(error)}`);
+      }
+    }
+    const text = noticeText(said, lang, { id, name });
     return {
       ...text,
       title: notice.kind === 'group' ? text.title : `${name} · ${text.title}`,
@@ -120,7 +165,10 @@ export function createNotifier(
   let stopFeed: (() => void) | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
 
-  const push = (target: NotifyTarget, text: NoticeText) => {
+  // What each phone was shown that may need closing, by device, then by the notice's tag.
+  const shown = new Map<string, Map<string, Shown>>();
+
+  const push = (target: NotifyTarget, text: NoticeText | { close: string }) => {
     const subscription = target.push;
     if (!subscription) return;
     const sent = options.sender
@@ -211,7 +259,13 @@ export function createNotifier(
       planner.offer(fresh, target.prefs, at);
       for (const notice of planner.take(at, seen, target.prefs)) {
         if (target.id !== DESKTOP) {
-          push(target, words(notice, target.lang));
+          const text = words(notice, target.lang);
+          push(target, text);
+          if (aboutThe(notice).some(({ kind }) => WAITS.has(kind))) {
+            const own = shown.get(target.id) ?? new Map<string, Shown>();
+            own.set(text.tag, { notice, at });
+            shown.set(target.id, own);
+          }
           continue;
         }
         // The language chosen in Preferencias, once it was; else the system's.
@@ -220,6 +274,46 @@ export function createNotifier(
           listener(words(notice, chose ? target.lang : lang));
         }
       }
+    }
+    // With a source unread, what it holds is unknown: nothing is closed on that look.
+    if (secretary !== undefined && bandeja !== undefined) {
+      closeGone(targets, new Set(signals.map((signal) => `${aboutOf(signal)}|${signal.kind}`)), at);
+    }
+  };
+
+  // What a phone was told waits for the person and no longer does: its notice is closed on the
+  // phone (a push the service worker answers without showing anything), and a burst's notice is
+  // replaced with the count of what still waits. `held` are the things true now.
+  const closeGone = (targets: readonly NotifyTarget[], held: ReadonlySet<string>, at: number) => {
+    for (const [device, byTag] of shown) {
+      const target = targets.find(({ id }) => id === device);
+      if (!target) {
+        shown.delete(device);
+        continue;
+      }
+      for (const [tag, record] of byTag) {
+        const { notice } = record;
+        if (at - record.at > SHOWN_FOR_MS) {
+          byTag.delete(tag);
+          continue;
+        }
+        const gone = aboutThe(notice).map(
+          ({ key, kind }) => WAITS.has(kind) && !held.has(`${key}|${kind}`),
+        );
+        if (!gone.includes(true)) continue;
+        const left = notice.kind === 'group' ? notice.items.filter((_, i) => !gone[i]) : [];
+        if (notice.kind !== 'group' || left.length === 0) {
+          push(target, { close: tag });
+          byTag.delete(tag);
+          continue;
+        }
+        const next = groupOf(left);
+        push(target, words(next, target.lang));
+        if (aboutThe(next).some(({ kind }) => WAITS.has(kind))) {
+          byTag.set(tag, { notice: next, at: record.at });
+        } else byTag.delete(tag);
+      }
+      if (byTag.size === 0) shown.delete(device);
     }
   };
 
@@ -232,6 +326,7 @@ export function createNotifier(
     unheardSince.clear();
     kept.clear();
     planners.clear();
+    shown.clear();
   };
 
   const refresh = () => {

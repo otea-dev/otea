@@ -1,7 +1,14 @@
 import { flush, sendWith } from './capture-queue.ts';
 import { idbQueue } from './idb-queue.ts';
 import { SYNC_TAG } from './register.ts';
-import { clickTarget, openFromClick, pushNotification, type WindowLike } from './sw-push.ts';
+import {
+  clickTarget,
+  closeShown,
+  closeTag,
+  openFromClick,
+  pushNotification,
+  type WindowLike,
+} from './sw-push.ts';
 import { SHELL_KEY, swRoute } from './sw-routes.ts';
 import {
   type Background,
@@ -38,6 +45,7 @@ type Scope = {
   skipWaiting(): Promise<void>;
   registration: {
     showNotification(title: string, options: NotificationOptions): Promise<void>;
+    getNotifications(filter: { tag: string }): Promise<readonly { close(): void }[]>;
   };
   clients: {
     claim(): Promise<void>;
@@ -153,6 +161,12 @@ sw.addEventListener('push', (event) => {
     payload = event.data?.json();
   } catch {
     payload = undefined;
+  }
+  // What it told stopped being true: the notice is closed, none is shown.
+  const closing = closeTag(payload);
+  if (closing !== undefined) {
+    event.waitUntil(closeShown(closing, sw.registration));
+    return;
   }
   const { title, options } = pushNotification(payload);
   event.waitUntil(sw.registration.showNotification(title, options));
