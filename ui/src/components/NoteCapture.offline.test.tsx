@@ -72,6 +72,10 @@ async function open(offline: boolean, onSent = vi.fn()) {
         phone: true,
         project: { id: 'p1', name: 'P', icon: null },
         sync: { offline, syncedAt: 1 },
+        // As the app gives it while the PC does not answer: the session reads as read-only, and
+        // the capture goes to the queue (app/data.ts).
+        session: { canWrite: !offline, canConfigure: true, canManageDevices: true },
+        canCapture: queue.available,
       })}
     >
       <NoteCapture onSent={onSent} />
@@ -172,7 +176,8 @@ describe('a quick note while the PC does not answer', () => {
   it('is sent straight away where there is no queue (a plain page): the failure is said, nothing is lost', async () => {
     queue.available = false;
     reaches = 'down';
-    const { root, onSent } = await open(true);
+    // The PC stops answering as it sends: the app has not noticed yet, so it still reads writable.
+    const { root, onSent } = await open(false);
     await typeInto(box(root), 'una idea');
 
     await press(save(root));
