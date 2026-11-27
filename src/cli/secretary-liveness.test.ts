@@ -1,4 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { postPersonMessage } from '../app/conversation.ts';
@@ -126,19 +129,22 @@ describe('the secretary seen offline once its process is gone', () => {
   ])(
     'reads offline within seconds of its harness being killed between two waits (named: $named)',
     async ({ named, waits }) => {
+      // The harness is node running a script: Linux and macOS name it by its program (node, or its
+      // thread), so what says it is claude is the script's name, as the real one's is.
       const starter = [
-        ...(named ? ["const harnessName = 'claude';"] : []),
         "const { spawn } = require('node:child_process');",
-        'const args = process.argv.slice(1);',
+        'const args = process.argv.slice(2);',
         "const run = (n) => { const c = spawn(process.execPath, args, { detached: true, stdio: 'ignore' }); console.log(c.pid); if (n > 1) c.on('exit', () => run(n - 1)); };",
         `run(${waits});`,
         'setTimeout(() => {}, 120_000);',
-      ].join(' ');
+      ].join('\n');
+      const dir = mkdtempSync(join(tmpdir(), 'otea-harness-'));
+      const script = join(dir, named ? 'claude-code.js' : 'launcher.js');
+      writeFileSync(script, starter);
       const harness = spawn(
         process.execPath,
         [
-          '-e',
-          starter,
+          script,
           '--disable-warning=ExperimentalWarning',
           MAIN,
           'wait',
@@ -184,6 +190,7 @@ describe('the secretary seen offline once its process is gone', () => {
         expect(Date.now() - killedAt).toBeLessThan(8_000);
       } finally {
         for (const pid of pids) if (processAlive(pid)) process.kill(pid);
+        rmSync(dir, { recursive: true, force: true });
       }
     },
     120_000,

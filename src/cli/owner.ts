@@ -108,15 +108,41 @@ export function harnessOf(rows: readonly ProcessRow[], start: number): number | 
 // session itself, never an intermediary that ends with its command (bwrap, docker exec, ssh,
 // wsl.exe, script). Its first find is trusted at once; an unknown process needs two waits.
 const KNOWN_HARNESS = /^(claude|opencode|codex|agy|gemini|antigravity)(-[a-z]+)?$/;
-const KNOWN_HARNESS_COMMAND =
-  /(?:^|[\\/\s"'])(?:claude|opencode|codex|agy|gemini|antigravity)(?:-[a-z]+)?(?:\.c?js|\.mjs|\.exe)?(?:["'\s\\/]|$)/i;
+
+const harnessWord = (token: string) =>
+  KNOWN_HARNESS.test(
+    basename(token.replaceAll('\\', '/'))
+      .replace(/\.(exe|c?js|mjs|cmd)$/i, '')
+      .toLowerCase(),
+  );
+
+// Whether the command line runs a known harness: its program (a bin called claude), or the script
+// it runs (node .../claude-code/cli.js), never a word further on (`ssh host claude` is ssh). Some
+// systems name a process by its thread, whatever it runs, so the name alone cannot say it.
+function commandRunsHarness(command: string): boolean {
+  const text = command.trim();
+  const quoted = text.startsWith('"') ? text.indexOf('"', 1) : -1;
+  const split = quoted > 0 ? quoted + 1 : text.search(/\s/);
+  const program = (
+    quoted > 0 ? text.slice(1, quoted) : text.slice(0, split < 0 ? undefined : split)
+  ).trim();
+  const args = split < 0 ? [] : text.slice(split).trim().split(/\s+/);
+  let script: string | undefined;
+  for (const arg of args) {
+    // An inline script is no file to name a harness by.
+    if (/^(-e|-p|-c|--eval|--print)$/.test(arg)) break;
+    if (arg.startsWith('-')) continue;
+    script = arg.replace(/^["']|["']$/g, '');
+    break;
+  }
+  return harnessWord(program) || (script?.split(/[\\/]/).some(harnessWord) ?? false);
+}
 
 export function isKnownHarness(rows: readonly ProcessRow[], pid: number): boolean {
   const row = rows.find((each) => each.pid === pid);
   if (!row) return false;
-  const program = programOf(row.name);
-  if (KNOWN_HARNESS.test(program)) return true;
-  return program === 'node' && row.command !== undefined && KNOWN_HARNESS_COMMAND.test(row.command);
+  if (KNOWN_HARNESS.test(programOf(row.name))) return true;
+  return row.command !== undefined && commandRunsHarness(row.command);
 }
 
 // Lines of "pid parent name", as both listings below print them; on Windows a tab and the program's

@@ -166,6 +166,22 @@ describe('the processes that own a command', () => {
       { pid: 5, parent: 0, name: 'bwrap' },
       { pid: 6, parent: 0, name: 'ssh' },
       { pid: 7, parent: 0, name: 'gemini' },
+      // A system may name a node process by its thread, whatever it runs.
+      {
+        pid: 8,
+        parent: 0,
+        name: 'MainThread',
+        command: 'node /usr/lib/node_modules/@anthropic-ai/claude-code/cli.js',
+      },
+      // The program's own words are not the harness: an intermediary that only mentions one.
+      { pid: 9, parent: 0, name: 'ssh', command: 'ssh host claude --resume' },
+      { pid: 10, parent: 0, name: 'node', command: 'node -e setInterval(()=>{}) claude' },
+      {
+        pid: 11,
+        parent: 0,
+        name: 'node.exe',
+        command: '"C:\\Program Files\\nodejs\\node.exe" C:\\u\\codex\\bin\\codex.js',
+      },
     ];
 
     expect(rows.map(({ pid }) => isKnownHarness(rows, pid))).toEqual([
@@ -173,6 +189,10 @@ describe('the processes that own a command', () => {
       true,
       true,
       false,
+      false,
+      false,
+      true,
+      true,
       false,
       false,
       true,
