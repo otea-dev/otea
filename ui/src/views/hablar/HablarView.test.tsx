@@ -950,7 +950,7 @@ describe('the secretary thinking', () => {
       const away = q(root, '.hb-away') as HTMLElement;
       const toggle = q<HTMLButtonElement>(away, '.hb-away-toggle') as HTMLButtonElement;
       expect(q(root, '.hb-te')).toBeNull();
-      expect(text(q(away, '.hb-away-line'))).toBe(
+      expect(text(q(away, '.hb-away-full'))).toBe(
         'Tu secretario está desconectado · 2 mensajes esperan',
       );
       expect(toggle.getAttribute('aria-expanded')).toBe('false');
@@ -1129,7 +1129,7 @@ describe('the secretary away, or never there', () => {
         waiting: { count: 2, since: ago(120) },
       }),
     );
-    expect(text(q(root, '.hb-away-line'))).toBe(
+    expect(text(q(root, '.hb-away-full'))).toBe(
       'Tu secretario está desconectado · 2 mensajes esperan',
     );
     // Since when, and that the messages are kept, once the line is opened.

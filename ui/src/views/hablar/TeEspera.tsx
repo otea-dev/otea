@@ -238,7 +238,13 @@ function AwayStrip({
           onClick={() => setOpen(!open)}
         >
           <i aria-hidden="true" />
-          <span className="hb-away-line">{sentence}</span>
+          <span className="hb-away-line">
+            <span className="hb-away-full">{sentence}</span>
+            {/* the narrowest phones: the sentence without the count, which fits one line */}
+            <span className="hb-away-brief" aria-hidden="true">
+              {t('hablar.away.shortNone')}
+            </span>
+          </span>
           {here ? (
             <span className="hb-te-n" data-tip={t('hablar.te.title')}>
               <span className="visually-hidden">{t('hablar.te.title')} </span>

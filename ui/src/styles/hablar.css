@@ -1825,6 +1825,17 @@ button.hb-kid:hover {
     line-height: 1.35;
   }
 }
+.hb-away-brief {
+  display: none;
+}
+@media (max-width: 360px) {
+  .hb-away-full {
+    display: none;
+  }
+  .hb-away-brief {
+    display: inline;
+  }
+}
 /* a narrow list: the chip's words go under its id and state, so the title keeps room */
 @container list (max-width: 340px) {
   .hb-chip {
