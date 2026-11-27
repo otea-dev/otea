@@ -130,7 +130,7 @@ import {
 import { type LandsFirst, landsFirst, landsFirstLine, landsFirstText } from './land-order.ts';
 import { assertMayWriteItem, type BaseTips, takeItem } from './lease-take.ts';
 import { scanned } from './overlap.ts';
-import { sessionAlive, sessionRuns } from './presence.ts';
+import { sessionAlive, sessionEnded, sessionRuns } from './presence.ts';
 import { priorityOf } from './priority.ts';
 import { liftSetAside, retakeOf, retakeText, SET_ASIDE_LIFTED, setAsideOf } from './set-aside.ts';
 import { approvedTipOf, type Recorded } from './tips.ts';
@@ -1053,7 +1053,11 @@ function mayTakeNow(
   at: string,
 ): boolean {
   const lease = activeLease(item.lease, at);
-  if (lease && lease.holder !== agent) return false;
+  // Another agent's lease holds it only while that agent's session is not known to have ended: a
+  // worker killed with its harness leaves a lease of minutes, which a claim already takes over
+  // (takeItem), so next and wait offer the item at once, not when the lease runs out.
+  if (lease && lease.holder !== agent && !sessionEnded(ctx.db, lease.holder, () => at))
+    return false;
   // A lease that ran out while its holder's session runs is still its holder's (P1-R3-6).
   const ranOut = !lease && item.lease && item.lease.holder !== agent ? item.lease : null;
   if (ranOut && sessionRuns(ctx.db, ranOut.holder, () => at)) return false;
@@ -1358,6 +1362,13 @@ function landingLines(
   );
 }
 
+// The lease the agent holds on the item now, if any: a lease of another agent whose session ended
+// is no lease of the agent's (a claim takes it over; an offer holds nothing).
+function ownLease(item: ItemRecord, agent: string, at: string): Lease | undefined {
+  const lease = activeLease(item.lease, at);
+  return lease?.holder === agent ? lease : undefined;
+}
+
 // With nothing to do while other agents hold the boards' work (P6-18): who holds what, and how two
 // agents share a board, so the idle one neither waits blind nor takes over what another holds.
 function heldElsewhere(
@@ -1448,7 +1459,7 @@ export function nextFor(
           return {
             item,
             board,
-            held: activeLease(item.lease, at) !== null,
+            held: activeLease(item.lease, at)?.holder === agent,
             left: leftFor(ctx, item.id) === agent,
             returned: on.sentBack !== undefined,
             approved: cameApproved(ctx, board.def, item),
@@ -1546,7 +1557,7 @@ export function nextFor(
           undefined,
           options.baseTipsOf,
         )
-      : (activeLease(first.item.lease, at) ?? undefined);
+      : ownLease(first.item, agent, at);
     const item = lease ? { ...first.item, lease } : first.item;
     if (!lease) saveOffer(ctx.db, { agent, item: item.id, state: item.state, at });
     const { sentBack, roundNotes } = itemOnBoard(ctx, item, board.def);
