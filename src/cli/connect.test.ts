@@ -90,6 +90,19 @@ describe('setup for agents', () => {
       expect((await json('init', '--local', '--agents-md')).agentsMd.action).toBe('updated');
       expect(read('AGENTS.md')).toBe(`# Agents\n\n${BLOCK}\n\n## Style\n`);
     });
+
+    // Windows with core.autocrlf=true checks AGENTS.md out with CRLF, block included: Otea's own
+    // block there is up to date, and a block it adds goes in with the file's line endings.
+    it('keeps the line endings of a CRLF file: the same block there is unchanged, a new one is CRLF', async () => {
+      const crlf = (text: string) => text.replaceAll('\n', '\r\n');
+      repo.write('AGENTS.md', crlf('# Agents\n\nRun the tests.\n'));
+
+      expect((await json('init', '--local', '--agents-md')).agentsMd.action).toBe('added');
+      expect(read('AGENTS.md')).toBe(crlf(`# Agents\n\nRun the tests.\n\n${BLOCK}\n`));
+
+      expect((await json('init', '--local', '--agents-md')).agentsMd.action).toBe('unchanged');
+      expect(read('AGENTS.md')).toBe(crlf(`# Agents\n\nRun the tests.\n\n${BLOCK}\n`));
+    });
   });
 
   describe('connect', () => {
