@@ -359,6 +359,7 @@ import {
 } from './hooks.ts';
 import { baseTipsOf, landedCommitRefusal } from './landed-commit.ts';
 import { type LocalBehind, localBehindOf, localBehindText } from './local-behind.ts';
+import { longPathNote } from './long-path.ts';
 import { mergedOutside, mergedOutsideLine } from './merged-outside.ts';
 import { boardsOf, eventData, itemCollections, itemData, readableEvent } from './names.ts';
 import { harnessOf, isKnownHarness, listProcesses, watchOwner } from './owner.ts';
@@ -1103,6 +1104,8 @@ const connect: Command = {
     // AGENTS.md goes in the checkout the agent works in: a linked worktree's own, so its agents
     // read it there.
     const here = checkoutRoot(cwd) ?? root;
+    const tooLong = longPathNote(root);
+    if (tooLong !== undefined) input.warn(tooLong);
     const agentsMd = writeAgentsMd(here);
     const agentsLine = `${AGENTS_MD_TEXT[agentsMd.action](agentsMd.path)}: every agent that reads AGENTS.md finds Otea there`;
     if (cliOnly) {
@@ -4292,6 +4295,8 @@ const start: Command = {
     });
     // The background server serves this project: a local one is remembered for it first.
     const here = projectHere(cwd);
+    const tooLong = longPathNote(checkoutRoot(cwd) ?? cwd);
+    if (tooLong !== undefined) input.warn(tooLong);
     const home = oteaHome();
     const { state, started, notes } = await ensureDesk(input, home);
     const { url, signInUrl } = pages(state.url, state.token, here);
