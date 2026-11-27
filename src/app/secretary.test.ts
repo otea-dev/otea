@@ -534,6 +534,16 @@ describe('the secretary', () => {
       });
     });
 
+    // T1a: its wait beats more often than a sighting is written: offline since its last beat, not
+    // since the sighting before it (up to a wait's length earlier).
+    it('says offline since the last beat of its wait', () => {
+      declareSecretary(ctx.db, 'sol', stamp(T0), running);
+      wait('sol', T0);
+      wait('sol', T0 + 20_000);
+
+      expect(secretaryStatus(ctx.db, stamp(T0 + 21_000), gone)?.since).toBe(iso(T0 + 20_000));
+    });
+
     it('says offline since the last time it was heard, once its session ended', () => {
       declareSecretary(ctx.db, 'sol', stamp(T0), running);
       wait('sol', T0);

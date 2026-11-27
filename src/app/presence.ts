@@ -118,6 +118,9 @@ export type AgentPresence = {
   // When it last ran an otea command, through the command line or MCP (null if never): a
   // listener's beat is none.
   actedAt: string | null;
+  // When it was last heard listening (a beat of its wait or MCP server), null if never: beats come
+  // oftener than a sighting is written.
+  heardAt: string | null;
   // Connected: it listens, or ran an otea command within LISTEN_WINDOW_MS; never for a lease alone.
   live: boolean;
   // What it is doing now, the one word every surface uses (core/agent-status.ts).
@@ -884,6 +887,7 @@ export function listAgents(
       holding: held,
       lastSeen,
       actedAt: record.actedAt ?? null,
+      heardAt: heardAt ?? null,
       live,
       status: agentStatus({
         live,

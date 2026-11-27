@@ -304,6 +304,7 @@ describe('agent presence', () => {
           mcp: null,
           folder: null,
           actedAt: null,
+          heardAt: T0,
           sessionEnded: false,
           there: false,
         },

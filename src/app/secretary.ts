@@ -53,7 +53,11 @@ export function secretaryName(db: DatabaseSync): string | undefined {
 // the role, for that.
 export const SECRETARY_HELD_MS = 30 * 60_000;
 
-const latest = (a: string, b: string | null) => (b !== null && b > a ? b : a);
+const latest = (a: string, ...rest: (string | null)[]) =>
+  rest.reduce<string>((best, each) => (each !== null && each > best ? each : best), a);
+
+// When the secretary was last heard: a sighting, a command, or a beat of its wait.
+const lastHeard = (agent: AgentPresence) => latest(agent.lastSeen, agent.actedAt, agent.heardAt);
 
 // Whether the secretary is really gone: not connected, and either its session ended (every process
 // it was heard through is gone) or it was not heard for SECRETARY_HELD_MS.
@@ -61,7 +65,7 @@ function secretaryGone(agent: AgentPresence | undefined, nowMs: number): boolean
   if (!agent) return true;
   if (agent.live) return false;
   if (agent.sessionEnded) return true;
-  return nowMs - Date.parse(latest(agent.lastSeen, agent.actedAt)) >= SECRETARY_HELD_MS;
+  return nowMs - Date.parse(lastHeard(agent)) >= SECRETARY_HELD_MS;
 }
 
 export type SecretaryDeclared = { agent: string; role: 'secretary'; replaced: string | null };
@@ -111,7 +115,7 @@ export function secretaryStatus(
   const agent = (agents ?? listAgents(db, now, processes)).find((each) => each.name === name);
   const pending = countPendingSignals(db);
   if (!agent || secretaryGone(agent, Date.parse(now()))) {
-    const since = agent ? latest(agent.lastSeen, agent.actedAt) : null;
+    const since = agent ? lastHeard(agent) : null;
     return { name, state: 'offline', since, pending };
   }
   return { name, state: agent.attending ? 'listening' : 'connected', since: null, pending };
