@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { listConversation, postPersonMessage } from '../app/conversation.ts';
 import { noteHarness, processAlive } from '../app/presence.ts';
 import { openProject } from '../app/project.ts';
+import { selectListenerProcesses } from '../store/queries.ts';
 import {
   cliAt,
   declareProfiles,
@@ -180,6 +181,15 @@ describe('an agent name is bound to the harness session noted for it', () => {
   it('refuses a worker name acting on an item its live session leased', async () => {
     const claim = await cliAt(repo.dir, { OTEA_AGENT: quill })('claim', 'TASKS-1');
     expect(claim.code, claim.err).toBe(0);
+    // The claim notes its own harness in the background; this session's note comes after it.
+    await until(() => {
+      const project = openProject(repo.dir);
+      try {
+        return selectListenerProcesses(project.db).get(quill)?.harness != null;
+      } finally {
+        project.db.close();
+      }
+    }, 15_000).catch(() => undefined);
     harness('mine', 'whoami', '--as', quill).boundTo(quill);
 
     const stranger = await harness(
