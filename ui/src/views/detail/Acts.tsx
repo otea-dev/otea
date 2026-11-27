@@ -326,7 +326,7 @@ export function Acts({
 
   // Nobody waits in otea wait: what the person does here, handed to an agent, waits for one, or
   // for one at work to wait again (P7-R2-9).
-  const heard = hearing(app.agents, app.all, app.now);
+  const heard = hearing(app.agents, app.all, app.now, item.collection);
   // The move in view: the one the person opened (a send-back's notes) or points at, else the first.
   // The notice stands beside it and beside the first: a review whose Aprobar closes the item says
   // nothing of listening until the person goes for Devolver.

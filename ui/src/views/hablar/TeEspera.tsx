@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { postEscalationDismiss } from '../../api.ts';
+import { useCallback, useState } from 'react';
+import { fetchRolePrompt, postEscalationDismiss } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
+import { useCopy } from '../../components/AgentPrompt.tsx';
 import { splitQuestion } from '../../conversation.ts';
 import { waitedText } from '../../derive/when.ts';
+import { useRemote } from '../../hooks.ts';
 import { language, t } from '../../i18n/i18n.ts';
 import { Icon } from '../../kit/Icon.tsx';
 import { toast } from '../../kit/index.ts';
@@ -20,13 +22,14 @@ import type { Pending, PendingEntry, PendingKind, QueueBlock } from '../../pendi
 
 const GROUPS: readonly {
   kinds: readonly PendingKind[];
-  key: 'q' | 'e' | 'r' | 's' | 'x';
+  key: 'q' | 'e' | 'r' | 's' | 'x' | 'w';
 }[] = [
   { kinds: ['question', 'bandeja', 'secretary'], key: 'q' },
   { kinds: ['escalation'], key: 'e' },
   { kinds: ['review'], key: 'r' },
   { kinds: ['step'], key: 's' },
   { kinds: ['stuck'], key: 'x' },
+  { kinds: ['worker'], key: 'w' },
 ];
 
 // What the conversation answers by itself: the questions. The rest is only here (and on Te toca).
@@ -70,10 +73,30 @@ export const PHONE_ROWS = 2;
 
 // What a row says: a question by the question itself, the rest by its text or its title.
 export function rowText(entry: PendingEntry): string {
+  if (entry.kind === 'worker') {
+    return t('hablar.te.worker', { count: entry.items?.length ?? 1, board: entry.title });
+  }
   if (entry.text !== undefined && ANSWERED_BELOW.includes(entry.kind)) {
     return splitQuestion(entry.text).lead;
   }
   return entry.text ?? entry.title;
+}
+
+// The worker's text for a board nobody works, to copy into a new session: read before the tap, so
+// the copy is the tap's own.
+function WorkerCopy({ board }: { board: string }) {
+  const load = useCallback(
+    (signal: AbortSignal) => fetchRolePrompt('worker', { board }, signal),
+    [board],
+  );
+  const prompt = useRemote(load, useApp().version, 'live');
+  const text = prompt.status === 'ready' ? prompt.value.prompt : '';
+  const [copied, copy] = useCopy(text);
+  return (
+    <button type="button" className="hb-te-dismiss" disabled={text === ''} onClick={copy}>
+      {copied ? t('hablar.te.worker.copied') : t('hablar.te.worker.copy')}
+    </button>
+  );
 }
 
 export function TeEspera({ pending, onJump }: TeEsperaProps) {
@@ -126,6 +149,7 @@ export function TeEspera({ pending, onJump }: TeEsperaProps) {
                   {waitedText(entry.since, app.now)}
                 </time>
               </button>
+              {entry.kind === 'worker' ? <WorkerCopy board={entry.ref} /> : null}
               {entry.kind === 'escalation' && entry.signal !== undefined ? (
                 <button
                   type="button"

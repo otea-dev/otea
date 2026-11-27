@@ -454,7 +454,8 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   const silentHere = unheard(item, app.agents, now);
   const standText = silentHere ? (
     <>
-      {standWords} {unheardLead(workingAgents(app.agents, app.all, now), app.agents, item.id)}
+      {standWords}{' '}
+      {unheardLead(workingAgents(app.agents, app.all, now, item.collection), app.agents, item.id)}
     </>
   ) : (
     standWords

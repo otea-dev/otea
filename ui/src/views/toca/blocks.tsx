@@ -36,6 +36,7 @@ import { stateWord } from '../../preset-words.ts';
 import { roundsOf } from '../../rounds.ts';
 import type { Item, TypeView } from '../../types.ts';
 import { byPriority } from '../board/matrix.ts';
+import { rowText } from '../hablar/TeEspera.tsx';
 import { deliveryOf, evidenceWords, quietLine } from './phone.ts';
 import { spanText } from './words.ts';
 
@@ -250,6 +251,31 @@ type TocaApp = Pick<App, 'all' | 'now' | 'feed' | 'collectionOf' | 'route'> &
 function OffRow({ entry, now }: { entry: PendingEntry; now: number }) {
   const secretary = entry.kind === 'secretary';
   const report = entry.kind === 'escalation';
+  const worker = entry.kind === 'worker';
+  if (worker) {
+    return (
+      <>
+        <div className="main-c">
+          <div className="t" data-leaf="" data-title="">
+            <span className="tt">{rowText(entry)}</span>
+          </div>
+          <div className="m" data-leaf="">
+            <span className="id">{entry.ref}</span>
+            <span className="bd">
+              <span className="bdc">{t('toca.off.worker')}</span>
+            </span>
+          </div>
+        </div>
+        <div className="a" data-leaf="">
+          {t('toca.act.worker')}
+          <small>{t('toca.sub.yourTurn')}</small>
+        </div>
+        <div className="age" data-leaf="">
+          {waitedText(entry.since, now)}
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <div className="main-c">
@@ -361,7 +387,7 @@ function TocaRow({
           ) : null}
           {sec === 'encamino' && unheard(it, app.agents, app.now) ? (
             <UnheardMark
-              busy={workingAgents(app.agents, app.all, app.now)}
+              busy={workingAgents(app.agents, app.all, app.now, it.collection)}
               nobody={noAgents(app.agents)}
               connected={connectedAgents(app.agents)}
             />

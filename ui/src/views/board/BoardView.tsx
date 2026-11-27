@@ -364,7 +364,7 @@ function Board({ board }: { board: string }) {
     onFold: toggleFold,
     onTick,
     agents: app.agents,
-    busy: workingAgents(app.agents, app.all, app.now),
+    busy: workingAgents(app.agents, app.all, app.now, board),
   };
   const empty: LaneBlock[] | null = !items.length
     ? [

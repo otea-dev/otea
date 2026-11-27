@@ -145,6 +145,15 @@ export const hablar = {
   'hablar.te.k.review': 'revisión',
   'hablar.te.k.step': 'tu paso',
   'hablar.te.k.stuck': '{agent} lleva rato sin avisar',
+  'hablar.te.sum.w': { one: '{count} tablero sin nadie', other: '{count} tableros sin nadie' },
+  'hablar.te.k.worker': 'abre una sesión',
+  'hablar.te.worker': {
+    one: '{board}: {count} cosa espera y nadie trabaja este tablero. Abre una sesión con el texto del trabajador.',
+    other:
+      '{board}: {count} cosas esperan y nadie trabaja este tablero. Abre una sesión con el texto del trabajador.',
+  },
+  'hablar.te.worker.copy': 'Copiar texto del trabajador',
+  'hablar.te.worker.copied': 'Copiado',
   'hablar.te.what.review': 'revisión',
   'hablar.te.what.answer': 'respuesta',
   'hablar.te.block': {

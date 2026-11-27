@@ -39,9 +39,14 @@ const ORDER: readonly PendingKind[] = [
   'secretary',
   'escalation',
   'stuck',
+  'worker',
   'review',
   'step',
 ];
+
+// How long a board's work may wait with nobody on it before it is the person's to open a worker: the
+// secretary launches one within moments when it can.
+export const OPEN_WORKER_AFTER_MS = 3 * 60_000;
 
 // The step of a board the person does themselves is theirs to do; a preset item they created and
 // that has not moved is the same. Every other item on their turn is a review.
@@ -276,13 +281,49 @@ const isDoing = (state: string): boolean => {
   return !isClosed(at) && at.phase === 'doing';
 };
 
+// A board whose work has waited for an agent for a while with nobody working it: the person opens a
+// session for it (U3, field study 4: the secretary had no way to launch one, and nothing said they
+// had to).
+function workerEntries(
+  ctx: Context,
+  queues: readonly BoardQueue[],
+  items: readonly Item[],
+  now: Clock,
+): PendingEntry[] {
+  const at = Date.parse(now());
+  const entered = selectStateEntries(ctx.db);
+  const sinceOf = new Map(items.map((item) => [item.id, entered.get(item.id) ?? item.createdAt]));
+  return queues.flatMap((queue) => {
+    if (queue.workers.length > 0) return [];
+    const since = queue.waiting
+      .map((id) => sinceOf.get(id))
+      .filter((time): time is string => time !== undefined)
+      .sort()[0];
+    if (since === undefined || at - Date.parse(since) < OPEN_WORKER_AFTER_MS) return [];
+    return [
+      {
+        kind: 'worker' as const,
+        items: [...queue.waiting],
+        ref: queue.board,
+        title: queue.board,
+        since,
+        text: `${queue.waiting.length} ${queue.waiting.length === 1 ? 'item waits' : 'items wait'} (${queue.waiting.join(', ')}) and nobody works this board: open a session and paste the worker text (otea prompt --role worker --board ${queue.board})`,
+      },
+    ];
+  });
+}
+
 export function pendingOf(
   ctx: Context,
   now: Clock = systemClock,
   options: PendingOptions = {},
 ): Pending {
   const items = listItems(ctx, {}, now);
-  const entries = entriesOf(ctx, items, now);
+  const queues = queuesOf(ctx, items, now);
+  const entries = sortEntries([
+    ...entriesOf(ctx, items, now),
+    ...workerEntries(ctx, queues, items, now),
+  ]);
   const status = secretaryStatus(ctx.db, now);
   return {
     count: entries.length,
@@ -291,7 +332,7 @@ export function pendingOf(
       options.blocks === false
         ? []
         : blocksOf(ctx, items, entries, now, options.landWait ?? landWaitOf),
-    queues: options.blocks === false ? [] : queuesOf(ctx, items, now),
+    queues: options.blocks === false ? [] : queues,
     secretary: status
       ? {
           name: status.name,
@@ -332,6 +373,8 @@ function lineOf(entry: PendingEntry): string {
       return `${entry.ref} ${quoted(entry.title)}: ${entry.by ?? 'an agent'} says ${quoted(entry.text ?? '')}${ago(entry.since)}`;
     case 'stuck':
       return `${entry.ref} ${quoted(entry.title)}: ${entry.by ?? 'its agent'} went quiet${ago(entry.since)}`;
+    case 'worker':
+      return `board ${quoted(entry.title)}: ${entry.text ?? 'nobody works it'}${ago(entry.since)}. If you cannot launch a worker yourself, give them the worker text as a numbered block (rule 8).`;
     case 'review':
       return `${entry.ref} ${quoted(entry.title)} waits for their review${ago(entry.since)}`;
     case 'step':
@@ -367,6 +410,7 @@ const GROUPS: readonly { kinds: readonly PendingKind[]; head: string }[] = [
   { kinds: ['question', 'bandeja', 'secretary'], head: 'Questions' },
   { kinds: ['escalation'], head: 'Escalated by agents' },
   { kinds: ['stuck'], head: 'Stuck' },
+  { kinds: ['worker'], head: 'Boards with nobody on them' },
   { kinds: ['review'], head: 'Reviews' },
   { kinds: ['step'], head: 'Their own steps' },
 ];

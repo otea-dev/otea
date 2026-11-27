@@ -53,7 +53,9 @@ export const rowKeyOf = (entry: PendingEntry): string =>
     ? `msg:${entry.ref}`
     : entry.kind === 'escalation'
       ? `esc:${entry.ref}:${entry.signal ?? ''}`
-      : entry.ref;
+      : entry.kind === 'worker'
+        ? `worker:${entry.ref}`
+        : entry.ref;
 
 // The secretary shown offline with something waiting for it: Te toca says so, with a way to Hablar.
 export function offlineWithWaiting(pending: Pending | null | undefined): PendingSecretary | null {

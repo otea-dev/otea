@@ -32,12 +32,26 @@ export function handsToAgent(
 // hears waits its turn in a queue: the desk says so calmly, not as an alarm.
 export function workingAgents(
   agents: readonly Agent[] | null | undefined,
-  items: readonly Pick<Item, 'id' | 'asks'>[],
+  items: readonly Pick<Item, 'id' | 'asks' | 'collection'>[],
   now: number,
+  // The board the queue is of: an agent at work only on another board never comes to it (field
+  // study 4, U3: «en cola: ines-check-3 está trabajando» on a board nobody worked).
+  board?: string,
 ): string[] {
   return takers(agents)
-    .filter((a) => isWorking(a, items, now))
+    .filter((a) => isWorking(a, items, now) && !worksOnlyElsewhere(a, items, board))
     .map((a) => a.name);
+}
+
+// Whether the agent holds items and none of them is on `board`: it works another board.
+function worksOnlyElsewhere(
+  agent: Agent,
+  items: readonly Pick<Item, 'id' | 'collection'>[],
+  board: string | undefined,
+): boolean {
+  if (board === undefined || agent.holding.length === 0) return false;
+  const held = items.filter(({ id }) => agent.holding.includes(id));
+  return held.length > 0 && held.every(({ collection }) => collection !== board);
 }
 
 // The agents that take items, the workers: every one but the secretary, which talks with the
@@ -129,11 +143,12 @@ export function noAgents(agents: readonly Agent[] | null | undefined): boolean {
 
 export function hearing(
   agents: readonly Agent[] | null | undefined,
-  items: readonly Pick<Item, 'id' | 'asks'>[],
+  items: readonly Pick<Item, 'id' | 'asks' | 'collection'>[],
   now: number,
+  board?: string,
 ): Hearing | null {
   if (anyoneWaits(agents)) return null;
-  const working = workingAgents(agents, items, now);
+  const working = workingAgents(agents, items, now, board);
   if (working.length > 0) return { kind: 'working', agents: working };
   const connected = connectedAgents(agents);
   if (connected.length > 0) return { kind: 'connected', agents: connected };

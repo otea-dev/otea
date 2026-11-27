@@ -143,6 +143,26 @@ describe('workingAgents', () => {
     ).toEqual([]);
   });
 
+  // U3 (field study 4): every piece of a board nobody works read «en cola: ines-check-3 está
+  // trabajando» because that agent works another board.
+  it('names, for a board, only the agents that can come to it: not one at work on another board', () => {
+    const research = item({ id: 'PRE-1', collection: 'Investigación', lease });
+    const docs = item({ id: 'PIE-1', collection: 'Documentos' });
+    const onResearch = agent('a', { holding: ['PRE-1'], status: 'working' as const });
+    const between = agent('b', { status: 'working' as const });
+    expect(workingAgents([onResearch, between], [research, docs], NOW, 'Documentos')).toEqual([
+      'b',
+    ]);
+    expect(workingAgents([onResearch, between], [research, docs], NOW, 'Investigación')).toEqual([
+      'a',
+      'b',
+    ]);
+    expect(workingAgents([onResearch], [research, docs], NOW, 'Documentos')).toEqual([]);
+    expect(hearing([onResearch], [research, docs], NOW, 'Documentos')).not.toMatchObject({
+      kind: 'working',
+    });
+  });
+
   it('names none that only waits for your answer, nor one gone', () => {
     const asks = { question: 1, by: 'a', text: 'Which one?', at: ago(1) };
     const asking = [item({ id: 'TASK-2', lease, asks })];

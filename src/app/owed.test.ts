@@ -59,7 +59,7 @@ describe('a message the secretary read and did not answer is owed', () => {
     // Answered: it stops.
     sayAsSecretary(
       project,
-      { agent: 'sol', text: 'Falta poco.', replyTo: message.id, consultation: true },
+      { agent: 'sol', text: 'Falta poco.', replyTo: message.id, kind: 'consultation' },
       clock(220_000),
     );
     expect(waitAt(230_000)).toBeUndefined();

@@ -9,6 +9,9 @@ import type { SecretaryState } from './secretary.ts';
 //   review     an item reached their review (or a step they decide)
 //   step       a step of their own on a board: theirs to do
 //   stuck      an agent's lease ran out and nobody took the item again
+//   worker     a board has work for an agent and nobody works it: opening a worker session (otea
+//              prompt --role worker --board <board>) is theirs to do when the secretary cannot
+//              launch one
 //   escalation an agent told the secretary something the person must know (otea escalate) and the
 //              secretary is away: the person reads it themselves
 export const PENDING_KINDS = [
@@ -19,6 +22,7 @@ export const PENDING_KINDS = [
   'review',
   'step',
   'stuck',
+  'worker',
 ] as const;
 
 export type PendingKind = (typeof PENDING_KINDS)[number];
@@ -41,6 +45,8 @@ export type PendingEntry = {
   turn?: number;
   // An escalation: the number the person dismisses it by.
   signal?: number;
+  // A board nobody works: the items that wait on it.
+  items?: string[];
 };
 
 // A review that holds the rest of a board's queue: the board works straight on its base (or lands in
@@ -103,7 +109,7 @@ export function pendingCounts(entries: readonly PendingEntry[]): Record<PendingK
 
 // What waits for them that is no item: the Bandeja's and the secretary's questions. The desk adds
 // them to the items on its own turn (Te toca's number).
-export const OFF_ITEM: readonly PendingKind[] = ['bandeja', 'secretary', 'escalation'];
+export const OFF_ITEM: readonly PendingKind[] = ['bandeja', 'secretary', 'escalation', 'worker'];
 
 export function offItem(entries: readonly PendingEntry[]): PendingEntry[] {
   return entries.filter(({ kind }) => OFF_ITEM.includes(kind));

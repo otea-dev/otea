@@ -80,6 +80,8 @@ export const toca = {
   'toca.off.inHablar': 'in Talk',
   'toca.off.report': 'Notice',
   'toca.act.report': 'Read',
+  'toca.off.worker': 'Board with nobody on it',
+  'toca.act.worker': 'Open a session',
   'toca.sub.reports': '{agent} reports',
 
   // The secretary is offline with things waiting for it

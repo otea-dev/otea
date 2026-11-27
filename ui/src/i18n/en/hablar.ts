@@ -143,6 +143,18 @@ export const hablar = {
   'hablar.te.k.review': 'review',
   'hablar.te.k.step': 'your step',
   'hablar.te.k.stuck': '{agent} has been quiet for a while',
+  'hablar.te.sum.w': {
+    one: '{count} board with nobody on it',
+    other: '{count} boards with nobody on them',
+  },
+  'hablar.te.k.worker': 'open a session',
+  'hablar.te.worker': {
+    one: '{board}: {count} item waits and nobody works this board. Open a session with the worker text.',
+    other:
+      '{board}: {count} items wait and nobody works this board. Open a session with the worker text.',
+  },
+  'hablar.te.worker.copy': 'Copy the worker text',
+  'hablar.te.worker.copied': 'Copied',
   'hablar.te.what.review': 'review',
   'hablar.te.what.answer': 'answer',
   'hablar.te.block': {

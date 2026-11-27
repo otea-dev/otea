@@ -52,6 +52,25 @@ describe('the «Te espera» strip of Hablar', () => {
     expect(html).toContain('2 reviews');
   });
 
+  // U3 (field study 4): with no way to launch a worker, opening a session is the person's to do.
+  it('lists a board nobody works as a thing to do, with the worker text to copy', () => {
+    const html = render(
+      pending([
+        {
+          kind: 'worker',
+          ref: 'Documentos',
+          title: 'Documentos',
+          since: ago(30),
+          items: ['PIE-1', 'PIE-2', 'PIE-3'],
+        },
+      ]),
+    );
+
+    expect(html).toContain('Documentos: 3 items wait and nobody works this board');
+    expect(html).toContain('1 board with nobody on it');
+    expect(html).toContain('Copy the worker text');
+  });
+
   it('says which review holds the queue of a board, and what waits behind it', () => {
     const html = render(
       pending(reviews, {

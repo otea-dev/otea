@@ -770,7 +770,7 @@ export function PhoneItem(p: PhoneItemProps) {
   // stays on the desk, as the phone's review always had it. Triage offers the same (otherMoves).
   const moreMoves = dock ? otherMoves(plan) : [];
   // Whether what is handed to an agent here is heard (P7-R2-9): said beside the move that does it.
-  const heard = hearing(app.agents, app.all, now);
+  const heard = hearing(app.agents, app.all, now, item.collection);
   const [pickOpen, setPickOpen] = useState(false);
   const pickBtn = useRef<HTMLButtonElement>(null);
   // Opened from Triage to pick: the sheet opens as soon as the pick is known.

@@ -85,6 +85,8 @@ export const toca = {
   'toca.off.inHablar': 'en Hablar',
   'toca.off.report': 'Aviso',
   'toca.act.report': 'Leer',
+  'toca.off.worker': 'Tablero sin nadie',
+  'toca.act.worker': 'Abre una sesión',
   'toca.sub.reports': '{agent} avisa',
 
   // El secretario está desconectado y le esperan cosas
