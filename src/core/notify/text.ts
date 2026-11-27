@@ -126,7 +126,8 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
     const title = words.group[notice.of](notice.count);
     return {
       title: project ? words.in(title, project.name) : title,
-      body: short(notice.items.map(({ title }) => title || words.hablar).join(' · ')),
+      // Items with no title of their own are the secretary talking: Hablar is named once.
+      body: short([...new Set(notice.items.map(({ title }) => title || words.hablar))].join(' · ')),
       tag: project ? `otea-group-${project.id}` : 'otea-group',
       url: '/#/',
       item: null,
