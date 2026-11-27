@@ -237,7 +237,7 @@ describe('hearing', () => {
   it('says no agent is connected, not that nobody listens, when there is none', () => {
     expect(hearing([], [], NOW)).toEqual({ kind: 'nobody' });
     expect(hearing([agent('a', { live: false })], [], NOW)).toEqual({ kind: 'nobody' });
-    expect(unheardWords([], true)).toEqual({ text: 'no worker is connected', calm: true });
+    expect(unheardWords([], true)).toEqual({ text: 'no agent is connected', calm: true });
   });
 
   // Review of F6: a refiner waiting on the Bandeja, like the secretary, takes no item: with only

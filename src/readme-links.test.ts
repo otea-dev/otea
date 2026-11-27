@@ -29,7 +29,6 @@ function anchors(markdown: string): Set<string> {
     const heading = /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(line)?.[1];
     if (heading === undefined) continue;
     const base = heading
-      .replace(/<[^>]*>/g, '')
       .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
       .toLowerCase()
       .replace(/[^\p{L}\p{N}\s_-]/gu, '')
