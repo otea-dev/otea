@@ -49,9 +49,12 @@ describe('the secretary seen offline once its process is gone', () => {
     lookAt((project) => {
       const noted = selectListenerProcesses(project.db).get('sol')?.harness ?? null;
       if (noted !== null) forgetHarness(project.db, 'sol', noted);
-      // What an earlier test wrote to it is read: a wait must not return at once for it.
+      // What an earlier test wrote to it is read and let go: a wait must not return at once for it
+      // (a message read and not answered is owed, so it is also marked as returned enough).
       project.db
-        .prepare('UPDATE conversation_messages SET read_at = ? WHERE read_at IS NULL')
+        .prepare(
+          'UPDATE conversation_messages SET read_at = COALESCE(read_at, ?), owed_returns = 99',
+        )
         .run(new Date().toISOString());
     });
   });
