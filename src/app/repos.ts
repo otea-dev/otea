@@ -123,11 +123,20 @@ export function readReposIn(project: Project, folders: readonly string[]): Repo[
     if (pick.length === 1 && pick[0] !== undefined) chosen.push({ name: pick[0], identity });
   }
   const taken = (name: string) => chosen.filter((repo) => repo.name === name).length > 1;
-  const added = chosen.filter(({ name }) => !names.has(name) && !taken(name));
-  transaction(project.db, () => {
+  const wanted = chosen.filter(({ name }) => !names.has(name) && !taken(name));
+  // Read again under the write lock: another process that read the same folders at the same moment
+  // (two sessions starting in a fresh repo) may have registered a repo since the look above, and an
+  // insert of it would end in a bare UNIQUE constraint failure.
+  return transaction(project.db, () => {
+    const now = selectRepos(project.db);
+    const knownIdentities = new Set(now.map(({ identity }) => identity));
+    const knownNames = new Set(now.map(({ name }) => name));
+    const added = wanted.filter(
+      ({ identity, name }) => !knownIdentities.has(identity) && !knownNames.has(name),
+    );
     for (const repo of added) insertRepo(project.db, repo);
+    return added;
   });
-  return added;
 }
 
 function itemRepoNames(project: Project): Set<string> {
