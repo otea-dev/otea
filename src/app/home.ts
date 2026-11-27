@@ -22,11 +22,14 @@ import {
   updateProjectPath,
   wholeDataDirs,
 } from '../store/registry.ts';
+import { msysDrive } from './msys-path.ts';
 import type { Env } from './project.ts';
 
 // The user-level Otea folder: OTEA_HOME, or ~/.otea on every OS.
 export function oteaHome(env: Env = process.env): string {
-  return env.OTEA_HOME ? resolve(env.OTEA_HOME) : join(homedir(), '.otea');
+  return env.OTEA_HOME
+    ? resolve(msysDrive(env.OTEA_HOME) ?? env.OTEA_HOME)
+    : join(homedir(), '.otea');
 }
 
 function registryPath(env: Env): string {

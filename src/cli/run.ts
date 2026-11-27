@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { type ParseArgsOptionsConfig, parseArgs } from 'node:util';
 import { oteaHome } from '../app/home.ts';
 import { findOnPath, installRoot } from '../app/launcher.ts';
+import { msysDrive } from '../app/msys-path.ts';
 import type { Probe } from '../app/phone.ts';
 import { CLI_HARNESS } from '../app/presence.ts';
 import { NO_TAILSCALE, type TailscaleCli } from '../app/tailscale.ts';
@@ -212,7 +213,9 @@ function inputFor(command: Command, values: Values, args: string[], io: Io, json
     probe: io.probe ?? (async () => false),
     ...(io.gh === undefined ? {} : { gh: io.gh }),
     forge: io.forge ?? NO_FORGE,
-    ...(io.env.OTEA_HOME ? { home: resolve(io.cwd, io.env.OTEA_HOME) } : {}),
+    ...(io.env.OTEA_HOME
+      ? { home: resolve(io.cwd, msysDrive(io.env.OTEA_HOME) ?? io.env.OTEA_HOME) }
+      : {}),
     oteaOnPath: () => {
       const found = findOnPath(io.env);
       return found && { ...found, root: installRoot(found.file) };
