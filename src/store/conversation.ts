@@ -3,6 +3,7 @@ import type {
   AnswerMode,
   KindBy,
   Message,
+  MessageAction,
   MessageAuthor,
   MessageChoice,
   MessageFile,
@@ -30,10 +31,11 @@ type MessageRow = {
   about: string | null;
   asked: string | null;
   heard_at: string | null;
+  action: string | null;
 };
 
 const COLUMNS =
-  'm.id, m.author, m.author_name, m.text, m.at, m.reply_to, m.root, m.read_at, m.topic, m.options, m.recommended, m.choice, m.choice_option, m.about, m.asked, m.heard_at';
+  'm.id, m.author, m.author_name, m.text, m.at, m.reply_to, m.root, m.read_at, m.topic, m.options, m.recommended, m.choice, m.choice_option, m.about, m.asked, m.heard_at, m.action';
 
 export type NewMessage = {
   author: MessageAuthor;
@@ -49,6 +51,8 @@ export type NewMessage = {
   // A question with options to tap.
   options?: readonly string[] | undefined;
   recommended?: number | undefined;
+  // What the first option does when the person taps it.
+  action?: MessageAction | undefined;
   // The person's answer to a question: how, and what it records when it is only a trace.
   choice?: { mode: AnswerMode; option?: number | undefined; about?: string; asked?: string };
 };
@@ -66,9 +70,9 @@ export function insertMessage(db: DatabaseSync, message: NewMessage): number {
         )?.root;
   const sql = `INSERT INTO conversation_messages
     (author, author_name, text, at, reply_to, root, read_at, topic, client_scope, client_key, client_digest,
-     options, recommended, choice, choice_option, about, asked)
+     options, recommended, choice, choice_option, about, asked, action)
     VALUES (:author, :name, :text, :at, :replyTo, :root, :readAt, :topic, :scope, :key, :digest,
-     :options, :recommended, :choice, :choiceOption, :about, :asked)`;
+     :options, :recommended, :choice, :choiceOption, :about, :asked, :action)`;
   const result = db.prepare(sql).run({
     author: message.author,
     name: message.name,
@@ -86,6 +90,7 @@ export function insertMessage(db: DatabaseSync, message: NewMessage): number {
         ? null
         : JSON.stringify(message.options),
     recommended: message.recommended ?? null,
+    action: message.action === undefined ? null : JSON.stringify(message.action),
     choice: message.choice?.mode ?? null,
     choiceOption: message.choice?.option ?? null,
     about: message.choice?.about ?? null,
@@ -298,6 +303,7 @@ function hydrate(db: DatabaseSync, rows: readonly MessageRow[]): Message[] {
       topic: row.topic,
       options: row.options === null ? [] : (JSON.parse(row.options) as string[]),
       recommended: row.recommended,
+      action: row.action === null ? null : (JSON.parse(row.action) as MessageAction),
       choice: choiceOf(row),
       heardAt: row.heard_at,
       kindNews: (head?.kind_news ?? 0) > 0,

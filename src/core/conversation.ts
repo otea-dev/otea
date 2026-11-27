@@ -61,6 +61,11 @@ export type MessageChoice = {
   asked: string | null;
 };
 
+// What the person's tap on the first option of a question performs, as the person: today only the
+// send-back of an item in their review, with the note the secretary drafted from their words (the
+// person may edit it before they tap). The secretary never performs it.
+export type MessageAction = { kind: 'send_back'; item: string; note: string };
+
 export type Message = {
   id: number;
   author: MessageAuthor;
@@ -88,6 +93,8 @@ export type Message = {
   // person's answer to one (or to an agent's, as a trace).
   options: string[];
   recommended: number | null;
+  // What the first option does when the person taps it, when the question carries an action.
+  action: MessageAction | null;
   choice: MessageChoice | null;
   // The person's messages only: when the secretary's wait returned it, before it read it.
   heardAt: string | null;

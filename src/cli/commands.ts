@@ -59,9 +59,9 @@ import {
   messageIdOf,
   readAsSecretary,
   requireLinkableMessage,
-  sayAsSecretary,
   turnsOfItem,
 } from '../app/conversation.ts';
+import { sayWithSendBack } from '../app/conversation-act.ts';
 import { cropNote } from '../app/crop.ts';
 import { listDevices, revokeDevice } from '../app/devices.ts';
 import { handInText, openDraftsOf } from '../app/draft-request.ts';
@@ -187,6 +187,7 @@ import {
 import { readerFilter } from '../app/reader-filter.ts';
 import { linkItems, unlinkItems } from '../app/relations.ts';
 import { relayDecision } from '../app/relay.ts';
+import { updateAndTell } from '../app/relay-change.ts';
 import {
   addRepo,
   listRepos,
@@ -2843,7 +2844,7 @@ async function waitForSecretary(input: Input): Promise<Output> {
 const wait: Command = {
   name: 'wait',
   summary:
-    'Wait until an item is on the turn and print it as a list row, at once if one already is; the one waiting longest in its state comes first. A note from the person on an item you hold, or their answer to your question, wakes it too, saying which. --secretary, instead of --turn, is the secretary wait: it wakes for the person, a Bandeja note, an escalated question or board work nobody hears',
+    'Wait until an item is on the turn and print it as a list row, at once if one already is; the one waiting longest in its state comes first. A note from the person on an item you hold, or their answer to your question, wakes it too, saying which. --secretary, instead of --turn, is the secretary wait: it wakes for the person, a Bandeja note, an escalated question, an item that reached their review or board work nobody hears',
   args: [],
   options: {
     // Required unless --secretary: checked in execute.
@@ -3612,12 +3613,18 @@ const update: Command = {
     description: {},
     field: { multiple: true, placeholder: 'key=value' },
     'field-file': FIELD_FILE,
+    tell: {
+      placeholder: 'text',
+      about:
+        'for the secretary: the person changed their mind about an item that is not in their review: the change is made even while a worker holds it, and the worker is told at once (it answers before it hands off)',
+    },
   },
   execute: async (input) => {
     const [id = ''] = input.args;
     const title = input.option('title');
+    const tell = input.option('tell');
     const fields = await fieldsFrom(input);
-    if (title === undefined && Object.keys(fields).length === 0) {
+    if (title === undefined && Object.keys(fields).length === 0 && tell === undefined) {
       throw new UsageError(
         'Nothing to update; pass --title, --description, --field or --field-file',
       );
@@ -3626,6 +3633,8 @@ const update: Command = {
     const changes = { id, fields, actor, ...(title === undefined ? {} : { title }) };
     return withAgent(input, (project) => {
       refuseAttachedParts(project, id, Object.keys(fields), input);
+      if (tell !== undefined)
+        return itemResult(project, updateAndTell(project, { ...changes, tell }));
       return itemResult(project, updateItem(project, changes));
     });
   },
@@ -5218,12 +5227,25 @@ const say: Command = {
     links: { placeholder: 'ids', about: 'item ids, comma separated' },
     option: { multiple: true, placeholder: 'text', about: '2 to 4 answers they tap' },
     recommend: { placeholder: 'n', about: 'number (from 1) of the one you pick' },
+    'send-back': {
+      placeholder: 'id',
+      about:
+        'an item in their review they changed their mind about: the FIRST --option sends it back for them, with --note, when they tap it (you never send it back)',
+    },
+    note: {
+      placeholder: 'text',
+      about: 'with --send-back: the note it goes back with, their words',
+    },
   },
   execute: async (input) => {
     const [given = ''] = input.args;
     const { actor, cwd } = input;
     const replyTo = input.option('reply-to');
     const options = input.options('option');
+    const sendBack = input.option('send-back');
+    const noteGiven = input.option('note');
+    if ((sendBack === undefined) !== (noteGiven === undefined))
+      throw new UsageError('--send-back <id> and --note "<note>" come together');
     const recommend = input.option('recommend');
     const recommended = recommend === undefined ? undefined : Number(recommend.replace(/^#/, ''));
     if (recommended !== undefined && !Number.isInteger(recommended))
@@ -5244,7 +5266,7 @@ const say: Command = {
         ? ('consultation' as const)
         : undefined;
     return withAgent(input, (project) => {
-      const said = sayAsSecretary(project, {
+      const said = sayWithSendBack(project, {
         agent: actor.name,
         text,
         files: input.options('file').map((path) => messageFileAt(resolve(cwd, path))),
@@ -5253,6 +5275,9 @@ const say: Command = {
         links,
         ...(options.length === 0 ? {} : { options }),
         ...(recommended === undefined ? {} : { recommended }),
+        ...(sendBack === undefined || noteGiven === undefined
+          ? {}
+          : { action: { kind: 'send_back' as const, item: sendBack, note: noteGiven } }),
       });
       const { message } = said;
       const turn =

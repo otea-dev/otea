@@ -530,6 +530,9 @@ function Entry({
             text={message.text}
             options={message.options}
             recommended={message.recommended ?? undefined}
+            {...(message.action === null
+              ? {}
+              : { action: { item: message.action.item, note: message.action.note } })}
             send={(given) => onAnswer(message, given)}
           />
         ) : null}

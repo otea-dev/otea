@@ -69,6 +69,7 @@ import {
   relatedItems,
   withRelations,
 } from './relations.ts';
+import { signalReview } from './review-signal.ts';
 
 export type Clock = () => string;
 
@@ -363,16 +364,24 @@ function withBranchGates(
   return { ...gates, push: false };
 }
 
-export type UpdateItemInput = { id: string; title?: string; fields?: FieldValues; actor: Actor };
+export type UpdateItemInput = {
+  id: string;
+  title?: string;
+  fields?: FieldValues;
+  actor: Actor;
+  // The secretary changes what a worker holds, and tells it in the same act (app/relay-change.ts);
+  // nothing else sets this.
+  overLease?: true;
+};
 
 export function updateItem(ctx: Context, input: UpdateItemInput, now = systemClock): Item {
   const { db } = ctx;
-  return transaction(db, () => {
+  return joinTransaction(db, () => {
     const item = requireWritableItem(db, input.id);
     const preset = presetOf(ctx, getCollection(db, item.collection));
     const type: ItemType = typeOf(preset, item.type);
     const at = now();
-    assertMayWriteItem(ctx, item, input.actor, at);
+    if (input.overLease !== true) assertMayWriteItem(ctx, item, input.actor, at);
     if (turnOf(type.workflow, item.state) === 'none') {
       throw new OteaError(
         'item_closed',
@@ -460,6 +469,9 @@ export function landMove(
     appendEvent(db, { itemId: item.id, type: 'released', actor, at, data: released });
   }
   if (turnOf(workflow, to) === 'none') liftWhenWaitsClose(ctx, item.id, actor, at);
+  // The person's review is news for the secretary, unless the person made the move themselves.
+  if (actor.kind === 'agent')
+    signalReview(ctx, item, { to, turn: turnOf(workflow, to), board }, at);
   const moved = { ...item, state: to, updatedAt: at, lease: handoff ? null : item.lease };
   return present(moved, workflow, at);
 }

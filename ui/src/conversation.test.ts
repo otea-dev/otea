@@ -44,6 +44,7 @@ function say(o: Partial<Message> & { author: Message['author'] }): Message {
     topic: null,
     options: [],
     recommended: null,
+    action: null,
     choice: null,
     heardAt: null,
     kindNews: false,

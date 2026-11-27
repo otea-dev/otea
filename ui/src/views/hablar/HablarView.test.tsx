@@ -37,6 +37,7 @@ function say(o: Partial<Message> & { author: Message['author'] }): Message {
     topic: null,
     options: [],
     recommended: null,
+    action: null,
     choice: null,
     heardAt: null,
     kindNews: false,
@@ -406,6 +407,50 @@ describe('a question of the secretary', () => {
     expect(text(q(root, '.hb-chose'))).toContain('Elegiste: Dejarlo como idea');
     // It is waiting for the secretary, as any message of yours.
     expect(q(root, '.hb-thinking')).not.toBeNull();
+  });
+});
+
+// U4 (field study 4): a change of mind on an item in review is one tap in Hablar, never a trip to
+// the board: the card shows the note it will go back with, and the person's tap sends it.
+describe('a card that sends an item back', () => {
+  const card = () => [
+    say({ id: 1, author: 'person', text: 'cambié de idea: déjalo en 404' }),
+    say({
+      id: 2,
+      author: 'secretary',
+      replyTo: 1,
+      root: 1,
+      text: '¿Devuelvo CAM-7 con tu cambio?',
+      options: ['Devolver CAM-7', 'No'],
+      action: { kind: 'send_back', item: 'CAM-7', note: 'Que dé 404 y solo cambie el mensaje.' },
+    }),
+  ];
+
+  it('shows the note it goes back with, taps once to send it back, and never offers to leave the decision to the secretary', async () => {
+    const { root, calls } = await open(conversation({ messages: card() }));
+
+    expect(text(q(root, '.hb-note'))).toBe('Que dé 404 y solo cambie el mensaje.');
+    expect(buttonNamed(root, 'Decide tú')).toBeUndefined();
+
+    await press(all(root, '.hb-row.secretary .hb-opt')[0]);
+
+    expect(calls.map(({ method, url, body }) => [method, url, body])).toEqual([
+      ['POST', '/api/conversation/messages/2/answer', { option: 1 }],
+    ]);
+  });
+
+  it('lets you edit the note first, and sends it back with your words', async () => {
+    const { root, calls } = await open(conversation({ messages: card() }));
+
+    await press(buttonNamed(root, 'Editar nota') as HTMLElement);
+    const field = q(root, '.hb-own textarea') as HTMLTextAreaElement;
+    expect(field.value).toBe('Que dé 404 y solo cambie el mensaje.');
+    await typeInto(field, 'Mejor 410.');
+    await press(buttonNamed(root, 'Devolver CAM-7 con esta nota') as HTMLElement);
+
+    expect(calls.map(({ method, url, body }) => [method, url, body])).toEqual([
+      ['POST', '/api/conversation/messages/2/answer', { option: 1, note: 'Mejor 410.' }],
+    ]);
   });
 });
 

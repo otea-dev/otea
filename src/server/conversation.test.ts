@@ -4,10 +4,15 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { addCollection } from '../app/collections.ts';
 import { readAsSecretary, sayAsSecretary } from '../app/conversation.ts';
+import { sayWithSendBack } from '../app/conversation-act.ts';
 import { pairDevice } from '../app/devices.ts';
-import { createItem } from '../app/items.ts';
+import { createItem, getItem } from '../app/items.ts';
+import { handoffItem } from '../app/next.ts';
 import type { Project } from '../app/project.ts';
 import { declareSecretary } from '../app/secretary.ts';
+import { publishAs } from '../app/testing.ts';
+import { creatures } from '../core/board/testing.ts';
+import { insertEvidence, selectEvents } from '../store/queries.ts';
 import { createServer, type OteaServer } from './server.ts';
 import { LOCAL_HOST, memoryProject, SESSION_COOKIE, TOKEN } from './testing.ts';
 
@@ -415,6 +420,97 @@ describe('the conversation over the API', () => {
 
       expect(unsigned.status).toBe(401);
       expect((await listed()).messages).toHaveLength(1);
+    });
+  });
+
+  // U4 (field study 4): a card that sends an item in the person's review back is performed by their
+  // tap on the desk's route (signed in, own origin), as the person, and by nothing else.
+  describe('a card that sends an item back', () => {
+    const quill = { kind: 'agent' as const, name: 'quill' };
+    let item: string;
+
+    beforeEach(() => {
+      publishAs(project, creatures(), 'bcri');
+      item = createItem(project, {
+        collection: 'Criaturas',
+        title: 'Rana',
+        fields: { fdesc: 'Lenta' },
+        actor: { kind: 'human', name: 'human' },
+      }).id;
+      insertEvidence(project.db, {
+        itemId: item,
+        role: 'after',
+        module: 'eart',
+        kind: 'image',
+        filename: 'a.png',
+        contentType: 'image/png',
+        size: 1,
+        sha256: 'a'.repeat(64),
+        caption: null,
+        createdAt: new Date().toISOString(),
+        actor: quill,
+        channel: 'cli',
+      });
+      handoffItem(project, { id: item, actor: quill, channel: 'cli' });
+      declareSecretary(project.db, 'sol');
+    });
+
+    const card = () =>
+      sayWithSendBack(project, {
+        agent: 'sol',
+        text: 'Send it back?',
+        options: ['Send it back', 'No'],
+        action: { kind: 'send_back', item, note: 'Less green.' },
+      }).message.id;
+    const tap = (id: number, body: unknown) =>
+      call(`/conversation/messages/${id}/answer`, { method: 'POST', body });
+    const back = () =>
+      selectEvents(project.db, item)
+        .filter(({ type }) => type === 'transitioned')
+        .at(-1);
+
+    it('is listed with its action, and the person’s tap sends the item back as them with the note', async () => {
+      const id = card();
+      expect((await listed()).messages[0]).toMatchObject({
+        action: { kind: 'send_back', item, note: 'Less green.' },
+      });
+
+      const done = await tap(id, { option: 1, note: 'Much less green.' });
+
+      expect(done.status).toBe(201);
+      expect(getItem(project, item).state).not.toMatch(/review/);
+      expect(back()?.actor).toEqual({ kind: 'human', name: 'human' });
+      expect(back()?.data).toMatchObject({ reason: 'Much less green.', channel: 'ui' });
+    });
+
+    it('refuses a note on the other option, and a delegation, and moves nothing', async () => {
+      const id = card();
+
+      expect((await tap(id, { option: 2, note: 'x' })).status).toBe(422);
+      expect((await tap(id, { delegate: true })).status).toBe(422);
+      expect(getItem(project, item).state).toMatch(/review/);
+    });
+
+    it('is never done by an agent: no session, no send-back', async () => {
+      const id = card();
+      const unsigned = await Promise.resolve(
+        server.app.request(
+          `/p/memory-aaaaaa/api/conversation/messages/${id}/answer`,
+          {
+            method: 'POST',
+            headers: {
+              host: LOCAL_HOST,
+              origin: `http://${LOCAL_HOST}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ option: 1 }),
+          },
+          { incoming: { socket: { remoteAddress: '127.0.0.1' } } },
+        ),
+      );
+
+      expect(unsigned.status).toBe(401);
+      expect(getItem(project, item).state).toMatch(/review/);
     });
   });
 

@@ -27,11 +27,14 @@ export function isAgentRole(value: string): value is (typeof AGENT_ROLES)[number
 //   escalation      an agent's question the secretary answers, not the person; `ref` is the item
 //   kind_changed    the person corrected what the secretary made of a turn (request or
 //                   consultation); `ref` is the turn's first message
+//   ready_for_review  an item reached the person's review (a first delivery, or a second round
+//                   after a send-back); `ref` is the item
 export const SECRETARY_SIGNALS = [
   'person_message',
   'bandeja_item',
   'escalation',
   'kind_changed',
+  'ready_for_review',
 ] as const;
 
 export type SecretarySignalKind = (typeof SECRETARY_SIGNALS)[number];

@@ -229,6 +229,53 @@ export function leaveNote(ctx: Context, input: LeaveNoteInput, now = systemClock
   });
 }
 
+// The secretary tells the agent doing a step what the person changed, as a note it must answer
+// before it hands off (the person's own words, relayed: the change reached the item first). Only
+// while an agent does the step; undefined for an item nobody is working on, which a worker reads
+// as changed when it takes it.
+export function relayChange(
+  ctx: Context,
+  input: { id: string; text: string; actor: Actor; channel: Channel },
+  now = systemClock,
+): ItemNote | undefined {
+  const text = input.text.trim();
+  if (text === '')
+    refuse(
+      'reason_required',
+      input.id,
+      'empty',
+      `Worker not told on ${input.id}: say what changed`,
+    );
+  const item = requireWritableItem(ctx.db, input.id);
+  const board = liveBoardOf(ctx, item.collection);
+  const at = positionOf(item.state);
+  const step =
+    board && !isClosed(at) && at.phase === 'doing' ? stepById(board.def, at.step) : undefined;
+  if (!board || !step || step.doer === 'you') return undefined;
+  const when = now();
+  const on = itemOnBoard(ctx, item, board.def);
+  const note = Math.max(0, ...leftNumbers(ctx, item.id)) + 1;
+  const to = activeLease(item.lease, when)?.holder;
+  appendEvent(ctx.db, {
+    itemId: item.id,
+    type: NOTE_LEFT,
+    actor: input.actor,
+    at: when,
+    data: {
+      note,
+      text,
+      step: step.id,
+      stepName: step.name,
+      round: on.round,
+      delivered: deliverables(board.def, step.id, on.facts),
+      relayed: true,
+      ...(to === undefined ? {} : { to }),
+      channel: input.channel,
+    },
+  });
+  return notesOf(selectEvents(ctx.db, item.id)).find((each) => each.note === note);
+}
+
 function leftNumbers(ctx: Context, id: string): number[] {
   return selectEvents(ctx.db, id)
     .filter(({ type, data }) => type === NOTE_LEFT && typeof data.note === 'number')

@@ -561,7 +561,13 @@ export type ChosenAnswer = { question: number } & (
 // question is the message the route names).
 const SecretaryAnswerBody = z.union([
   z.object({ text: z.string() }).strict(),
-  z.object({ option: z.number().int().positive() }).strict(),
+  z
+    .object({
+      option: z.number().int().positive(),
+      // The person's edit of the note a card sends back with.
+      note: z.string().max(MAX_MESSAGE_CHARS).optional(),
+    })
+    .strict(),
   z.object({ delegate: z.literal(true) }).strict(),
 ]);
 

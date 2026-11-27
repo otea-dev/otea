@@ -8,6 +8,7 @@ import {
   MAX_MESSAGE_CHARS,
   MAX_MESSAGE_FILES,
   type Message,
+  type MessageAction,
   type MessageAuthor,
   type MessageFile,
   type MessageKind,
@@ -225,6 +226,10 @@ export type SayInput = {
   // A question with 2 to 4 options to tap, and the number of the one the secretary recommends.
   options?: readonly string[];
   recommended?: number;
+  // What the person's tap on the FIRST option performs for them (their send-back of an item in
+  // their review, with a note the secretary drafted from their words). It needs the options: the
+  // first does it, the others only answer. Only the person's tap performs it (conversation-act.ts).
+  action?: MessageAction;
 };
 
 export type Said = {
@@ -259,6 +264,25 @@ function linkItems(project: Project, root: number, items: readonly string[], at:
   for (const id of items) insertLink(project.db, root, requireItem(project.db, id).id, at);
 }
 
+// The action a question carries: its note is the person's own change, in a few words, and the first
+// option is what performs it, so there must be options to tap.
+function checkedAction(
+  action: MessageAction | undefined,
+  options: readonly string[],
+): MessageAction | undefined {
+  if (action === undefined) return undefined;
+  if (options.length === 0) {
+    invalid(
+      'Not said: a question that sends an item back needs its options: the first one does it, the other says no (--option "<do it>" --option "<leave it>")',
+    );
+  }
+  const note = action.note.trim();
+  if (note === '') invalid('Not said: the note to send the item back with is empty');
+  if (note.length > MAX_MESSAGE_CHARS)
+    invalid(`Not said: the note takes at most ${MAX_MESSAGE_CHARS} characters`);
+  return { ...action, note };
+}
+
 // The secretary's message: only the project's declared secretary says anything.
 export function sayAsSecretary(project: Project, input: SayInput, now: Clock = systemClock): Said {
   requireSecretary(project.db, input.agent, 'speaks for the project (say)');
@@ -267,6 +291,7 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
   const links = [...new Set((input.links ?? []).map((id) => id.trim()).filter((id) => id !== ''))];
   const checked = checkOptions(input.options, input.recommended);
   if ('problem' in checked) invalid(`Not said: ${checked.problem}`);
+  const action = checkedAction(input.action, checked.options);
   // Classifying is about a turn of the person's. Without --reply-to it is the latest message
   // already read, and only when that is no guess: another message not read yet, or another read
   // turn not classified, and the secretary says which (a reply to the wrong turn would tie the
@@ -310,6 +335,7 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
       ...(replyTo === undefined ? {} : { replyTo }),
       options: checked.options,
       recommended: checked.recommended,
+      action,
     });
     keepFiles(project, id, files);
     // What it answers is read: it answered from what the wake showed, without `otea conversation`,
@@ -382,10 +408,12 @@ export function correctKind(project: Project, id: number, kind: MessageKind): Me
 
 // What the person gives to a question of the secretary's: one of its options (the number from 1),
 // their own words, or the decision left to the secretary. Exactly one.
+// `note`: with the first option of a question that carries an action, the person's own edit of the
+// note it performs with.
 export type GivenAnswer =
-  | { option: number; text?: never; delegate?: never }
-  | { text: string; option?: never; delegate?: never }
-  | { delegate: true; text?: never; option?: never };
+  | { option: number; note?: string | undefined; text?: never; delegate?: never }
+  | { text: string; option?: never; delegate?: never; note?: never }
+  | { delegate: true; text?: never; option?: never; note?: never };
 
 // The person's answer to a question of the secretary's (say --option): their own message, in reply
 // to it, that wakes the secretary like any message. Answered once: by a reply to that question;
@@ -405,6 +433,14 @@ export function answerSecretaryQuestion(
   let words: string;
   let mode: AnswerMode;
   let option: number | undefined;
+  if (given.delegate && question.action !== null) {
+    invalid(
+      `Message ${id} sends ${question.action.item} back: only you decide that, so it is not left to the secretary`,
+    );
+  }
+  if (given.note !== undefined && (question.action === null || given.option !== 1)) {
+    invalid(`Message ${id} has no note to edit: a note goes with the first option of its action`);
+  }
   if (given.delegate) {
     words = DELEGATED;
     mode = 'delegated';
@@ -421,7 +457,7 @@ export function answerSecretaryQuestion(
       invalid(`An answer takes at most ${MAX_MESSAGE_CHARS} characters`);
     mode = 'text';
   }
-  return transaction(project.db, () => {
+  return joinTransaction(project.db, () => {
     if (isAnswered(project.db, id)) {
       throw new OteaError('invalid_transition', `Message ${id} was already answered`);
     }

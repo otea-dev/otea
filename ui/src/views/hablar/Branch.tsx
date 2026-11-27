@@ -131,6 +131,7 @@ export function AskBody({
   recommended,
   gone = false,
   bare = false,
+  action,
   send,
 }: {
   by: string;
@@ -142,6 +143,9 @@ export function AskBody({
   gone?: boolean;
   // Only the buttons: the question is the words just above (the secretary's own question).
   bare?: boolean;
+  // The question sends an item back for you when you tap its first option, with this note: the card
+  // shows the note, lets you edit it, and never leaves the decision to the secretary.
+  action?: { item: string; note: string };
   send: (given: AnswerWords) => Promise<void>;
 }) {
   const app = useApp();
@@ -183,7 +187,12 @@ export function AskBody({
         <p className="hb-said">{said ?? t('hablar.ask.gone')}</p>
       ) : (
         <>
-          {options.length > 0 ? (
+          {action && free === null ? (
+            <blockquote className="hb-note" aria-label={t('hablar.act.note')}>
+              {action.note}
+            </blockquote>
+          ) : null}
+          {options.length > 0 && !(action && free !== null) ? (
             <div className="hb-opts">
               {options.map((text, index) => (
                 <button
@@ -204,23 +213,31 @@ export function AskBody({
           ) : null}
           {free === null ? (
             <div className="hb-foot">
-              <button type="button" disabled={blocked} onClick={() => setFree('')}>
-                {t('hablar.ask.other')}
-              </button>
-              <button
-                type="button"
-                disabled={blocked}
-                onClick={() => answer({ delegate: true }, t('sheet.qa.delegated'))}
-              >
-                {t('sheet.qa.delegate')}
-              </button>
+              {action ? (
+                <button type="button" disabled={blocked} onClick={() => setFree(action.note)}>
+                  {t('hablar.act.edit')}
+                </button>
+              ) : (
+                <>
+                  <button type="button" disabled={blocked} onClick={() => setFree('')}>
+                    {t('hablar.ask.other')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={blocked}
+                    onClick={() => answer({ delegate: true }, t('sheet.qa.delegated'))}
+                  >
+                    {t('sheet.qa.delegate')}
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             <div className="hb-own">
               <textarea
                 rows={2}
                 value={free}
-                aria-label={t('hablar.ask.other')}
+                aria-label={action ? t('hablar.act.note') : t('hablar.ask.other')}
                 placeholder={t('sheet.qa.placeholder')}
                 onChange={(event) => setFree(event.target.value)}
               />
@@ -230,10 +247,18 @@ export function AskBody({
                   size="sm"
                   disabled={blocked || free.trim() === ''}
                   onClick={() =>
-                    answer({ text: free.trim() }, t('hablar.ask.answered', { text: free.trim() }))
+                    action
+                      ? answer(
+                          { option: 1, note: free.trim() },
+                          t('hablar.ask.answered', { text: options[0] ?? '' }),
+                        )
+                      : answer(
+                          { text: free.trim() },
+                          t('hablar.ask.answered', { text: free.trim() }),
+                        )
                   }
                 >
-                  {t('sheet.qa.send')}
+                  {action ? t('hablar.act.send', { item: action.item }) : t('sheet.qa.send')}
                 </Button>
                 <button type="button" onClick={() => setFree(null)}>
                   {t('topics.convert.cancel')}

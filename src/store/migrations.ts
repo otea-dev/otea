@@ -642,6 +642,12 @@ export const MIGRATIONS = [
   `
   CREATE INDEX conversation_reply_to ON conversation_messages (reply_to);
   `,
+  // A question of the secretary's that carries an action the person's tap performs (field study 4:
+  // a change of mind on an item in review): a JSON object, performed as the person on the first
+  // option, never by the secretary.
+  `
+  ALTER TABLE conversation_messages ADD COLUMN action TEXT;
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {

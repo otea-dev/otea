@@ -359,6 +359,29 @@ describe('the conversation from the secretary', () => {
       expect(one.err).toContain('2 to 4');
     });
 
+    it('a card that sends an item back needs its note and an item in the person’s review: nothing is said otherwise', async () => {
+      const half = await otea('say', 'Back?', '--send-back', 'CAM-1', '--as', 'sol');
+      expect(half.code).toBe(2);
+      expect(half.err).toContain('--send-back <id> and --note');
+
+      const none = await otea(
+        'say',
+        'Send it back?',
+        '--send-back',
+        'CAM-1',
+        '--note',
+        'less green',
+        '--option',
+        'Send it back',
+        '--option',
+        'No',
+        '--as',
+        'sol',
+      );
+      expect(none.code).not.toBe(0);
+      expect(conversation()).toEqual([]);
+    });
+
     it('an item comes from a message or from a Bandeja note, not both', async () => {
       const sent = person('add dark mode');
 

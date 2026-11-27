@@ -382,7 +382,8 @@ export async function postOpened(id: string, evidence: number): Promise<void> {
 // What you answer an agent's question with: your words, one of its options (by number, from 1), or
 // the decision left to the agent, and the number of the question you were shown: an answer to one
 // that has since changed is refused.
-export type AnswerWords = { text: string } | { option: number } | { delegate: true };
+// `note`: with the first option of a card that sends an item back, the person's edit of its note.
+export type AnswerWords = { text: string } | { option: number; note?: string } | { delegate: true };
 export type AnswerGiven = { question: number } & AnswerWords;
 
 // Your answer to an agent's question (otea ask): the turn goes back to the agent, in the same round.

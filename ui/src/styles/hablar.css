@@ -834,6 +834,18 @@ button.hb-chip:hover {
   font: 400 italic 14px / 1.4 var(--serif);
   color: var(--ink-2);
 }
+/* The note a card sends an item back with: what the tap will say for you. */
+.hb-note {
+  margin: 0;
+  padding: 8px 11px;
+  border-left: 2px solid var(--you);
+  border-radius: 0 8px 8px 0;
+  background: var(--ground);
+  font: 400 14px / 1.4 var(--serif);
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .hb-opts {
   display: flex;
   flex-direction: column;

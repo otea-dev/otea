@@ -97,7 +97,7 @@ import type { Actor } from '../core/item.ts';
 import { activeLease, type Lease } from '../core/lease.ts';
 import { closesOf, turnOf } from '../core/workflow.ts';
 import { findBoardOfCollection, findVersion, listBoards } from '../store/boards.ts';
-import { transaction } from '../store/database.ts';
+import { joinTransaction, transaction } from '../store/database.ts';
 import {
   appendEvent,
   type EventRecord,
@@ -1908,13 +1908,14 @@ export function backWithComments(ctx: Context, item: ItemRecord, to: string): bo
 }
 
 // A send-back from a review (the person's Devolver, an agent reviewer's Pedir otra ronda): the item
-// goes back to the step's `back` for its next round, with why.
+// goes back to the step's `back` for its next round, with why. Part of a larger atomic act when one
+// is open (the person's tap on a card of the secretary's sends back and answers in one).
 export function sendBackItem(
   ctx: Context,
   input: BoardMoveInput,
   now = systemClock,
 ): BoardMoveResult {
-  return transaction(ctx.db, () => {
+  return joinTransaction(ctx.db, () => {
     const item = requireWritableItem(ctx.db, input.id);
     // The review comments are what to change: with some, the send-back needs no words of its own.
     if (!input.reason?.trim() && !reviewCommented(ctx, item))

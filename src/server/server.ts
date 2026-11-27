@@ -18,7 +18,6 @@ import { syncBoardPresets } from '../app/boards.ts';
 import { briefFor } from '../app/brief.ts';
 import { listCollectionViews, listShownCollectionViews } from '../app/collections.ts';
 import {
-  answerSecretaryQuestion,
   attachmentToServe,
   correctKind,
   listConversation,
@@ -26,6 +25,7 @@ import {
   postPersonMessage,
   turnsOfItem,
 } from '../app/conversation.ts';
+import { answerSecretaryTap } from '../app/conversation-act.ts';
 import { deviceByToken, listDevices, touchDevice } from '../app/devices.ts';
 import { dismissOpenEscalation } from '../app/escalate.ts';
 import { listEvents } from '../app/events.ts';
@@ -1054,7 +1054,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
         async (c) => {
           assertWritable(c, auth);
           const given = await secretaryAnswerRequest(c);
-          const message = answerSecretaryQuestion(
+          const message = answerSecretaryTap(
             project,
             messageIdOf(c.req.param('id')),
             given,
