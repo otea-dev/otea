@@ -79,7 +79,8 @@ function WhoText({
         : blockers > 0
           ? t('boardView.blocked', { count: blockers })
           : t('boardView.queued');
-  } else if (item.expiredLease && !item.lease) suffix = t('boardView.who.quiet');
+  } else if (item.expiredLease && !item.lease)
+    suffix = item.expiredLease.connected ? t('when.lapsed') : t('boardView.who.quiet');
   return (
     <span className="who" data-s={`${item.id}:who`}>
       {agent}

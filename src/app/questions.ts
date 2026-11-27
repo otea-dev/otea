@@ -49,6 +49,7 @@ type Why =
   | 'asking'
   | 'none_open'
   | 'options'
+  | 'option_text'
   | 'no_option'
   | 'stale';
 
@@ -68,6 +69,8 @@ export type AskInput = {
   text: string;
   options?: readonly string[];
   recommended?: number;
+  // The numbers (from 1) of the options that need the person's own words (ask --option-text).
+  optionText?: readonly number[];
   actor: Actor;
   channel: Channel;
 };
@@ -95,6 +98,26 @@ function doing(ctx: Context, item: ItemRecord): { board: LiveBoard; step: string
   return { board, step: step.id };
 }
 
+// The options marked as needing the person's own words: numbers of options that exist, once each.
+export function checkedOptionText(
+  given: readonly number[] | undefined,
+  count: number,
+  id: string,
+): number[] {
+  const numbers = [...new Set(given ?? [])].sort((a, b) => a - b);
+  for (const number of numbers) {
+    if (!Number.isInteger(number) || number < 1 || number > count) {
+      refuse(
+        'invalid_fields',
+        id,
+        'option_text',
+        `Not asked on ${id}: --option-text ${number} names no option (${count} given, numbered from 1)`,
+      );
+    }
+  }
+  return numbers;
+}
+
 // The agent doing the item's step asks the person: one question at a time, while no other agent
 // holds the item. The question keeps the step and round it was asked in.
 export function askQuestion(ctx: Context, input: AskInput, now = systemClock): AskResult {
@@ -113,6 +136,7 @@ export function askQuestion(ctx: Context, input: AskInput, now = systemClock): A
   const checked = checkOptions(input.options, input.recommended);
   if ('problem' in checked)
     refuse('invalid_fields', id, 'options', `Not asked on ${id}: ${checked.problem}`);
+  const optionText = checkedOptionText(input.optionText, checked.options.length, id);
   return transaction(ctx.db, () => {
     const item = requireWritableItem(ctx.db, id);
     const at = now();
@@ -144,6 +168,7 @@ export function askQuestion(ctx: Context, input: AskInput, now = systemClock): A
           : {
               options: checked.options,
               ...(checked.recommended === undefined ? {} : { recommended: checked.recommended }),
+              ...(optionText.length === 0 ? {} : { optionText }),
             }),
       },
     });

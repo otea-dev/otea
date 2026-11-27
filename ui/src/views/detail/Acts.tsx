@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { optionsNeedingWords } from '../../../../src/core/own-words.ts';
 import type { AnswerWords } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { ShortText } from '../../components/ShortText.tsx';
@@ -225,6 +226,7 @@ export function Acts({
   // While the answer is typed: its send row kept above the phone's keyboard (DR3-15).
   const sendRow = useRef<HTMLDivElement>(null);
   const following = useRef<(() => void) | null>(null);
+  const freeBox = useRef<HTMLTextAreaElement>(null);
   useEffect(() => () => following.current?.(), []);
   const agent = facts.agent;
   const says = (c: MoveChoice | null) =>
@@ -409,6 +411,9 @@ export function Acts({
     // What an agent's question (otea ask) offers: one tap on an option, or on «Decide tú», answers.
     const offered = item.asks?.options ?? [];
     const recommended = item.asks?.recommended;
+    // The options that need your own words (marked, or any that promises them): tapping one opens
+    // the text box with the option in it, nothing is sent yet.
+    const words = optionsNeedingWords(offered, item.asks?.optionText ?? []);
     // The answer says which question it is to: one that changed while the page was open is refused,
     // and the page says so (the item itself comes back fresh with the live feed).
     const refusedBy = (error: unknown) => {
@@ -458,7 +463,12 @@ export function Acts({
                   type="button"
                   className="opt"
                   disabled={offline}
-                  onClick={() => answerWith({ option: i + 1 })}
+                  data-words={words.includes(i + 1) ? '' : undefined}
+                  onClick={() => {
+                    if (!words.includes(i + 1)) return answerWith({ option: i + 1 });
+                    setFree(`${text} — `);
+                    freeBox.current?.focus();
+                  }}
                 >
                   {text}
                   {recommended === i + 1 ? (
@@ -471,6 +481,7 @@ export function Acts({
           <label className="free">
             {freeAnswerLabel(options.length > 0 || offered.length > 0)}
             <textarea
+              ref={freeBox}
               placeholder={t('sheet.qa.placeholder')}
               rows={2}
               value={free}

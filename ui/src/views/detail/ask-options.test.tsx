@@ -115,6 +115,32 @@ describe('a question with options', () => {
     expect(given).toEqual([{ question: 1, option: 3 }]);
   });
 
+  // Field study 5, V7/V2: tapping «Te escribo las fechas» sent that label as the answer.
+  it('opens the box instead of sending an option the agent marked as needing your words', async () => {
+    const root = open(asking({ ...offered, optionText: [1] }));
+
+    await press(rows(root)[0]);
+
+    expect(given).toEqual([]);
+    expect((root.querySelector('.qa textarea') as HTMLTextAreaElement).value).toBe(
+      'Sí, también el río — ',
+    );
+  });
+
+  it('opens the box for an option whose words promise yours, marked or not', async () => {
+    const root = open(asking({ ...offered, options: ['Dejarlo así', 'Te escribo las fechas'] }));
+
+    await press(rows(root)[1]);
+    expect(given).toEqual([]);
+    expect((root.querySelector('.qa textarea') as HTMLTextAreaElement).value).toBe(
+      'Te escribo las fechas — ',
+    );
+
+    // An option that only decides is still one tap.
+    await press(rows(root)[0]);
+    expect(given).toEqual([{ question: 1, option: 1 }]);
+  });
+
   it('says when the question changed under it, and sends nothing more', async () => {
     refusal = new Error(t('refusal.questionChanged'));
     const root = open(asking(offered));

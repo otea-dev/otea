@@ -23,3 +23,19 @@ export function signalReview(
   if (![...selectRoles(ctx.db).values()].includes('secretary')) return;
   insertSignal(ctx.db, { kind: 'ready_for_review', ref: item.id, text: item.title }, at);
 }
+
+// An item an agent closed as Done (landed, for work with code) is news the person may have missed:
+// they were away, or never looked at the board. It wakes the secretary, whose wait returns every
+// landing since it last spoke as one (app/secretary.ts), so it says in one line what landed since
+// the person's last message. A nudge, never the record; nothing is kept for a project with no
+// secretary. Only for an agent's move: the person knows what they did themselves.
+export function signalLanded(
+  ctx: Context,
+  item: { id: string; title: string },
+  closes: 'done' | 'discarded' | undefined,
+  at: string,
+): void {
+  if (closes !== 'done') return;
+  if (![...selectRoles(ctx.db).values()].includes('secretary')) return;
+  insertSignal(ctx.db, { kind: 'landed', ref: item.id, text: item.title }, at);
+}

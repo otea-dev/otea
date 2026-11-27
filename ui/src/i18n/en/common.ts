@@ -131,6 +131,7 @@ export const common = {
   'when.hours': '{hours} h',
   'when.minutes': '{minutes} min',
   'when.expired': 'lease expired',
+  'when.lapsed': 'lease ran out · back in the queue',
   'when.now': 'now',
   'when.yesterday': 'yesterday',
   'when.days': { one: '{count} day', other: '{count} days' },

@@ -1,4 +1,5 @@
 import { type CSSProperties, type RefObject, useLayoutEffect, useRef, useState } from 'react';
+import { optionsNeedingWords } from '../../../../src/core/own-words.ts';
 import type { AnswerWords } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { ShortText } from '../../components/ShortText.tsx';
@@ -112,6 +113,8 @@ export function AskCard({ item, gone = false }: { item: Item; gone?: boolean }) 
       text={asks.text}
       options={asks.options ?? []}
       recommended={asks.recommended}
+      optionText={asks.optionText ?? []}
+      joined
       gone={gone}
       send={(given) =>
         app.answer(item.id, { ...given, question: asks.question }, t('hablar.ask.sent'))
@@ -133,6 +136,7 @@ export function AskBody({
   bare = false,
   action,
   optionText = [],
+  joined = false,
   retract,
   send,
 }: {
@@ -151,12 +155,18 @@ export function AskBody({
   // The numbers (from 1) of the options that need your own words: tapping one opens the text box
   // instead of answering at once.
   optionText?: readonly number[];
+  // The answer to an option that needs words goes as one text (the option, a dash, your words): an
+  // item's question and a note's have no field for what you add to an option.
+  joined?: boolean;
   // Takes the answer back (Deshacer), while the secretary has not heard it: the question asks again.
   retract?: () => Promise<void>;
   send: (given: AnswerWords) => Promise<void>;
 }) {
   const app = useApp();
   const [free, setFree] = useState<string | null>(null);
+  // The options that need your words: the ones marked, and any that promises them (a label that
+  // says «te escribo…» is never sent as it reads).
+  const words = optionsNeedingWords(options, optionText);
   // The option picked that needs words: the text box is its explanation.
   const [picked, setPicked] = useState<number | null>(null);
   const [said, setSaid] = useState<string | null>(null);
@@ -236,11 +246,11 @@ export function AskBody({
                   type="button"
                   className="hb-opt"
                   data-rec={recommended === index + 1 ? '' : undefined}
-                  data-words={optionText.includes(index + 1) ? '' : undefined}
+                  data-words={words.includes(index + 1) ? '' : undefined}
                   disabled={blocked}
                   onClick={() => {
                     // An option that needs your words opens the box: nothing is sent yet.
-                    if (optionText.includes(index + 1)) {
+                    if (words.includes(index + 1)) {
                       setPicked(index + 1);
                       setFree('');
                       return;
@@ -299,7 +309,11 @@ export function AskBody({
                   onClick={() =>
                     picked !== null
                       ? answer(
-                          { option: picked, explain: free.trim() },
+                          // The secretary's question takes the option and what you add apart; an
+                          // item's or a note's takes them as one text.
+                          joined
+                            ? { text: `${options[picked - 1] ?? ''} — ${free.trim()}` }
+                            : { option: picked, explain: free.trim() },
                           t('hablar.ask.answered', {
                             text: `${options[picked - 1] ?? ''} — ${free.trim()}`,
                           }),

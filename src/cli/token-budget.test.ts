@@ -147,7 +147,9 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // the worker at once (measured at 7764).
   // Raised to 7940 for the security package (S): relay's --from-message, say's --drop, --motive,
   // --option-text and --withdraw (measured at 7930).
-  tools: { mcp: 7940 },
+  // Raised to 7980 for ask's --option-text, the option that promises the person's own words, which
+  // opens the text box (field study 5; measured at 7979).
+  tools: { mcp: 7980 },
   // Otea's agent guide, the server's instructions: in every MCP agent's context from the start, so
   // it buys only what agents keep getting wrong. Measured at 203. Raised to 270 for the line on
   // declaring the profile every agent and subagent must keep current (measured at 246). Raised to

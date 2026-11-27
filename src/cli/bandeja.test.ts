@@ -297,6 +297,51 @@ describe('the Bandeja from the refiner', () => {
       expect(entries()[0]?.state).toBe('filed');
     });
 
+    // Field study 5: the refiner's «te escribo…» option was sent as it read; it can now mark it.
+    it('keeps the options the refiner marks as needing the person’s own words', async () => {
+      capture('make it better');
+      await otea('bandeja', 'take', 'B-1', '--as', 'lia');
+
+      const asked = await otea(
+        'ask',
+        'B-1',
+        'Better how?',
+        '--option',
+        'Faster',
+        '--option',
+        'I will write what I mean',
+        '--option-text',
+        '2',
+        '--as',
+        'lia',
+      );
+
+      expect(asked.code, asked.err).toBe(0);
+      expect(entries()[0]?.asking?.optionText).toEqual([2]);
+    });
+
+    it('refuses an option-text that names no option on an entry', async () => {
+      capture('make it better');
+      await otea('bandeja', 'take', 'B-1', '--as', 'lia');
+
+      const stray = await otea(
+        'ask',
+        'B-1',
+        'Better how?',
+        '--option',
+        'Faster',
+        '--option',
+        'Prettier',
+        '--option-text',
+        '5',
+        '--as',
+        'lia',
+      );
+
+      expect(stray.code).toBe(8);
+      expect(stray.err).toContain('--option-text 5 names no option');
+    });
+
     it('is asked only by the holder, and takes a question that checks', async () => {
       capture('make it better');
 

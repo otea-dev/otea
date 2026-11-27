@@ -8,6 +8,7 @@ import { joinTransaction } from '../store/database.ts';
 import {
   answerSecretaryQuestion,
   type GivenAnswer,
+  refuseUnverifiedCard,
   type Said,
   type SayInput,
   sayAsSecretary,
@@ -72,6 +73,7 @@ export function sayWithSendBack(
 ): Said {
   const { action, ...rest } = input;
   if (action === undefined) return sayAsSecretary(project, rest, now);
+  refuseUnverifiedCard(rest.unverified, action.kind);
   const { round, to } = assertInReview(project, action.item);
   const target = action.kind === 'drop' ? motiveOf(project, action.item, action.motive) : to;
   return sayAsSecretary(project, { ...rest, action: { ...action, round, to: target } }, now);

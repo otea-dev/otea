@@ -87,9 +87,15 @@ export type PendingSecretary = {
 // What was done in the last day, as Otea counts it: what the secretary answers «what got done?» from.
 export type PendingDone = { id: string; title: string; at: string };
 
+// An item an agent holds whose session is over: its lease still runs, but nobody works it (field
+// study 5, V7: a restarted secretary said a worker had it in progress when its session had ended).
+export type PendingEnded = { id: string; title: string; holder: string };
+
 export type Pending = {
   // The items that closed as Done in the last 24 hours, oldest first (left out of the cheap count).
   done?: PendingDone[];
+  // The items held by an agent whose session ended (left out when none, and of the cheap count).
+  ended?: PendingEnded[];
   // How many things wait for the person.
   count: number;
   // In the order the person should look at them: what holds an agent up (questions) first, then

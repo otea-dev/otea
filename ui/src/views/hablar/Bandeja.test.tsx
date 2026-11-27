@@ -298,6 +298,39 @@ describe('the Bandeja beside what came out', () => {
     );
   });
 
+  // Field study 5, V2: an option that says «lo escribo en la respuesta» was sent as it read.
+  it('opens the box for an option the refiner marked, or one that promises your words, and answers with both', async () => {
+    const calls = server([
+      entry({
+        id: 6,
+        state: 'asking',
+        text: 'fechas',
+        asking: {
+          question: 1,
+          by: 'lia',
+          at: ago(3),
+          text: '¿Qué fechas?',
+          options: ['Las de siempre', 'Te escribo las fechas', 'Otra cosa'],
+          optionText: [3],
+        },
+      }),
+    ]);
+    const root = await show(<Live />);
+
+    const options = () => all(root, '.bn-row[data-state="asking"] .hb-opt');
+    // The one the refiner marked: nothing is sent, the box opens.
+    await press(options()[2]);
+    expect(calls).toEqual([]);
+    expect(all(root, '.bn-row textarea')).toHaveLength(1);
+    await press(all(root, '.bn-row .hb-own .hb-foot button')[1]);
+    // The one that only reads «te escribo…»: the same.
+    await press(options()[1]);
+    expect(calls).toEqual([]);
+    await typeInto(q(root, '.bn-row textarea'), 'el 3 y el 4');
+    await press(all(root, '.bn-row .hb-own .hb-foot button')[0]);
+    expect(calls.at(-1)?.body).toMatchObject({ text: 'Te escribo las fechas — el 3 y el 4' });
+  });
+
   it('leaves the decision to the refiner, or takes your own words', async () => {
     const calls = server(list);
     const root = await show(<Live />);

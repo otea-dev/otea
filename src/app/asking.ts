@@ -16,6 +16,8 @@ export type Asks = {
   at: string;
   options?: string[];
   recommended?: number;
+  // The options that need the person's own words (ask --option-text), by number from 1.
+  optionText?: number[];
 };
 
 // The open question of every item that has one, by item id, read in one query.
@@ -49,6 +51,7 @@ export function withAsks<T extends { turn: string }>(
   const asks: Asks = { question: open.question, by: open.by, text: open.text, at: open.at };
   if (open.options) asks.options = open.options;
   if (open.recommended !== undefined) asks.recommended = open.recommended;
+  if (open.optionText) asks.optionText = open.optionText;
   return { ...item, turn: 'human', asks };
 }
 

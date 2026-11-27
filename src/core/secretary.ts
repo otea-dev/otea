@@ -29,12 +29,15 @@ export function isAgentRole(value: string): value is (typeof AGENT_ROLES)[number
 //                   consultation); `ref` is the turn's first message
 //   ready_for_review  an item reached the person's review (a first delivery, or a second round
 //                   after a send-back); `ref` is the item
+//   landed          an agent closed an item as Done (integrated); `ref` is the item. Returned in one
+//                   wake for every landing since the secretary last acted (a stay away's worth)
 export const SECRETARY_SIGNALS = [
   'person_message',
   'bandeja_item',
   'escalation',
   'kind_changed',
   'ready_for_review',
+  'landed',
 ] as const;
 
 export type SecretarySignalKind = (typeof SECRETARY_SIGNALS)[number];

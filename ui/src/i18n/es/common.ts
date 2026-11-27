@@ -138,6 +138,7 @@ export const common = {
   'when.hours': '{hours} h',
   'when.minutes': '{minutes} min',
   'when.expired': 'sin señales',
+  'when.lapsed': 'se le acabó el tiempo · vuelve a la cola',
   'when.now': 'ahora',
   'when.yesterday': 'ayer',
   'when.days': { one: '{count} día', other: '{count} días' },

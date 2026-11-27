@@ -116,6 +116,7 @@ type QuestionRow = {
   text: string;
   options: string | null;
   recommended: number | null;
+  option_text: string | null;
   asked_by: string;
   at: string;
   answer_text: string | null;
@@ -134,6 +135,7 @@ function questionOf(row: QuestionRow): BandejaQuestion {
     by: row.asked_by,
     ...(options.length === 0 ? {} : { options }),
     ...(row.recommended === null ? {} : { recommended: row.recommended }),
+    ...(row.option_text === null ? {} : { optionText: JSON.parse(row.option_text) as number[] }),
     ...(answered
       ? {
           answer: {
@@ -172,18 +174,23 @@ export function insertQuestion(
     text: string;
     options: readonly string[];
     recommended?: number | undefined;
+    optionText?: readonly number[] | undefined;
     by: string;
     at: string;
   },
 ): void {
-  const sql = `INSERT INTO bandeja_questions (entry_id, n, text, options, recommended, asked_by, at)
-    VALUES (:entry, :n, :text, :options, :recommended, :by, :at)`;
+  const sql = `INSERT INTO bandeja_questions (entry_id, n, text, options, recommended, option_text, asked_by, at)
+    VALUES (:entry, :n, :text, :options, :recommended, :optionText, :by, :at)`;
   db.prepare(sql).run({
     entry,
     n: question.n,
     text: question.text,
     options: question.options.length === 0 ? null : JSON.stringify(question.options),
     recommended: question.recommended ?? null,
+    optionText:
+      question.optionText === undefined || question.optionText.length === 0
+        ? null
+        : JSON.stringify(question.optionText),
     by: question.by,
     at: question.at,
   });

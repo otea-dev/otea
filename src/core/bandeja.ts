@@ -32,6 +32,8 @@ export type BandejaQuestion = {
   by: string;
   options?: string[];
   recommended?: number;
+  // The options that need the person's own words (ask --option-text), by number from 1.
+  optionText?: number[];
   answer?: {
     text: string;
     at: string;

@@ -15,7 +15,9 @@ import { STARTED_BY } from './started-by.ts';
 // alike; once the session is gone, a new one takes the name over. Reading the processes costs a
 // listing, so it happens only when a session is noted and runs, and a listing that cannot be read in
 // time leaves the command alone, said as unverified (which the desk marks on the secretary's
-// messages).
+// messages, and which never carries a card). A listing that is read but reaches no harness from the
+// caller (an orphan process, an MCP server whose launcher is gone) does not leave it alone: while
+// the noted session runs, what cannot be proven to be it is refused (field study 5, V8).
 //
 // What this stops is a process that misuses Otea's own interfaces. A local process that writes the
 // SQLite file directly is outside it: Otea cannot stop that, and docs/working-with-agents.md says so.
@@ -62,21 +64,31 @@ const strangers = new WeakSet<Input>();
 
 export const isFromAnotherSession = (input: Input): boolean => strangers.has(input);
 
-type Caller = { pid: number; started: number | undefined; known: boolean; rows: ProcessRow[] };
+// `pid` is the harness the command runs under; undefined when the table is read but reaches none: a
+// process nobody started that runs (an orphan, whose parent is gone, so no harness can be resolved).
+type Caller = {
+  pid: number | undefined;
+  started: number | undefined;
+  known: boolean;
+  rows: ProcessRow[];
+};
+
+// The caller, from the processes read; the harness is none when the table does not reach one.
+export function callerIn(rows: ProcessRow[], startedBy: number): Caller {
+  const pid = harnessOf(rows, startedBy);
+  return {
+    pid,
+    started: pid === undefined ? undefined : rows.find((row) => row.pid === pid)?.started,
+    known: pid !== undefined && isKnownHarness(rows, pid),
+    rows,
+  };
+}
 
 // The harness this command runs under, from the processes; undefined when they cannot be read (or
 // not in time).
 async function callerOf(): Promise<Caller | undefined> {
   const table = await listProcesses(AbortSignal.timeout(READ_MS));
-  if (table === undefined) return undefined;
-  const pid = harnessOf(table.rows, STARTED_BY);
-  if (pid === undefined) return undefined;
-  return {
-    pid,
-    started: table.rows.find((row) => row.pid === pid)?.started,
-    known: isKnownHarness(table.rows, pid),
-    rows: table.rows,
-  };
+  return table === undefined ? undefined : callerIn(table.rows, STARTED_BY);
 }
 
 type Bound = { noted: Noted; refusal: string };
@@ -118,7 +130,18 @@ async function judge(
   if (noted.kind === 'mcp' && input.channel === 'mcp') {
     return { verdict: noted.session === process.pid ? 'bound' : 'other' };
   }
-  const caller = await callerOf();
+  return judgeCaller(noted, await callerOf());
+}
+
+// The verdict for a caller read from the processes. While the noted session runs, a caller that
+// cannot be proven to be it is not it: one the table reads but reaches no harness from (an orphan
+// background process, an MCP server whose launcher is gone) is refused, not let through unverified
+// (field study 5, V8). Unverified stays for what cannot be checked at all: the table cannot be read,
+// or the noted harness cannot be resolved.
+export function judgeCaller(
+  noted: Noted,
+  caller: Caller | undefined,
+): { verdict: SessionVerdict | 'gone'; harness?: number } {
   if (caller === undefined) return { verdict: 'unverified' };
   const bound =
     noted.kind === 'cli' ? noted.pid : harnessOf(caller.rows, noted.launcher ?? Number.NaN);
@@ -185,7 +208,7 @@ export async function guardSession(input: Input): Promise<(() => Promise<void>) 
 
 async function noteCallerAs(input: Input, agent: string): Promise<void> {
   const caller = await callerOf();
-  if (caller === undefined || caller.pid === process.pid) return;
+  if (caller?.pid === undefined || caller.pid === process.pid) return;
   try {
     const project = openProject(input.cwd);
     try {

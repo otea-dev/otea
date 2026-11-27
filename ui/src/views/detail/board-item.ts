@@ -689,6 +689,8 @@ export function backOf(
   unmerged?: true;
   unpushed?: string;
   unchanged?: true;
+  // The repo has no remote: landing pushes nothing, and the footnote never says it does.
+  local?: true;
 } {
   const target = positionOf(to);
   // Only an item that names its branch has one to merge (P5-R2-5, P4-R2-4): one that left it empty
@@ -701,6 +703,7 @@ export function backOf(
   const warn = {
     ...(unpushed === undefined ? {} : { unpushed }),
     ...(handedTip(item)?.unchanged === true ? { unchanged: true as const } : {}),
+    ...(handedTip(item)?.local === true ? { local: true as const } : {}),
   };
   if (isClosed(target))
     return target.closed === DONE && branch && !land
@@ -733,7 +736,7 @@ export function backOf(
 // The tip the last handoff into a review recorded of the protected branch.
 function handedTip(
   item: ItemLike,
-): { branch?: unknown; pushed?: unknown; unchanged?: unknown } | undefined {
+): { branch?: unknown; pushed?: unknown; unchanged?: unknown; local?: unknown } | undefined {
   const handed = item.events.findLast(({ type, data }) => {
     if (type !== 'transitioned') return false;
     const to = positionOf(String(data.to));

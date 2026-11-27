@@ -60,7 +60,7 @@ describe('migrate', () => {
         'bandeja_questions',
       ]),
     );
-    expect(userVersion(db)).toBe(53);
+    expect(userVersion(db)).toBe(54);
   });
 
   // Cold review G2: what answers a message, and the notes and turns of an item by its id, were
@@ -87,7 +87,7 @@ describe('migrate', () => {
     migrate(db);
     migrate(db);
 
-    expect(userVersion(db)).toBe(53);
+    expect(userVersion(db)).toBe(54);
   });
 
   // The desk and the agents' commands open a project the moment an upgrade lands: one that read the
@@ -117,7 +117,7 @@ describe('migrate', () => {
       });
 
       expect(() => migrate(slow)).not.toThrow();
-      expect(userVersion(second)).toBe(53);
+      expect(userVersion(second)).toBe(54);
     } finally {
       first.close();
       second.close();

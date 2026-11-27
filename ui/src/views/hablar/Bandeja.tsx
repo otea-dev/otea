@@ -60,6 +60,8 @@ export function BandejaAsk({ entry, onAnswered }: { entry: BandejaEntry; onAnswe
       text={asking.text}
       options={asking.options ?? []}
       recommended={asking.recommended}
+      optionText={asking.optionText ?? []}
+      joined
       send={async (given) => {
         await postBandejaAnswer(entry.id, { ...given, question: asking.question });
         toast({ msg: t('hablar.ask.sent') });

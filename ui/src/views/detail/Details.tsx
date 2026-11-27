@@ -110,6 +110,8 @@ export function detailCells(o: {
       ) : (
         <span className="warn">{t('sheet.d.expired')}</span>
       )
+    ) : item.expiredLease?.connected ? (
+      <span>{t('when.lapsed')}</span>
     ) : item.expiredLease ? (
       <span className="warn">{t('sheet.d.expired')}</span>
     ) : (

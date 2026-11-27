@@ -454,6 +454,7 @@ export type BandejaAsk = {
   text: string;
   options?: readonly string[];
   recommended?: number | undefined;
+  optionText?: readonly number[] | undefined;
 };
 
 // The refiner asks the person what the entry lacks, with options to tap (as an item's question
@@ -483,6 +484,14 @@ export function askOnBandeja(
       `Not asked on ${bandejaRef(input.id)}: ${checked.problem}`,
     );
   }
+  const optionText = [...new Set(input.optionText ?? [])].sort((a, b) => a - b);
+  for (const number of optionText) {
+    if (!Number.isInteger(number) || number < 1 || number > checked.options.length) {
+      invalid(
+        `Not asked on ${bandejaRef(input.id)}: --option-text ${number} names no option (${checked.options.length} given, numbered from 1)`,
+      );
+    }
+  }
   return transaction(project.db, () => {
     const at = now();
     const entry = requireHold(project, input.id, input.agent, at);
@@ -492,6 +501,7 @@ export function askOnBandeja(
       text,
       options: checked.options,
       recommended: checked.recommended,
+      optionText,
       by: input.agent,
       at,
     });

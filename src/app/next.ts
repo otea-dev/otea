@@ -976,7 +976,15 @@ function textFor(
     ...(on.approved === undefined ? {} : { approved: on.approved }),
     ...(tip && !tip.unchanged ? { approvedTip: tip.commit.slice(0, 7) } : {}),
     ...(on.facts.did === undefined ? {} : { did: on.facts.did }),
-    ...(lease ? { holder: { name: lease.holder, expiresAt: lease.expiresAt } } : {}),
+    ...(lease
+      ? {
+          holder: {
+            name: lease.holder,
+            expiresAt: lease.expiresAt,
+            ...(sessionEnded(ctx.db, lease.holder, () => at) ? { ended: true as const } : {}),
+          },
+        }
+      : {}),
     ...(left === undefined ? {} : { leftFor: left }),
     ...(planned === undefined ? {} : { plannedBy: planned }),
     ...(parent === undefined ? {} : { parent }),
@@ -1600,7 +1608,15 @@ export type BoardMoveInput = {
   // it off: kept with a handoff into a review, it is what the person approves (app/gates.ts).
   // `pushed: false`: never pushed though the repo has a remote, for the approval to warn (P7-8).
   // `unchanged`: the base itself, holding nothing the remote lacks: no code change (P2S-R3-3).
-  tip?: { branch: string; commit: string; tree: string; pushed?: false; unchanged?: true };
+  // `local`: the repo has no remote at all, so approving pushes nothing (the review says so).
+  tip?: {
+    branch: string;
+    commit: string;
+    tree: string;
+    pushed?: false;
+    unchanged?: true;
+    local?: true;
+  };
   // Recorded with the tip of a handoff into a review (app/tips.ts Recorded): that the round only
   // merges main into what was approved, and the open items that change the files it does.
   merge?: NonNullable<Recorded['merge']>;

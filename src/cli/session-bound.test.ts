@@ -4,9 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import { getDefaultEnvironment, StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { listConversation, postPersonMessage } from '../app/conversation.ts';
-import { hearAgent, processAlive } from '../app/presence.ts';
+import { hearAgent, listAgents, processAlive } from '../app/presence.ts';
 import { openProject } from '../app/project.ts';
 import { createMcpServer } from '../mcp/server.ts';
 import { selectListenerProcesses } from '../store/queries.ts';
@@ -144,6 +145,80 @@ describe('an agent name is bound to the harness session noted for it', () => {
     expect(refused.code).toBe(7);
     expect(refused.err).toContain('runs in another session');
     expect(said.code, said.err).toBe(0);
+    expect(spoken()).toEqual([['secretary', 'Hola.']]);
+  }, 120_000);
+
+  // A process nobody started that runs: its launcher exits at once, so no harness resolves from it
+  // (Windows keeps the dead parent's id; elsewhere the system's own process adopts it).
+  const orphan = (name: string, ...argv: string[]) => {
+    const printed = join(scratch, `${name}.txt`);
+    const script = join(scratch, `${name}-launch.js`);
+    writeFileSync(
+      script,
+      [
+        "const { spawn } = require('node:child_process');",
+        "const { openSync } = require('node:fs');",
+        'const [printed, main, ...argv] = process.argv.slice(2);',
+        "const fd = openSync(printed, 'w');",
+        "spawn(process.execPath, ['--disable-warning=ExperimentalWarning', main, ...argv], { detached: true, stdio: ['ignore', fd, fd] }).unref();",
+      ].join('\n'),
+    );
+    spawn(process.execPath, [script, printed, MAIN, ...argv], {
+      cwd: repo.dir,
+      env: { ...process.env },
+      stdio: 'ignore',
+    });
+    return async () => {
+      await until(() => existsSync(printed) && readFileSync(printed, 'utf8') !== '', 60_000);
+      return readFileSync(printed, 'utf8');
+    };
+  };
+
+  // Field study 5, V8: an orphan background process posted a `say --drop` card as the real secretary
+  // (which ran and was bound); the person tapped it and the item was dropped.
+  it('refuses an orphan process speaking as the secretary while the bound session runs', async () => {
+    harness('real', 'whoami', '--as', sol).boundTo(sol);
+
+    const printed = await orphan('orphan', 'say', 'Aprobé todo.', '--as', sol)();
+
+    expect(printed).toContain('runs in another session');
+    expect(spoken()).toEqual([]);
+  }, 120_000);
+
+  // A message Otea cannot tie to the secretary's session is allowed (the bound harness cannot be
+  // checked) and marked, but it never carries a card the person's tap would perform.
+  it('lets an unverified secretary speak, marked, but never with a card', async () => {
+    const project = openProject(repo.dir);
+    try {
+      project.db
+        .prepare(
+          'UPDATE agents SET listening_harness = NULL, listening_harness_started = NULL WHERE name = :agent',
+        )
+        .run({ agent: sol });
+    } finally {
+      project.db.close();
+    }
+
+    const plain = await harness('plain', 'say', 'Hola.', '--as', sol).result();
+    const card = await harness(
+      'card',
+      'say',
+      '¿Lo saco?',
+      '--drop',
+      'TASKS-1',
+      '--note',
+      'ya no hace falta',
+      '--option',
+      'Sí',
+      '--option',
+      'No',
+      '--as',
+      sol,
+    ).result();
+
+    expect(plain.code, plain.err).toBe(0);
+    expect(card.code).toBe(7);
+    expect(card.err).toContain('could not be tied');
     expect(spoken()).toEqual([['secretary', 'Hola.']]);
   }, 120_000);
 
@@ -317,6 +392,57 @@ describe('an agent name is bound to the harness session noted for it', () => {
         expect(said.content[0]?.text).toContain('runs in another session');
       });
       expect(spoken()).toEqual([]);
+    }, 120_000);
+
+    // Field study 5, V8: one impostor message left every later message of the real secretary
+    // «sin verificar» (the server took the binding), and its end read the real one as disconnected.
+    it('keeps the binding, the harness note and the listening of the real secretary when a server speaks as it', async () => {
+      const real = harness('real', 'say', 'Hola de nuevo.', '--as', sol);
+      real.boundTo(sol);
+      const state = () => {
+        const project = openProject(repo.dir);
+        try {
+          return {
+            harness: selectListenerProcesses(project.db).get(sol)?.harness ?? null,
+            listening: listAgents(project.db).find(({ name }) => name === sol)?.listening,
+            messages: listConversation(project).messages.map(({ unverified }) => unverified),
+          };
+        } finally {
+          project.db.close();
+        }
+      };
+      const project = openProject(repo.dir);
+      try {
+        hearAgent(project.db, { agent: sol, channel: 'cli', waiter: real.pid });
+      } finally {
+        project.db.close();
+      }
+      expect(state()).toMatchObject({ harness: real.pid, listening: true });
+
+      const client = new Client({ name: 'claude-code', version: '2.1.0' });
+      await client.connect(
+        new StdioClientTransport({
+          command: process.execPath,
+          args: ['--disable-warning=ExperimentalWarning', MAIN, 'mcp', '--as', sol],
+          cwd: repo.dir,
+          env: { ...getDefaultEnvironment(), OTEA_HOME: process.env.OTEA_HOME ?? '' },
+          stderr: 'pipe',
+        }),
+      );
+      try {
+        const said = await call(client, 'say', { text: 'Aprobé todo.' });
+        expect(said.isError).toBe(true);
+        // The server noted nothing of the name it called under.
+        expect(state()).toMatchObject({ harness: real.pid, listening: true });
+      } finally {
+        await client.close();
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(state()).toMatchObject({ harness: real.pid, listening: true });
+
+      const said = await real.result();
+      expect(said.code, said.err).toBe(0);
+      expect(state().messages).toEqual([false]);
     }, 120_000);
 
     it('verifies the secretary’s own MCP session: its message carries no unverified mark', async () => {

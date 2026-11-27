@@ -50,6 +50,8 @@ export function whenText(item: Item, now: number): { text: string; warn: boolean
       const left = Math.max(1, Math.ceil((Date.parse(lease.expiresAt) - now) / MIN));
       return { text: t('when.left', { time: span(left) }), warn: false };
     }
+    // An agent still connected: its lease ran out and the item went back to the queue, no alarm.
+    if (item.expiredLease?.connected) return { text: t('when.lapsed'), warn: false };
     if (item.expiredLease) return { text: t('when.expired'), warn: true };
   }
   return { text: age((now - turnSince(item)) / MIN), warn: false };

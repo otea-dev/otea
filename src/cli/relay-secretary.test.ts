@@ -7,6 +7,8 @@ import { stateOf } from '../core/board/engine.ts';
 import { createMcpServer } from '../mcp/server.ts';
 import { updateItemState } from '../store/queries.ts';
 import { COMMANDS } from './commands.ts';
+import { harnessOf, listProcesses } from './owner.ts';
+import { STARTED_BY } from './started-by.ts';
 import { type Cli, cliAt, declareProfiles, type TempRepo, tempGitRepo } from './testing.ts';
 
 // U8 (field study 4): `otea relay CAM-5 Dropped --quote "tiralo, no va" --reason ... --as intruso`
@@ -115,7 +117,26 @@ describe('relay attacks, through the command line and MCP', () => {
     expect(await stateOfCam()).toBe(inReview);
   });
 
+  // The secretary's session as a known harness leaves it: the process that runs these commands.
+  const boundToThisSession = async () => {
+    // In-process the commands run under the harness above this worker: the one the guard resolves.
+    const table = await listProcesses(AbortSignal.timeout(20_000));
+    const pid = table === undefined ? undefined : harnessOf(table.rows, STARTED_BY);
+    if (pid === undefined) throw new Error('no harness above this process');
+    const project = openProject(repo.dir);
+    try {
+      project.db
+        .prepare(
+          'UPDATE agents SET listening_harness = :pid, listening_harness_started = NULL WHERE name = :agent',
+        )
+        .run({ pid, agent: 'sol' });
+    } finally {
+      project.db.close();
+    }
+  };
+
   it('asks the person to drop it with a card instead, which moves nothing until they tap', async () => {
+    await boundToThisSession();
     const said = await sol(
       'say',
       'Drop CAM-1?',

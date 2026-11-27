@@ -41,6 +41,9 @@ export type ItemQuestion = {
   round: number;
   options?: string[];
   recommended?: number;
+  // The numbers (from 1) of the options that need the person's own words: tapping one opens the
+  // text box instead of answering at once (ask --option-text).
+  optionText?: number[];
   answer?: QuestionAnswer;
 };
 
@@ -108,13 +111,22 @@ function liveEvents(events: readonly QuestionEvent[]): readonly QuestionEvent[] 
 }
 
 // The options a question was asked with, as its event kept them.
-function optionsOf(data: Record<string, unknown>): Pick<ItemQuestion, 'options' | 'recommended'> {
+function optionsOf(
+  data: Record<string, unknown>,
+): Pick<ItemQuestion, 'options' | 'recommended' | 'optionText'> {
   const options = Array.isArray(data.options)
     ? data.options.filter((option): option is string => typeof option === 'string')
     : [];
   if (options.length === 0) return {};
   const { recommended } = data;
-  return { options, ...(typeof recommended === 'number' ? { recommended } : {}) };
+  const words = Array.isArray(data.optionText)
+    ? data.optionText.filter((n): n is number => typeof n === 'number')
+    : [];
+  return {
+    options,
+    ...(typeof recommended === 'number' ? { recommended } : {}),
+    ...(words.length === 0 ? {} : { optionText: words }),
+  };
 }
 
 // The item's questions, oldest first, each with its answer once there is one.

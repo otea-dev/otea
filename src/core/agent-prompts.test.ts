@@ -512,6 +512,40 @@ describe('the role prompts', () => {
       expect(text).toContain(`/d/${folder}`);
     });
 
+    // Field study 5, V7: 9 of 10 approvals were followed by «¿La actualizo esta vez?». The approval
+    // is the yes: the worker and the secretary never ask it, and tell the person only a failure.
+    it(`has the worker and the secretary never ask whether to integrate or update after an approval (${lang})`, () => {
+      const never =
+        lang === 'es' ? /nunca me preguntes si integrar/ : /never ask me whether to integrate/;
+      const worker = rolePrompt('worker', lang, { board: 'Cambios', name: 'ana' });
+      expect(worker).toMatch(never);
+      expect(worker).toMatch(
+        lang === 'es' ? /solo cuando diga que no pudo/ : /only when it says it could not/,
+      );
+      expect(rolePrompt('secretary', lang, { name: 'ana' })).toMatch(never);
+    });
+
+    // Field study 5, V8: work integrated during an absence was never announced.
+    it(`has the secretary tell the person in one line what landed, and read an item before saying anyone works it (${lang})`, () => {
+      const secretary = rolePrompt('secretary', lang, { name: 'ana' });
+      expect(secretary).toContain('landed');
+      expect(secretary).toMatch(
+        lang === 'es' ? /desde mi último mensaje/ : /since my last message/,
+      );
+      expect(secretary).toMatch(
+        lang === 'es' ? /la sesión de quien lo tiene terminó/ : /its holder's session ended/,
+      );
+    });
+
+    // Field study 5, V7/V2: an option that promises the person's own words sent at once.
+    it(`has the worker and the refiner mark an option that promises the person's words with --option-text (${lang})`, () => {
+      for (const text of [
+        rolePrompt('worker', lang, { board: 'Cambios', name: 'ana' }),
+        rolePrompt('refiner', lang, { name: 'ana-ref' }),
+      ])
+        expect(text).toContain('--option-text <');
+    });
+
     // Cold review G2: a board with no repository or protected branch (a notes or to-do board) was
     // told to make a git worktree and run `land sync` that have no meaning there.
     it(`gives a board with no code no worktree, merge or land sync, only where its files go (${lang})`, () => {

@@ -670,6 +670,11 @@ export const MIGRATIONS = [
   `
   ALTER TABLE conversation_messages ADD COLUMN owed_returns INTEGER NOT NULL DEFAULT 0;
   `,
+  // The options of a refiner's question on a Bandeja note that need the person's own words (field
+  // study 5: «te escribo…» was sent as it read): a JSON list of option numbers, as the secretary's.
+  `
+  ALTER TABLE bandeja_questions ADD COLUMN option_text TEXT;
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {

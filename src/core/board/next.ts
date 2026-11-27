@@ -109,7 +109,8 @@ export type NextInput = {
   // The commit of the protected branch the person approved, as its handoff recorded it (short id).
   approvedTip?: string;
   // The agent holding the item's live lease, and until when.
-  holder?: { name: string; expiresAt: string };
+  // `ended`: its session is over, so nobody works the item although its lease still runs.
+  holder?: { name: string; expiresAt: string; ended?: true };
   // The agent the person left a stuck item for (Reasignar), until an agent claims or moves it.
   leftFor?: string;
   // The notes the person left in this round of the step, oldest first.
@@ -152,6 +153,16 @@ export type NextInput = {
   startsAs?: 'json' | 'none';
 };
 
+// Who holds the item and until when. A holder whose session ended works nothing: a reader who says
+// someone is on it, from this line alone, would be wrong (field study 5, V7: «un trabajador lo tiene
+// en marcha» about a worker that had died), so it says the session ended.
+function heldLine(holder: NonNullable<NextInput['holder']>): string {
+  const until = `Held by ${holder.name} until ${timeText(holder.expiresAt)}`;
+  return holder.ended
+    ? `${until}, but ${holder.name}'s session ended: nobody is working on it now, and any agent may take it over (otea claim).`
+    : `${until}.`;
+}
+
 // Another agent's say on the item keeps the asking agent off it: a live lease it does not hold, or
 // a stuck item the person left for someone else.
 function heldElsewhere(input: NextInput): string | undefined {
@@ -159,8 +170,11 @@ function heldElsewhere(input: NextInput): string | undefined {
   if (me === undefined) return undefined;
   if (plannedBy)
     return `Waits for ${plannedBy.id}, which planned it, to leave ${plannedBy.step}: pick another item.`;
-  if (holder && holder.name !== me)
-    return `Held by ${holder.name} until ${timeText(holder.expiresAt)}: pick another item.`;
+  if (holder && holder.name !== me) {
+    return holder.ended
+      ? heldLine(holder)
+      : `Held by ${holder.name} until ${timeText(holder.expiresAt)}: pick another item.`;
+  }
   if (!holder && leftFor !== undefined && leftFor !== me)
     return `Left for ${leftFor}: pick another item.`;
   return undefined;
@@ -173,7 +187,7 @@ function holdLine({ id, holder, me, brief }: NextInput): string {
     return `You hold it until ${timeText(holder.expiresAt)}.`;
   if (holder && holder.name === me)
     return `You hold it until ${timeText(holder.expiresAt)}; your otea calls keep it, and on a long step with none (a rebase, a test run), otea heartbeat ${id} every 90 seconds.`;
-  if (holder) return `Held by ${holder.name} until ${timeText(holder.expiresAt)}.`;
+  if (holder) return heldLine(holder);
   return `Claim it first: otea claim ${id} (otea next --claim takes and claims the next in one call).`;
 }
 
@@ -850,8 +864,7 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
   if (!input.holder && input.leftFor !== undefined && input.leftFor === input.me)
     lines.push('The person left it for you.');
   if (!person) lines.push(holdLine(input));
-  else if (input.holder)
-    lines.push(`Held by ${input.holder.name} until ${timeText(input.holder.expiresAt)}.`);
+  else if (input.holder) lines.push(heldLine(input.holder));
   if (reviewing && input.handed?.note.trim())
     lines.push(
       '',

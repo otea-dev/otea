@@ -177,6 +177,22 @@ describe('templates', () => {
     }
   });
 
+  // Field study 5, V7: on a repo with no remote the worker asked «¿la actualizo?» after 9 of 10
+  // approvals. The Land step says the approval is the yes, and what landing is with no remote.
+  it('says in the Land step that approving is the yes, and what landing is with no remote', () => {
+    const said = {
+      en: [/never ask whether to/, /no remote/],
+      es: [/nunca preguntes si hacerlo/, /sin remoto/i],
+    };
+    for (const key of ['changes', 'bug-reports', 'design'] as const) {
+      for (const lang of ['en', 'es'] as const) {
+        const def = instantiate(requireTemplate(key), lang, {}, sequenceIds());
+        const land = def.steps.find(({ name }) => name === (lang === 'en' ? 'Land' : 'Integrar'));
+        for (const pattern of said[lang]) expect(land?.instructions.take).toMatch(pattern);
+      }
+    }
+  });
+
   // P8-F1: the commit field the guard names is checked by a handoff; boards keep naming it.
   it('names the commit field of Code on main, so a handoff checks it', () => {
     const def = instantiate(requireTemplate('mainline'), 'en', {}, sequenceIds());

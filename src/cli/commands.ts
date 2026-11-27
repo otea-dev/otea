@@ -212,6 +212,7 @@ import {
   secretaryWake,
   startSecretaryWait,
 } from '../app/secretary.ts';
+import { bindsToAnother } from '../app/session-bound.ts';
 import { startProject } from '../app/start.ts';
 import type { TailscaleCli } from '../app/tailscale.ts';
 import { approvedTipOf, repeatsLastRound } from '../app/tips.ts';
@@ -2305,8 +2306,12 @@ function handedBranch(
     ? `${item.id} goes to review with no commit: ${branch} holds nothing the remote lacks, so the person reviews no code change and the push gate does not wait on it.`
     : undefined;
   const kept = tip && unpushed ? { ...tip, pushed: false as const } : tip;
+  // A repo with no remote: what the person approves is landed here, never pushed, and the review
+  // says so instead of promising a push.
+  const noRemote = tip && (state ?? pushState(cwd, branch))?.kind === 'local';
+  const marked = kept && noRemote ? { ...kept, local: true as const } : kept;
   return {
-    ...(kept ? { tip: unchanged ? { ...kept, unchanged: true as const } : kept } : {}),
+    ...(marked ? { tip: unchanged ? { ...marked, unchanged: true as const } : marked } : {}),
     ...(warning ? { warning } : {}),
     ...(said ? { said } : {}),
     ...(recorded ? { overlaps: recorded } : {}),
@@ -2771,8 +2776,9 @@ async function listenWhile<T>(
   // On the command line its own process is watched: killed with its session, it leaves its
   // agent counted as gone at once, not a listening window later (P2S-R2-7, P8-R2-7).
   const waiter = input.channel === 'cli' ? { waiter: process.pid } : {};
+  // Under the secretary's name from another session, a wait is no sign of it: it moves no listening.
   const heard =
-    input.actor.kind === 'agent'
+    input.actor.kind === 'agent' && !isFromAnotherSession(input)
       ? waitBeat(
           project.db,
           {
@@ -3644,11 +3650,23 @@ const ask: Command = {
   options: {
     option: { multiple: true, placeholder: 'text', about: '2 to 4 answers to tap' },
     recommend: { placeholder: 'n', about: 'number (from 1) of the one you would choose' },
+    'option-text': {
+      multiple: true,
+      placeholder: 'n',
+      about:
+        'number of an option that promises the person will write or explain (te escribo…): tapping it opens the text box',
+    },
   },
   execute: (input) => {
     const [id = '', question = ''] = input.args;
     const { actor, channel } = input;
     const options = input.options('option');
+    const optionText = input.options('option-text').map((n) => {
+      const number = Number(n.replace(/^#/, ''));
+      if (!Number.isInteger(number))
+        throw new UsageError('--option-text is the number of an option');
+      return number;
+    });
     const given = input.option('recommend');
     const recommended = given === undefined ? undefined : Number(given.replace(/^#/, ''));
     if (recommended !== undefined && !Number.isInteger(recommended))
@@ -3662,6 +3680,7 @@ const ask: Command = {
           text: question,
           ...(options.length === 0 ? {} : { options }),
           ...(recommended === undefined ? {} : { recommended }),
+          ...(optionText.length === 0 ? {} : { optionText }),
         });
         return {
           data: { entry, question: asked },
@@ -3673,6 +3692,7 @@ const ask: Command = {
         text: question,
         ...(options.length === 0 ? {} : { options }),
         ...(recommended === undefined ? {} : { recommended }),
+        ...(optionText.length === 0 ? {} : { optionText }),
         actor,
         channel,
       });
@@ -4576,6 +4596,9 @@ function heardBy(
 ) {
   try {
     withProject(cwd, (project) => {
+      // The secretary's name called through a server that is not its noted session is heard as
+      // nothing: it moves no binding, listening or harness (its acts are refused by their processes).
+      if (bindsToAnother(project.db, agent, { pid: process.pid, launcher: process.ppid })) return;
       // An agent at work in another project is no one's to hear here (its calls are refused).
       holdAgentHome(project, agent, 'write', process.env, systemClock, process.ppid);
       claimName(

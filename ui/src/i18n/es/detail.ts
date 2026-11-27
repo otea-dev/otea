@@ -488,6 +488,9 @@ export const detail = {
   'sheet.says.landsAnyPush':
     'luego un agente la integra y la sube al remoto, como dice el paso {step}',
   'sheet.says.landsOwn': 'luego un agente sube {base} al remoto',
+  'sheet.says.landsLocal':
+    'luego un agente la integra en {base}, en tu carpeta, como dice el paso {step}; no se sube nada',
+  'sheet.says.landsOwnLocal': 'luego un agente pone {base} al día en tu carpeta',
   'sheet.says.unpushed': 'ojo: {branch} nunca se subió al remoto',
   'sheet.says.unchanged': 'no trae cambios de código: no hay nada que subir',
   'sheet.says.closesUnmerged': 'queda Hecho, pero aún falta integrarlo y marcarlo como integrado',

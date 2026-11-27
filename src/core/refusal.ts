@@ -152,6 +152,7 @@ export type RefusalDetails =
         | 'asking'
         | 'none_open'
         | 'options'
+        | 'option_text'
         | 'no_option'
         | 'stale';
     }

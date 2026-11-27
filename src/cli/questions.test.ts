@@ -214,6 +214,40 @@ describe('an agent asks the person, on the CLI and over MCP', () => {
     expect(next).toContain('The person chose option 2: "Con musgo"');
   });
 
+  // Field study 5, V7/V2: «Te escribo las fechas» was sent as it read when tapped, and otea ask had
+  // no way to say that option needs the person's words (say has --option-text).
+  it('marks the options that need the person’s own words, and refuses one that names no option', async () => {
+    const asked = await otea(
+      'ask',
+      'CRI-1',
+      '¿Qué fechas?',
+      '--option',
+      'Las de siempre',
+      '--option',
+      'Te escribo las fechas',
+      '--option-text',
+      '2',
+    );
+    expect(asked.code, asked.err).toBe(0);
+    const shown = JSON.parse((await otea('show', 'CRI-1', '--json')).out);
+    expect(shown.asks).toMatchObject({ options: ['Las de siempre', 'Te escribo las fechas'] });
+    expect(shown.asks.optionText).toEqual([2]);
+
+    const stray = await otea(
+      'ask',
+      'CRI-2',
+      '¿A?',
+      '--option',
+      'a',
+      '--option',
+      'b',
+      '--option-text',
+      '3',
+    );
+    expect(stray.code).not.toBe(0);
+    expect(stray.err).toContain('--option-text 3 names no option');
+  });
+
   it('refuses options it cannot offer, and a recommendation with none, on the CLI', async () => {
     const one = await otea('ask', 'CRI-1', '¿A?', '--option', 'Solo');
     expect(one.code).not.toBe(0);

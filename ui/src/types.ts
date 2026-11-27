@@ -43,6 +43,8 @@ export type Item = {
     // What the agent offers to pick with one tap (2 to 4), and the number (from 1) it recommends.
     options?: string[];
     recommended?: number;
+    // The options that need your own words (the agent marked them): tapping one opens the box.
+    optionText?: number[];
   };
   collection: string;
   // The item type: "item" in a collection whose preset declares no types.
@@ -60,8 +62,9 @@ export type Item = {
   enteredAt?: string;
   createdBy: Actor;
   lease: Lease | null;
-  // A lease that ran out with nobody releasing it; lease is null then.
-  expiredLease?: Lease;
+  // A lease that ran out with nobody releasing it; lease is null then. `connected`: its holder is
+  // still connected, so the item is not stuck: it only went back to the queue.
+  expiredLease?: Lease & { connected?: true };
   // While an agent has it set aside for later (otea release --later, app/set-aside.ts): that agent
   // and when. Its next and wait leave the item out until it lifts (Retomar, or what the person does).
   setAside?: { by: string; at: string };

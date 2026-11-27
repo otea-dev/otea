@@ -58,7 +58,13 @@ export const CLOSED_FOR = 7 * 24 * 60 * 60_000;
 
 // An agent's lease ran out with nobody releasing it, and nobody took the item again.
 export function isStuck(item: Item, now: number): boolean {
-  return item.turn === 'agent' && !!item.expiredLease && !activeLease(item.lease, now);
+  // A lapsed lease of an agent that is still connected is no stuck item: it went back to the queue.
+  return (
+    item.turn === 'agent' &&
+    !!item.expiredLease &&
+    !item.expiredLease.connected &&
+    !activeLease(item.lease, now)
+  );
 }
 
 export type HandedNote = { agent: string; reason: string; at: string };

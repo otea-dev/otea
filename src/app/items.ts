@@ -61,7 +61,7 @@ import {
   liveBoardOf,
   relayAllowed,
 } from './next.ts';
-import { keepLeasesOfAgentsThere } from './presence.ts';
+import { keepLeasesOfAgentsThere, listAgents } from './presence.ts';
 import {
   addRelation,
   assertMayEnter,
@@ -72,7 +72,7 @@ import {
   relatedItems,
   withRelations,
 } from './relations.ts';
-import { signalReview } from './review-signal.ts';
+import { signalLanded, signalReview } from './review-signal.ts';
 
 export type Clock = () => string;
 
@@ -83,7 +83,9 @@ export type Item = ItemRecord & {
   closes?: Closing;
   // A lease that ran out with nobody releasing it (expiry is lazy, so it stays stored until a
   // release, a handoff or a new claim): readers see lease null and this, the abandoned hold.
-  expiredLease?: Lease;
+  // `connected`: the holder is still connected (a short lease ran out while it works), so the item
+  // is no stuck one: it only went back to the queue (field study 5, V2).
+  expiredLease?: Lease & { connected?: true };
   relations?: RelationRef[];
   children?: ChildrenSummary;
   // On a board, while an agent's question waits for the person (otea ask): the question; the turn
@@ -255,12 +257,16 @@ export function listItems(ctx: Context, filter: ListItemsFilter = {}, now = syst
   keepLeasesOfAgentsThere(ctx.db, now);
   const at = now();
   const asking = askingItems(ctx.db);
-  const items = selectItems(ctx.db, stored)
-    .map((item) => withAsks(present(item, workflowFor(item), at), asking.get(item.id)))
-    .filter((item) => turn === undefined || item.turn === turn)
-    .filter(({ lease }) => availableTo === undefined || !lease || lease.holder === availableTo)
-    .filter(({ id }) => children === undefined || children.has(id))
-    .filter((item) => fields === undefined || holdsFields(item, fields));
+  const items = connectedLapses(
+    ctx,
+    selectItems(ctx.db, stored)
+      .map((item) => withAsks(present(item, workflowFor(item), at), asking.get(item.id)))
+      .filter((item) => turn === undefined || item.turn === turn)
+      .filter(({ lease }) => availableTo === undefined || !lease || lease.holder === availableTo)
+      .filter(({ id }) => children === undefined || children.has(id))
+      .filter((item) => fields === undefined || holdsFields(item, fields)),
+    now,
+  );
   if (relations.length === 0) return items;
   // A child may sit outside the filter, so the summaries read every item.
   const closings = new Map(
@@ -293,7 +299,30 @@ export function getItem(ctx: Context, id: string, now = systemClock): ItemWithEv
   const item = requireItem(ctx.db, id);
   const workflow = workflowOf(ctx, item);
   const events = selectEvents(ctx.db, id);
-  return { ...withAsks(present(item, workflow, now()), openQuestion(events)), events };
+  const [shown] = connectedLapses(
+    ctx,
+    [withAsks(present(item, workflow, now()), openQuestion(events))],
+    now,
+  );
+  return { ...(shown as Item), events };
+}
+
+// A lease that ran out while its holder is still connected is no stuck item: a short lease (--ttl)
+// lapses under an agent that is there, and the item only goes back to the queue. The desk says so
+// plainly and neutral instead of «sin señales» in red, and `pending` does not list it as stuck
+// (field study 5, V2). Reads the agents only when some lease ran out.
+function connectedLapses<T extends Item>(ctx: Context, items: T[], now: Clock): T[] {
+  if (!items.some(({ expiredLease }) => expiredLease)) return items;
+  const connected = new Set(
+    listAgents(ctx.db, now)
+      .filter(({ live }) => live)
+      .map(({ name }) => name),
+  );
+  return items.map((item) =>
+    item.expiredLease && connected.has(item.expiredLease.holder)
+      ? { ...item, expiredLease: { ...item.expiredLease, connected: true as const } }
+      : item,
+  );
 }
 
 // `transitions` are the moves the performer may make, `relayable` the human decisions an agent
@@ -506,8 +535,10 @@ export function landMove(
   }
   if (turnOf(workflow, to) === 'none') liftWhenWaitsClose(ctx, item.id, actor, at);
   // The person's review is news for the secretary, unless the person made the move themselves.
-  if (actor.kind === 'agent')
+  if (actor.kind === 'agent') {
     signalReview(ctx, item, { to, turn: turnOf(workflow, to), board }, at);
+    signalLanded(ctx, item, closesOf(workflow, to), at);
+  }
   // What the person settled by moving the item is no longer asked: the secretary's questions about
   // it stop waiting for them (they kept counting in Te espera after the item was sent back). Only
   // the person's own move on the desk or the phone settles anything: a relay, or a terminal, says

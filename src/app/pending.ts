@@ -6,6 +6,7 @@ import {
   type BoardQueue,
   type Pending,
   type PendingDone,
+  type PendingEnded,
   type PendingEntry,
   type PendingKind,
   pendingCounts,
@@ -23,7 +24,7 @@ import { escalationShown, parseEscalation } from './escalate.ts';
 import { type Clock, type Item, listItems, systemClock, workflowOf } from './items.ts';
 import { landWaitOf, liveBoardOf, liveBoards } from './next.ts';
 import { scanned } from './overlap.ts';
-import { listAgents } from './presence.ts';
+import { listAgents, sessionEnded } from './presence.ts';
 import { secretaryStatus } from './secretary.ts';
 import { secretaryWaiting } from './secretary-waiting.ts';
 import { stepFactsOf } from './step-facts.ts';
@@ -160,7 +161,12 @@ function entriesOf(ctx: Context, items: readonly Item[], now: Clock): PendingEnt
       } else {
         out.push({ kind: kindOfTurn(ctx, item), ref: item.id, title: item.title, since });
       }
-    } else if (item.turn === 'agent' && item.expiredLease && !item.lease) {
+    } else if (
+      item.turn === 'agent' &&
+      item.expiredLease &&
+      !item.expiredLease.connected &&
+      !item.lease
+    ) {
       out.push({
         kind: 'stuck',
         ref: item.id,
@@ -332,6 +338,16 @@ function doneOf(ctx: Context, items: readonly Item[], now: Clock): PendingDone[]
     .sort((a, b) => a.at.localeCompare(b.at));
 }
 
+// The items an agent holds while its session is over: nobody works them, whatever the lease says.
+function endedOf(ctx: Context, items: readonly Item[], now: Clock): PendingEnded[] {
+  const at = now();
+  return items.flatMap((item) =>
+    item.turn === 'agent' && item.lease && sessionEnded(ctx.db, item.lease.holder, () => at)
+      ? [{ id: item.id, title: item.title, holder: item.lease.holder }]
+      : [],
+  );
+}
+
 export function pendingOf(
   ctx: Context,
   now: Clock = systemClock,
@@ -344,6 +360,7 @@ export function pendingOf(
     ...workerEntries(ctx, queues, items, now),
   ]);
   const status = secretaryStatus(ctx.db, now);
+  const ended = options.blocks === false ? [] : endedOf(ctx, items, now);
   return {
     count: entries.length,
     entries,
@@ -353,6 +370,7 @@ export function pendingOf(
         : blocksOf(ctx, items, entries, now, options.landWait ?? landWaitOf),
     queues: options.blocks === false ? [] : queues,
     ...(options.blocks === false ? {} : { done: doneOf(ctx, items, now) }),
+    ...(ended.length === 0 ? {} : { ended }),
     secretary: status
       ? {
           name: status.name,
@@ -445,12 +463,24 @@ function doneLine(done: readonly PendingDone[]): string[] {
   ];
 }
 
+// The items nobody works though an agent holds them: said apart from what waits for the person, so
+// the secretary never reports a worker on an item whose session is over.
+function endedLines(ended: readonly PendingEnded[]): string[] {
+  if (ended.length === 0) return [];
+  const list = ended.map(
+    ({ id, title, holder }) => `${id} ${quoteAgent(title, 80)} (${holder}'s session ended)`,
+  );
+  return [
+    `Held by an agent whose session ended, so nobody is working on it now: ${list.join('; ')}. Do not tell the person someone is working on these: read each one (otea show <id>), and launch another worker if its board needs one.`,
+  ];
+}
+
 // What `otea pending` prints, for the secretary: the count, each thing with what it waits for and
 // since when, what holds a board's queue, and what to do with it.
 export function pendingText(pending: Pending): string {
   const { count, entries, blocks, queues } = pending;
   const loads = queues.map(queueLine);
-  const finished = doneLine(pending.done ?? []);
+  const finished = [...endedLines(pending.ended ?? []), ...doneLine(pending.done ?? [])];
   if (count === 0) {
     return [
       'Nothing waits for the person: no review, question or step of their own. Do not say otherwise from memory.',

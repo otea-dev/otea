@@ -300,6 +300,19 @@ function checkedAction(
   return { ...action, note };
 }
 
+// A message Otea could not tie to the secretary's session never carries a card: the person's tap
+// would do what a process of unknown origin drafted.
+export function refuseUnverifiedCard(
+  unverified: boolean | undefined,
+  card: MessageAction['kind'] | undefined,
+): void {
+  if (!unverified || card === undefined) return;
+  throw new OteaError(
+    'forbidden',
+    `Not said: this message could not be tied to the secretary's session, and a card (--${card === 'drop' ? 'drop' : 'send-back'}) only goes from it. If you are the secretary, declare your session first (otea profile --role secretary) and say it again; otherwise use otea escalate`,
+  );
+}
+
 // The secretary's message: only the project's declared secretary says anything.
 export function sayAsSecretary(project: Project, input: SayInput, now: Clock = systemClock): Said {
   requireSecretary(project.db, input.agent, 'speaks for the project (say)');
@@ -308,6 +321,7 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
   const links = [...new Set((input.links ?? []).map((id) => id.trim()).filter((id) => id !== ''))];
   const checked = checkOptions(input.options, input.recommended);
   if ('problem' in checked) invalid(`Not said: ${checked.problem}`);
+  refuseUnverifiedCard(input.unverified, input.action?.kind);
   const action = checkedAction(input.action, checked.options);
   const optionText = [...new Set(input.optionText ?? [])].sort((a, b) => a - b);
   for (const number of optionText) {
