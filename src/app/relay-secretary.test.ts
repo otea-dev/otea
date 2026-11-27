@@ -76,12 +76,13 @@ describe('a relay in a project with a secretary', () => {
     });
 
     it('is not dropped by the secretary either, even with the person’s real words: it asks them with a card', () => {
-      const said = postPersonMessage(project, { text: 'tiralo, no va' }, now).message;
+      const said = postPersonMessage(project, { text: 'tiralo ya, no va' }, now).message;
       const before = where().state;
 
-      expect(() => drop({ via: 'sol', quote: 'tiralo', fromMessage: said.id })).toThrow(
+      expect(() => drop({ via: 'sol', quote: 'tiralo ya', fromMessage: said.id })).toThrow(
         /waits for your review[\s\S]*--drop/,
       );
+      // Said first for a project with a secretary; the rule is the same without one.
       expect(where().state).toBe(before);
     });
 
@@ -114,22 +115,20 @@ describe('a relay in a project with a secretary', () => {
   });
 
   describe('on an item an agent works on', () => {
-    it('takes the secretary’s relay of words the person wrote, and records the message', () => {
+    it('refuses even the secretary’s relay of a drop, with the person’s own words', () => {
+      // A relay never drops: not even the secretary's, with the person's real words.
       const said = postPersonMessage(project, { text: 'Tiralo, ya no hace falta.' }, now).message;
 
-      drop({ via: 'sol', quote: 'ya no hace falta', fromMessage: said.id });
-
-      expect(where().state).toBe('dropped');
-      expect(selectEvents(project.db, id).at(-1)?.data).toMatchObject({
-        quote: 'ya no hace falta',
-        message: said.id,
-      });
+      expect(() => drop({ via: 'sol', quote: 'ya no hace falta', fromMessage: said.id })).toThrow(
+        /person's alone/,
+      );
+      expect(where().state).not.toBe('dropped');
     });
 
     it('refuses any other agent, even with a message of the person to quote', () => {
-      const said = postPersonMessage(project, { text: 'tiralo' }, now).message;
+      const said = postPersonMessage(project, { text: 'tiralo ya' }, now).message;
 
-      expect(() => drop({ via: 'intruso', quote: 'tiralo', fromMessage: said.id })).toThrow(
+      expect(() => drop({ via: 'intruso', quote: 'tiralo ya', fromMessage: said.id })).toThrow(
         /only the secretary/,
       );
       expect(where().state).not.toBe('dropped');
@@ -138,13 +137,15 @@ describe('a relay in a project with a secretary', () => {
     it('refuses a quote the message does not contain, no message, or a message that is not the person’s', () => {
       const said = postPersonMessage(project, { text: 'dejalo como esta' }, now).message;
 
-      expect(() => drop({ via: 'sol', quote: 'tiralo', fromMessage: said.id })).toThrow(
+      expect(() => drop({ via: 'sol', quote: 'tiralo ya', fromMessage: said.id })).toThrow(
         /does not contain/,
       );
-      expect(() => drop({ via: 'sol', quote: 'tiralo' })).toThrow(/--from-message/);
-      expect(() => drop({ via: 'sol', quote: 'tiralo', fromMessage: 9999 })).toThrow(/9999/);
-      const own = sayWithSendBack(project, { agent: 'sol', text: 'tiralo' }, now).message;
-      expect(() => drop({ via: 'sol', quote: 'tiralo', fromMessage: own.id })).toThrow(/person's/);
+      expect(() => drop({ via: 'sol', quote: 'tiralo ya' })).toThrow(/--from-message/);
+      expect(() => drop({ via: 'sol', quote: 'tiralo ya', fromMessage: 9999 })).toThrow(/9999/);
+      const own = sayWithSendBack(project, { agent: 'sol', text: 'tiralo ya' }, now).message;
+      expect(() => drop({ via: 'sol', quote: 'tiralo ya', fromMessage: own.id })).toThrow(
+        /person's/,
+      );
       expect(where().state).not.toBe('dropped');
     });
   });

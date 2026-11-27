@@ -2010,7 +2010,7 @@ export function dropItem(ctx: Context, input: DropInput, now = systemClock): Boa
 }
 
 // Whether a move into `target` from a review approves it: on to a later step or to Hecho.
-function approves(def: BoardDefinition, from: Position, target: Position): boolean {
+export function approves(def: BoardDefinition, from: Position, target: Position): boolean {
   if (isClosed(from) || from.phase === 'doing') return false;
   if (isClosed(target)) return target.closed === DONE;
   return target.phase === 'doing' && stepIndex(def, target.step) > stepIndex(def, from.step);

@@ -105,7 +105,16 @@ describe('events', () => {
       await until(() => lines(follow.out()).length === 1);
 
       // Relayed by an agent other than the one that handed TASKS-1 off.
-      const relayed = ['TASKS-1', 'todo', '--quote', 'Again', '--reason', 'Again', '--as', 'codex'];
+      const relayed = [
+        'TASKS-1',
+        'todo',
+        '--quote',
+        'Again please',
+        '--reason',
+        'Again',
+        '--as',
+        'codex',
+      ];
       await spawnCli(repo.dir, 'relay', ...relayed);
       await until(() => lines(follow.out()).length === 2);
       const code = await follow.stop();
@@ -122,7 +131,17 @@ describe('events', () => {
       const follow = startCli(repo.dir, 'events', '--follow', '--collection', 'bugs');
       await until(() => lines(follow.out()).length === 1);
 
-      await otea('relay', 'TASKS-1', 'todo', '--quote', 'Again', '--reason', 'R', '--as', 'codex');
+      await otea(
+        'relay',
+        'TASKS-1',
+        'todo',
+        '--quote',
+        'Again please',
+        '--reason',
+        'R',
+        '--as',
+        'codex',
+      );
       await otea('move', 'BUGS-1', 'todo__review');
       await until(() => lines(follow.out()).length === 2);
       await follow.stop();

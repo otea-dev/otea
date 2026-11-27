@@ -5,7 +5,7 @@ import { OteaError } from '../core/errors.ts';
 import { assertCanLeave } from '../core/fields.ts';
 import type { Actor } from '../core/item.ts';
 import { activeLease } from '../core/lease.ts';
-import { stateLabel, transitionsBetween, type Workflow } from '../core/workflow.ts';
+import { closesOf, stateLabel, transitionsBetween, type Workflow } from '../core/workflow.ts';
 import { selectMessage } from '../store/conversation.ts';
 import { transaction } from '../store/database.ts';
 import { type EventRecord, type ItemRecord, selectEvents } from '../store/queries.ts';
@@ -13,6 +13,7 @@ import { typeOfItem } from './collections.ts';
 import type { Context } from './context.ts';
 import { type Item, landMove, requireWritableItem, systemClock } from './items.ts';
 import {
+  approves,
   assertMoveHandsOff,
   boardState,
   liveBoardOf,
@@ -50,7 +51,12 @@ const plainWords = (text: string) => text.toLocaleLowerCase().replace(/\s+/g, ' 
 // an item with a sentence nobody said): the secretary, with the person's own message, which says
 // what is quoted. Returns the message. Without a secretary there is no conversation to check
 // against and a relay is the agent's word, as it was.
-function assertSaidInHablar(ctx: Context, input: RelayInput, quote: string): number | undefined {
+function assertSaidInHablar(
+  ctx: Context,
+  input: RelayInput,
+  quote: string,
+  at: string,
+): number | undefined {
   const secretary = secretaryName(ctx.db);
   if (secretary === undefined) return undefined;
   if (input.via !== secretary) {
@@ -73,6 +79,19 @@ function assertSaidInHablar(ctx: Context, input: RelayInput, quote: string): num
       `Not relayed: message ${message.id} is not the person's: ${refer}`,
     );
   }
+  // What they typed, not what they tapped: a tap on a card's option is the secretary's own words.
+  if (message.choice !== null) {
+    throw new OteaError(
+      'quote_required',
+      `Not relayed: message ${message.id} is a tap on a question, not words the person wrote: ${refer}`,
+    );
+  }
+  if (Date.parse(at) - Date.parse(message.at) > RELAY_MESSAGE_MS) {
+    throw new OteaError(
+      'quote_required',
+      `Not relayed: message ${message.id} is more than a day old (words of the person's from the last 24 hours only): ${refer}`,
+    );
+  }
   if (!plainWords(message.text).includes(plainWords(quote))) {
     throw new OteaError(
       'quote_required',
@@ -80,6 +99,43 @@ function assertSaidInHablar(ctx: Context, input: RelayInput, quote: string): num
     );
   }
   return message.id;
+}
+
+// How long a message of the person's may be quoted by a relay.
+const RELAY_MESSAGE_MS = 24 * 3600_000;
+
+// A message of the person's backs one relay on an item: said once, it is not a standing order.
+function assertMessageUnused(ctx: Context, item: ItemRecord, message: number): void {
+  const used = selectEvents(ctx.db, item.id).some(
+    (event) => event.type === 'transitioned' && event.data.message === message,
+  );
+  if (used) {
+    throw new OteaError(
+      'quote_required',
+      `Not relayed: message ${message} was already relayed on ${item.id}; a message backs one relay of an item. Ask the person again.`,
+    );
+  }
+}
+
+// What a relay may never do, with a secretary or without one (adversarial review of S): drop,
+// finish or approve. Words an agent says the person said cannot do what is the person's alone or
+// cannot be taken back; the person taps a card (otea say --drop) or decides on the desk.
+function assertNotDestructive(
+  ctx: Context,
+  item: ItemRecord,
+  workflow: Workflow,
+  to: string,
+): void {
+  const board = liveBoardOf(ctx, item.collection);
+  const target = positionOf(to);
+  const from = positionOf(item.state);
+  const closes = isClosed(target) || closesOf(workflow, to) !== undefined;
+  const approving = board !== undefined && approves(board.def, from, target);
+  if (!closes && !approving) return;
+  throw new OteaError(
+    'forbidden',
+    `Not relayed: ${closes ? 'dropping or finishing' : 'approving'} ${item.id} is the person's alone, by their own tap, never by words relayed through an agent. Ask them: otea ask ${item.id} "<your question>"${closes ? ' (the secretary offers a card with otea say --drop)' : ''}, or they decide it on the desk or the phone.`,
+  );
 }
 
 // An item that waits for the person's review leaves it by their own tap (the desk's Devolver,
@@ -126,23 +182,31 @@ export function relayDecision(ctx: Context, input: RelayInput, now = systemClock
       'A relayed decision needs a quote of what the human said',
     );
   }
+  if (quote.split(/\s+/).length < 2) {
+    throw new OteaError(
+      'quote_required',
+      'A relayed decision needs a quote of two words or more: what the human said, not a bare yes',
+    );
+  }
   const { db } = ctx;
   return transaction(db, () => {
     const item = requireWritableItem(db, input.id);
     assertRelayOn(ctx, item);
-    const message = assertSaidInHablar(ctx, input, quote);
+    const message = assertSaidInHablar(ctx, input, quote, now());
     if (message !== undefined) assertNotInReview(ctx, item);
     const type = typeOfItem(ctx, item);
     const { workflow } = type;
     const { reason, via, channel } = input;
     const to = relayedState(ctx, item.collection, input.to, input.motive);
-    // On a board the engine says first: a discard the person makes only on the page, an approval
-    // whose parts are not finished.
+    // An item still in its agent's hands has no decision to relay: said first, with what to do.
+    assertRelayable(workflow, item, to);
+    assertNotDestructive(ctx, item, workflow, to);
+    if (message !== undefined) assertMessageUnused(ctx, item, message);
+    // On a board the engine says first: an approval whose parts are not finished.
     const note = assertMoveHandsOff(ctx, item, to, RELAYED_HUMAN, {
       ...(reason === undefined ? {} : { reason }),
       via: 'relay',
     });
-    assertRelayable(workflow, item, to);
     authorizeRelay(workflow, item.state, to, reason);
     assertCanLeave(type, item.state, to, item.fields);
     const at = now();

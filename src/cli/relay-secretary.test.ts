@@ -76,13 +76,13 @@ describe('relay attacks, through the command line and MCP', () => {
   it('refuses the secretary with no message of the person, or one that does not say it', async () => {
     const said = person('dejalo, me gusta');
 
-    const none = await sol('relay', 'CAM-1', 'Hacerlo', '--quote', 'dejalo', '--reason', 'x');
+    const none = await sol('relay', 'CAM-1', 'Hacerlo', '--quote', 'dejalo ya', '--reason', 'x');
     const wrong = await sol(
       'relay',
       'CAM-1',
       'Hacerlo',
       '--quote',
-      'tiralo',
+      'tiralo ya',
       '--reason',
       'x',
       '--from-message',
@@ -138,7 +138,7 @@ describe('relay attacks, through the command line and MCP', () => {
   });
 
   it('serves the same guards as an MCP tool', async () => {
-    const said = person('tiralo');
+    const said = person('tiralo ya');
     const server = createMcpServer(COMMANDS, { cwd: repo.dir, agent: 'intruso', warn: () => {} });
     const client = new Client({ name: 'test', version: '0' });
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
@@ -153,7 +153,7 @@ describe('relay attacks, through the command line and MCP', () => {
         arguments: {
           id: 'CAM-1',
           state: 'Dropped',
-          quote: 'tiralo',
+          quote: 'tiralo ya',
           reason: 'x',
           from_message: String(said.id),
         },

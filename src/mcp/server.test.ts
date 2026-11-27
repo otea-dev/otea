@@ -425,16 +425,8 @@ describe('mcp server', () => {
       expect(shown.hint).toContain(
         'TASKS-2 · Tarea · Completar, round 1\nYour turn: do this step.',
       );
-      expect(shown.relayable).toEqual([
-        {
-          to: 'dropped',
-          toName: 'Dropped',
-          by: 'human',
-          reasonRequired: true,
-          turn: 'none',
-          closes: 'discarded',
-        },
-      ]);
+      // A relay never drops: nothing is offered to relay on an item in its agent's hands.
+      expect(shown.relayable ?? []).toEqual([]);
     });
 
     it('returns the events after a cursor as an array of otea events --json lines', async () => {
@@ -548,12 +540,17 @@ describe('mcp server', () => {
     });
 
     it('relays a human decision with the quote', async () => {
-      const quote = 'Drop it, it is too vague';
-      await data('relay', { id: 'TASKS-2', state: 'dropped', quote, reason: 'Vague' });
+      const quote = 'Send it back, it is too vague';
+      declareProfiles(repo.dir, 'codex');
+      await otea('update', 'TASKS-2', '--description', 'D');
+      // Out of Completar, then the Hacerlo step into the person's review.
+      await otea('handoff', 'TASKS-2', '--as', 'codex');
+      await otea('handoff', 'TASKS-2', '--as', 'codex');
+      await data('relay', { id: 'TASKS-2', state: 'todo', quote, reason: 'Vague' });
 
       expect((await json('show', 'TASKS-2')).events.at(-1)).toMatchObject({
         actor: { kind: 'human', name: 'human' },
-        data: { to: 'dropped', quote, via: 'claude', source: 'conversation' },
+        data: { to: 'todo', quote, via: 'claude', source: 'conversation' },
       });
     });
   });
@@ -566,14 +563,18 @@ describe('mcp server', () => {
         description: 'D',
       });
       await data('handoff', { id });
-      await data('relay', { id: 'TASKS-2', state: 'dropped', quote: 'Drop it', reason: 'Vague' });
+      declareProfiles(repo.dir, 'codex');
+      await otea('update', 'TASKS-2', '--description', 'D');
+      await otea('handoff', 'TASKS-2', '--as', 'codex');
+      await otea('handoff', 'TASKS-2', '--as', 'codex');
+      await data('relay', { id: 'TASKS-2', state: 'todo', quote: 'Send it back', reason: 'Vague' });
 
       const channels = async (item: string) =>
         (await json('show', item)).events.map(
           ({ data }: { data: { channel?: string } }) => data.channel,
         );
       expect(await channels(id)).toEqual(['mcp', 'mcp']);
-      expect(await channels('TASKS-2')).toEqual(['cli', 'mcp']);
+      expect(await channels('TASKS-2')).toEqual(['cli', undefined, 'cli', 'cli', 'mcp']);
       expect((await otea('show', id)).out).toContain('created by agent:claude via mcp at ');
     });
 
@@ -637,18 +638,37 @@ describe('mcp server', () => {
         error: { ...cli.error, message: cli.error.message.replace('via cli', 'via mcp') },
       });
       expect(
-        JSON.parse(await errorOf('relay', { id: 'TASKS-1', state: 'done', quote: 'Yes' })),
+        JSON.parse(await errorOf('relay', { id: 'TASKS-1', state: 'done', quote: 'Yes sure' })),
       ).toMatchObject({ error: { code: 'forbidden' } });
+    });
+
+    it('refuses to relay a drop, as the CLI does: the person taps it', async () => {
+      declareProfiles(repo.dir, 'codex');
+      await otea('update', 'TASKS-2', '--description', 'D');
+      await otea('handoff', 'TASKS-2', '--as', 'codex');
+      await otea('handoff', 'TASKS-2', '--as', 'codex');
+
+      const text = await errorOf('relay', {
+        id: 'TASKS-2',
+        state: 'dropped',
+        quote: 'Drop it, it is too vague',
+        reason: 'Vague',
+      });
+
+      expect(JSON.parse(text).error.code).toBe('forbidden');
+      expect((await json('show', 'TASKS-2')).state).toBe('todo__review');
     });
 
     it('refuses to relay a decision on the agent’s own step, as the CLI does', async () => {
       await data('handoff', { id: 'TASKS-1' });
-      const relayed = { id: 'TASKS-1', state: 'todo', quote: 'dale', reason: 'Redo' };
+      const relayed = { id: 'TASKS-1', state: 'todo', quote: 'dale ya', reason: 'Redo' };
 
       const text = await errorOf('relay', relayed);
 
       expect(JSON.parse(text)).toEqual(
-        JSON.parse(await cliError('relay', 'TASKS-1', 'todo', '--quote', 'dale', '--reason', 'R')),
+        JSON.parse(
+          await cliError('relay', 'TASKS-1', 'todo', '--quote', 'dale ya', '--reason', 'R'),
+        ),
       );
       expect(JSON.parse(text).error.code).toBe('forbidden');
       expect((await json('show', 'TASKS-1')).state).toBe('todo__review');

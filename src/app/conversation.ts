@@ -40,6 +40,7 @@ import {
   selectKindNews,
   selectMessage,
   selectMessages,
+  selectOpenQuestions,
   selectPending,
   selectRootKind,
   selectTurn,
@@ -402,6 +403,10 @@ export function retractAnswer(project: Project, id: number, now: Clock = systemC
     };
     if (answer === undefined) return refuse('there is no answer to take back');
     if (question.action !== null) return refuse('its tap already did what the card says');
+    // A tap on an option only: what the person typed, or left to the secretary, is a message of
+    // their own.
+    if (answer.choice?.mode !== 'option')
+      return refuse('only a tap on one of its options is taken back, not words you wrote');
     if (answer.readAt !== null || answer.heardAt !== null)
       return refuse('the secretary already has your answer');
     if (Date.parse(now()) - Date.parse(answer.at) > RETRACT_ANSWER_MS)
@@ -445,12 +450,19 @@ export function linkMessageToItem(
     linkItems(project, message.root, [item], now());
     if (selectRootKind(project.db, message.root).kind === null)
       classify(project, message.root, 'request');
-    // The turn became an item: what the secretary asked about it is settled.
-    closeQuestions(project.db, { root: message.root }, now(), 'settled');
+    // The questions of this turn stay open: whether the item answers them is for the secretary to
+    // say (openQuestionsOfTurn tells it, and say --withdraw closes one), not for Otea to guess.
     // Making an item out of a turn is acting on it, whether or not it was read.
     clearKindNews(project.db, [message.root]);
     return requireMessage(project, messageId);
   });
+}
+
+// The secretary's questions still waiting for the person in a turn, by message id.
+export function openQuestionsOfTurn(project: Project, root: number): number[] {
+  return selectOpenQuestions(project.db)
+    .filter((question) => question.root === root)
+    .map(({ id }) => id);
 }
 
 // The message an item may be made from: the secretary's to ask, and a message of the person's turn

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, vi } from 'vitest';
 import { addCollection } from '../app/collections.ts';
 import { openProject } from '../app/project.ts';
-import { saveProfile } from '../store/queries.ts';
+import { saveProfile, updateItemState } from '../store/queries.ts';
 import type { Opener } from './opener.ts';
 import { type Io, run } from './run.ts';
 
@@ -241,6 +241,17 @@ export function presetCollection(cwd: string, name: string, preset = 'tasks'): v
   const project = openProject(cwd);
   try {
     addCollection(project, { name, preset });
+  } finally {
+    project.db.close();
+  }
+}
+
+// An item discarded, the way the person's tap on the desk leaves it: no command of an agent drops an
+// item for good (a relay never does), so tests that need a closed one set it here.
+export function dropItemDirectly(cwd: string, id: string, state = 'dropped'): void {
+  const project = openProject(cwd);
+  try {
+    updateItemState(project.db, id, state, new Date().toISOString());
   } finally {
     project.db.close();
   }

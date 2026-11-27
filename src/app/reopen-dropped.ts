@@ -50,7 +50,10 @@ export function reopenDropped(
       );
     }
     const { workflow } = typeOfItem(ctx, item);
-    const back = last.data.from;
+    // Where it was, if the board still has that state; a step the board lost since (it was edited
+    // or replaced) puts the item back at the first step instead of nowhere.
+    const left = last.data.from;
+    const back = workflow.states.some(({ name }) => name === left) ? left : workflow.initial;
     const at = now();
     updateItemState(db, item.id, back, at);
     appendEvent(db, {

@@ -57,8 +57,10 @@ import {
   linkMessageToItem,
   messageFileAt,
   messageIdOf,
+  openQuestionsOfTurn,
   readAsSecretary,
   requireLinkableMessage,
+  requireMessage,
   turnsOfItem,
   withdrawQuestion,
 } from '../app/conversation.ts';
@@ -1304,9 +1306,18 @@ const create: Command = {
       });
       // On a board: where it starts, and why when its first step was skipped or lacks something.
       const started = createdTextOf(project, item) ?? item.id;
+      // Questions of that turn are not closed by an item: say which stay open.
+      const open =
+        message === undefined
+          ? []
+          : openQuestionsOfTurn(project, requireMessage(project, message).root);
+      const stays =
+        open.length === 0
+          ? ''
+          : `\nYour question${open.length === 1 ? '' : 's'} ${open.join(', ')} in that turn still wait${open.length === 1 ? 's' : ''} for the person: if ${item.id} answers ${open.length === 1 ? 'it' : 'them'}, take ${open.length === 1 ? 'it' : 'them'} back with otea say --withdraw <id>.`;
       return {
         data: { ...itemData(project, item), ...(filed ? { bandeja: filed.ref } : {}) },
-        text: filed ? `${started}\nFiled ${filed.ref} under ${item.id}.` : started,
+        text: `${filed ? `${started}\nFiled ${filed.ref} under ${item.id}.` : started}${stays}`,
       };
     });
   },

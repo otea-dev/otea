@@ -17,7 +17,7 @@ import {
   tempGitRepo,
 } from './testing.ts';
 
-const QUOTE = 'Discard it, the old flow is gone';
+const QUOTE = 'Send it back, the old flow is wrong';
 const USAGE =
   'Usage: otea relay <id> <state> --quote <what the human said> [--from-message <id>] [--reason <reason>]';
 
@@ -27,6 +27,8 @@ function tasksBoard(dir: string): void {
   presetCollection(dir, 'tasks');
 }
 
+// A relay is words an agent says the person said, so it moves nothing for good: on the tasks board
+// the person's review leaves by a send-back (todo), never by a drop or an approval.
 describe('relay', () => {
   let repo: TempRepo;
   let otea: Cli;
@@ -48,16 +50,16 @@ describe('relay', () => {
   afterEach(() => repo.remove());
 
   it('moves the item as the human via the agent and prints it as a list row', async () => {
-    const result = await otea('relay', 'TASKS-1', 'dropped', '--quote', QUOTE, '--reason', 'Gone');
+    const result = await otea('relay', 'TASKS-1', 'todo', '--quote', QUOTE, '--reason', 'Redo');
 
-    expect(result).toMatchObject({ code: 0, out: 'TASKS-1  Dropped  none  Old flow\n' });
+    expect(result).toMatchObject({ code: 0, out: 'TASKS-1  Hacerlo  agent  Old flow\n' });
     expect((await json('show', 'TASKS-1')).events.at(-1)).toMatchObject({
       type: 'transitioned',
       actor: { kind: 'human', name: 'human' },
       data: {
         from: 'todo__review',
-        to: 'dropped',
-        reason: 'Gone',
+        to: 'todo',
+        reason: 'Redo',
         channel: 'cli',
         via: 'claude',
         source: 'conversation',
@@ -67,43 +69,33 @@ describe('relay', () => {
   });
 
   it('names the relaying agent with --as', async () => {
-    await otea(
-      'relay',
-      'TASKS-1',
-      'dropped',
-      '--quote',
-      QUOTE,
-      '--reason',
-      'Gone',
-      '--as',
-      'gemini',
-    );
+    await otea('relay', 'TASKS-1', 'todo', '--quote', QUOTE, '--reason', 'Redo', '--as', 'gemini');
 
     expect((await json('show', 'TASKS-1')).events.at(-1).data.via).toBe('gemini');
   });
 
   it('shows the relay and the quote in the timeline of show', async () => {
-    await otea('relay', 'TASKS-1', 'dropped', '--quote', QUOTE, '--reason', 'Gone');
+    await otea('relay', 'TASKS-1', 'todo', '--quote', QUOTE, '--reason', 'Redo');
 
     expect((await otea('show', 'TASKS-1')).out).toMatch(
-      /relay:claude +transitioned {2}Hacerlo \(en revisión\) -> Dropped \(Gone\), relayed by claude, quoting "Discard it, the old flow is gone"$/m,
+      /relay:claude +transitioned {2}Hacerlo \(en revisión\) -> Hacerlo \(Redo\), relayed by claude, quoting "Send it back, the old flow is wrong"$/m,
     );
   });
 
   it('never shows a relayed decision as the person’s own', async () => {
-    await otea('relay', 'TASKS-1', 'dropped', '--quote', QUOTE, '--reason', 'Gone');
+    await otea('relay', 'TASKS-1', 'todo', '--quote', QUOTE, '--reason', 'Redo');
 
     expect((await otea('show', 'TASKS-1')).out).not.toMatch(/human:human +transitioned/);
   });
 
   it('prints the moved item with --json', async () => {
-    const item = await json('relay', 'TASKS-1', 'dropped', '--quote', QUOTE, '--reason', 'x');
+    const item = await json('relay', 'TASKS-1', 'todo', '--quote', QUOTE, '--reason', 'x');
 
-    expect(item).toMatchObject({ id: 'TASKS-1', state: 'dropped', turn: 'none' });
+    expect(item).toMatchObject({ id: 'TASKS-1', state: 'todo', turn: 'agent' });
   });
 
   it('requires --quote, with the usage', async () => {
-    const { code, err } = await otea('relay', 'TASKS-1', 'dropped', '--reason', 'Gone');
+    const { code, err } = await otea('relay', 'TASKS-1', 'todo', '--reason', 'Redo');
 
     expect(code).toBe(2);
     expect(err).toContain('Missing --quote for "otea relay"');
@@ -111,34 +103,33 @@ describe('relay', () => {
   });
 
   it('refuses a blank quote with quote_required (exit 2)', async () => {
-    const { code, err } = await otea('relay', 'TASKS-1', 'dropped', '--quote', ' ', '--json');
+    const { code, err } = await otea('relay', 'TASKS-1', 'todo', '--quote', ' ', '--json');
 
     expect(code).toBe(2);
     expect(JSON.parse(err).error.code).toBe('quote_required');
     expect((await json('show', 'TASKS-1')).state).toBe('todo__review');
   });
 
-  it('requires --reason when the transition does (exit 2)', async () => {
-    const { code, err } = await otea('relay', 'TASKS-1', 'dropped', '--quote', QUOTE);
+  it('refuses a one-word quote: a bare yes is no decision', async () => {
+    const { code, err } = await otea('relay', 'TASKS-1', 'todo', '--quote', 'yes', '--json');
 
     expect(code).toBe(2);
-    expect(err).toContain('Not dropped TASKS-1: say why with --reason.');
+    expect(JSON.parse(err).error.code).toBe('quote_required');
+    expect((await json('show', 'TASKS-1')).state).toBe('todo__review');
   });
 
-  it('refuses a human-ui transition with forbidden (exit 7), pointing to the web UI', async () => {
-    const { code, err } = await otea('relay', 'TASKS-1', 'done', '--quote', 'Approved', '--json');
+  it('refuses to drop or finish with any quote, in review or not: the person taps it (U8)', async () => {
+    for (const to of ['dropped', 'done']) {
+      const { code, err } = await otea('relay', 'TASKS-1', to, '--quote', QUOTE, '--reason', 'x');
 
-    expect(code).toBe(7);
-    expect(JSON.parse(err).error).toEqual({
-      code: 'forbidden',
-      message:
-        'Moving from "Hacerlo (en revisión)" to "Done" requires human-ui authority (a human in the web UI) and cannot be relayed; the person gives it themselves on the desk or the phone: ask them with otea ask',
-    });
+      expect(code).toBe(7);
+      expect(err).toMatch(/person's alone|requires human-ui/);
+    }
     expect((await json('show', 'TASKS-1')).state).toBe('todo__review');
   });
 
   it('refuses an agent transition with not_relayable (exit 4), pointing to otea move', async () => {
-    const { code, err } = await otea('relay', 'TASKS-2', 'todo__review', '--quote', 'Go ahead');
+    const { code, err } = await otea('relay', 'TASKS-2', 'todo__review', '--quote', 'Go ahead now');
 
     expect(code).toBe(4);
     expect(err).toContain('make it with "otea move"');
@@ -146,42 +137,31 @@ describe('relay', () => {
 
   // P8-F5: 'Cannot move from "Hacerlo" to "Hacerlo"' said nothing of why: a send-back is relayed
   // only while the person reviews the step, and this one is still the agent's.
-  it.each(['todo', 'done'])(
-    'says why an item still in its agent’s hands is not relayed to %s, and what to do',
-    async (to) => {
-      const { code, err } = await otea('relay', 'TASKS-2', to, '--quote', 'Send it back');
+  it('says why an item still in its agent’s hands is not relayed to todo, and what to do', async () => {
+    const { code, err } = await otea('relay', 'TASKS-2', 'todo', '--quote', 'Send it back');
 
-      expect(code).toBe(4);
-      expect(err).not.toContain('Cannot move');
-      expect(err).toContain('Not relayed: TASKS-2 is not in review, it is at Hacerlo');
-      expect(err).toContain(
-        'a send-back or an approval is relayed only while the person reviews it',
-      );
-      expect(err).toContain('otea handoff TASKS-2');
-      expect(err).toContain('a relay can only move it to Dropped now');
-    },
-  );
+    expect(code).toBe(4);
+    expect(err).not.toContain('Cannot move');
+    expect(err).toContain('Not relayed: TASKS-2 is not in review, it is at Hacerlo');
+    expect(err).toContain('a send-back or an approval is relayed only while the person reviews it');
+    expect(err).toContain('otea handoff TASKS-2');
+  });
 
   it('fails as usual for an invalid transition or an unknown item', async () => {
-    expect((await otea('relay', 'TASKS-2', 'done', '--quote', 'Done')).code).toBe(4);
-    expect((await otea('relay', 'TASKS-9', 'dropped', '--quote', 'x', '--reason', 'x')).code).toBe(
-      3,
-    );
+    expect((await otea('relay', 'TASKS-2', 'done', '--quote', 'Done now')).code).toBe(4);
+    expect(
+      (await otea('relay', 'TASKS-9', 'todo', '--quote', 'not there', '--reason', 'x')).code,
+    ).toBe(3);
   });
 
   it('is not blocked by a lease another agent holds, and releases it', async () => {
-    await otea('claim', 'TASKS-2', '--as', 'codex');
+    await otea('claim', 'TASKS-1', '--as', 'quill');
 
-    const result = await otea('relay', 'TASKS-2', 'dropped', '--quote', QUOTE, '--reason', 'x');
+    const result = await otea('relay', 'TASKS-1', 'todo', '--quote', QUOTE, '--reason', 'x');
 
     expect(result.code).toBe(0);
-    const item = await json('show', 'TASKS-2');
-    expect(item.lease).toBeNull();
-    expect(item.events.at(-1)).toMatchObject({
-      type: 'released',
-      actor: { kind: 'human', name: 'human' },
-      data: { holder: 'codex', cause: 'handoff', via: 'claude' },
-    });
+    const item = await json('show', 'TASKS-1');
+    expect(item.state).toBe('todo');
   });
 });
 
@@ -209,7 +189,7 @@ describe('relay of a decision on the agent’s own step', () => {
       'TASKS-1',
       'todo',
       '--quote',
-      'dale',
+      'dale ya',
       '--reason',
       'Redo',
       '--json',
@@ -226,24 +206,50 @@ describe('relay of a decision on the agent’s own step', () => {
   });
 
   it('refuses any human decision on it, a discard included', async () => {
-    const { code } = await otea('relay', 'TASKS-1', 'dropped', '--quote', 'drop', '--reason', 'x');
+    const { code } = await otea(
+      'relay',
+      'TASKS-1',
+      'dropped',
+      '--quote',
+      'drop it',
+      '--reason',
+      'x',
+    );
 
     expect(code).toBe(7);
     expect((await json('show', 'TASKS-1')).state).toBe('todo__review');
   });
 
   it('lets another agent relay it', async () => {
-    const relayed = ['relay', 'TASKS-1', 'todo', '--quote', 'redo', '--reason', 'Redo'];
+    const relayed = ['relay', 'TASKS-1', 'todo', '--quote', 'redo it', '--reason', 'Redo'];
 
     expect((await otea(...relayed, '--as', 'codex')).code).toBe(0);
     expect((await json('show', 'TASKS-1')).state).toBe('todo');
   });
 
   it('lets the agent relay again once a new round of the step is handed off by another', async () => {
-    await otea('relay', 'TASKS-1', 'todo', '--quote', 'redo', '--reason', 'Redo', '--as', 'codex');
+    await otea(
+      'relay',
+      'TASKS-1',
+      'todo',
+      '--quote',
+      'redo it',
+      '--reason',
+      'Redo',
+      '--as',
+      'codex',
+    );
     await otea('handoff', 'TASKS-1', '--note', 'Redone', '--as', 'codex');
 
-    const { code } = await otea('relay', 'TASKS-1', 'todo', '--quote', 'again', '--reason', 'R');
+    const { code } = await otea(
+      'relay',
+      'TASKS-1',
+      'todo',
+      '--quote',
+      'again please',
+      '--reason',
+      'R',
+    );
 
     expect(code).toBe(0);
   });
@@ -254,7 +260,7 @@ describe('relay by an agent that worked the step but did not hand it off', () =>
   let otea: Cli;
 
   const relay = (...extra: string[]) =>
-    otea('relay', 'TASKS-1', 'todo', '--quote', 'redo', '--reason', 'Redo', ...extra);
+    otea('relay', 'TASKS-1', 'todo', '--quote', 'redo it', '--reason', 'Redo', ...extra);
 
   const seeded = seedOnce(async (seed, dir) => {
     tasksBoard(dir);
@@ -356,13 +362,31 @@ describe('relay on the review of a step that leads to what lands or closes', () 
     expect(offered.length).toBeGreaterThan(0);
   });
 
+  it('refuses a relayed drop of the same review, with any quote', async () => {
+    const { code, err } = await otea(
+      'relay',
+      'CAM-1',
+      'Dropped',
+      '--quote',
+      'tiralo ya, no va',
+      '--reason',
+      'x',
+      '--motive',
+      'Ya no hace falta',
+    );
+
+    expect(code).toBe(7);
+    expect(err).toContain("person's alone");
+    expect(JSON.parse((await otea('show', 'CAM-1', '--json')).out).state).toBe(inReview);
+  });
+
   it('still relays a send-back from the same review', async () => {
     const { code, err } = await otea(
       'relay',
       'CAM-1',
       'Hacerlo',
       '--quote',
-      'devuélvelo',
+      'devuélvelo ya',
       '--reason',
       'Falta el carro',
     );
@@ -377,6 +401,7 @@ describe('relay on a board that turned it off', () => {
   let repo: TempRepo;
   let otea: Cli;
 
+  // A bug waiting for the person's review on Errores, which may take relays or not.
   async function bugOn(relay: boolean): Promise<string> {
     repo = tempGitRepo();
     otea = cliAt(repo.dir, { OTEA_AGENT: 'claude' });
@@ -395,7 +420,7 @@ describe('relay on a board that turned it off', () => {
   }
 
   const discard = (id: string) =>
-    otea('relay', id, 'Dropped', '--motive', 'Duplicado', '--quote', 'tíralo', '--reason', 'x');
+    otea('relay', id, 'Dropped', '--motive', 'Duplicado', '--quote', 'tíralo ya', '--reason', 'x');
 
   afterEach(() => repo.remove());
 
@@ -416,10 +441,13 @@ describe('relay on a board that turned it off', () => {
     expect((await otea('show', id)).out).not.toContain('Agent can relay to:');
   });
 
-  it('relays as ever on a board that keeps it on', async () => {
+  it('refuses a drop even on a board that keeps relay on: the person taps it', async () => {
     const id = await bugOn(true);
 
-    expect((await discard(id)).code).toBe(0);
+    const { code, err } = await discard(id);
+
+    expect(code).toBe(7);
+    expect(err).toContain("person's alone");
   });
 });
 

@@ -50,24 +50,26 @@ describe('a drop the person asked for in the chat', () => {
 
   afterEach(() => repo.remove());
 
-  it('names the relay of their words, which drops it as printed', async () => {
+  it('names how to ask the person, since a relay never drops', async () => {
     const refused = await otea('drop', 'CAM-1', '--reason', 'ya no hace falta');
     expect(refused.code).toBe(7);
     expect(refused.err).toContain(
-      'Not dropped CAM-1: only the person drops items here. If the person told you to drop it, relay their decision in their words: otea relay CAM-1 Dropped --quote "<the person\'s words>" --reason "<why>" --motive "Rechazado|Duplicado|Ya no hace falta"',
+      'Not dropped CAM-1: only the person drops items here. If the person may want it dropped, ask them with otea ask CAM-1 "<your question>"; the secretary offers them a card to tap (otea say --drop CAM-1), and a relayed sentence never drops an item.',
     );
 
+    // A relay never drops, with the person's words or without them.
     const relayed = await otea(
       'relay',
       'CAM-1',
       'Dropped',
       '--quote',
-      'descártalo',
+      'descártalo ya',
       '--reason',
       'ya no hace falta',
       '--motive',
       'Ya no hace falta',
     );
-    expect(relayed.code, relayed.err).toBe(0);
+    expect(relayed.code).toBe(7);
+    expect(relayed.err).toContain("person's alone");
   });
 });

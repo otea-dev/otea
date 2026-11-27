@@ -394,7 +394,7 @@ describe('relations', () => {
       expect(getItem(ctx, 'WORK-1').state).toBe('review');
     });
 
-    it('is refused for a relayed decision too', () => {
+    it('is refused for a relayed decision too: a relay never finishes an item at all', () => {
       const relay = () =>
         relayDecision(ctx, {
           id: 'WORK-1',
@@ -404,7 +404,8 @@ describe('relations', () => {
           quote: 'Ship the wolf',
         });
 
-      expect(codeOf(relay)).toBe('children_open');
+      expect(codeOf(relay)).toBe('forbidden');
+      expect(getItem(ctx, 'WORK-1').state).toBe('review');
     });
 
     it('goes through once every child is closed, and never on its own', () => {

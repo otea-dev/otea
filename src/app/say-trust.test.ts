@@ -5,7 +5,9 @@ import { addCollection } from './collections.ts';
 import {
   answerSecretaryQuestion,
   correctKind,
+  linkMessageToItem,
   listConversation,
+  openQuestionsOfTurn,
   postPersonMessage,
   retractAnswer,
   sayAsSecretary,
@@ -119,6 +121,13 @@ describe('what the secretary says and asks', () => {
       expect(() => retractAnswer(project, question.id, now)).toThrow(/already has your answer/);
     });
 
+    it('is not taken back when it was words the person wrote, only a tap on an option', () => {
+      const question = asked();
+      answerSecretaryQuestion(project, question.id, { text: 'mejor la explico aquí' }, now);
+
+      expect(() => retractAnswer(project, question.id, now)).toThrow(/only a tap/);
+    });
+
     it('names no option that is not there', () => {
       expect(() =>
         sayAsSecretary(
@@ -169,6 +178,29 @@ describe('what the secretary says and asks', () => {
       correctKind(project, wrote.id, 'request');
 
       expect(waiting()).toEqual([]);
+    });
+
+    it('stays open when an item is made from its turn: the secretary says if the item answers it', () => {
+      const wrote = postPersonMessage(project, { text: 'agrega /health' }, now).message;
+      const question = ask('¿Lo anoto?', { replyTo: wrote.id });
+
+      linkMessageToItem(project, 'sol', wrote.id, made('Health'), now);
+
+      expect(waiting()).toEqual([question.id]);
+      expect(openQuestionsOfTurn(project, wrote.root)).toEqual([question.id]);
+    });
+
+    it('is not closed by a move that is no tap of the person’s: a terminal or a relay says nothing they did', () => {
+      const id = made('Cancha');
+      ask('¿Por cancha también?', { links: [id] });
+
+      moveItem(
+        project,
+        { id, to: 'in_progress', actor: { kind: 'human', name: 'human' }, channel: 'cli' },
+        now,
+      );
+
+      expect(waiting()).toHaveLength(1);
     });
 
     it('closes when the person moves the item it is about', () => {

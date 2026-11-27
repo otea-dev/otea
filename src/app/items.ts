@@ -509,8 +509,10 @@ export function landMove(
   if (actor.kind === 'agent')
     signalReview(ctx, item, { to, turn: turnOf(workflow, to), board }, at);
   // What the person settled by moving the item is no longer asked: the secretary's questions about
-  // it stop waiting for them (they kept counting in Te espera after the item was sent back).
-  else closeQuestions(db, { item: item.id }, at, 'settled');
+  // it stop waiting for them (they kept counting in Te espera after the item was sent back). Only
+  // the person's own move on the desk or the phone settles anything: a relay, or a terminal, says
+  // nothing the person did.
+  else if (data.channel === 'ui') closeQuestions(db, { item: item.id }, at, 'settled');
   const moved = { ...item, state: to, updatedAt: at, lease: handoff ? null : item.lease };
   return present(moved, workflow, at);
 }
