@@ -42,7 +42,7 @@ import {
   selectTurnsOfItem,
   setKind,
 } from '../store/conversation.ts';
-import { transaction } from '../store/database.ts';
+import { joinTransaction, transaction } from '../store/database.ts';
 import type { Context } from './context.ts';
 import { evidenceFile, namedReadPath, readEvidence, storeFile } from './evidence.ts';
 import { type Clock, requireItem, systemClock } from './items.ts';
@@ -339,7 +339,7 @@ export function linkMessageToItem(
   now: Clock = systemClock,
 ): Message {
   const message = requireLinkableMessage(project, agent, messageId);
-  return transaction(project.db, () => {
+  return joinTransaction(project.db, () => {
     linkItems(project, message.root, [item], now());
     if (selectRootKind(project.db, message.root).kind === null)
       classify(project, message.root, 'request');

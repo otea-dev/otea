@@ -1270,23 +1270,30 @@ const create: Command = {
       // The message too, and that this agent may link it: only the secretary does.
       const message = fromMessage === undefined ? undefined : messageIdOf(fromMessage);
       if (message !== undefined) requireLinkableMessage(project, actor.name, message);
-      const item = createItem(project, {
-        collection,
-        ...(type === undefined ? {} : { type }),
-        title,
-        fields,
-        ...(parent === undefined ? {} : { parent }),
-        actor,
-        channel,
-        ...(input.unnamedTerminal ? { via: 'terminal' as const } : {}),
+      // The item, what it came from and the note filed under it are one step: a note that cannot be
+      // filed (its hold ran out meanwhile) leaves no item behind for a retry to duplicate.
+      const { item, filed } = transaction(project.db, () => {
+        const made = createItem(project, {
+          collection,
+          ...(type === undefined ? {} : { type }),
+          title,
+          fields,
+          ...(parent === undefined ? {} : { parent }),
+          actor,
+          channel,
+          ...(input.unnamedTerminal ? { via: 'terminal' as const } : {}),
+        });
+        if (topic) linkTopic(project, { id: topic.id, item: made.id, via: 'from' });
+        if (message !== undefined) linkMessageToItem(project, actor.name, message, made.id);
+        // The entry is filed under the item it became: its wait ends.
+        return {
+          item: made,
+          filed:
+            entry === undefined
+              ? undefined
+              : fileBandeja(project, { id: entry, agent: actor.name, item: made.id }),
+        };
       });
-      if (topic) linkTopic(project, { id: topic.id, item: item.id, via: 'from' });
-      if (message !== undefined) linkMessageToItem(project, actor.name, message, item.id);
-      // The entry is filed under the item it became: its wait ends.
-      const filed =
-        entry === undefined
-          ? undefined
-          : fileBandeja(project, { id: entry, agent: actor.name, item: item.id });
       // On a board: where it starts, and why when its first step was skipped or lacks something.
       const started = createdTextOf(project, item) ?? item.id;
       return {

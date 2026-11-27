@@ -13,7 +13,7 @@ import type { Surface } from '../core/surface.ts';
 import { itemMoves } from '../core/views.ts';
 import { type Closing, closesOf, type Turn, turnOf, type Workflow } from '../core/workflow.ts';
 import { findBoardOfCollection } from '../store/boards.ts';
-import { transaction } from '../store/database.ts';
+import { joinTransaction, transaction } from '../store/database.ts';
 import {
   appendEvent,
   archivedBoardOf,
@@ -209,7 +209,7 @@ export function insertNewItem(
 }
 
 export function createItem(ctx: Context, input: CreateItemInput, now = systemClock): Item {
-  return transaction(ctx.db, () => insertNewItem(ctx, input, now()).created);
+  return joinTransaction(ctx.db, () => insertNewItem(ctx, input, now()).created);
 }
 
 // `availableTo` hides items whose active lease is held by anyone other than that actor; `parent`

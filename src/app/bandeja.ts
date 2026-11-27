@@ -37,7 +37,7 @@ import {
   selectEntryRow,
   selectEntryRows,
 } from '../store/bandeja.ts';
-import { transaction } from '../store/database.ts';
+import { joinTransaction, transaction } from '../store/database.ts';
 import { findItem } from '../store/queries.ts';
 import { saveRole, selectRoles } from '../store/secretary.ts';
 import type { Context } from './context.ts';
@@ -549,13 +549,14 @@ export function answerBandeja(
 }
 
 // The entry became an item: the refiner that holds it files it under the item, which ends the
-// entry's wait. `otea create --from-bandeja` calls this once the item is made.
+// entry's wait. `otea create --from-bandeja` calls this in the transaction that makes the item, so a
+// note that cannot be filed leaves no item behind.
 export function fileBandeja(
   project: Project,
   input: { id: number; agent: string; item: string },
   now: Clock = systemClock,
 ): BandejaEntry {
-  return transaction(project.db, () => {
+  return joinTransaction(project.db, () => {
     const at = now();
     requireHold(project, input.id, input.agent, at);
     const item = requireItem(project.db, input.item).id;
