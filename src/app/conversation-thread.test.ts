@@ -124,7 +124,7 @@ describe('the conversation as a thread', () => {
         clock(2000),
       );
       expect(answered.message.links).toEqual([made]);
-      expect(answered.warnings.join(' ')).toMatch(new RegExp(`${fromNote}.*Bandeja`, 's'));
+      expect(answered.warnings.join(' ')).toMatch(new RegExp(`${fromNote}.*Inbox`, 's'));
       expect(turnsOfItem(project, fromNote)).toEqual([]);
       // A notice may mention it all the same.
       const notice = sayAsSecretary(

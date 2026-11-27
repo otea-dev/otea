@@ -62,7 +62,7 @@ describe('the Bandeja: closing, and one refiner taking the next note', () => {
       expect((await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1')).code).toBe(13);
       const all = await otea('bandeja', '--all', '--as', 'lia');
       expect(all.out).toContain('closed by sol: the same as CAM-1');
-      expect((await otea('bandeja', '--as', 'lia')).out).toContain('The Bandeja is empty');
+      expect((await otea('bandeja', '--as', 'lia')).out).toContain('The Inbox is empty');
     });
 
     it('wants a reason, and is the secretary’s or the holder’s', async () => {

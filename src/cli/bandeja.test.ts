@@ -56,7 +56,7 @@ describe('the Bandeja from the refiner', () => {
 
   describe('reading and taking', () => {
     it('lists what waits, and one entry whole with a path to each file', async () => {
-      expect((await otea('bandeja', '--as', 'lia')).out).toContain('The Bandeja is empty');
+      expect((await otea('bandeja', '--as', 'lia')).out).toContain('The Inbox is empty');
       const sent = capture('the Aprobar button is hidden on the phone', [
         { filename: 'phone.png', bytes: Buffer.from('png-bytes') },
       ]);
@@ -183,7 +183,7 @@ describe('the Bandeja from the refiner', () => {
 
       const shown = await otea('show', item.id, '--as', 'worker');
       expect(shown.out).toContain(
-        'Refined from the Bandeja, B-1: "the Aprobar button is hidden on the phone"',
+        'Refined from the Inbox, B-1: "the Aprobar button is hidden on the phone"',
       );
       const json = JSON.parse((await otea('show', item.id, '--as', 'worker', '--json')).out);
       expect(json.fromBandeja).toMatchObject({ ref: 'B-1', snippet: expect.any(String) });
@@ -245,7 +245,7 @@ describe('the Bandeja from the refiner', () => {
         'lia',
       );
       expect(noteAsked.code).toBe(3);
-      expect(noteAsked.err).toContain('B-2 is not in the Bandeja');
+      expect(noteAsked.err).toContain('B-2 is not in the Inbox');
     });
   });
 

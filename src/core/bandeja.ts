@@ -80,7 +80,7 @@ export function bandejaIdOf(text: string): number {
   if (!Number.isInteger(id) || id < 1) {
     throw new OteaError(
       'invalid_fields',
-      `Not a Bandeja entry: ${text}. Pass its number, such as B-3 (otea bandeja lists them)`,
+      `Not an Inbox entry: ${text}. Pass its number, such as B-3 (otea bandeja lists them)`,
     );
   }
   return id;

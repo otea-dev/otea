@@ -424,7 +424,7 @@ describe('the conversation from the secretary', () => {
       );
 
       expect(code).not.toBe(0);
-      expect(err).toContain('a message or a Bandeja note, not both');
+      expect(err).toContain('a message or an Inbox note, not both');
       expect(JSON.parse((await otea('list', '--as', 'sol', '--json')).out)).toEqual([]);
     });
 

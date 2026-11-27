@@ -58,7 +58,7 @@ export function prefixFor(collectionName: string): string {
   if (prefix === BANDEJA_PREFIX) {
     throw new OteaError(
       'invalid_name',
-      `"${collectionName}" would give its items the prefix ${BANDEJA_PREFIX}, which the Bandeja keeps for its entries (B-3): give the board a longer name`,
+      `"${collectionName}" would give its items the prefix ${BANDEJA_PREFIX}, which the Inbox keeps for its entries (B-3): give the board a longer name`,
     );
   }
   return prefix;

@@ -1267,7 +1267,7 @@ const create: Command = {
     'from-bandeja': {
       placeholder: 'B-n',
       about:
-        'refiner: the Bandeja entry you hold (B-3) this item refines; it is filed under the item',
+        'refiner: the Inbox entry you hold (B-3) this item refines; it is filed under the item',
     },
   },
   execute: async (input) => {
@@ -1280,7 +1280,7 @@ const create: Command = {
     const fromBandeja = input.option('from-bandeja');
     if (fromMessage !== undefined && fromBandeja !== undefined) {
       throw new UsageError(
-        'An item comes from a message or a Bandeja note, not both: give --from-message or --from-bandeja',
+        'An item comes from a message or an Inbox note, not both: give --from-message or --from-bandeja',
       );
     }
     const fields = await fieldsFrom(input);
@@ -1490,7 +1490,7 @@ const show: Command = {
         fromMessageLine(fromMessages),
         fromBandeja === undefined
           ? undefined
-          : `Refined from the Bandeja, ${fromBandeja.ref}: "${fromBandeja.snippet}". Read the whole note with otea bandeja ${fromBandeja.ref}.`,
+          : `Refined from the Inbox, ${fromBandeja.ref}: "${fromBandeja.snippet}". Read the whole note with otea bandeja ${fromBandeja.ref}.`,
         // U5: the request was rewritten while its delivery waits for review.
         shown.requestChanged ? requestChangedText(shown.requestChanged) : undefined,
         mergedOutsideLine(project, input.cwd, shown),
@@ -1823,7 +1823,7 @@ function projectRolePrompt(
 const promptCommand: Command = {
   name: 'prompt',
   summary:
-    "Print what to paste into an agent's chat: start (a new project: set up, connect, read the project, interview you to understand what you need, one question at a time, tell you plainly whether a template fits, fits with changes, needs a board of its own or Otea is not a good fit, and draft its boards), join (one more agent working the boards there are, named from the project now) or design (one more board); without one, start until the project has boards of its own, then join. Or --role secretary (the chat you talk to: it answers you shortly, turns requests into items on boards, keeps workers and a refiner running, never doing an item itself), --role worker --board <name> [--as <name>] (what the secretary gives each worker, or you paste into a new chat; without --as it tells the worker to pick a name with otea whoami) or --role refiner [--as <name>] (turns the Bandeja's rough notes into items). --lang en|es (default: the project's language, set when it was made; with no project yet, the one you use: the desk's, else this computer's, else English)",
+    "Print what to paste into an agent's chat: start (a new project: set up, connect, read the project, interview you to understand what you need, one question at a time, tell you plainly whether a template fits, fits with changes, needs a board of its own or Otea is not a good fit, and draft its boards), join (one more agent working the boards there are, named from the project now) or design (one more board); without one, start until the project has boards of its own, then join. Or --role secretary (the chat you talk to: it answers you shortly, turns requests into items on boards, keeps workers and a refiner running, never doing an item itself), --role worker --board <name> [--as <name>] (what the secretary gives each worker, or you paste into a new chat; without --as it tells the worker to pick a name with otea whoami) or --role refiner [--as <name>] (turns the Inbox's rough notes into items). --lang en|es (default: the project's language, set when it was made; with no project yet, the one you use: the desk's, else this computer's, else English)",
   args: ['moment?'],
   options: {
     lang: { placeholder: 'en|es' },
@@ -2996,7 +2996,7 @@ async function waitForSecretary(input: Input): Promise<Output> {
 const wait: Command = {
   name: 'wait',
   summary:
-    'Wait until an item is on the turn and print it as a list row, at once if one already is; the one waiting longest in its state comes first. A note from the person on an item you hold, or their answer to your question, wakes it too, saying which. --secretary, instead of --turn, is the secretary wait: it wakes for the person, a Bandeja note, an escalated question, an item that reached their review or board work nobody hears',
+    'Wait until an item is on the turn and print it as a list row, at once if one already is; the one waiting longest in its state comes first. A note from the person on an item you hold, or their answer to your question, wakes it too, saying which. --secretary, instead of --turn, is the secretary wait: it wakes for the person, an Inbox note, an escalated question, an item that reached their review or board work nobody hears',
   args: [],
   options: {
     // Required unless --secretary: checked in execute.
@@ -3658,7 +3658,7 @@ const tick: Command = {
 const ask: Command = {
   name: 'ask',
   summary:
-    'Ask the person a question while you do a step: the turn is theirs until they answer (the step, round and lease stay); wait wakes on the answer, and next and show give it. Offer 2 to 4 short --option answers to tap, and --recommend the one you would choose. On a Bandeja entry you hold (B-3 for the id) it asks what the note lacks',
+    'Ask the person a question while you do a step: the turn is theirs until they answer (the step, round and lease stay); wait wakes on the answer, and next and show give it. Offer 2 to 4 short --option answers to tap, and --recommend the one you would choose. On an Inbox entry you hold (B-3 for the id) it asks what the note lacks',
   args: ['id', 'question'],
   options: {
     option: { multiple: true, placeholder: 'text', about: '2 to 4 answers to tap' },
@@ -5544,7 +5544,7 @@ const say: Command = {
 const pending: Command = {
   name: 'pending',
   summary:
-    "What waits for the person now, counted by Otea: reviews, their own steps, questions (items, Bandeja notes, yours), stuck items, a review holding a board's queue. Say it as it is, never from memory",
+    "What waits for the person now, counted by Otea: reviews, their own steps, questions (items, Inbox notes, yours), stuck items, a review holding a board's queue. Say it as it is, never from memory",
   args: [],
   options: {},
   execute: (input) =>
@@ -5554,11 +5554,11 @@ const pending: Command = {
     }),
 };
 
-// An agent tells the secretary what the person must know, to relay it in Hablar.
+// An agent tells the secretary what the person must know, to relay it in Talk.
 const escalate: Command = {
   name: 'escalate',
   summary:
-    'Tell the secretary what the person must know and is no question for them (a duplicate, a failed push, a block): it tells them in Hablar. A decision is otea ask. About an item or a Bandeja note (B-3)',
+    'Tell the secretary what the person must know and is no question for them (a duplicate, a failed push, a block): it tells them in Talk. A decision is otea ask. About an item or an Inbox note (B-3)',
   args: ['id', 'text'],
   options: {},
   execute: (input) => {
@@ -5567,8 +5567,8 @@ const escalate: Command = {
       const sent = escalateToSecretary(project, { agent: input.actor.name, about: id, text });
       const told =
         sent.secretaryState === 'offline'
-          ? `${sent.secretary} is offline: the person will see it directly, in Te toca and in Hablar, until it is back.`
-          : `${sent.secretary} tells the person in Hablar.`;
+          ? `${sent.secretary} is offline: the person will see it directly, in Your turn and in Talk, until it is back.`
+          : `${sent.secretary} tells the person in Talk.`;
       const again = sent.already ? ' (It was waiting already: nothing new was sent.)' : '';
       return {
         data: sent,
@@ -5583,7 +5583,7 @@ const escalate: Command = {
 const bandeja: Command = {
   name: 'bandeja',
   summary:
-    "Read the Bandeja, the person's rough captures: the entries not filed yet (--all adds filed ones), or one (B-3) whole, with file paths and the questions and answers. Refine: bandeja take, then create --from-bandeja, or ask B-3",
+    "Read the Inbox, the person's rough captures: the entries not filed yet (--all adds filed ones), or one (B-3) whole, with file paths and the questions and answers. Refine: bandeja take, then create --from-bandeja, or ask B-3",
   args: ['id?'],
   options: { all: { flag: true } },
   execute: (input) => {
@@ -5623,7 +5623,7 @@ const BANDEJA_RECHECK_MS = 5000;
 const bandejaTake: Command = {
   name: 'bandeja take',
   summary:
-    'Take a Bandeja entry (B-3) to refine it: held 30 minutes (acting on it renews), no other refiner takes it. --next takes the next free one (yours first), --wait waits for it. Only the refiner itself takes a note: the secretary never takes one for it',
+    'Take an Inbox entry (B-3) to refine it: held 30 minutes (acting on it renews), no other refiner takes it. --next takes the next free one (yours first), --wait waits for it. Only the refiner itself takes a note: the secretary never takes one for it',
   args: ['id?'],
   options: {
     next: { flag: true },
@@ -5720,7 +5720,7 @@ const bandejaTakeNextCommand = (agent: string): string =>
 const bandejaClose: Command = {
   name: 'bandeja close',
   summary:
-    'Close a Bandeja entry (B-3) that needs no item (a duplicate), with the --reason the person reads and may reopen. The secretary, or the refiner holding it',
+    'Close an Inbox entry (B-3) that needs no item (a duplicate), with the --reason the person reads and may reopen. The secretary, or the refiner holding it',
   args: ['id'],
   options: { reason: { required: true } },
   execute: (input) => {
@@ -5731,7 +5731,7 @@ const bandejaClose: Command = {
       const entry = closeBandeja(project, { id: bandejaIdOf(id), agent: actor.name, reason });
       return {
         data: { entry },
-        text: `Closed ${entry.ref}: "${entry.closeReason ?? reason}". The person sees the reason on the desk (Hablar, the Bandeja) and may reopen it; nothing waits for you on it.`,
+        text: `Closed ${entry.ref}: "${entry.closeReason ?? reason}". The person sees the reason on the desk (Talk, the Inbox) and may reopen it; nothing waits for you on it.`,
       };
     });
   },

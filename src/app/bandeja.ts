@@ -221,11 +221,11 @@ export function requireEntry(ctx: Context, id: number, now: Clock = systemClock)
   if (!row) {
     throw new OteaError(
       'not_found',
-      `${bandejaRef(id)} is not in the Bandeja (otea bandeja lists it)`,
+      `${bandejaRef(id)} is not in the Inbox (otea bandeja lists it)`,
     );
   }
   const [entry] = hydrate(ctx, [row], now());
-  if (!entry) throw new OteaError('not_found', `${bandejaRef(id)} is not in the Bandeja`);
+  if (!entry) throw new OteaError('not_found', `${bandejaRef(id)} is not in the Inbox`);
   return entry;
 }
 
@@ -773,7 +773,7 @@ export function entryText(
 
 // The lines `otea bandeja` prints: one per entry.
 export function listText(entries: readonly BandejaEntry[], agent?: string): string {
-  if (entries.length === 0) return 'The Bandeja is empty: nothing waits to be refined.';
+  if (entries.length === 0) return 'The Inbox is empty: nothing waits to be refined.';
   const as = agent === undefined ? '' : ` --as ${agent}`;
   return [
     ...entries.map(

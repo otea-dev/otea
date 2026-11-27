@@ -62,10 +62,10 @@ function assertSaidInHablar(
   if (input.via !== secretary) {
     throw new OteaError(
       'forbidden',
-      `Not relayed: only the secretary (${secretary}) relays what the person said, and only words they wrote in Hablar. ${input.via} asks them instead: otea ask ${input.id} "<your question>"`,
+      `Not relayed: only the secretary (${secretary}) relays what the person said, and only words they wrote in Talk.${input.via} asks them instead: otea ask ${input.id} "<your question>"`,
     );
   }
-  const refer = `relay it with --from-message <id of the person's message in Hablar (otea conversation shows them)> and --quote words that message contains`;
+  const refer = `relay it with --from-message <id of the person's message in Talk (otea conversation shows them)> and --quote words that message contains`;
   if (input.fromMessage === undefined) {
     throw new OteaError('quote_required', `Not relayed: ${refer}`);
   }
@@ -146,7 +146,7 @@ function assertNotInReview(ctx: Context, item: ItemRecord): void {
   if (!board || isClosed(position) || position.phase !== 'review') return;
   throw new OteaError(
     'forbidden',
-    `Not relayed: ${item.id} waits for your review, and an item leaves the person's review only by their own tap, never by a relayed sentence. Ask them in Hablar with a card they tap: otea say "<text>" --drop ${item.id} --note "<why>" --option "Drop ${item.id}" --option "Leave it" (or --send-back ${item.id}), or they decide it on the desk.`,
+    `Not relayed: ${item.id} waits for your review, and an item leaves the person's review only by their own tap, never by a relayed sentence. Ask them in Talk with a card they tap: otea say "<text>" --drop ${item.id} --note "<why>" --option "Drop ${item.id}" --option "Leave it" (or --send-back ${item.id}), or they decide it on the desk.`,
   );
 }
 

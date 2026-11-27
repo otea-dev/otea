@@ -1113,7 +1113,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
         return c.json({ entries: listBandeja(project, { filed: filed ?? 30 }) });
       })
       .get('/bandeja/attachments/:id', (c) => {
-        assertSignedIn(c, auth, 'open the Bandeja files');
+        assertSignedIn(c, auth, 'open the Inbox files');
         const { file, path } = bandejaFileToServe(project, c.req.param('id'));
         return serveStored(
           c,

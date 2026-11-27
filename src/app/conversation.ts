@@ -380,7 +380,7 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
     const note = replyTo === undefined ? undefined : selectEntryOfItem(project.db, item.id);
     if (note !== undefined) {
       warnings.push(
-        `${item.id} came from the Bandeja note B-${note.id}: it does not hang from a message, so this was said without that link. Mention it in a notice if the person must see it: otea say "<text>" --links ${item.id} with no --reply-to`,
+        `${item.id} came from the Inbox note B-${note.id}: it does not hang from a message, so this was said without that link. Mention it in a notice if the person must see it: otea say "<text>" --links ${item.id} with no --reply-to`,
       );
     } else hung.push(item.id);
   }

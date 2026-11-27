@@ -169,7 +169,7 @@ describe('the secretary and its wait', () => {
       emit('bandeja_item', 'b-1');
 
       expect(await waiting.done).toBe(0);
-      expect(waiting.out()).toContain('Bandeja (b-1)');
+      expect(waiting.out()).toContain('Inbox (b-1)');
       await otea('say', 'Looking at it.', '--as', 'sol');
       const again = await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1');
       expect(again.code).toBe(13);

@@ -231,7 +231,7 @@ describe('the Bandeja', () => {
 
     it('is refused for an entry that is not there', () => {
       expect(() => takeBandeja(project, { id: 9, agent: 'lia' }, clock(1000))).toThrow(
-        /B-9 is not in the Bandeja/,
+        /B-9 is not in the Inbox/,
       );
     });
   });
