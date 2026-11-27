@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { listConversation, postPersonMessage } from '../app/conversation.ts';
 import { hearAgent, listAgents, processAlive } from '../app/presence.ts';
 import { openProject } from '../app/project.ts';
+import { secretaryStatus } from '../app/secretary.ts';
 import { createMcpServer } from '../mcp/server.ts';
 import { selectListenerProcesses } from '../store/queries.ts';
 import { COMMANDS } from './commands.ts';
@@ -25,6 +26,14 @@ import {
 } from './testing.ts';
 
 const MAIN = fileURLToPath(new URL('./main.ts', import.meta.url));
+
+// A process listing that takes longer than the guard waits (3 s) reads as «unverified» and lets the
+// command through: an impostor then passes on a slow runner (a Windows CI run answered exit 0 where
+// 7 was expected). Every session these tests start waits for its listing up to the guard's own
+// ceiling instead, so the refusal rests on the listing completing, not on the machine's speed. The
+// guard only lets the wait be raised (cli/session-guard.ts readMsOf), never shortened: that clamp
+// is checked on its own in session-judge.test.ts.
+const SLOW_LISTING_OK = { OTEA_SESSION_READ_MS: '60000' };
 
 // U8 (field study 4): `otea say "..." --as claude-sec` from any other process posted in Hablar
 // labelled SECRETARIO, as the real one. The secretary is bound to the harness session noted for it:
@@ -105,7 +114,7 @@ describe('an agent name is bound to the harness session noted for it', () => {
     );
     const child = spawn(process.execPath, [script, out, goFile, MAIN, ...argv], {
       cwd: repo.dir,
-      env: { ...process.env },
+      env: { ...process.env, ...SLOW_LISTING_OK },
       stdio: 'ignore',
     });
     children.push(child);
@@ -146,17 +155,12 @@ describe('an agent name is bound to the harness session noted for it', () => {
     }
   };
 
-  // The caller's environment is its own: an impostor that sets the listing wait to 1 ms must not
-  // make every listing time out (unverified lets the act through).
-  it('still refuses an act from another session whose environment shortens the listing wait', async () => {
+  // The act of an impostor is refused because the listing of processes completes and shows another
+  // session, never because it was quick: the wait is the ceiling's (SLOW_LISTING_OK). The caller's
+  // environment may raise the wait but never shorten it (session-judge.test.ts: 1 ms reads as 3 s).
+  it('refuses an act from another session when the process listing is slow', async () => {
     harness('real', 'whoami', '--as', sol).boundTo(sol);
-    process.env.OTEA_SESSION_READ_MS = '1';
-    let stranger: ReturnType<typeof harness>;
-    try {
-      stranger = harness('stranger', 'say', 'Aprobé todo.', '--as', sol);
-    } finally {
-      delete process.env.OTEA_SESSION_READ_MS;
-    }
+    const stranger = harness('stranger', 'say', 'Aprobé todo.', '--as', sol);
 
     const refused = await stranger.result();
 
@@ -196,7 +200,7 @@ describe('an agent name is bound to the harness session noted for it', () => {
     );
     spawn(process.execPath, [script, printed, MAIN, ...argv], {
       cwd: repo.dir,
-      env: { ...process.env },
+      env: { ...process.env, ...SLOW_LISTING_OK },
       stdio: 'ignore',
     });
     return async () => {
@@ -662,7 +666,7 @@ describe('the secretary’s declaration notes its harness', () => {
     );
     const child = spawn(process.execPath, [script, out, MAIN, ...argv], {
       cwd: repo.dir,
-      env: { ...process.env },
+      env: { ...process.env, ...SLOW_LISTING_OK },
       stdio: 'ignore',
     });
     children.push(child);
@@ -719,5 +723,48 @@ describe('the secretary’s declaration notes its harness', () => {
     expect(refused.code).toBe(7);
     expect(refused.err).toContain('runs in another session');
     expect(notedFor('solo')).toBe(real.pid);
+  }, 120_000);
+
+  // S2, P2 (final red-team run): four sessions declaring `profile --role secretary` under one new
+  // name at once all answered success, and it was unclear which was the secretary. One declaration
+  // wins, as one session wins a wait (noteHarness): the others are refused, nothing of theirs kept,
+  // and the project says which session is the secretary.
+  it('lets one of four sessions that declare the secretary at once win, and says which', async () => {
+    const owner = cliAt(repo.dir);
+    await owner('init', '--local');
+    const sessions = ['a', 'b', 'c', 'd'].map((name) =>
+      harnessRunning(
+        name,
+        'profile',
+        '--role',
+        'secretary',
+        '--model',
+        'm',
+        '--effort',
+        'high',
+        '--harness',
+        'claude-code',
+        '--as',
+        'solo',
+      ),
+    );
+
+    const results = await Promise.all(sessions.map((session) => session.result()));
+
+    const winners = sessions.filter((_, index) => results[index]?.code === 0);
+    expect(winners).toHaveLength(1);
+    const losers = results.filter(({ code }) => code !== 0);
+    expect(losers.map(({ code }) => code)).toEqual([7, 7, 7]);
+    for (const loser of losers) expect(loser.err).toContain('declared by another session');
+    const winner = winners[0]?.pid;
+    expect(notedFor('solo')).toBe(winner);
+    const status = await cliAt(repo.dir)('whoami', '--as', 'solo');
+    expect(status.out).toContain(`session ${winner}`);
+    const project = openProject(repo.dir);
+    try {
+      expect(secretaryStatus(project.db)?.session).toBe(winner);
+    } finally {
+      project.db.close();
+    }
   }, 120_000);
 });
