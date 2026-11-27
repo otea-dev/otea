@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { act, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Pending } from '../../../../src/core/pending.ts';
 import { type App, AppTestProvider } from '../../app/context.tsx';
 import type { ConversationView, Message } from '../../conversation.ts';
 import { ago, item, NOW } from '../../derive/fixtures.ts';
@@ -49,6 +50,18 @@ function say(o: Partial<Message> & { author: Message['author'] }): Message {
 }
 
 const LISTENING = { name: 'quill', state: 'listening', since: null, pending: 0 } as const;
+
+// What waits for the person: two reviews.
+const yours: Pending = {
+  count: 2,
+  entries: [
+    { kind: 'review', ref: 'CAM-2', title: 'Modo oscuro', since: ago(30) },
+    { kind: 'review', ref: 'CAM-3', title: 'Borrar tarea', since: ago(20) },
+  ],
+  blocks: [],
+  queues: [],
+  secretary: null,
+};
 
 const conversation = (o: Partial<ConversationView> = {}): ConversationView => ({
   messages: [],
@@ -231,6 +244,17 @@ describe('the conversation on the two lanes', () => {
 
     await press(chips[1]);
     expect(openItem).toHaveBeenCalledWith('CAM-13');
+  });
+
+  // Field study 4 (design): «sec» and «tú» scrolled away with the first message, and the lanes
+  // stopped mid-pane. The names stand over the thread, outside what scrolls.
+  it('keeps the lanes’ names over the thread, outside what scrolls', async () => {
+    const { root } = await open(conversation({ messages: request() }));
+
+    const head = q(root, '.hb-head') as HTMLElement;
+    expect(text(head)).toBe('sectú');
+    expect(head.closest('.hb-chat')).toBeNull();
+    expect(q(root, '.hb-chat .lane-head')).toBeNull();
   });
 
   it('shows an agent’s question on a linked item with its options, and answers it in place', async () => {
@@ -877,7 +901,8 @@ describe('the secretary thinking', () => {
         secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 1 },
       }),
     );
-    const away = q(root, '.hb-away');
+    const away = q(root, '.hb-away') as HTMLElement;
+    await press(q(away, '.hb-away-toggle'));
     expect(text(away)).toContain('otea wait --secretary --as quill');
     expect(text(away)).toContain('otea prompt --role secretary --as quill');
   });
@@ -900,52 +925,50 @@ describe('the secretary thinking', () => {
     );
     const away = q(root, '.hb-away') as HTMLElement;
 
+    // The line has «Copiar» (the text that brings it back) without opening anything.
+    await press(buttonNamed(away, 'Copiar'));
+    expect(written).toEqual(['Eres el secretario de este proyecto.']);
+    // Where it restarts, and the commands as the second way, folded: words first.
+    expect(text(away)).not.toContain('en tu equipo');
+    await press(q(away, '.hb-away-toggle'));
     expect(text(away)).toContain('en tu equipo');
     expect(text(away)).toContain('Tus mensajes se guardan');
-    await press(buttonNamed(away, 'Copiar el texto del secretario'));
-    expect(written).toEqual(['Eres el secretario de este proyecto.']);
-    // The commands are a second way, folded: a person on a phone reads words first.
     expect(q(away, 'details')?.hasAttribute('open')).toBe(false);
   });
 
-  // P (phone, field study 4): the block took a third of a 390 px screen. On the phone it is one
-  // line that opens to the full block, open by default only the first time in a session.
-  it('folds the away block to one line on the phone, open only the first time in a session', async () => {
-    try {
-      sessionStorage.clear();
-    } catch {}
+  // Field study 4 (design): a card for the secretary, another for what waits and a sliver of chat.
+  // The two are one quiet line over the lanes, on the desk and on the phone alike: a dot, one
+  // sentence, «Copiar», and what waits for you; a tap opens the rest under it.
+  it('is one quiet line on the desk and the phone, holding «Te espera» under it', async () => {
     const view = conversation({
       messages: read,
       secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 2 },
       waiting: { count: 2, since: ago(120) },
     });
-    const first = await open(view, { phone: true });
-    let away = q(first.root, '.hb-away') as HTMLElement;
-    const head = q<HTMLButtonElement>(away, '.hb-away-head') as HTMLButtonElement;
-    expect(text(head)).toBe('Tu secretario está desconectado · 2 mensajes esperan');
-    expect(head.getAttribute('aria-expanded')).toBe('true');
-    expect(buttonNamed(away, 'Copiar el texto del secretario')).toBeDefined();
-    page?.unmount();
-
-    // A later visit in the same session: one line, until it is tapped.
-    await open(view, { phone: true });
-    away = q(page?.root as HTMLElement, '.hb-away') as HTMLElement;
-    expect(q(away, '.hb-away-head')?.getAttribute('aria-expanded')).toBe('false');
-    expect(buttonNamed(away, 'Copiar el texto del secretario')).toBeUndefined();
-    await press(q(away, '.hb-away-head'));
-    expect(buttonNamed(away, 'Copiar el texto del secretario')).toBeDefined();
+    for (const phone of [false, true]) {
+      const { root } = await open(view, { phone, pending: yours });
+      const away = q(root, '.hb-away') as HTMLElement;
+      const toggle = q<HTMLButtonElement>(away, '.hb-away-toggle') as HTMLButtonElement;
+      expect(q(root, '.hb-te')).toBeNull();
+      expect(text(q(away, '.hb-away-line'))).toBe(
+        'Tu secretario está desconectado · 2 mensajes esperan',
+      );
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(buttonNamed(away, 'Copiar')).toBeDefined();
+      expect(q(away, '.hb-te-row')).toBeNull();
+      // What waits for you is counted on the line, listed once it opens.
+      expect(text(q(away, '.hb-te-n'))).toContain('2');
+      await press(toggle);
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(text(away)).toContain('Modo oscuro');
+      page?.unmount();
+    }
   });
 
-  it('keeps the whole away block on the desk, with no fold', async () => {
-    const { root } = await open(
-      conversation({
-        messages: read,
-        secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 1 },
-      }),
-      { phone: false },
-    );
-    expect(q(root, '.hb-away-head')).toBeNull();
-    expect(buttonNamed(root, 'Copiar el texto del secretario')).toBeDefined();
+  it('is the line «Te espera» alone while the secretary is there', async () => {
+    const { root } = await open(conversation({ messages: read }), { pending: yours });
+    expect(q(root, '.hb-away')).toBeNull();
+    expect(q(root, '.hb-te')).not.toBeNull();
   });
 
   it('marks a message it has not read yet as waiting', async () => {
@@ -1098,7 +1121,7 @@ describe('correcting what a turn is', () => {
 });
 
 describe('the secretary away, or never there', () => {
-  it('says since when it is away, that the messages wait, and how many', async () => {
+  it('says that it is away, how many messages wait, and since when', async () => {
     const { root } = await open(
       conversation({
         messages: [say({ id: 1, author: 'person', delivery: 'pending' })],
@@ -1106,11 +1129,12 @@ describe('the secretary away, or never there', () => {
         waiting: { count: 2, since: ago(120) },
       }),
     );
-    const banner = text(q(root, '.hb-away')) ?? '';
-    expect(banner).toMatch(
+    expect(text(q(root, '.hb-away-line'))).toBe(
+      'Tu secretario está desconectado · 2 mensajes esperan',
+    );
+    expect(q(root, '.hb-away-line')?.getAttribute('data-tip')).toMatch(
       /^Tu secretario está desconectado desde .+\. Tus mensajes se guardan hasta que vuelva\./,
     );
-    expect(banner).toContain('2 mensajes esperando');
   });
 
   // Field study 3: the empty state gave `otea profile --role secretary`, which only declares a role

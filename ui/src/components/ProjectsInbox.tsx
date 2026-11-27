@@ -10,7 +10,15 @@ import { LaneHead } from '../lanes/LaneHead.tsx';
 import { type LaneBlock, LaneList } from '../lanes/LaneList.tsx';
 import { lookOf } from '../lanes/looks.ts';
 import { stateWord } from '../preset-words.ts';
-import { agentsAcross, inboxOf, itemHref, projectHref, waitingIn, whereOf } from '../projects.ts';
+import {
+  agentsAcross,
+  inboxOf,
+  itemHref,
+  placeOf,
+  projectHref,
+  waitingIn,
+  whereOf,
+} from '../projects.ts';
 import { hablarHash } from '../selection.ts';
 import { capped } from '../topics.ts';
 import type { AnsweredTopic, Item, ProjectOverview } from '../types.ts';
@@ -198,13 +206,16 @@ export function hereBlocks(
 // Another project's section: its name, its count, where it lives; its rows say where they open.
 export function elsewhereBlocks(project: ProjectOverview): LaneBlock[] {
   const key = `p:${project.id}`;
+  const where = whereOf(project);
   const blocks: LaneBlock[] = [
     {
       kind: 'sec',
       key,
       title: project.name,
       count: waitingIn(project) + (project.topics?.length ?? 0),
-      gloss: whereOf(project) ?? '',
+      // Where it lives, short: its folder and what is above it, the whole path on hover.
+      gloss: where ? placeOf(where) : '',
+      ...(where ? { glossTip: where } : {}),
     },
   ];
   if (project.unavailable !== undefined) {

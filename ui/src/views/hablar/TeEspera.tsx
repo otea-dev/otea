@@ -4,11 +4,13 @@ import { useApp } from '../../app/context.tsx';
 import { useCopy } from '../../components/AgentPrompt.tsx';
 import { splitQuestion } from '../../conversation.ts';
 import { waitedText } from '../../derive/when.ts';
+import { momentLabel } from '../../format.ts';
 import { useRemote } from '../../hooks.ts';
 import { language, t } from '../../i18n/i18n.ts';
 import { Icon } from '../../kit/Icon.tsx';
 import { toast } from '../../kit/index.ts';
 import type { Pending, PendingEntry, PendingKind, QueueBlock } from '../../pending.ts';
+import { AwayCopy, AwayHow } from './Away.tsx';
 
 // «Te espera»: everything that waits for you, pinned over the conversation, computed by Otea
 // (GET /api/pending) and never by what the secretary remembers to say. It is an index, never a
@@ -59,10 +61,20 @@ export function blockText(block: QueueBlock): string {
   });
 }
 
+// The secretary is away: since when (null: unknown), how many messages wait for it, and its name
+// (what brings it back is named by it).
+export type AwayState = {
+  since: string | null | undefined;
+  waiting: number;
+  name: string | undefined;
+};
+
 export type TeEsperaProps = {
   pending: Pending | undefined;
   // Goes to where the thing is dealt with.
   onJump: (entry: PendingEntry) => void;
+  // With the secretary away, the line says so and holds what waits under it: one line, not two.
+  away?: AwayState | undefined;
 };
 
 // How many rows show before «Ver todas»: a long list never takes the room of the conversation
@@ -99,16 +111,83 @@ function WorkerCopy({ board }: { board: string }) {
   );
 }
 
-export function TeEspera({ pending, onJump }: TeEsperaProps) {
+// What waits, one line each: the blocks first, then the first rows, the rest behind «Ver todas».
+function TeRows({ pending, onJump }: { pending: Pending; onJump: (entry: PendingEntry) => void }) {
+  const app = useApp();
+  const [all, setAll] = useState(false);
+  const { entries, blocks } = pending;
+  const shown = all ? entries : entries.slice(0, SHOWN_ROWS);
+  return (
+    <ul className="hb-te-list">
+      {blocks.map((block) => (
+        <li key={`block:${block.first}`} className="hb-te-block">
+          {blockText(block)}
+        </li>
+      ))}
+      {shown.map((entry) => (
+        <li
+          key={`${entry.kind}:${entry.ref}:${entry.signal ?? ''}`}
+          // A row with a button at its end (set a notice aside, copy the worker text) keeps it on
+          // the row's own line.
+          data-dismissable={entry.signal === undefined && entry.kind !== 'worker' ? undefined : ''}
+        >
+          <button
+            type="button"
+            className="hb-te-row"
+            data-kind={entry.kind}
+            onClick={() => onJump(entry)}
+          >
+            <span className="hb-te-ref">
+              {entry.kind === 'secretary' || entry.kind === 'worker' ? '' : entry.ref}
+            </span>
+            <span className="hb-te-t">{rowText(entry)}</span>
+            <span className="hb-te-k">
+              {t(`hablar.te.k.${entry.kind}`, { agent: entry.by ?? '' })}
+            </span>
+            <time className="hb-te-age" dateTime={entry.since ?? undefined}>
+              {waitedText(entry.since, app.now)}
+            </time>
+          </button>
+          {entry.kind === 'worker' ? <WorkerCopy board={entry.ref} /> : null}
+          {entry.kind === 'escalation' && entry.signal !== undefined ? (
+            <button
+              type="button"
+              className="hb-te-dismiss"
+              disabled={!app.session.canWrite}
+              onClick={() => {
+                postEscalationDismiss(entry.signal ?? 0).catch((error: unknown) =>
+                  toast({ msg: error instanceof Error ? error.message : String(error) }),
+                );
+              }}
+            >
+              {t('hablar.te.dismiss')}
+            </button>
+          ) : null}
+        </li>
+      ))}
+      {entries.length > SHOWN_ROWS ? (
+        <li className="hb-te-foot">
+          <button type="button" className="hb-te-more" onClick={() => setAll(!all)}>
+            {all ? t('hablar.te.fewer') : t('hablar.te.all', { count: entries.length })}
+          </button>
+        </li>
+      ) : null}
+    </ul>
+  );
+}
+
+const waits = (pending: Pending | undefined): pending is Pending =>
+  pending !== undefined && (pending.count > 0 || pending.blocks.length > 0);
+
+export function TeEspera({ pending, onJump, away }: TeEsperaProps) {
   const app = useApp();
   // What the person chose by tapping the head; until then it opens as the content asks.
   const [chosen, setChosen] = useState<boolean | undefined>();
-  const [all, setAll] = useState(false);
-  if (!pending || (pending.count === 0 && pending.blocks.length === 0)) return null;
+  if (away) return <AwayStrip away={away} pending={pending} onJump={onJump} />;
+  if (!waits(pending)) return null;
   const { entries, blocks } = pending;
   const roomy = !app.phone || entries.length + blocks.length <= PHONE_ROWS;
   const open = chosen ?? (opensByDefault(entries) && roomy);
-  const shown = all ? entries : entries.slice(0, SHOWN_ROWS);
   return (
     <section className="hb-te" data-enter="fade" aria-label={t('hablar.te.title')}>
       <button
@@ -122,60 +201,69 @@ export function TeEspera({ pending, onJump }: TeEsperaProps) {
         <span className="hb-te-sum">{summaryOf(entries)}</span>
         <Icon name="chevron" />
       </button>
-      {open ? (
-        <ul className="hb-te-list">
-          {blocks.map((block) => (
-            <li key={`block:${block.first}`} className="hb-te-block">
-              {blockText(block)}
-            </li>
-          ))}
-          {shown.map((entry) => (
-            <li
-              key={`${entry.kind}:${entry.ref}:${entry.signal ?? ''}`}
-              data-dismissable={entry.signal === undefined ? undefined : ''}
-            >
-              <button
-                type="button"
-                className="hb-te-row"
-                data-kind={entry.kind}
-                onClick={() => onJump(entry)}
-              >
-                <span className="hb-te-ref">
-                  {entry.kind === 'secretary' || entry.kind === 'worker' ? '' : entry.ref}
-                </span>
-                <span className="hb-te-t">{rowText(entry)}</span>
-                <span className="hb-te-k">
-                  {t(`hablar.te.k.${entry.kind}`, { agent: entry.by ?? '' })}
-                </span>
-                <time className="hb-te-age" dateTime={entry.since ?? undefined}>
-                  {waitedText(entry.since, app.now)}
-                </time>
-              </button>
-              {entry.kind === 'worker' ? <WorkerCopy board={entry.ref} /> : null}
-              {entry.kind === 'escalation' && entry.signal !== undefined ? (
-                <button
-                  type="button"
-                  className="hb-te-dismiss"
-                  disabled={!app.session.canWrite}
-                  onClick={() => {
-                    postEscalationDismiss(entry.signal ?? 0).catch((error: unknown) =>
-                      toast({ msg: error instanceof Error ? error.message : String(error) }),
-                    );
-                  }}
-                >
-                  {t('hablar.te.dismiss')}
-                </button>
-              ) : null}
-            </li>
-          ))}
-          {entries.length > SHOWN_ROWS ? (
-            <li className="hb-te-foot">
-              <button type="button" className="hb-te-more" onClick={() => setAll(!all)}>
-                {all ? t('hablar.te.fewer') : t('hablar.te.all', { count: entries.length })}
-              </button>
-            </li>
+      {open ? <TeRows pending={pending} onJump={onJump} /> : null}
+    </section>
+  );
+}
+
+// The secretary is away: that and «Te espera» are one quiet line over the lanes, so the
+// conversation keeps the pane (field study 4: a card for the secretary, a card for what waits and a
+// sliver of chat). The line is a dot, one sentence, «Copiar» (the text that brings it back) and the
+// count of what waits for you; a tap opens where it restarts and what waits, one line each.
+function AwayStrip({
+  away,
+  pending,
+  onJump,
+}: {
+  away: AwayState;
+  pending: Pending | undefined;
+  onJump: (entry: PendingEntry) => void;
+}) {
+  const app = useApp();
+  const [open, setOpen] = useState(false);
+  const here = waits(pending) ? pending : undefined;
+  const sentence =
+    away.waiting > 0 ? t('hablar.away.short', { count: away.waiting }) : t('hablar.away.shortNone');
+  // Since when, on hover: the line itself is short on purpose.
+  const since = away.since
+    ? t('hablar.away', { since: momentLabel(away.since, app.now) })
+    : t('hablar.awayUnknown');
+  return (
+    <section className="hb-away" data-enter="fade" data-open={open || undefined}>
+      <div className="hb-away-head">
+        <button
+          type="button"
+          className="hb-away-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          <i aria-hidden="true" />
+          <span className="hb-away-line" data-tip={since}>
+            {sentence}
+          </span>
+          {here ? (
+            <span className="hb-te-n" data-tip={t('hablar.te.title')}>
+              <span className="visually-hidden">{t('hablar.te.title')} </span>
+              {here.count}
+            </span>
           ) : null}
-        </ul>
+          <Icon name="chevron" />
+        </button>
+        {away.name ? <AwayCopy name={away.name} /> : null}
+      </div>
+      {open ? (
+        <div className="hb-away-body">
+          {away.name ? <AwayHow name={away.name} /> : null}
+          {here ? (
+            <div className="hb-away-te">
+              <p className="hb-away-sub">
+                <b>{t('hablar.te.title')}</b>
+                <span>{summaryOf(here.entries)}</span>
+              </p>
+              <TeRows pending={here} onJump={onJump} />
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

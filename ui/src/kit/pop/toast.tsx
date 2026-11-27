@@ -251,6 +251,22 @@ export function ToastHost() {
 
   useEffect(() => () => clearTimeout(dwell.current.timer), []);
 
+  // The room a toast at the foot takes, for a page whose own last lines would lie under it (Hablar's
+  // thread: the question just answered) to make: `--toast-room`, its height and a gap. Gone with it.
+  useEffect(() => {
+    const node = el.current;
+    const root = document.documentElement;
+    if (!mounted || !node || at === 'top') return;
+    const measure = () => root.style.setProperty('--toast-room', `${node.offsetHeight + 12}px`);
+    measure();
+    const seen = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    seen?.observe(node);
+    return () => {
+      seen?.disconnect();
+      root.style.removeProperty('--toast-room');
+    };
+  }, [mounted, at]);
+
   // A page that was in the background (a phone locked, a hidden tab) throttles its timers: its
   // toast sat there an hour over Te toca (field study 4). Back in view, a toast past its time goes.
   // biome-ignore lint/correctness/useExhaustiveDependencies: close reads refs only

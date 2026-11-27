@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   inboxOf,
   itemHref,
+  placeOf,
   projectHref,
   sizeLabel,
   waitingElsewhere,
@@ -117,5 +118,18 @@ describe('the projects inbox', () => {
     [134_217_728, '128 MB'],
   ])('writes %d bytes as %s', (bytes, label) => {
     expect(sizeLabel(bytes)).toBe(label);
+  });
+});
+
+// field study 4 (design): a project's folder was its dek as a raw temp path, cut mid-word.
+describe('placeOf', () => {
+  it.each([
+    ['C:\\Users\\ana\\code\\shop', '~/code/shop'],
+    ['/home/ana/work/clients/acme/shop', '~/…/acme/shop'],
+    ['C:\\Users\\ana\\AppData\\Local\\Temp\\claude\\run\\scratchpad\\dw\\repo2', '~/…/dw/repo2'],
+    ['/srv/app', '/srv/app'],
+    ['/var/lib/otea/projects/shop/', '/…/projects/shop'],
+  ])('says %s as %s', (path, shown) => {
+    expect(placeOf(path)).toBe(shown);
   });
 });

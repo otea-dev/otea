@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect } from 'react';
 import { AppProvider, useApp } from './app/context.tsx';
+import { useKeepSideways } from './app/keep-pane.ts';
 import { ViewHost } from './app/ViewHost.tsx';
 import { useWorkspace } from './app/workspace.ts';
 import { applyAttention } from './attention-dom.ts';
@@ -132,6 +133,7 @@ function Shell() {
     [yours, working, projectName, phone],
   );
   useQuestionNotice(app.feed, { open: app.route.item, phone: app.phone, onAnswer: app.openItem });
+  useKeepSideways();
   const route = app.route;
   return (
     <>

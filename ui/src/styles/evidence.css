@@ -1339,6 +1339,97 @@
 .rd-main .ev-reader-view .ev-img[data-tall] {
   max-height: none;
 }
+
+/* The desk reader in Otea's own look (field study 4: a plain modal with a list of file names). The
+   title and the file's name are set in the serif, the files hang on a lane of nodes (ring: not
+   opened, grey disc: opened, blue disc: the one shown), the file lies on the dotted ground, and
+   what is empty says so in italics. */
+.rd-head {
+  align-items: baseline;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+}
+.rd-title {
+  font: 500 26px / 1.1 var(--serif);
+  font-variation-settings: "opsz" 36;
+  letter-spacing: -0.01em;
+}
+.rd-list {
+  position: relative;
+  gap: 4px;
+  padding-block: 4px;
+}
+/* the lane the files hang on: it runs the whole list, scrolling with it */
+.rd-list {
+  background: linear-gradient(var(--lane), var(--lane)) no-repeat 15px 0 / 1px 100%;
+  background-attachment: local;
+}
+.rd-file {
+  position: relative;
+  padding-left: 34px;
+  z-index: 1;
+}
+.rd-file::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 13px;
+  width: 9px;
+  height: 9px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.3px solid var(--ink-3);
+  background: var(--sheet);
+  box-shadow: 0 0 0 4px var(--sheet);
+}
+.rd-file[data-seen="true"]::before {
+  border-color: var(--closed);
+  background: var(--closed);
+}
+.rd-file[aria-current="true"]::before {
+  border-color: var(--you);
+  background: var(--you);
+  box-shadow:
+    0 0 0 4px var(--sheet),
+    0 0 9px 1px color-mix(in oklch, var(--you) 55%, transparent);
+}
+/* the dot that said «opened» is the node now; its words stay for a reader of the page */
+.rd-seen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.rd-fn {
+  font-size: 12px;
+}
+.rd-main .ev-reader-where b {
+  font: 400 11.5px / 1.3 var(--mono);
+  color: var(--ink-3);
+}
+.rd-main .ev-reader-name {
+  font: 500 18px / 1.25 var(--serif);
+  font-variation-settings: "opsz" 20;
+  color: var(--ink);
+}
+.rd-main .ev-reader > .ev-reader-view {
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background-color: var(--ground);
+  background-image: radial-gradient(circle at 1px 1px, var(--dot) 0.9px, transparent 1.15px);
+  background-size: 22px 22px;
+}
+.rd-main .ev-left-head,
+.rd-main .ev-reader-on b {
+  font: 500 15px / 1.3 var(--serif);
+  font-variation-settings: "opsz" 18;
+  letter-spacing: 0;
+}
+.rd-main .ev-left-none p {
+  font: 400 italic 14.5px / 1.4 var(--serif);
+  color: var(--ink-3);
+}
 @media (max-width: 760px) {
   .rd-pane {
     grid-template-columns: minmax(0, 1fr);

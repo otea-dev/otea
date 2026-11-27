@@ -36,7 +36,16 @@ export type LaneBlock =
       inert?: boolean;
       content: ReactNode;
     }
-  | { kind: 'sec'; key: string; title: string; count: number; gloss?: string; action?: ReactNode }
+  | {
+      kind: 'sec';
+      key: string;
+      title: string;
+      count: number;
+      gloss?: string;
+      // What the gloss says in full, when it is cut short (its themed tooltip).
+      glossTip?: string;
+      action?: ReactNode;
+    }
   | { kind: 'empty'; key: string; content: ReactNode; big?: boolean }
   | { kind: 'other'; key: string; className: string; content: ReactNode };
 
@@ -143,7 +152,7 @@ function Block({
         <h2 data-leaf="">{b.title}</h2>
         <Count value={b.count} hold data-leaf="" />
         {b.gloss ? (
-          <span className="gloss" data-leaf="">
+          <span className="gloss" data-leaf="" data-tip={b.glossTip}>
             {b.gloss}
           </span>
         ) : null}

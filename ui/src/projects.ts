@@ -102,6 +102,24 @@ export function whereOf(project: Pick<ProjectOverview, 'paths'>): string | undef
   return (project.paths.find((path) => !path.missing) ?? project.paths[0])?.path;
 }
 
+// A folder, said short: from the home folder as «~/», and only its last two names when it is deep
+// (`C:\Users\ana\AppData\Local\Temp\run\scratch\shop` reads «…/scratch/shop», not the whole way).
+// The full path is the tooltip's.
+export function placeOf(path: string): string {
+  const parts = path
+    .replace(/\\/g, '/')
+    .replace(/^[A-Za-z]:/, '')
+    .split('/')
+    .filter(Boolean);
+  const homed = (parts[0] === 'Users' || parts[0] === 'home') && parts.length > 2;
+  const names = homed ? parts.slice(2) : parts;
+  if (names.length === 0) return path;
+  const start = homed ? '~/' : '/';
+  return names.length <= 3
+    ? `${start}${names.join('/')}`
+    : `${start}…/${names.slice(-2).join('/')}`;
+}
+
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
 
 // A size in bytes, in the largest unit that keeps it at 1 or more, with one decimal under 10.

@@ -13,7 +13,9 @@ const at = () => (window.matchMedia(PHONE_QUERY).matches ? { at: 'top' as const 
 const AFTER_DRAW_MS = 1200;
 
 export function announceUpdated(): void {
-  const show = () => setTimeout(() => toast({ msg: t('offline.updated'), ...at() }), AFTER_DRAW_MS);
+  // At the foot, where a toast stands clear of the page's own words: under the top bar it lay over
+  // the headline of whatever page the new version opened on (and over Hablar's, the first lines).
+  const show = () => setTimeout(() => toast({ msg: t('offline.updated') }), AFTER_DRAW_MS);
   if (document.visibilityState !== 'hidden') return void show();
   const once = () => {
     if (document.visibilityState === 'hidden') return;

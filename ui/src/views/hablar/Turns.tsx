@@ -49,8 +49,9 @@ import { SecretaryMark } from './SecretaryMark.tsx';
 
 const X_SEC = 16.5;
 const X_YOU = 40.5;
-// The lanes start under their names (14 px of label and 8 of air).
-const HEAD = 22;
+// The lanes' names stand over the thread (HablarView: «sec» and «tú» stay in sight as it scrolls),
+// so the lanes start at the top of the thread.
+const HEAD = 0;
 
 // What was already on the page when it first drew: nothing in it is new. `fresh(key)` says whether a
 // message, a reply or a chip arrived since, so only that animates in.
@@ -771,10 +772,6 @@ export function Turns({
   return (
     <div className="lanes hb-lanes" ref={list}>
       <LaneInk geometry={geometry} />
-      <div className="lane-head hb-head" aria-hidden="true">
-        <span className="ag">sec</span>
-        <span className="you">{t('lanes.you')}</span>
-      </div>
       {rows.map((row) => {
         const begins = !begun.has(row.turn.root);
         begun.add(row.turn.root);

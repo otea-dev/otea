@@ -16,7 +16,7 @@ function Kid({ chip }: { chip: Chip }) {
   const body = (
     <>
       {chip.look ? (
-        <NodeGlyph look={chip.look} size={14} />
+        <NodeGlyph look={chip.look} size={22} />
       ) : (
         <i className="hb-draft" aria-hidden="true" />
       )}

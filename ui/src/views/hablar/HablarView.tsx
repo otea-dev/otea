@@ -23,10 +23,8 @@ import {
   turnAt,
   turnsOf,
 } from '../../conversation.ts';
-import { momentLabel } from '../../format.ts';
 import { useRemote } from '../../hooks.ts';
 import { t } from '../../i18n/i18n.ts';
-import { Icon } from '../../kit/Icon.tsx';
 import { Button, toast } from '../../kit/index.ts';
 import { F, lerp } from '../../motion/curves.ts';
 import { drive } from '../../motion/drive.ts';
@@ -97,98 +95,6 @@ function NoSecretary() {
       <p className="hb-or">{t('hablar.none.orRun')}</p>
       <CopyCommand command="otea prompt --role secretary" />
       <p className="hb-after">{t('hablar.none.after')}</p>
-    </div>
-  );
-}
-
-// The secretary is away: it restarts on the computer, and the person may be on a phone. Plain words
-// first (where, and that the messages wait), then the text that makes an agent the secretary, to
-// copy, and the two commands as the second way, folded (field study 4: «pídele a tu agente que
-// ejecute otea wait…» was all a phone showed).
-function AwayHow({ name }: { name: string }) {
-  const load = useCallback(
-    (signal: AbortSignal) => fetchRolePrompt('secretary', { name }, signal),
-    [name],
-  );
-  const prompt = useRemote(load, useApp().version, 'live');
-  const text = prompt.status === 'ready' ? prompt.value.prompt : '';
-  const [copied, copy] = useCopy(text);
-  return (
-    <>
-      <p className="hb-back">{t('hablar.away.back')}</p>
-      <Button size="sm" variant="primary" disabled={text === ''} onClick={copy}>
-        <CopyGlyph />
-        {copied ? t('hablar.none.copied') : t('hablar.none.copy')}
-      </Button>
-      <details className="hb-cmds">
-        <summary>{t('hablar.away.cmds')}</summary>
-        <p>{t('hablar.away.cmdWait')}</p>
-        <CopyCommand command={`otea wait --secretary --as ${name}`} />
-        <p>{t('hablar.away.cmdPrompt')}</p>
-        <CopyCommand command={`otea prompt --role secretary --as ${name}`} />
-      </details>
-    </>
-  );
-}
-
-// On the phone the notice is one line that opens to the whole block; it opens by itself only the
-// first time in a session (then the person knows what it says). The desk keeps the whole block.
-const AWAY_SEEN = 'otea.away-seen';
-
-function firstAwayThisSession(): boolean {
-  try {
-    if (sessionStorage.getItem(AWAY_SEEN) !== null) return false;
-    sessionStorage.setItem(AWAY_SEEN, '1');
-  } catch {
-    // no storage: it opens, as the first time does
-  }
-  return true;
-}
-
-function AwayNotice({
-  since,
-  now,
-  phone,
-  waiting,
-  name,
-}: {
-  since: string | null | undefined;
-  now: number;
-  phone: boolean;
-  waiting: number;
-  name: string | undefined;
-}) {
-  const [first] = useState(() => (phone ? firstAwayThisSession() : false));
-  const [chosen, setChosen] = useState<boolean | undefined>();
-  const open = chosen ?? first;
-  const sentence = since
-    ? t('hablar.away', { since: momentLabel(since, now) })
-    : t('hablar.awayUnknown');
-  if (!phone) {
-    return (
-      <div className="hb-away" role="status" data-enter="fade">
-        <i aria-hidden="true" />
-        <span>{sentence}</span>
-        {waiting > 0 ? <b className="hb-wait">{t('hablar.waiting', { count: waiting })}</b> : null}
-        {name ? <AwayHow name={name} /> : null}
-      </div>
-    );
-  }
-  return (
-    <div className="hb-away" data-phone="" role="status" data-enter="fade">
-      <button
-        type="button"
-        className="hb-away-head"
-        aria-expanded={open}
-        onClick={() => setChosen(!open)}
-      >
-        <i aria-hidden="true" />
-        <span>
-          {waiting > 0 ? t('hablar.away.short', { count: waiting }) : t('hablar.away.shortNone')}
-        </span>
-        <Icon name="chevron" />
-      </button>
-      {open && name ? <AwayHow name={name} /> : null}
     </div>
   );
 }
@@ -540,16 +446,27 @@ export function HablarView({
           </button>
         </div>
         {none ? <NoSecretary /> : null}
-        {away ? (
-          <AwayNotice
-            since={away.since}
-            now={app.now}
-            phone={app.phone}
-            waiting={convo.status === 'ready' ? convo.waiting.count : 0}
-            name={secretary?.name}
-          />
+        <TeEspera
+          pending={app.pending}
+          onJump={jump}
+          away={
+            away
+              ? {
+                  since: away.since,
+                  waiting: convo.status === 'ready' ? convo.waiting.count : 0,
+                  name: secretary?.name,
+                }
+              : undefined
+          }
+        />
+        {turns.length > 0 || noteAsks.length > 0 ? (
+          // The lanes' names stay over the thread as it scrolls: whose lane is whose is read
+          // before any text.
+          <div className="lane-head hb-head" aria-hidden="true">
+            <span className="ag">sec</span>
+            <span className="you">{t('lanes.you')}</span>
+          </div>
         ) : null}
-        <TeEspera pending={app.pending} onJump={jump} />
         <div className="hb-chat" id="hb-panel-chat" ref={scroller}>
           {convo.status === 'loading' ? (
             <p className="hb-pane">{t('hablar.loading')}</p>

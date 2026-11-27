@@ -45,7 +45,7 @@ function ItemChip({ chip }: { chip: Chip }) {
   const body = (
     <>
       <span className="hb-nd" ref={glyph} aria-hidden="true">
-        {chip.look ? <NodeGlyph look={chip.look} size={16} /> : <i className="hb-draft" />}
+        {chip.look ? <NodeGlyph look={chip.look} size={22} /> : <i className="hb-draft" />}
       </span>
       <span className="hb-id">{chip.id}</span>
       <span className="hb-ttl">{chip.title}</span>

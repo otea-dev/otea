@@ -25,11 +25,11 @@
     opacity 360ms var(--o-drift),
     background-color 360ms var(--o-drift);
 }
-/* away: a ring, no light */
+/* away: a ring, no light, still its lilac (a grey ring read as nothing: it is the secretary's) */
 .sec-dot[data-state="offline"] {
   background: transparent;
-  box-shadow: inset 0 0 0 1.3px var(--sec);
-  opacity: 0.6;
+  box-shadow: inset 0 0 0 1.5px var(--sec);
+  opacity: 0.9;
 }
 
 /* ───────── the page ───────── */
@@ -98,95 +98,90 @@
   color: var(--ink);
 }
 
-/* the secretary is away: since when, and how many messages wait */
+/* the secretary is away: one quiet line over the lanes (a dot, one sentence, «Copiar», what waits
+   for you), opening to where it restarts and what waits. The conversation keeps the pane. */
 .hb-away {
   flex: none;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 12px;
   margin: 0 0 10px var(--pl);
-  padding: 9px 13px;
-  border: 1px solid color-mix(in oklch, var(--warn) 42%, var(--rule-2));
+  border: 1px solid color-mix(in oklch, var(--warn) 30%, var(--rule-2));
   border-radius: 10px;
   background: var(--sheet);
   font: 400 13.5px / 1.4 var(--sans);
   color: var(--ink);
-}
-.hb-away i {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--warn);
-}
-.hb-away span {
-  flex: 1 1 240px;
-  min-width: 0;
-}
-.hb-wait {
-  font: 500 12px / 1.2 var(--mono);
-  color: var(--ink-2);
-}
-/* how to bring it back: the sentence, then the command to copy, each on its own line */
-.hb-away .hb-back {
-  flex: 1 1 100%;
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: var(--ink-2);
-}
-.hb-away .pj-cmd {
-  flex: 1 1 100%;
-  min-width: 0;
-  max-width: 100%;
-}
-/* the `.hb-away span` grow rule is for the sentence, not the prompt mark inside the command */
-.hb-away .pj-cmd span,
-.hb-away .btn span {
-  flex: none;
-}
-.hb-away > .btn {
-  flex: none;
-  margin-top: 2px;
-}
-/* on the phone the notice is one line (the head) that opens to the whole block */
-.hb-away[data-phone] {
-  padding: 0 13px;
+  overflow: hidden;
 }
 .hb-away-head {
-  flex: 1 1 100%;
+  position: relative;
+}
+.hb-away-toggle {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 40px;
-  margin: 0 -13px;
-  padding: 6px 13px;
-  width: calc(100% + 26px);
+  gap: 10px;
+  width: 100%;
+  min-height: 42px;
+  /* room on the right for «Copiar» and the chevron, which stand over the line */
+  padding: 6px 134px 6px 13px;
   border: 0;
   background: transparent;
   font: inherit;
   color: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background-color 120ms var(--ease);
 }
-.hb-away-head span {
-  flex: 1;
-  min-width: 0;
+.hb-away-toggle:hover {
+  background: var(--hov);
 }
-.hb-away-head .ic {
+.hb-away-toggle > i {
   flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+.hb-away-line {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hb-away-toggle .hb-te-n {
+  flex: none;
+}
+.hb-away-toggle > .ic {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  margin-top: -8px;
   color: var(--ink-3);
   transition: transform 240ms var(--o-settle);
 }
-.hb-away-head[aria-expanded="true"] .ic {
+.hb-away-toggle[aria-expanded="true"] > .ic {
   transform: rotate(180deg);
 }
-.hb-away[data-phone]:has(.hb-back) {
-  padding-bottom: 9px;
+.hb-away-copy {
+  position: absolute;
+  right: 40px;
+  top: 50%;
+  margin-top: -14px;
+}
+.hb-away-body {
+  border-top: 1px solid var(--rule);
+}
+/* how to bring it back: the sentence, then the commands (folded) */
+.hb-away-body > .hb-back,
+.hb-away-body > .hb-cmds {
+  margin: 0;
+  padding-inline: 13px;
+}
+.hb-away .hb-back {
+  padding-top: 9px;
+  font-size: 13px;
+  color: var(--ink-2);
 }
 /* the commands are the second way to bring it back: folded, in the page's own words */
 .hb-cmds {
-  flex: 1 1 100%;
   min-width: 0;
   font-size: 13px;
   color: var(--ink-2);
@@ -200,6 +195,37 @@
 }
 .hb-cmds p {
   margin: 6px 0 4px;
+}
+.hb-away .hb-cmds {
+  padding-bottom: 6px;
+}
+.hb-away .pj-cmd {
+  max-width: 100%;
+  min-width: 0;
+}
+/* what waits for you, under it: one list, the same rows as the line «Te espera» alone has */
+.hb-away-te {
+  border-top: 1px solid var(--rule);
+}
+.hb-away-te + .hb-cmds,
+.hb-cmds + .hb-away-te {
+  margin-top: 0;
+}
+.hb-away-sub {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 13px 3px;
+  color: var(--ink-2);
+}
+.hb-away-sub b {
+  flex: none;
+  font: 500 13.5px / 1.3 var(--sans);
+  color: var(--ink);
+}
+.hb-away-te .hb-te-list {
+  border-top: 0;
 }
 
 /* «Te espera»: what waits for you, pinned over the conversation (never inside it, so it is never
@@ -339,6 +365,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* a board nobody works says what it needs in words: they wrap, the copy button keeps its place */
+.hb-te-row[data-kind="worker"] .hb-te-t {
+  white-space: normal;
+}
 /* the question «Te espera» sent you to, at the foot of the conversation: it lights for a moment */
 .hb-turn [id^="hb-ask-"][data-lit] .hb-ask {
   box-shadow: 0 0 0 2px var(--you);
@@ -426,12 +456,28 @@
   letter-spacing: -0.005em;
 }
 
+/* The thread is as tall as the pane: the lanes run down to the composer, whatever has been said. A
+   toast at the foot takes its room from the thread's foot, so it never lies over its last lines
+   (the question just answered). */
+.hb-flow {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding-bottom: var(--toast-room, 0px);
+  transition: padding-bottom 240ms var(--o-settle);
+}
+.hb-flow > .hb-lanes {
+  flex: 1 0 auto;
+}
 .hb-lanes {
   --pl: 72px;
+  padding-top: 8px;
   padding-bottom: 14px;
 }
-.hb-lanes .lane-head {
-  margin-bottom: 8px;
+/* «sec» and «tú» over the thread: they stay where the lanes start, outside what scrolls */
+.hb-main > .hb-head {
+  flex: none;
+  margin: 2px 0 0;
 }
 .hb-head .ag {
   color: var(--sec);
@@ -854,12 +900,18 @@ button.hb-chip:hover {
 .hb-nd {
   display: grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
+  width: 22px;
+  height: 22px;
   flex: none;
 }
 .hb-nd svg {
   overflow: visible;
+}
+/* the node looks as the lanes draw them (an orbit, a ring, a disc), with your disc lit: a bullet
+   is not one of them (field study 4) */
+.hb-nd svg .lk circle[fill="var(--you)"],
+.hb-kid svg .lk circle[fill="var(--you)"] {
+  filter: drop-shadow(0 0 3px color-mix(in oklch, var(--you) 75%, transparent));
 }
 .hb-draft {
   width: 9px;
@@ -1588,6 +1640,7 @@ button.hb-kid:hover {
     display: none;
   }
   .hb[data-tab="out"] .hb-chat,
+  .hb[data-tab="out"] .hb-head,
   .hb[data-tab="out"] .hb-composer,
   .hb[data-tab="out"] .hb-nosec,
   .hb[data-tab="out"] .hb-te,
@@ -1645,6 +1698,28 @@ button.hb-kid:hover {
   .hb-nosec {
     margin-left: 0;
   }
+  /* the line on the phone: «Copiar» is its glyph (the word is its name for a reader), the sentence
+     takes two lines before it is cut, the time is in the opened part */
+  .hb-away-toggle {
+    min-height: 48px;
+    padding-right: 96px;
+  }
+  .hb-away-line {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+  }
+  .hb-away-copy {
+    right: 44px;
+    margin-top: -20px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+  }
+  .hb-away-copy .lb {
+    display: none;
+  }
   /* on the phone the ref (the title says enough) gives its room to the line */
   .hb-te-row {
     grid-template-columns: minmax(0, 1fr) auto auto;
@@ -1667,6 +1742,9 @@ button.hb-kid:hover {
     padding-right: 16px;
     margin-left: -2px;
   }
+  .hb-main > .hb-head {
+    margin-left: -2px;
+  }
   .hb-lanes {
     --pl: 60px;
   }
@@ -1687,8 +1765,12 @@ button.hb-kid:hover {
     flex-wrap: nowrap;
     overflow-x: auto;
     margin-right: -8px;
-    padding-right: 8px;
+    /* the row is cut by the edge on purpose, and says so: it fades out there (the last chip
+       scrolls clear of the fade) instead of ending in half a word */
+    padding-right: 34px;
     scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 30px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 30px), transparent);
   }
   .hb-attach,
   .hb-send {
@@ -1722,6 +1804,15 @@ button.hb-kid:hover {
   }
   .hb-tabs {
     padding: 4px 0 8px;
+  }
+}
+/* a very narrow line gives its count of what waits to the opened part: the sentence needs the room */
+@media (max-width: 360px) {
+  .hb-away-toggle .hb-te-n {
+    display: none;
+  }
+  .hb-away-toggle {
+    padding-right: 88px;
   }
 }
 /* a narrow list: the chip's words go under its id and state, so the title keeps room */
