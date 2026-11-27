@@ -85,10 +85,12 @@ function putHandedFirst(out: Sec[], rounds: BoardRounds): void {
   const step =
     rounds.step === undefined ? undefined : rounds.def.steps.find((s) => s.id === rounds.step);
   if (!step) return;
+  // A field's section is keyed by the name the type gives it: a board's fields go by their part's
+  // id (the desk shows the part's name as the label), a plainer type's by the name itself.
   const handed = new Set(
     step.hand.flatMap(({ ref }) => {
       const name = rounds.def.parts[ref]?.name;
-      return name === undefined ? [] : [`f:${name}`];
+      return name === undefined ? [`f:${ref}`] : [`f:${ref}`, `f:${name}`];
     }),
   );
   const slots = out.flatMap(({ key }, at) => (key.startsWith('f:') ? [at] : []));

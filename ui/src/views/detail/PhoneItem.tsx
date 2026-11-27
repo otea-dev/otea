@@ -513,6 +513,11 @@ function RoundView({
   seen?: ReadonlySet<number> | undefined;
 }) {
   const { images, files } = splitEvidence(r.evidence);
+  // What a person judges leads: a text the step handed in (a draft, the options, the findings) is
+  // read here, right under the delivery note; only the plain values (the branch, a commit) wait
+  // behind «Detalles técnicos».
+  const lead = handed?.filter((f) => f.long) ?? [];
+  const plain = handed?.filter((f) => !f.long) ?? [];
   return (
     <>
       <section className="p-part" data-c>
@@ -529,6 +534,11 @@ function RoundView({
           {r.by} · {agoText(r.at, now)}
         </div>
       </section>
+      {lead.length > 0 ? (
+        <section className="p-part p-lead" data-c>
+          <HandedList fields={lead} agent={r.by} />
+        </section>
+      ) : null}
       {notes ? (
         <RoundThread
           key={r.n}
@@ -558,10 +568,10 @@ function RoundView({
       </section>
       {/* One fold for what only a reader of code uses: the branch and what Otea says of it, the
           fields the step handed off (the branch, the commit), the diff and the test output. */}
-      {technical || handed?.length || files.length > 0 ? (
+      {technical || plain.length > 0 || files.length > 0 ? (
         <TechDetails notices={technicalNotices}>
           {technical}
-          {handed?.length ? <HandedList fields={handed} agent={r.by} /> : null}
+          {plain.length > 0 ? <HandedList fields={plain} agent={r.by} /> : null}
           {files.length > 0 ? (
             <Files
               evidence={files}
