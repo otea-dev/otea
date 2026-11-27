@@ -22,6 +22,7 @@ import type { Pending } from './pending.ts';
 import { type Agent, parseAgents } from './presence.ts';
 import type { LinkRequest } from './relations.ts';
 import { serverMessage, unreachable } from './remote.ts';
+import { leaveStaleProject, NO_PROJECT } from './stale-project.ts';
 import type { ItemTopics, Topic, TopicsView } from './topics.ts';
 import type {
   CollectionView,
@@ -59,7 +60,7 @@ async function get(path: string, signal: AbortSignal): Promise<Response> {
   // The refusal is classified before the read is noted: a refused read records only that, never a
   // fresh answer that would lift the signed-out page for an instant (it remounts the app).
   let code: unknown;
-  if (response.status === 401) {
+  if (response.status === 401 || response.status === 404) {
     const body: unknown = await response
       .clone()
       .json()
@@ -72,6 +73,12 @@ async function get(path: string, signal: AbortSignal): Promise<Response> {
   if (code === 'unauthorized') {
     noteRead({ kind: 'refused' });
     throw new Error(t('error.readSignIn'));
+  }
+  // The PC serves no such project (it was removed, or the server was set up again) while this page,
+  // or the app installed on it, still remembers it: leave for the project the PC does serve.
+  if (code === NO_PROJECT) {
+    void leaveStaleProject();
+    throw new Error(t('error.getFailed', { path, status: response.status }));
   }
   const read = readOf(response.headers);
   // The session's own read is the PC's answer to anyone: it says it is there, not that this
