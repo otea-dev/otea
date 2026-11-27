@@ -48,7 +48,8 @@ describe('Te toca, a report about an item that is also yours to review', () => {
     });
     vi.stubGlobal(
       'fetch',
-      async () => new Response('{}', { status: 404, headers: { 'content-type': 'application/json' } }),
+      async () =>
+        new Response('{}', { status: 404, headers: { 'content-type': 'application/json' } }),
     );
     page = mount(
       <AppTestProvider value={app}>

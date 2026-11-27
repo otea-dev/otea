@@ -136,7 +136,8 @@ export function Composer({ onSent }: { onSent: () => void }) {
               className="hb-sugg"
               disabled={!canWrite}
               onClick={() => {
-                setText(t(key));
+                // Added to what you were writing, never over it.
+                setText((was) => (was.trim() === '' ? t(key) : `${was.trimEnd()} ${t(key)}`));
                 field.current?.focus();
               }}
             >

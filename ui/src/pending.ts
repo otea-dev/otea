@@ -45,9 +45,15 @@ export function entryHash(entry: PendingEntry): string {
   return route.view === 'hablar' ? hablarHash(route) : hablarHash();
 }
 
-// Whether the key of a row of Te toca is a pending entry that is no item (a note, a message).
+// The key of the row of Te toca that stands for an entry that is no item (a note, a message, a
+// report). A report names the item it is about, which may be a row of its own: its key never is the
+// item's.
 export const rowKeyOf = (entry: PendingEntry): string =>
-  entry.kind === 'secretary' ? `msg:${entry.ref}` : entry.ref;
+  entry.kind === 'secretary'
+    ? `msg:${entry.ref}`
+    : entry.kind === 'escalation'
+      ? `esc:${entry.ref}:${entry.signal ?? ''}`
+      : entry.ref;
 
 // The secretary shown offline with something waiting for it: Te toca says so, with a way to Hablar.
 export function offlineWithWaiting(pending: Pending | null | undefined): PendingSecretary | null {

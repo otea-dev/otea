@@ -54,6 +54,7 @@ export function BandejaAsk({ entry, onAnswered }: { entry: BandejaEntry; onAnswe
   if (!asking) return null;
   return (
     <AskBody
+      key={asking.question}
       by={asking.by}
       about={entry.ref}
       text={asking.text}
@@ -82,6 +83,8 @@ function Row({
   answerBelow: boolean;
 }) {
   const app = useApp();
+  // A second tap while the first is on its way is the same tap.
+  const [reopening, setReopening] = useState(false);
   const asking = entry.asking;
   const known = entry.item !== null && app.all.some(({ id }) => id === entry.item);
   const state = t(`bandeja.st.${entry.state}`, {
@@ -120,13 +123,16 @@ function Row({
         <button
           type="button"
           className="bn-reopen"
-          disabled={!app.session.canWrite}
+          disabled={!app.session.canWrite || reopening}
           onClick={() => {
+            if (reopening) return;
+            setReopening(true);
             postBandejaReopen(entry.id)
               .then(onAnswered)
               .catch((error: unknown) =>
                 toast({ msg: error instanceof Error ? error.message : String(error) }),
-              );
+              )
+              .finally(() => setReopening(false));
           }}
         >
           {t('bandeja.reopen')}

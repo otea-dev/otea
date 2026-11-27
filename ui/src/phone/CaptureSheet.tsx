@@ -341,6 +341,8 @@ export function CaptureSheet() {
 
   const [seq, setSeq] = useState(-1);
   const [mode, setMode] = useState<CaptureMode>('note');
+  // The note has been shown since the sheet opened: from then on it is kept, hidden or not.
+  const [noteSeen, setNoteSeen] = useState(false);
   const [chosen, setChosen] = useState<string>();
   const [picking, setPicking] = useState(false);
   const [title, setTitle] = useState('');
@@ -361,6 +363,7 @@ export function CaptureSheet() {
   if (cap.open && cap.seq !== seq) {
     setSeq(cap.seq);
     setMode(startMode(cap.o));
+    setNoteSeen(startMode(cap.o) === 'note');
     setChosen(undefined);
     setPicking(false);
     setTitle('');
@@ -371,7 +374,7 @@ export function CaptureSheet() {
     setPosting(false);
     setError(undefined);
     key.current = captureId();
-  }
+  } else if (cap.open && mode === 'note' && !noteSeen) setNoteSeen(true);
 
   // The words a save that failed left behind come back as the sheet opens (a reload too); they stay
   // until a save succeeds.
@@ -526,8 +529,10 @@ export function CaptureSheet() {
           { value: 'board', label: t('bandeja.mode.board') },
         ]}
       />
-      {mode === 'note' ? (
-        <div ref={noteBox}>
+      {/* Once shown, the note stays mounted while the board's form is looked at: what was typed, and
+          the files picked, are still there when the person comes back. */}
+      {noteSeen ? (
+        <div ref={noteBox} hidden={mode !== 'note'}>
           <NoteCapture
             key={cap.seq}
             onSent={(how, ref) => {
@@ -548,7 +553,8 @@ export function CaptureSheet() {
             }}
           />
         </div>
-      ) : (
+      ) : null}
+      {mode === 'note' ? null : (
         <CaptureBody
           boards={boards}
           board={board}

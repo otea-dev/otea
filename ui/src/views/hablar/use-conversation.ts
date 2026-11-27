@@ -8,10 +8,14 @@ import {
   mergeMessages,
   type SecretaryStatus,
 } from '../../conversation.ts';
-import { useRemote } from '../../hooks.ts';
+import { useRemote, useThrottled } from '../../hooks.ts';
 
 // How many messages one read of the conversation brings: the newest ones, and a page back on ask.
 const PAGE = 100;
+
+// The conversation (and the secretary's state) is read again at most this often as the project
+// changes, as the pending list is: a read is a hundred messages, and a busy minute is many events.
+const READ_MS = 1_500;
 
 export type ConversationState =
   | { status: 'loading' }
@@ -24,6 +28,8 @@ export type ConversationState =
       // Earlier messages lie before the first one loaded.
       earlier: boolean;
       loadingEarlier: boolean;
+      // The last page asked for did not come: what asks for pages on its own stops there.
+      earlierFailed: boolean;
       loadEarlier: () => void;
       // Reads the conversation again now (after a send), and shows a turn as the person set it
       // until the server says so too (`uncorrected`: the server refused, the turn is as it was).
@@ -41,9 +47,11 @@ export function useConversation(): ConversationState {
   const [older, setOlder] = useState<Message[]>([]);
   const [olderMore, setOlderMore] = useState<boolean | null>(null);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const [earlierFailed, setEarlierFailed] = useState(false);
   const [kinds, setKinds] = useState<ReadonlyMap<number, MessageKind>>(new Map());
   const load = useCallback((signal: AbortSignal) => fetchConversation({ limit: PAGE }, signal), []);
-  const remote = useRemote(load, app.version + bump, app.connection);
+  // A send or a tap reads again at once (`bump`); the project's own changes follow the throttle.
+  const remote = useRemote(load, useThrottled(app.version, READ_MS) + bump, app.connection);
   const view = remote.status === 'ready' ? remote.value : undefined;
 
   const merged = useMemo(() => (view ? mergeMessages(older, view.messages) : []), [older, view]);
@@ -61,7 +69,9 @@ export function useConversation(): ConversationState {
   );
   useEffect(() => {
     if (kinds.size === 0) return;
-    const served = new Map(merged.map((m) => [m.root, m.kind]));
+    // What the page shows as a turn's kind (turnsOf): the last one any of its messages carries.
+    const served = new Map<number, MessageKind>();
+    for (const m of merged) if (m.kind !== null) served.set(m.root, m.kind);
     const matched = [...kinds].filter(([root, kind]) => served.get(root) === kind);
     if (matched.length === 0) return;
     setKinds((was) => {
@@ -74,13 +84,17 @@ export function useConversation(): ConversationState {
   const loadEarlier = useCallback(() => {
     if (first === undefined || loadingEarlier) return;
     setLoadingEarlier(true);
+    setEarlierFailed(false);
     fetchConversation({ before: first, limit: PAGE }, new AbortController().signal).then(
       (page) => {
         setOlder((was) => mergeMessages(page.messages, was));
         setOlderMore(page.more);
         setLoadingEarlier(false);
       },
-      () => setLoadingEarlier(false),
+      () => {
+        setEarlierFailed(true);
+        setLoadingEarlier(false);
+      },
     );
   }, [first, loadingEarlier]);
 
@@ -95,6 +109,7 @@ export function useConversation(): ConversationState {
     waiting: view.waiting,
     earlier: olderMore ?? view.more,
     loadingEarlier,
+    earlierFailed,
     loadEarlier,
     reload: () => setBump((n) => n + 1),
     corrected: (root, kind) => setKinds((was) => new Map(was).set(root, kind)),
@@ -111,6 +126,6 @@ export function useConversation(): ConversationState {
 export function useSecretary(): SecretaryStatus | null | undefined {
   const app = useApp();
   const load = useCallback((signal: AbortSignal) => fetchSecretary(signal), []);
-  const remote = useRemote(load, app.version, app.connection);
+  const remote = useRemote(load, useThrottled(app.version, READ_MS), app.connection);
   return remote.status === 'ready' ? remote.value : undefined;
 }

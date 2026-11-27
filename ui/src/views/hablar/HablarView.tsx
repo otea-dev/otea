@@ -154,30 +154,50 @@ export function HablarView({
   // lights for a moment, once its entries are read.
   const noteAsked = useRef<string | undefined>(undefined);
   const notesReady = notes.entries !== undefined;
+  // With the conversation beside (from 1240 px) the question is answered at its foot, which is
+  // there once the conversation is read too: the link waits for both.
+  const convoReady = convo.status === 'ready';
+  const linkReady = notesReady && (!wide || convoReady);
   useEffect(() => {
     if (bandeja === undefined) noteAsked.current = undefined;
-    if (!notesReady || bandeja === undefined || noteAsked.current === bandeja) return;
+    if (!linkReady || bandeja === undefined || noteAsked.current === bandeja) return;
     noteAsked.current = bandeja;
     setTab('out');
     setLitNote(bandeja);
-    // With the conversation beside (from 1240 px) the question is answered at its foot: the page goes
-    // there; else the note's row scrolls into view.
+    // The page goes to the question at the foot; else the note's row scrolls into view.
     const frame = requestAnimationFrame(() => {
       if (wide && toAskRef.current(bandeja)) return;
       document.getElementById(`bn-${bandeja}`)?.scrollIntoView({ block: 'center' });
     });
+    return () => cancelAnimationFrame(frame);
+  }, [bandeja, linkReady, wide]);
+  // A light goes out a moment after it came on, whatever else the page did meanwhile.
+  useEffect(() => {
+    if (litNote === undefined) return;
     const timer = setTimeout(() => setLitNote(undefined), 2400);
-    return () => {
-      cancelAnimationFrame(frame);
-      clearTimeout(timer);
-    };
-  }, [bandeja, notesReady, wide]);
+    return () => clearTimeout(timer);
+  }, [litNote]);
+  useEffect(() => {
+    if (litAsk === undefined) return;
+    const timer = setTimeout(() => setLitAsk(undefined), 2400);
+    return () => clearTimeout(timer);
+  }, [litAsk]);
 
   // Goes to a turn: the conversation shows, scrolls there and the turn lights for a moment.
   const goTo = useCallback((root: number) => {
     setTab('chat');
     setTarget((was) => ({ root, n: (was?.n ?? 0) + 1 }));
   }, []);
+
+  // Opens a turn the search found: here when it is on the page, else through its address, which
+  // reads earlier pages until it is.
+  const openHit = useCallback(
+    (root: number) => {
+      if (turns.some((each) => each.root === root)) goTo(root);
+      else app.go({ view: 'hablar', turn: root });
+    },
+    [turns, goTo, app.go],
+  );
 
   // Goes to the question at the foot of the conversation (an item's, or a note's), where it is
   // answered. False when it is not there (the conversation does not hold it): the caller opens the
@@ -190,7 +210,6 @@ export function HablarView({
     near.current = false;
     scrollBox(box, top - 16);
     setLitAsk(ref);
-    setTimeout(() => setLitAsk(undefined), 2400);
     return true;
   }, []);
 
@@ -236,6 +255,7 @@ export function HablarView({
   const ready = convo.status === 'ready';
   const earlier = convo.status === 'ready' && convo.earlier;
   const loadingEarlier = convo.status === 'ready' && convo.loadingEarlier;
+  const earlierFailed = convo.status === 'ready' && convo.earlierFailed;
   const loadEarlier = convo.status === 'ready' ? convo.loadEarlier : undefined;
   useEffect(() => {
     if (wanted === undefined) asked.current = undefined;
@@ -247,12 +267,26 @@ export function HablarView({
       // The link has done its work: the address is the conversation's again, so the page follows
       // its foot as before.
       app.go({ view: 'hablar' });
-    } else if (earlier && !loadingEarlier) loadEarlier?.();
-    else if (!earlier) {
+    } else if (earlier && !loadingEarlier && !earlierFailed) loadEarlier?.();
+    else if (!earlier || earlierFailed) {
+      // Nothing more to read, or a page that did not come: it is not asked for again on its own
+      // (the button beside the conversation asks for it).
       asked.current = wanted;
       app.go({ view: 'hablar' });
     }
-  }, [ready, wanted, turns, turn, topic, earlier, loadingEarlier, loadEarlier, goTo, app.go]);
+  }, [
+    ready,
+    wanted,
+    turns,
+    turn,
+    topic,
+    earlier,
+    loadingEarlier,
+    earlierFailed,
+    loadEarlier,
+    goTo,
+    app.go,
+  ]);
 
   // The newest message stays in sight as it arrives, unless the person scrolled up to read.
   const last = messages?.at(-1)?.id;
@@ -361,11 +395,35 @@ export function HablarView({
             </p>
           ) : null}
         </header>
-        <div className="hb-tabs" role="tablist" aria-label={t('hablar.tabs')} data-enter="fade">
+        <div
+          className="hb-tabs"
+          role="tablist"
+          aria-label={t('hablar.tabs')}
+          data-enter="fade"
+          onKeyDown={(event) => {
+            const to =
+              event.key === 'ArrowRight' || event.key === 'ArrowLeft'
+                ? tab === 'chat'
+                  ? 'out'
+                  : 'chat'
+                : event.key === 'Home'
+                  ? 'chat'
+                  : event.key === 'End'
+                    ? 'out'
+                    : undefined;
+            if (to === undefined) return;
+            event.preventDefault();
+            setTab(to);
+            document.getElementById(`hb-tab-${to}`)?.focus();
+          }}
+        >
           <button
             type="button"
             role="tab"
+            id="hb-tab-chat"
             aria-selected={tab === 'chat'}
+            aria-controls="hb-panel-chat"
+            tabIndex={tab === 'chat' ? 0 : -1}
             onClick={() => setTab('chat')}
           >
             {t('hablar.tab.chat')}
@@ -373,7 +431,10 @@ export function HablarView({
           <button
             type="button"
             role="tab"
+            id="hb-tab-out"
             aria-selected={tab === 'out'}
+            aria-controls="hb-panel-out"
+            tabIndex={tab === 'out' ? 0 : -1}
             onClick={() => setTab('out')}
           >
             {t('hablar.out.count', { count: counts.all + asking })}
@@ -404,7 +465,7 @@ export function HablarView({
           </div>
         ) : null}
         <TeEspera pending={app.pending} onJump={jump} />
-        <div className="hb-chat" ref={scroller}>
+        <div className="hb-chat" id="hb-panel-chat" ref={scroller}>
           {convo.status === 'loading' ? (
             <p className="hb-pane">{t('hablar.loading')}</p>
           ) : convo.status === 'failed' ? (
@@ -458,13 +519,14 @@ export function HablarView({
           }}
         />
       </section>
-      <aside className="hb-side" aria-label={t('hablar.out')}>
+      <aside className="hb-side" id="hb-panel-out" aria-label={t('hablar.out')}>
         <Side
           cards={cards}
           counts={counts}
           filter={filter}
           onFilter={setFilter}
           onGo={goTo}
+          onHit={openHit}
           now={app.now}
           bandeja={{ ...notes, lit: litNote, answerBelow: threadShows }}
           search={search}

@@ -25,12 +25,13 @@ export function ShortText({
 }) {
   const [open, setOpen] = useState(false);
   const id = useId();
-  const toggle = (shown: boolean) => (
+  // `target`: what the toggle opens is on the page now (a folded rest is not, so nothing is named).
+  const toggle = (shown: boolean, target: boolean) => (
     <button
       type="button"
       className="st-toggle"
       aria-expanded={open}
-      aria-controls={id}
+      aria-controls={target ? id : undefined}
       onClick={() => setOpen(!open)}
     >
       {shown ? t('hablar.less') : t('hablar.more')}
@@ -49,7 +50,7 @@ export function ShortText({
             <p className={`${leadClass} st-lines`}>{text}</p>
           )}
         </div>
-        {long ? toggle(open) : null}
+        {long ? toggle(open, true) : null}
       </>
     );
   }
@@ -69,7 +70,7 @@ export function ShortText({
           {draw(reply.rest, 'st-body')}
         </div>
       ) : null}
-      {reply.folds ? toggle(open) : null}
+      {reply.folds ? toggle(open, showRest) : null}
     </>
   );
 }

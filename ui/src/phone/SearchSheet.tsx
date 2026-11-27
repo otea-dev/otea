@@ -93,11 +93,15 @@ export function SearchBody({
         </p>
       ) : (
         <>
-          {found.length > 0 ? (
-            <p className="srch-count t-cap" role="status" data-i="">
-              {t('phone.search.count', { count: found.length })}
-            </p>
-          ) : null}
+          {/* What a screen reader hears when the results change: the items, and what was said. */}
+          <p className="srch-count t-cap" role="status" data-i="">
+            {[
+              found.length > 0 ? t('phone.search.count', { count: found.length }) : '',
+              talk.length > 0 ? t('phone.search.countTalk', { count: talk.length }) : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
           <ul className="srch-list">
             {found.map((item) => {
               const collection = collectionOf(item.collection);
@@ -155,7 +159,7 @@ export function SearchSheet() {
   const index = useMemo(() => indexItems(app.all), [app.all]);
   const asked = useDeferredValue(search);
   const found = useMemo(() => findItems(index, asked), [index, asked]);
-  const talk = useConversationHits(asked);
+  const { hits: talk } = useConversationHits(asked);
 
   // Each opening starts blank.
   if (open && seq !== seen) {

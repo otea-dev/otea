@@ -996,6 +996,10 @@ const change = async (ctl: { bump: () => void }) => {
   await settle();
 };
 
+// The page reads the conversation again at most every 1.5 s as the project changes: a second change
+// waits for the window.
+const pastTheWindow = () => act(async () => new Promise((resolve) => setTimeout(resolve, 1600)));
+
 const enter = (field: Element | null | undefined, init: KeyboardEventInit, keyCode = 13) => {
   const event = new KeyboardEvent('keydown', {
     key: 'Enter',
@@ -1090,6 +1094,7 @@ describe('the kind you set, and the server’s word', () => {
 
     // Someone else puts it back: the old tap no longer hides that.
     setKind('request');
+    await pastTheWindow();
     await change(ctl);
     expect(text(q(page?.root as HTMLElement, '.hb-kind'))).toBe('pedido');
   });
@@ -1320,6 +1325,7 @@ describe('the kind of a turn whose last message says none', () => {
     await change(ctl);
     // Someone else puts it back: the old tap no longer hides that.
     for (const message of view.messages) if (message.kind !== null) message.kind = 'request';
+    await pastTheWindow();
     await change(ctl);
     expect(text(q(page?.root as HTMLElement, '.hb-kind'))).toBe('pedido');
   });

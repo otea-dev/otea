@@ -47,6 +47,8 @@ export function NoteCapture({
   const project = app.project?.id;
   // The words a send that failed left behind come back, a reload too.
   const [text, setText] = useState(() => readNoteDraft(project) ?? '');
+  // Words a send left behind (or that came back from one): they can be thrown away.
+  const [kept, setKept] = useState(() => readNoteDraft(project) !== undefined);
   const [drafts, setDrafts] = useState<FileDraft[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +98,7 @@ export function NoteCapture({
       clearNoteDraft(project);
       if (!alive.current) return;
       setText('');
+      setKept(false);
       setDrafts([]);
       setBusy(false);
       if (ref === undefined) onSent(how);
@@ -106,6 +109,7 @@ export function NoteCapture({
     const fail = (message: string) => {
       keepNoteDraft(project, words);
       if (!alive.current) return;
+      setKept(words !== '');
       setBusy(false);
       setError(message);
     };
@@ -149,6 +153,18 @@ export function NoteCapture({
       if (failure instanceof Unheard && queueAvailable()) return keep();
       fail(failure instanceof Error ? failure.message : String(failure));
     }
+  };
+
+  // Throws away what a send that failed left: the words, the files, the error, and the copy kept
+  // on this phone.
+  const discard = () => {
+    attempt.current = null;
+    clearNoteDraft(project);
+    setText('');
+    setKept(false);
+    setDrafts([]);
+    setError(null);
+    field.current?.focus({ preventScroll: true });
   };
 
   const onPaste = (event: ClipboardEvent<HTMLFormElement>) => {
@@ -217,6 +233,11 @@ export function NoteCapture({
             event.target.value = '';
           }}
         />
+        {kept && !busy ? (
+          <button type="button" className="bn-discard" onClick={discard}>
+            {t('bandeja.discard')}
+          </button>
+        ) : null}
         <button type="submit" className="btn primary bn-save" disabled={!ready} aria-busy={busy}>
           {busy ? t('bandeja.saving') : t('bandeja.save')}
         </button>

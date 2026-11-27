@@ -445,6 +445,9 @@ export function NewItemForm({ board, parent, onCancel, onCreated }: NewItemFormP
     app.phone && parent === undefined && board === undefined ? 'note' : 'board',
   );
   const canNote = parent === undefined;
+  // Once the note has been shown it is kept while the board's form is looked at, so what was typed
+  // is still there on the way back.
+  const [noteSeen, setNoteSeen] = useState(mode === 'note');
   return (
     <div className="nform">
       <div className="sheet-bar" data-c="">
@@ -462,32 +465,38 @@ export function NewItemForm({ board, parent, onCancel, onCreated }: NewItemFormP
           className="bn-mode"
           label={t('bandeja.mode')}
           value={mode}
-          onChange={setMode}
+          onChange={(next) => {
+            setMode(next);
+            if (next === 'note') setNoteSeen(true);
+          }}
           options={[
             { value: 'note', label: t('bandeja.mode.note') },
             { value: 'board', label: t('bandeja.mode.board') },
           ]}
         />
       ) : null}
-      {canNote && mode === 'note' ? (
-        <NoteCapture
-          autoFocus
-          onSent={(how, ref) => {
-            toast({
-              msg: t(how === 'queued' ? 'bandeja.queued' : 'bandeja.saved'),
-              ...(ref
-                ? {
-                    action: {
-                      label: t('bandeja.see'),
-                      run: () => app.go({ view: 'hablar', bandeja: ref }),
-                    },
-                  }
-                : {}),
-            });
-            onCancel();
-          }}
-        />
-      ) : first ? (
+      {canNote && noteSeen ? (
+        <div hidden={mode !== 'note'}>
+          <NoteCapture
+            autoFocus
+            onSent={(how, ref) => {
+              toast({
+                msg: t(how === 'queued' ? 'bandeja.queued' : 'bandeja.saved'),
+                ...(ref
+                  ? {
+                      action: {
+                        label: t('bandeja.see'),
+                        run: () => app.go({ view: 'hablar', bandeja: ref }),
+                      },
+                    }
+                  : {}),
+              });
+              onCancel();
+            }}
+          />
+        </div>
+      ) : null}
+      {canNote && mode === 'note' ? null : first ? (
         <IntakeForm
           collections={collections}
           first={first}

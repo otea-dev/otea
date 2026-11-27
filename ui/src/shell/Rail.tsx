@@ -35,10 +35,17 @@ import { useMedia } from './use-media.ts';
 const NARROW = '(max-width: 1023px)';
 
 // The secretary's state on its row: a dot in its colour while it is there, a ring while it is away;
-// nothing while the project has none.
+// nothing while the project has none. The colour is for the eye; the state is also said in words.
 export function SecretaryDot({ status }: { status: SecretaryStatus | null | undefined }) {
   if (!status) return null;
-  return <i className="sec-dot" data-state={status.state} aria-hidden="true" />;
+  return (
+    <>
+      <i className="sec-dot" data-state={status.state} aria-hidden="true" />
+      <span className="visually-hidden">
+        {t(`hablar.status.${status.state}`, { name: status.name })}
+      </span>
+    </>
+  );
 }
 
 export function RowIcon({ icon }: { icon: BoardIcon }) {

@@ -34,18 +34,27 @@ export function hitsOf(messages: readonly Message[], max = 12): Hit[] {
 
 const DELAY_MS = 250;
 
-// The hits of what is typed, a moment after the last key; none for a blank search or a PC that
-// does not answer.
-export function useConversationHits(search: string): Hit[] {
-  const [hits, setHits] = useState<{ for: string; hits: Hit[] }>({ for: '', hits: [] });
+// Where a search stands: nothing typed, asked and not answered yet, answered (maybe with no hit),
+// or the PC did not answer. «Nothing says it» is only for `ready`.
+export type HitsState = 'idle' | 'searching' | 'ready' | 'failed';
+
+// The hits of what is typed, a moment after the last key, and where the search stands; no hits for
+// a blank search, one still on its way, or a PC that does not answer.
+export function useConversationHits(search: string): { hits: Hit[]; state: HitsState } {
+  const [heard, setHeard] = useState<{ for: string; hits: Hit[] | null }>({
+    for: '',
+    hits: null,
+  });
   const asked = search.trim();
   useEffect(() => {
     if (asked === '') return;
     const control = new AbortController();
     const timer = setTimeout(() => {
       fetchConversation({ search: asked, limit: 40 }, control.signal).then(
-        (view) => setHits({ for: asked, hits: hitsOf(view.messages) }),
-        () => undefined,
+        (view) => setHeard({ for: asked, hits: hitsOf(view.messages) }),
+        () => {
+          if (!control.signal.aborted) setHeard({ for: asked, hits: null });
+        },
       );
     }, DELAY_MS);
     return () => {
@@ -53,5 +62,7 @@ export function useConversationHits(search: string): Hit[] {
       control.abort();
     };
   }, [asked]);
-  return asked !== '' && hits.for === asked ? hits.hits : [];
+  if (asked === '') return { hits: [], state: 'idle' };
+  if (heard.for !== asked) return { hits: [], state: 'searching' };
+  return heard.hits === null ? { hits: [], state: 'failed' } : { hits: heard.hits, state: 'ready' };
 }

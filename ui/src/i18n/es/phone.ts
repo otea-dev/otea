@@ -21,6 +21,7 @@ export const phone = {
   'phone.search.talk': 'En Hablar',
   'phone.search.none': 'Ningún ítem dice «{search}».',
   'phone.search.count': { one: '{count} ítem', other: '{count} ítems' },
+  'phone.search.countTalk': '{count} en Hablar',
   // Captura rápida (mock, pantalla 3)
   'phone.capture.board': 'Tablero: {board}. Cambiarlo',
   'phone.capture.here': 'este tablero',

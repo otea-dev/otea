@@ -19,6 +19,7 @@ export const phone = {
   'phone.search.talk': 'In Talk',
   'phone.search.none': 'No item says “{search}”.',
   'phone.search.count': { one: '{count} item', other: '{count} items' },
+  'phone.search.countTalk': '{count} in Talk',
   // Quick capture (mock screen 3)
   'phone.capture.board': 'Board: {board}. Change it',
   'phone.capture.here': 'this board',

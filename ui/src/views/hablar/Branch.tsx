@@ -105,6 +105,8 @@ export function AskCard({ item, gone = false }: { item: Item; gone?: boolean }) 
   if (!asks) return null;
   return (
     <AskBody
+      // A new question on the item is a new card: what was answered before is not this answer.
+      key={asks.question}
       by={asks.by}
       about={item.id}
       text={asks.text}

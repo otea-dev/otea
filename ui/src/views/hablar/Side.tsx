@@ -77,6 +77,7 @@ export function Side({
   filter,
   onFilter,
   onGo,
+  onHit,
   now,
   bandeja,
   search,
@@ -87,6 +88,8 @@ export function Side({
   filter: Filter;
   onFilter: (filter: Filter) => void;
   onGo: (root: number) => void;
+  // Opens a turn the search found: it may be on an earlier page than the one read.
+  onHit: (root: number) => void;
   now: number;
   // The Bandeja's notes as the page read them, and the one lit by a link.
   bandeja: BandejaProps;
@@ -94,7 +97,7 @@ export function Side({
   search: string;
   onSearch: (search: string) => void;
 }) {
-  const hits = useConversationHits(search);
+  const { hits, state } = useConversationHits(search);
   const searching = search.trim() !== '';
   return (
     <div className="hb-out">
@@ -114,12 +117,16 @@ export function Side({
       </label>
       {searching ? (
         hits.length === 0 ? (
-          <p className="hb-none">{t('hablar.search.none', { search: search.trim() })}</p>
+          <p className="hb-none" role="status">
+            {state === 'ready'
+              ? t('hablar.search.none', { search: search.trim() })
+              : t(state === 'failed' ? 'hablar.search.failed' : 'hablar.search.searching')}
+          </p>
         ) : (
           <ul className="hb-hits">
             {hits.map((hit) => (
               <li key={hit.root} className="hb-hit">
-                <button type="button" onClick={() => onGo(hit.root)}>
+                <button type="button" onClick={() => onHit(hit.root)}>
                   <span className="hb-meta">
                     {hit.kind ? (
                       <span className="hb-kind static" data-kind={hit.kind}>

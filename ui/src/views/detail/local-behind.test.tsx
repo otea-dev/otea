@@ -30,7 +30,13 @@ function pc(first: number | null) {
     const behind =
       answer.now === null
         ? null
-        : { base: 'main', remote: 'origin/main', behind: answer.now, checkout: '/w', state: 'ready' };
+        : {
+            base: 'main',
+            remote: 'origin/main',
+            behind: answer.now,
+            checkout: '/w',
+            state: 'ready',
+          };
     return new Response(JSON.stringify({ behind }), {
       headers: { 'content-type': 'application/json' },
     });

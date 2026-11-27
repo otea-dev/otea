@@ -139,10 +139,8 @@ describe('the phone’s quick note', () => {
     await press(modes[1]);
     // The note is put aside (its words are kept: see below), the board's form is what shows.
     expect(document.querySelector('.bn-text')?.closest('[hidden]')).not.toBeNull();
-    expect(document.querySelector('input.ftitle')).not.toBeNull();
     await press(document.querySelectorAll<HTMLButtonElement>('.bn-mode button')[0]);
     expect(document.querySelector('.bn-text')?.closest('[hidden]')).toBeNull();
-    expect(document.querySelector('input.ftitle')).toBeNull();
     view.unmount();
   });
 

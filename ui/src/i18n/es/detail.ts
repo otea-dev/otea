@@ -758,19 +758,19 @@ export const detail = {
   'bi.branch.closed': 'ya no se sube',
   'bi.branch.noPush': 'sin subidas en {step}',
   'bi.branch.behind.ready': {
-    one: 'Subido a {remote}, pero tu {base} local va {count} commit atrasado: en {checkout} ejecuta git pull --ff-only',
+    one: 'Subido a {remote}, pero en tu {base} local va {count} commit atrasado: en {checkout} ejecuta git pull --ff-only',
     other:
-      'Subido a {remote}, pero tu {base} local va {count} commits atrasado: en {checkout} ejecuta git pull --ff-only',
+      'Subido a {remote}, pero en tu {base} local van {count} commits atrasados: en {checkout} ejecuta git pull --ff-only',
   },
   'bi.branch.behind.changes': {
-    one: 'Subido a {remote}, pero tu {base} local va {count} commit atrasado: {checkout} tiene cambios tuyos, así que no se tocó; ejecuta git pull --ff-only ahí cuando puedas',
+    one: 'Subido a {remote}, pero en tu {base} local va {count} commit atrasado: {checkout} tiene cambios tuyos, así que no se tocó; ejecuta git pull --ff-only ahí cuando puedas',
     other:
-      'Subido a {remote}, pero tu {base} local va {count} commits atrasado: {checkout} tiene cambios tuyos, así que no se tocó; ejecuta git pull --ff-only ahí cuando puedas',
+      'Subido a {remote}, pero en tu {base} local van {count} commits atrasados: {checkout} tiene cambios tuyos, así que no se tocó; ejecuta git pull --ff-only ahí cuando puedas',
   },
   'bi.branch.behind.elsewhere': {
-    one: 'Subido a {remote}, pero tu {base} local va {count} commit atrasado: {checkout} está en {on}, así que no se tocó; cambia a {base} y ejecuta git pull --ff-only',
+    one: 'Subido a {remote}, pero en tu {base} local va {count} commit atrasado: {checkout} está en {on}, así que no se tocó; cambia a {base} y ejecuta git pull --ff-only',
     other:
-      'Subido a {remote}, pero tu {base} local va {count} commits atrasado: {checkout} está en {on}, así que no se tocó; cambia a {base} y ejecuta git pull --ff-only',
+      'Subido a {remote}, pero en tu {base} local van {count} commits atrasados: {checkout} está en {on}, así que no se tocó; cambia a {base} y ejecuta git pull --ff-only',
   },
   'bi.branch.behind.diverged':
     'Subido a {remote}, pero tu {base} local y {remote} se separaron: tu {base} tiene commits propios, así que no se tocó y ningún pull puede ponerlo al día; mira git log {remote}..{base} en {checkout} y decide cómo unirlos',

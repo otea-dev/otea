@@ -70,6 +70,18 @@ describe('Nuevo ítem', () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
+  // G3: a look at the board's form threw away the note that was being typed.
+  it('keeps the note that was typed while the board’s form is looked at', async () => {
+    const root = await open(false, { onCancel: vi.fn(), onCreated: vi.fn() });
+
+    await press(modes(root)[0]);
+    await typeInto(root.querySelector('.bn-text'), 'una idea a medias');
+    await press(modes(root)[1]);
+    await press(modes(root)[0]);
+
+    expect(root.querySelector<HTMLTextAreaElement>('.bn-text')?.value).toBe('una idea a medias');
+  });
+
   it('starts on the note on the phone, unless a board or a parent asked for the form', async () => {
     const root = await open(true, { onCancel: vi.fn(), onCreated: vi.fn() });
     expect(modes(root)[0]?.classList.contains('on')).toBe(true);
