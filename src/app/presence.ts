@@ -1,5 +1,10 @@
 import type { DatabaseSync } from 'node:sqlite';
-import { type AgentStatus, agentStatus, LISTEN_WINDOW_MS } from '../core/agent-status.ts';
+import {
+  type AgentStatus,
+  agentStatus,
+  LISTEN_WINDOW_MS,
+  THERE_FOR_MS,
+} from '../core/agent-status.ts';
 import type { AgentChannel } from '../core/authority.ts';
 import { OteaError } from '../core/errors.ts';
 import { isAgentName } from '../core/item.ts';
@@ -117,6 +122,9 @@ export type AgentPresence = {
   // Every process it was heard listening through (its MCP server, its wait) has ended: Otea knows
   // its session ended. Never for one heard through none, such as one at the command line.
   sessionEnded: boolean;
+  // The session it runs under runs now and gave a sign within THERE_FOR_MS: whatever it holds, it
+  // is at (a long step makes no otea call).
+  there: boolean;
   // Heard listening within LISTEN_WINDOW_MS.
   listening: boolean;
   // Heard waiting in otea wait within LISTEN_WINDOW_MS: what the person does on the desk reaches
@@ -338,7 +346,7 @@ export function runningProcesses(
 // the session while it was noted lately, and only then. Past the secretary's held time with no
 // sign of it, an id that still runs may be another process's, as Windows hands them out within
 // seconds of one ending.
-export const HARNESS_BEAT_MS = 35 * 60_000;
+export const HARNESS_BEAT_MS = THERE_FOR_MS;
 
 // An MCP session (`session`, its server's process id) takes an agent name only while no other open
 // session works under it: two sessions under one name would take one item twice and hand off each
@@ -568,6 +576,50 @@ export function waitBeat(
   return { everyMs: LISTEN_BEAT_MS, run };
 }
 
+// A lease within this of running out (or already out) of a holder that is there is extended.
+const LEASE_RENEW_AHEAD_MS = 3 * 60_000;
+
+// What the last look at the leases found per project: the holders it left alone, and when, so a
+// really stuck item does not make every read list the agents again.
+const lookedAt = new WeakMap<DatabaseSync, { key: string; at: number }>();
+
+// A worker at a long step makes no otea call, so its lease runs out while it works: its session is
+// the sign it is there (a harness noted by its commands, a listener of it), and the lease is the
+// promise it works (H2, field study 4). Each lease about to run out, or out, of a holder that is
+// there (its session runs and gave a sign within THERE_FOR_MS) is extended to a default lease from
+// now, never shortened, so the item is not «atascado» for a worker that is at it. A holder whose
+// session is gone, or that has been quiet for long, keeps no lease: that is the stuck item. Cheap
+// when no lease is near its end, and the agents are read only then.
+export function keepLeasesOfAgentsThere(
+  db: DatabaseSync,
+  now: Clock = systemClock,
+  processes: (pid: number) => boolean = processAlive,
+): void {
+  const at = now();
+  const soon = leaseExpiry(at, LEASE_RENEW_AHEAD_MS);
+  const due = selectLeases(db).filter(({ lease }) => lease.expiresAt < soon);
+  if (due.length === 0) return;
+  const key = JSON.stringify(due.map(({ id, lease }) => [id, lease.holder, lease.expiresAt]));
+  const last = lookedAt.get(db);
+  const stamp = Date.parse(at);
+  if (last && last.key === key && Math.abs(stamp - last.at) < LOOK_AGAIN_MS) return;
+  const there = new Set(
+    listAgents(db, () => at, processes)
+      .filter((agent) => agent.there && agent.role !== 'secretary')
+      .map(({ name }) => name),
+  );
+  const until = leaseExpiry(at, DEFAULT_LEASE_TTL_MS);
+  let left = 0;
+  for (const { id, lease } of due) {
+    if (there.has(lease.holder)) takeLease(db, id, { holder: lease.holder, expiresAt: until }, at);
+    else left += 1;
+  }
+  if (left > 0) lookedAt.set(db, { key, at: stamp });
+  else lookedAt.delete(db);
+}
+
+const LOOK_AGAIN_MS = 5_000;
+
 // A waiting agent is alive: a parent waiting on its children, or on the person's answer, keeps
 // what it holds, each live lease extended to a default lease from now, never shortened. A lease
 // that already ran out stays as it is (Atasco): the agent claims it again.
@@ -680,6 +732,11 @@ export function listAgents(
     const harness = listeners.get(name)?.harness ?? null;
     return harness !== null && !harnessRuns(harness) && !listenerRuns(listeners.get(name), alive);
   };
+  // The harness session it was heard through runs now and was noted lately.
+  const harnessThere = (name: string) => {
+    const harness = listeners.get(name)?.harness ?? null;
+    return harness !== null && harnessRuns(harness);
+  };
   const records = selectAgents(db);
   const released = selectLastReleases(db);
   // Whoever has a question of its own waiting for the person: it waits for the answer, not at work.
@@ -758,6 +815,15 @@ export function listAgents(
     // The secretary's wait hears the person, not the boards' desk: it is never a board listener.
     const waiting = attending && role !== 'secretary';
     const sessionEnded = silenced(name);
+    const quietMs =
+      Date.parse(at) - Math.max(Date.parse(lastSeen), Date.parse(record.actedAt ?? lastSeen));
+    // The session it runs under runs now (its harness noted by the commands it ran, or a listener
+    // of it) and it gave a sign lately: a long step with no otea call is no silence.
+    const there =
+      !sessionEnded &&
+      !ended &&
+      quietMs < THERE_FOR_MS &&
+      (listenerRuns(listeners.get(name), alive) || harnessThere(name));
     return {
       name,
       harness,
@@ -773,10 +839,11 @@ export function listAgents(
         waiting,
         asking: askers.has(name),
         sessionEnded: sessionEnded || ended,
-        quietMs:
-          Date.parse(at) - Math.max(Date.parse(lastSeen), Date.parse(record.actedAt ?? lastSeen)),
+        quietMs,
+        there,
       }),
       sessionEnded,
+      there,
       listening,
       waiting,
       attending,

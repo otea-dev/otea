@@ -203,6 +203,7 @@ import {
   declareSecretary,
   isSecretaryAct,
   requireSecretary,
+  secretaryName,
   secretaryStatus,
   secretaryWake,
   startSecretaryWait,
@@ -354,7 +355,7 @@ import { baseTipsOf, landedCommitRefusal } from './landed-commit.ts';
 import { type LocalBehind, localBehindOf, localBehindText } from './local-behind.ts';
 import { mergedOutside, mergedOutsideLine } from './merged-outside.ts';
 import { boardsOf, eventData, itemCollections, itemData, readableEvent } from './names.ts';
-import { watchOwner } from './owner.ts';
+import { harnessOf, isKnownHarness, listProcesses, watchOwner } from './owner.ts';
 import { PHONE_COMMANDS } from './phone.ts';
 import { portFrom, portToOpen, portToStart, projectPage } from './ports.ts';
 import { probeSignIn } from './probe.ts';
@@ -366,6 +367,7 @@ import {
   choiceQuestion,
   defaultBoard,
 } from './start-choice.ts';
+import { STARTED_BY } from './started-by.ts';
 import { statsText } from './stats.ts';
 import {
   dataTargets,
@@ -1922,7 +1924,7 @@ const next: Command = {
     harness: { placeholder: 'name' },
     ...BRIEFING,
   },
-  execute: (input) => {
+  execute: async (input) => {
     const collection = input.option('collection');
     const claim = input.flag('claim');
     const { actor, channel } = input;
@@ -1930,7 +1932,7 @@ const next: Command = {
     const model = input.option('model');
     const effort = input.option('effort');
     const given = input.option('harness');
-    return withAgent(input, (project) => {
+    const answered = withAgent(input, (project) => {
       if (model !== undefined || effort !== undefined) {
         declareFromOptions(input, project, {
           ...(model === undefined ? {} : { model }),
@@ -1984,6 +1986,9 @@ const next: Command = {
         text,
       };
     });
+    // What it claims, it does in a session whose process Otea notes (H2).
+    if (claim) await noteWorkerHarnessAfter(input);
+    return answered;
   },
 };
 
@@ -2765,6 +2770,45 @@ async function listenWhile<T>(
   return waited;
 }
 
+// A worker's harness session, noted the way the secretary's is (H2, field study 4): the process
+// above the shells that ran its claim or its wait, for as long as it lives. A worker at a long step
+// makes no otea call, and a session that runs is the sign it is there; without it the desk read the
+// item «atascado» and the worker «sin señal» while it worked. Read once per session, by the command
+// that starts the work (claim, next --claim) or by a wait, never by a heartbeat; the secretary's
+// own waits note theirs. An agent known to run under a noted harness reads no table.
+function workerHarnessUnknown(project: Project, input: Input): boolean {
+  if (input.channel !== 'cli' || input.actor.kind !== 'agent') return false;
+  const me = input.actor.name;
+  if (secretaryName(project.db) === me) return false;
+  const harness = selectListenerProcesses(project.db).get(me)?.harness ?? null;
+  return harness === null || !processAlive(harness);
+}
+
+// How long the command that starts a worker's work waits for the process table, once per session:
+// a busy machine answers slowly, and the worker's wait notes it then.
+const WORKER_HARNESS_READ_MS = 3000;
+
+async function noteWorkerHarnessAfter(input: Input): Promise<void> {
+  let unknown = false;
+  try {
+    unknown = withProject(input.cwd, (project) => workerHarnessUnknown(project, input));
+  } catch {
+    return;
+  }
+  if (!unknown) return;
+  const table = await listProcesses(AbortSignal.timeout(WORKER_HARNESS_READ_MS));
+  const pid = table && harnessOf(table.rows, STARTED_BY);
+  if (!table || pid === undefined || pid === process.pid) return;
+  const known = isKnownHarness(table.rows, pid);
+  try {
+    withProject(input.cwd, (project) =>
+      noteHarness(project.db, input.actor.name, pid, systemClock, known),
+    );
+  } catch {
+    // The project is gone: nothing to note it for.
+  }
+}
+
 // The secretary's wait (otea wait --secretary): returns for a message from the person, a Bandeja
 // capture, a question escalated to it, or board work nobody listens to (app/secretary.ts). Only the
 // project's secretary waits this way, and the boards do not count it as listening.
@@ -2872,6 +2916,17 @@ const wait: Command = {
       // A note from the person on an item this agent holds wakes it too: it answers it first. So
       // does the person's answer to its question.
       const me = input.actor.name;
+      // A worker's harness session is noted once the owner watch has read the processes (H2).
+      if (workerHarnessUnknown(project, input)) {
+        void Promise.all([owner.harness, owner.harnessKnown]).then(([pid, known]) => {
+          if (pid === undefined || pid === process.pid) return;
+          try {
+            noteHarness(project.db, me, pid, systemClock, known);
+          } catch {
+            // The wait ended and closed the project first: nothing left to note it for.
+          }
+        });
+      }
       // An agent waiting for unclaimed agent work wakes only for an item next would offer it: one left for
       // or just offered to another agent would wake it to "nothing to do" again and again.
       const forMe =
@@ -3053,12 +3108,12 @@ const claim: Command = {
     'Hold an item on the agent turn so no other agent can write it (default --ttl 15m); claiming it again extends it',
   args: ['id'],
   options: TTL,
-  execute: (input) => {
+  execute: async (input) => {
     const [id = ''] = input.args;
     const { actor, option } = input;
     const ttl = ttlFrom(option('ttl'));
     const lease = { id, actor, ...(ttl === undefined ? {} : { ttlMs: ttl }) };
-    return withAgent(input, (project) => {
+    const claimed = withAgent(input, (project) => {
       requireProfile(project.db, actor.name, { channel: input.channel });
       const item = claimItem(project, {
         ...lease,
@@ -3084,6 +3139,8 @@ const claim: Command = {
         text,
       };
     });
+    await noteWorkerHarnessAfter(input);
+    return claimed;
   },
 };
 

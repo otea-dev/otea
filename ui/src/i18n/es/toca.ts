@@ -39,7 +39,7 @@ export const toca = {
     one: '{n} cosa se quedó quieta: ',
     other: '{n} cosas se quedaron quietas: ',
   },
-  'toca.dekStuck.agent': '{agent} no da señales desde hace {time}',
+  'toca.dekStuck.agent': '{agent} lleva {time} sin avisar',
   'toca.dekStuck.none': 'Nada parado: los agentes siguen dando señales.',
 
   // La llamada a actuar de una fila y su línea pequeña
@@ -62,7 +62,7 @@ export const toca = {
   'toca.sub.thenAgent': 'después lo toma un agente',
   'toca.sub.thenClose': 'después se cierra',
   'toca.sub.does': 'lo hace {agent}',
-  'toca.sub.silent': '{agent} no da señales',
+  'toca.sub.silent': '{agent} lleva rato sin avisar',
   'toca.sub.waitsFor': 'espera a {agent}',
   'toca.sub.waitsAgent': 'espera a un agente',
   'toca.sub.waitsKids': 'espera a sus hijos',

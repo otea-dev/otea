@@ -116,7 +116,7 @@ export const hablar = {
   'bandeja.below': 'responde abajo, al final de la conversación',
   'hablar.te.k.review': 'revisión',
   'hablar.te.k.step': 'tu paso',
-  'hablar.te.k.stuck': '{agent} no da señales',
+  'hablar.te.k.stuck': '{agent} lleva rato sin avisar',
   'hablar.te.what.review': 'revisión',
   'hablar.te.what.answer': 'respuesta',
   'hablar.te.block': {

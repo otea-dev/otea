@@ -114,7 +114,7 @@ export const hablar = {
   'bandeja.below': 'answer below, at the foot of the conversation',
   'hablar.te.k.review': 'review',
   'hablar.te.k.step': 'your step',
-  'hablar.te.k.stuck': '{agent} gave no sign',
+  'hablar.te.k.stuck': '{agent} has been quiet for a while',
   'hablar.te.what.review': 'review',
   'hablar.te.what.answer': 'answer',
   'hablar.te.block': {

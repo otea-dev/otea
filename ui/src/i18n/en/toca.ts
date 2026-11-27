@@ -34,7 +34,7 @@ export const toca = {
   'toca.since.yesterday': 'since yesterday',
   'toca.since.days': { one: 'for {count} day', other: 'for {count} days' },
   'toca.dekStuck.lead': { one: '{n} thing went quiet: ', other: '{n} things went quiet: ' },
-  'toca.dekStuck.agent': '{agent} has given no sign for {time}',
+  'toca.dekStuck.agent': '{agent} has been quiet for {time}',
   'toca.dekStuck.none': 'Nothing stuck: the agents keep checking in.',
 
   // A row's call to act and its small line
@@ -57,7 +57,7 @@ export const toca = {
   'toca.sub.thenAgent': 'then an agent takes it',
   'toca.sub.thenClose': 'then it closes',
   'toca.sub.does': '{agent} is on it',
-  'toca.sub.silent': '{agent} has no signal',
+  'toca.sub.silent': '{agent} has been quiet for a while',
   'toca.sub.waitsFor': 'waiting for {agent}',
   'toca.sub.waitsAgent': 'waiting for an agent',
   'toca.sub.waitsKids': 'waiting for its children',

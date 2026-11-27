@@ -59,6 +59,7 @@ import {
   liveBoardOf,
   relayAllowed,
 } from './next.ts';
+import { keepLeasesOfAgentsThere } from './presence.ts';
 import {
   addRelation,
   assertMayEnter,
@@ -249,6 +250,7 @@ export function listItems(ctx: Context, filter: ListItemsFilter = {}, now = syst
   if (parent !== undefined) requireItem(ctx.db, parent);
   const relations = selectRelations(ctx.db);
   const children = parent === undefined ? undefined : new Set(childIds(relations, parent));
+  keepLeasesOfAgentsThere(ctx.db, now);
   const at = now();
   const asking = askingItems(ctx.db);
   const items = selectItems(ctx.db, stored)
@@ -285,6 +287,7 @@ export function oldestWaiting(
 }
 
 export function getItem(ctx: Context, id: string, now = systemClock): ItemWithEvents {
+  keepLeasesOfAgentsThere(ctx.db, now);
   const item = requireItem(ctx.db, id);
   const workflow = workflowOf(ctx, item);
   const events = selectEvents(ctx.db, id);

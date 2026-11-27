@@ -305,6 +305,7 @@ describe('agent presence', () => {
           folder: null,
           actedAt: null,
           sessionEnded: false,
+          there: false,
         },
       ]);
       expect(listAgents(ctx.db, at(T2_31S))[0]).toMatchObject({ live: false, listening: false });

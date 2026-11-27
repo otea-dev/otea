@@ -65,7 +65,7 @@ import {
   setLanOpen,
   switchToTailscale,
 } from '../app/phone.ts';
-import { listAgents } from '../app/presence.ts';
+import { keepLeasesOfAgentsThere, listAgents } from '../app/presence.ts';
 import { listPresetViews } from '../app/preset-views.ts';
 import { estimatesOfItems, pinItems, priorityOf, setOrder } from '../app/priority.ts';
 import { type Env, type Project, projectView } from '../app/project.ts';
@@ -1443,7 +1443,12 @@ export function createServer(
     // A process that ended writes nothing: the feed looks at liveness on a timer, and a change in
     // it reaches every open desk as a change and a presence.
     const feed = createChangeFeed(project.db, options.pollIntervalMs, {
-      signature: () => livenessSignature(project.db),
+      signature: () => {
+        // A worker at a long step makes no call: its lease is kept before the desk could read it
+        // as stuck while its session runs (H2).
+        keepLeasesOfAgentsThere(project.db);
+        return livenessSignature(project.db);
+      },
       everyMs: options.livenessEveryMs ?? LIVENESS_EVERY_MS,
     });
     const streams = liveStreams(feed, () => deskSignature(project.db));
