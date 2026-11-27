@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import { type Context, Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -174,6 +175,7 @@ import {
   relinkPath,
 } from './projects.ts';
 import { generateVapidKeys, type PushSender, type VapidKeys, webPushSender } from './push.ts';
+import { digestOf, keepReplay, replaying, replayOf } from './replays.ts';
 import { roundSame } from './round-same.ts';
 import {
   type Client,
@@ -771,6 +773,15 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
         assertWritable(c, auth, true);
         const clientKey = clientKeyOf(c);
         const { files, ...request } = await createRequest(c);
+        // The key's content: a key that made another item is refused, as Bandeja's and Hablar's are.
+        const digest = digestOf([
+          request,
+          files.map((file) => [
+            file.filename,
+            createHash('sha256').update(file.bytes).digest('hex'),
+          ]),
+        ]);
+        replayOf(c, project, digest);
         // Sent again (a phone that never heard back): the item the first send made, not a second.
         const made = clientKey === undefined ? undefined : itemOfClientKey(project.db, clientKey);
         if (made !== undefined) {
@@ -787,6 +798,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
           files.length === 0
             ? createItem(project, input)
             : createItemWithEvidence(project, input, files);
+        keepReplay(c, project, digest, 201, {});
         feed.notify();
         return c.json(item, 201);
       })
@@ -1069,24 +1081,29 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
         async (c) => {
           assertWritable(c, auth);
           const given = await secretaryAnswerRequest(c);
-          const message = answerSecretaryTap(
-            project,
-            messageIdOf(c.req.param('id')),
-            given,
-            undefined,
-            HUMAN_IN_UI.actor.name,
-            surfaceOf(c),
-          );
-          feed.notify();
-          return c.json(message, 201);
+          // Sent again under the same key (a phone that never heard back): the first result.
+          return replaying(c, project, given, 201, () => {
+            const message = answerSecretaryTap(
+              project,
+              messageIdOf(c.req.param('id')),
+              given,
+              undefined,
+              HUMAN_IN_UI.actor.name,
+              surfaceOf(c),
+            );
+            feed.notify();
+            return message;
+          });
         },
       )
       // The person takes back the answer they just gave (Deshacer), before the secretary heard it.
       .post('/conversation/messages/:id/unanswer', (c) => {
         assertWritable(c, auth);
-        const question = retractAnswer(project, messageIdOf(c.req.param('id')));
-        feed.notify();
-        return c.json(question);
+        return replaying(c, project, null, 200, () => {
+          const question = retractAnswer(project, messageIdOf(c.req.param('id')));
+          feed.notify();
+          return question;
+        });
       })
       // The Bandeja (app/bandeja.ts): the person's rough captures. The person captures and answers
       // only here, signed in, from the UI's own origin: no command or tool of an agent makes an
@@ -1130,22 +1147,26 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
           assertWritable(c, auth);
           const given = await chosenAnswerRequest(c);
           const { question, ...words } = given;
-          const entry = answerBandeja(project, {
-            id: bandejaIdOf(c.req.param('id')),
-            question,
-            ...words,
+          return replaying(c, project, given, 200, () => {
+            const entry = answerBandeja(project, {
+              id: bandejaIdOf(c.req.param('id')),
+              question,
+              ...words,
+            });
+            feed.notify();
+            return entry;
           });
-          feed.notify();
-          return c.json(entry);
         },
       )
       // The person reopens a note the secretary or its refiner closed: it waits for the secretary
       // again.
       .post('/bandeja/:id/reopen', (c) => {
         assertWritable(c, auth);
-        const entry = reopenBandeja(project, { id: bandejaIdOf(c.req.param('id')) });
-        feed.notify();
-        return c.json(entry);
+        return replaying(c, project, null, 200, () => {
+          const entry = reopenBandeja(project, { id: bandejaIdOf(c.req.param('id')) });
+          feed.notify();
+          return entry;
+        });
       })
       // An item's topics: those linked to it, and those it may have come from, for the person to
       // confirm or dismiss.

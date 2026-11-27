@@ -675,6 +675,22 @@ export const MIGRATIONS = [
   `
   ALTER TABLE bandeja_questions ADD COLUMN option_text TEXT;
   `,
+  // What a write of the person answered, kept under the Idempotency-Key it came with (field study 4,
+  // T1b): a tap, an answer, an undo or a reopen sent again gives that result, never a refusal that
+  // reads as a failure, and the same key with other content is refused. A key is one client's (the
+  // device or the desk's browser) and one route's.
+  `
+  CREATE TABLE replays (
+    scope TEXT NOT NULL,
+    key TEXT NOT NULL,
+    route TEXT NOT NULL,
+    digest TEXT NOT NULL,
+    status INTEGER NOT NULL,
+    body TEXT NOT NULL,
+    at TEXT NOT NULL,
+    PRIMARY KEY (scope, key, route)
+  );
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {
