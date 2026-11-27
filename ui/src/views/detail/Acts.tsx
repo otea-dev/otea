@@ -16,7 +16,7 @@ import { keepInView } from '../../phone/keep-in-view.ts';
 import { statusWord } from '../../presence.ts';
 import type { ItemView, TypeView } from '../../types.ts';
 import { closerOf, type Facts } from './facts.ts';
-import { resumedToastOf, stuckToastOf, toastOf } from './frame.ts';
+import { reopenedToastOf, resumedToastOf, stuckToastOf, toastOf } from './frame.ts';
 import { type MoveChoice, type MovePlan, moveSaysOf } from './moves.ts';
 import { answerDraftKeyOf, draftStore, dropDraft, keepDraft, readDraft } from './note-draft.ts';
 import { PickForm, type PickMade } from './PickForm.tsx';
@@ -689,10 +689,20 @@ export function Acts({
         <p className="receipt">{text}</p>
         {/* While an agent is at work, it sees the item when it waits again (P7-R2-9). */}
         {heard && unheard(item, app.agents, app.now) ? <Unheard hearing={heard} /> : null}
-        {freeButton || open ? (
+        {freeButton || open || look === 'dropped' ? (
           <div className="actions">
             {freeButton}
             {open ? closeAs : null}
+            {/* A discard nobody should have made: the person takes it back, to where it was. */}
+            {look === 'dropped' ? (
+              <Button
+                variant="quiet"
+                data-reopen-dropped=""
+                onClick={() => void app.reopenDropped(item.id, reopenedToastOf(item.title))}
+              >
+                {t('sheet.dropped.reopen')}
+              </Button>
+            ) : null}
           </div>
         ) : null}
         {freeable ? <div className="movesays">{freeSays}</div> : null}

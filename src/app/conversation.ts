@@ -271,13 +271,17 @@ function checkedAction(
   options: readonly string[],
 ): MessageAction | undefined {
   if (action === undefined) return undefined;
+  const does = action.kind === 'drop' ? 'drops an item' : 'sends an item back';
   if (options.length === 0) {
     invalid(
-      'Not said: a question that sends an item back needs its options: the first one does it, the other says no (--option "<do it>" --option "<leave it>")',
+      `Not said: a question that ${does} needs its options: the first one does it, the other says no (--option "<do it>" --option "<leave it>")`,
     );
   }
   const note = action.note.trim();
-  if (note === '') invalid('Not said: the note to send the item back with is empty');
+  if (note === '')
+    invalid(
+      `Not said: the note to ${action.kind === 'drop' ? 'drop' : 'send back'} the item with is empty`,
+    );
   if (note.length > MAX_MESSAGE_CHARS)
     invalid(`Not said: the note takes at most ${MAX_MESSAGE_CHARS} characters`);
   return { ...action, note };
@@ -435,7 +439,7 @@ export function answerSecretaryQuestion(
   let option: number | undefined;
   if (given.delegate && question.action !== null) {
     invalid(
-      `Message ${id} sends ${question.action.item} back: only you decide that, so it is not left to the secretary`,
+      `Message ${id} ${question.action.kind === 'drop' ? 'drops' : 'sends'} ${question.action.item}${question.action.kind === 'drop' ? '' : ' back'}: only you decide that, so it is not left to the secretary`,
     );
   }
   if (given.note !== undefined && (question.action === null || given.option !== 1)) {

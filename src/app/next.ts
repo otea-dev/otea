@@ -1997,7 +1997,7 @@ function dropTarget(board: LiveBoard, item: ItemRecord, input: Omit<DropInput, '
 // agent drops only while doing a step that lets it, a relay only where the person may discard
 // through an agent.
 export function dropItem(ctx: Context, input: DropInput, now = systemClock): BoardMoveResult {
-  return transaction(ctx.db, () => {
+  return joinTransaction(ctx.db, () => {
     const item = requireWritableItem(ctx.db, input.id);
     const board = requireBoard(ctx, item);
     const at = now();

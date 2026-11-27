@@ -6,6 +6,7 @@ import { assertCanLeave } from '../core/fields.ts';
 import type { Actor } from '../core/item.ts';
 import { activeLease } from '../core/lease.ts';
 import { stateLabel, transitionsBetween, type Workflow } from '../core/workflow.ts';
+import { selectMessage } from '../store/conversation.ts';
 import { transaction } from '../store/database.ts';
 import { type EventRecord, type ItemRecord, selectEvents } from '../store/queries.ts';
 import { typeOfItem } from './collections.ts';
@@ -20,6 +21,7 @@ import {
   roundWorkersOf,
 } from './next.ts';
 import { assertMayEnter } from './relations.ts';
+import { secretaryName } from './secretary.ts';
 
 // The human a relayed decision belongs to: the same actor the web UI records.
 export const RELAYED_HUMAN: Actor = { kind: 'human', name: 'human' };
@@ -35,7 +37,62 @@ export type RelayInput = {
   reason?: string;
   // On a board with motives, the motive of a relayed discard, by its name (any case) or its id.
   motive?: string;
+  // The message of the person's in Hablar the quote comes from. A project with a secretary takes a
+  // relay only from it and only with this message, which must contain the quote.
+  fromMessage?: number;
 };
+
+// Words compared as a reader would: case, accents' case and the spaces between words do not tell
+// two sentences apart.
+const plainWords = (text: string) => text.toLocaleLowerCase().replace(/\s+/g, ' ').trim();
+
+// What a relay stands on once the project has a secretary (field study 4, U8: any process could drop
+// an item with a sentence nobody said): the secretary, with the person's own message, which says
+// what is quoted. Returns the message. Without a secretary there is no conversation to check
+// against and a relay is the agent's word, as it was.
+function assertSaidInHablar(ctx: Context, input: RelayInput, quote: string): number | undefined {
+  const secretary = secretaryName(ctx.db);
+  if (secretary === undefined) return undefined;
+  if (input.via !== secretary) {
+    throw new OteaError(
+      'forbidden',
+      `Not relayed: only the secretary (${secretary}) relays what the person said, and only words they wrote in Hablar. ${input.via} asks them instead: otea ask ${input.id} "<your question>"`,
+    );
+  }
+  const refer = `relay it with --from-message <id of the person's message in Hablar (otea conversation shows them)> and --quote words that message contains`;
+  if (input.fromMessage === undefined) {
+    throw new OteaError('quote_required', `Not relayed: ${refer}`);
+  }
+  const message = selectMessage(ctx.db, input.fromMessage);
+  if (message === undefined) {
+    throw new OteaError('quote_required', `Not relayed: there is no message ${input.fromMessage}`);
+  }
+  if (message.author !== 'person') {
+    throw new OteaError(
+      'quote_required',
+      `Not relayed: message ${message.id} is not the person's: ${refer}`,
+    );
+  }
+  if (!plainWords(message.text).includes(plainWords(quote))) {
+    throw new OteaError(
+      'quote_required',
+      `Not relayed: message ${message.id} does not contain that quote: ${refer}`,
+    );
+  }
+  return message.id;
+}
+
+// An item that waits for the person's review leaves it by their own tap (the desk's Devolver,
+// Descartar, Aprobar, or a card of the secretary's they tap), never by words an agent relays.
+function assertNotInReview(ctx: Context, item: ItemRecord): void {
+  const board = liveBoardOf(ctx, item.collection);
+  const position = positionOf(item.state);
+  if (!board || isClosed(position) || position.phase !== 'review') return;
+  throw new OteaError(
+    'forbidden',
+    `Not relayed: ${item.id} waits for your review, and an item leaves the person's review only by their own tap, never by a relayed sentence. Ask them in Hablar with a card they tap: otea say "<text>" --drop ${item.id} --note "<why>" --option "Drop ${item.id}" --option "Leave it" (or --send-back ${item.id}), or they decide it on the desk.`,
+  );
+}
 
 // Where a relayed decision moves the item: the state named, or, with a motive, the discard with
 // that motive (`otea relay ERR-2 Dropped --motive Duplicado`).
@@ -73,6 +130,8 @@ export function relayDecision(ctx: Context, input: RelayInput, now = systemClock
   return transaction(db, () => {
     const item = requireWritableItem(db, input.id);
     assertRelayOn(ctx, item);
+    const message = assertSaidInHablar(ctx, input, quote);
+    if (message !== undefined) assertNotInReview(ctx, item);
     const type = typeOfItem(ctx, item);
     const { workflow } = type;
     const { reason, via, channel } = input;
@@ -97,6 +156,7 @@ export function relayDecision(ctx: Context, input: RelayInput, now = systemClock
       channel,
       quote,
       source: 'conversation',
+      ...(message === undefined ? {} : { message }),
     };
     return landMove(ctx, workflow, item, move, data, { via });
   });

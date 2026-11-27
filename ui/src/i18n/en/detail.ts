@@ -653,6 +653,8 @@ export const detail = {
   'sheet.toast.restarted': 'You put “{title}” back in the queue of {state}.',
   'sheet.toast.reassigned': 'You left “{title}” for {agent}.',
   'sheet.toast.resumed': 'You took “{title}” up again: the agents see it once more.',
+  'sheet.toast.reopened': 'You reopened “{title}”: it is back where it was.',
+  'sheet.dropped.reopen': 'Reopen',
 
   // An item on a Studio board: its parts, its links, its branch, its rounds, the discard dialog.
   'bi.refuse.partsUnmerged': {

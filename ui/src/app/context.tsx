@@ -20,6 +20,7 @@ import {
   withdrawNote as postNoteWithdraw,
   postWaive,
   reassignItem,
+  reopenDropped,
   restartItem,
   resumeItem,
   undoMove,
@@ -124,6 +125,8 @@ export type AppActions = {
   // An item an agent set aside for later, taken up again (Retomar): nothing moves, so the toast
   // comes at once, with nothing to undo.
   resume(id: string, toast: string): Promise<void>;
+  // A discard taken back (Reabrir): the item returns to the state it left, so it reads as before.
+  reopenDropped(id: string, toast: string): Promise<void>;
   link(id: string, kind: RelationView, other: string): Promise<void>;
   unlink(id: string, relation: RelatedItem): Promise<void>;
   newItem(o?: { board?: string; parent?: IntakeParent }): void;
@@ -260,6 +263,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       async resume(id, message) {
         await Q.run(() => resumeItem(id));
+        toast({ msg: message, id });
+      },
+      async reopenDropped(id, message) {
+        await Q.run(() => reopenDropped(id));
+        await landed();
         toast({ msg: message, id });
       },
       async link(id, kind, other) {

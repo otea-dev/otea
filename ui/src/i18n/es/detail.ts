@@ -661,6 +661,8 @@ export const detail = {
   'sheet.toast.restarted': 'Pusiste «{title}» otra vez en la cola de {state}.',
   'sheet.toast.reassigned': 'Le dejaste «{title}» a {agent}.',
   'sheet.toast.resumed': 'Retomaste «{title}»: los agentes lo verán otra vez.',
+  'sheet.toast.reopened': 'Reabriste «{title}»: vuelve a estar donde estaba.',
+  'sheet.dropped.reopen': 'Reabrir',
 
   // Un ítem de un tablero de Studio: sus partes, sus enlaces, su rama, sus rondas, el descarte.
   'bi.refuse.partsUnmerged': {

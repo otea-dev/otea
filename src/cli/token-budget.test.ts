@@ -145,7 +145,9 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // Raised to 7860 for the secretary's change of mind (H1): say's --send-back and --note, the card
   // that sends an item of the person's review back on their tap, and update's --tell, which tells
   // the worker at once (measured at 7764).
-  tools: { mcp: 7860 },
+  // Raised to 7880 for the security package (S): relay's --from-message, say's --drop and --motive
+  // (measured at 7873).
+  tools: { mcp: 7880 },
   // Otea's agent guide, the server's instructions: in every MCP agent's context from the start, so
   // it buys only what agents keep getting wrong. Measured at 203. Raised to 270 for the line on
   // declaring the profile every agent and subagent must keep current (measured at 246). Raised to

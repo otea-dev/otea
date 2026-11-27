@@ -251,6 +251,11 @@ export async function resumeItem(id: string): Promise<void> {
   await post(`/api/items/${encodeURIComponent(id)}/resume`, {});
 }
 
+// A discard the person takes back (Reabrir): the item returns to the state it left.
+export async function reopenDropped(id: string): Promise<void> {
+  await post(`/api/items/${encodeURIComponent(id)}/reopen-dropped`, {});
+}
+
 // The person's order of the work (app/priority.ts): «Fijar el orden» from a board's matrix (the
 // items in order; the board's earlier order goes), and «Poner arriba» / «Quitar de arriba».
 export async function setOrder(collection: string, ids: readonly string[]): Promise<void> {

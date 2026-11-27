@@ -2528,10 +2528,11 @@ const unlink: Command = {
 const relay: Command = {
   name: 'relay',
   summary:
-    'Record a decision the human made in conversation: move the item as the human, via you (human transitions only; human-ui ones stay in the web UI)',
+    'Record a decision the human made in conversation: move the item as the human, via you (human transitions only; human-ui ones stay in the web UI). With a secretary only it relays, with --from-message (their message holding the quote); never an item in their review (say --drop/--send-back asks them)',
   args: ['id', 'state'],
   options: {
     quote: { required: true, placeholder: 'what the human said' },
+    'from-message': { placeholder: 'id' },
     reason: {},
     motive: { placeholder: 'name' },
   },
@@ -2540,6 +2541,7 @@ const relay: Command = {
     const quote = input.required('quote');
     const reason = input.option('reason');
     const motive = input.option('motive');
+    const fromMessage = input.option('from-message');
     const via = input.actor.name;
     const { channel } = input;
     const relayed = {
@@ -2548,6 +2550,7 @@ const relay: Command = {
       via,
       channel,
       quote,
+      ...(fromMessage === undefined ? {} : { fromMessage: messageIdOf(fromMessage) }),
       ...(reason ? { reason } : {}),
       ...(motive ? { motive } : {}),
     };
@@ -5313,9 +5316,15 @@ const say: Command = {
       about:
         'an item in their review they changed their mind about: the FIRST --option sends it back for them, with --note, when they tap it (you never send it back)',
     },
+    drop: {
+      placeholder: 'id',
+      about:
+        'an item in their review they want gone: the FIRST --option drops it for them, with --note (why), when they tap it',
+    },
+    motive: { placeholder: 'name', about: 'with --drop: the board motive' },
     note: {
       placeholder: 'text',
-      about: 'with --send-back: the note it goes back with, their words',
+      about: 'with --send-back or --drop: what it goes with, their words',
     },
   },
   execute: async (input) => {
@@ -5323,10 +5332,20 @@ const say: Command = {
     const { actor, cwd } = input;
     const replyTo = input.option('reply-to');
     const options = input.options('option');
-    const sendBack = input.option('send-back');
+    const sendBackGiven = input.option('send-back');
+    const dropGiven = input.option('drop');
     const noteGiven = input.option('note');
+    if (sendBackGiven !== undefined && dropGiven !== undefined)
+      throw new UsageError('--send-back and --drop are two cards: say one, then the other');
+    const sendBack = sendBackGiven ?? dropGiven;
+    const cardKind = dropGiven === undefined ? ('send_back' as const) : ('drop' as const);
+    const motiveGiven = input.option('motive');
+    if (motiveGiven !== undefined && dropGiven === undefined)
+      throw new UsageError('--motive goes with --drop');
     if ((sendBack === undefined) !== (noteGiven === undefined))
-      throw new UsageError('--send-back <id> and --note "<note>" come together');
+      throw new UsageError(
+        `--${dropGiven === undefined ? 'send-back' : 'drop'} <id> and --note "<note>" come together`,
+      );
     const recommend = input.option('recommend');
     const recommended = recommend === undefined ? undefined : Number(recommend.replace(/^#/, ''));
     if (recommended !== undefined && !Number.isInteger(recommended))
@@ -5358,7 +5377,14 @@ const say: Command = {
         ...(recommended === undefined ? {} : { recommended }),
         ...(sendBack === undefined || noteGiven === undefined
           ? {}
-          : { action: { kind: 'send_back' as const, item: sendBack, note: noteGiven } }),
+          : {
+              action: {
+                kind: cardKind,
+                item: sendBack,
+                note: noteGiven,
+                ...(motiveGiven === undefined ? {} : { motive: motiveGiven }),
+              },
+            }),
       });
       const { message } = said;
       const turn =

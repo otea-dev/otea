@@ -72,6 +72,7 @@ import { type Env, type Project, projectView } from '../app/project.ts';
 import { projectLanguage } from '../app/project-language.ts';
 import { answerQuestion } from '../app/questions.ts';
 import { linkItems, unlinkItems } from '../app/relations.ts';
+import { reopenDropped } from '../app/reopen-dropped.ts';
 import { reassignItem, restartItem, resumeItem, undoRelease } from '../app/restart.ts';
 import { secretaryStatus } from '../app/secretary.ts';
 import { setAsideOf } from '../app/set-aside.ts';
@@ -1212,6 +1213,18 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
       .post('/items/:id/restart', (c) => {
         assertWritable(c, auth);
         const item = restartItem(project, { id: c.req.param('id'), ...HUMAN_IN_UI });
+        feed.notify();
+        return c.json(item);
+      })
+      // A discard the person takes back, whenever they see it was wrong (Reabrir): the item returns
+      // to the state it left.
+      .post('/items/:id/reopen-dropped', (c) => {
+        assertWritable(c, auth);
+        const item = reopenDropped(project, {
+          id: c.req.param('id'),
+          ...HUMAN_IN_UI,
+          surface: surfaceOf(c),
+        });
         feed.notify();
         return c.json(item);
       })

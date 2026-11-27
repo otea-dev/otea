@@ -145,7 +145,7 @@ export function AskBody({
   bare?: boolean;
   // The question sends an item back for you when you tap its first option, with this note: the card
   // shows the note, lets you edit it, and never leaves the decision to the secretary.
-  action?: { item: string; note: string; to: string };
+  action?: { kind: 'send_back' | 'drop'; item: string; note: string; to: string };
   send: (given: AnswerWords) => Promise<void>;
 }) {
   const app = useApp();
@@ -188,7 +188,14 @@ export function AskBody({
       ) : (
         <>
           {action ? (
-            <p className="hb-does">{t('hablar.act.does', { item: action.item, to: action.to })}</p>
+            <p className="hb-does">
+              {action.kind === 'drop'
+                ? t(action.to === '' ? 'hablar.act.does.drop' : 'hablar.act.does.dropAs', {
+                    item: action.item,
+                    to: action.to,
+                  })
+                : t('hablar.act.does', { item: action.item, to: action.to })}
+            </p>
           ) : null}
           {action && free === null ? (
             <blockquote className="hb-note" aria-label={t('hablar.act.note')}>
@@ -261,7 +268,11 @@ export function AskBody({
                         )
                   }
                 >
-                  {action ? t('hablar.act.send', { item: action.item }) : t('sheet.qa.send')}
+                  {action
+                    ? t(action.kind === 'drop' ? 'hablar.act.send.drop' : 'hablar.act.send', {
+                        item: action.item,
+                      })
+                    : t('sheet.qa.send')}
                 </Button>
                 <button type="button" onClick={() => setFree(null)}>
                   {t('topics.convert.cancel')}

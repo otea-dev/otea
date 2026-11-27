@@ -61,18 +61,23 @@ export type MessageChoice = {
   asked: string | null;
 };
 
-// What the person's tap on the first option of a question performs, as the person: today only the
-// send-back of an item in their review, with the note the secretary drafted from their words (the
-// person may edit it before they tap). The secretary never performs it.
+// What the person's tap on the first option of a question performs, as the person: the send-back or
+// the discard of an item in their review, with the note the secretary drafted from their words (the
+// person may edit it before they tap). The secretary never performs it, and nothing else takes an
+// item out of their review (a relay never does).
 // `round`: the round of the item's review when the card was asked: the tap is about that delivery.
-// `to`: the name of the step it goes back to, which the desk says in its own words beside the first
+// `to`: the name of the step it goes back to (a send-back) or the motive it is dropped with (a
+// discard, empty when the board has none), which the desk says in its own words beside the first
 // option (never the secretary's label).
+export const ACTION_KINDS = ['send_back', 'drop'] as const;
 export type MessageAction = {
-  kind: 'send_back';
+  kind: (typeof ACTION_KINDS)[number];
   item: string;
   note: string;
   round: number;
   to: string;
+  // A discard on a board with motives: the one it goes with, by name.
+  motive?: string;
 };
 
 export type Message = {

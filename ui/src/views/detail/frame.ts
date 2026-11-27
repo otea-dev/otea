@@ -101,6 +101,11 @@ export function resumedToastOf(title: string): string {
   return t('sheet.toast.resumed', { title: shortTitle(title) });
 }
 
+// The toast after Reabrir on a discarded item.
+export function reopenedToastOf(title: string): string {
+  return t('sheet.toast.reopened', { title: shortTitle(title) });
+}
+
 // The item the sheet holds: the one asked for once the server has answered, null when it has no
 // such item (the sheet then says so; it never keeps the item open before), else what it held, so a
 // swap waits for the next item and a close shows what it showed until it is gone.

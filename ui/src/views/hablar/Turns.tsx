@@ -513,6 +513,7 @@ function Entry({ row, items, now, fresh, found, begins, onKind, onGo, onAnswer }
               ? {}
               : {
                   action: {
+                    kind: message.action.kind,
                     item: message.action.item,
                     note: message.action.note,
                     to: message.action.to,

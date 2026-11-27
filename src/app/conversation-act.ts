@@ -13,7 +13,7 @@ import {
   sayAsSecretary,
 } from './conversation.ts';
 import { type Clock, getItem, requireItem, systemClock } from './items.ts';
-import { itemOnBoard, liveBoardOf, sendBackItem } from './next.ts';
+import { dropItem, itemOnBoard, liveBoardOf, motiveByName, sendBackItem } from './next.ts';
 import type { Project } from './project.ts';
 
 // The cards of the secretary's that carry an action (field study 4, a change of mind on an item
@@ -46,9 +46,25 @@ export type SayWithSendBack = Omit<SayInput, 'action'> & {
   action?: Omit<MessageAction, 'round' | 'to'>;
 };
 
-// The secretary asks the person to send an item back with a note: the card says what is proposed,
-// and nothing moves until the person taps. Refused for an item that is not in their review now.
-// The card keeps the round it was asked in: it is about that delivery only.
+// Where a discard goes: the board's motive the card names (its name as the board says it), which a
+// board with motives asks for.
+function motiveOf(project: Project, id: string, motive: string | undefined): string {
+  const board = liveBoardOf(project, getItem(project, id).collection);
+  if (board === undefined || board.def.drop.motives.length === 0) return '';
+  const found = motiveByName(board.def, motive);
+  const names = board.def.drop.motives.map(({ name }) => name).join('|');
+  if (found === undefined) {
+    throw new OteaError(
+      'invalid_fields',
+      `Not said: ${board.def.name} drops with a motive: --motive "${names}"`,
+    );
+  }
+  return board.def.drop.motives.find(({ id: each }) => each === found)?.name ?? '';
+}
+
+// The secretary asks the person to send an item back, or drop it, with a note: the card says what
+// is proposed, and nothing moves until the person taps. Refused for an item that is not in their
+// review now. The card keeps the round it was asked in: it is about that delivery only.
 export function sayWithSendBack(
   project: Project,
   input: SayWithSendBack,
@@ -57,7 +73,46 @@ export function sayWithSendBack(
   const { action, ...rest } = input;
   if (action === undefined) return sayAsSecretary(project, rest, now);
   const { round, to } = assertInReview(project, action.item);
-  return sayAsSecretary(project, { ...rest, action: { ...action, round, to } }, now);
+  const target = action.kind === 'drop' ? motiveOf(project, action.item, action.motive) : to;
+  return sayAsSecretary(project, { ...rest, action: { ...action, round, to: target } }, now);
+}
+
+// What a tap on the first option of a card does, as the person, from the surface they tapped on.
+function perform(
+  project: Project,
+  action: MessageAction,
+  note: string,
+  by: string,
+  now: Clock,
+  surface?: Surface,
+): void {
+  const actor = { kind: 'human' as const, name: by };
+  if (action.kind === 'drop') {
+    dropItem(
+      project,
+      {
+        id: action.item,
+        actor,
+        channel: 'ui',
+        via: 'page',
+        reason: note,
+        ...(action.motive === undefined ? {} : { motive: action.motive }),
+      },
+      now,
+    );
+    return;
+  }
+  sendBackItem(
+    project,
+    {
+      id: action.item,
+      actor,
+      channel: 'ui',
+      reason: note,
+      ...(surface === undefined ? {} : { surface }),
+    },
+    now,
+  );
 }
 
 // The person's answer to a question of the secretary's. When the question carries an action and the
@@ -81,24 +136,19 @@ export function answerSecretaryTap(
       if (round !== action.round) {
         throw new OteaError(
           'invalid_transition',
-          `${action.item} was sent back and handed in again since this was asked (round ${action.round}, now ${round}): the note was about the earlier delivery. Nothing was sent back; ask the secretary again or send it back from the item`,
+          `${action.item} was sent back and handed in again since this was asked (round ${action.round}, now ${round}): the note was about the earlier delivery. Nothing was ${action.kind === 'drop' ? 'dropped' : 'sent back'}; ask the secretary again or do it from the item`,
         );
       }
       const note = (given.note ?? action.note).trim();
       if (note === '') {
-        throw new OteaError('reason_required', 'Say what to change before you send it back');
+        throw new OteaError(
+          'reason_required',
+          action.kind === 'drop'
+            ? 'Say why before you drop it'
+            : 'Say what to change before you send it back',
+        );
       }
-      sendBackItem(
-        project,
-        {
-          id: action.item,
-          actor: { kind: 'human', name: by },
-          channel: 'ui',
-          reason: note,
-          ...(surface === undefined ? {} : { surface }),
-        },
-        now,
-      );
+      perform(project, action, note, by, now, surface);
     }
     return answerSecretaryQuestion(project, id, given, now, by);
   });
