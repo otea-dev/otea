@@ -63,6 +63,10 @@ export type BoardQueue = {
   waiting: string[];
   workers: string[];
   limit: number;
+  // Of the waiting, the approved ones an agent has yet to land («approved, waiting to land»), and the
+  // ones taken back to their step after approval with the reason the agent gave. Absent when none.
+  landing?: string[];
+  bounced?: { id: string; reason: string | null }[];
 };
 
 export type PendingSecretary = {

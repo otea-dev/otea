@@ -260,6 +260,19 @@ export function takeLease(db: DatabaseSync, id: string, lease: Lease, at: string
   return db.prepare(sql).run({ id, at, ...lease }).changes === 1;
 }
 
+// Extends a lease only while it is still the one that was read: the holder and expiry the reader
+// saw (`seen`). A lease released or taken since (a person freed the item, another agent took it) is
+// never brought back, and a free item is never given a holder: unlike takeLease, a renewal cannot
+// undo what happened between the read and the write.
+export function renewLease(db: DatabaseSync, id: string, seen: Lease, expiresAt: string): boolean {
+  const sql = `UPDATE items SET lease_expires_at = :expiresAt
+    WHERE id = :id AND lease_holder = :holder AND lease_expires_at = :seen
+      AND lease_expires_at < :expiresAt`;
+  return (
+    db.prepare(sql).run({ id, holder: seen.holder, seen: seen.expiresAt, expiresAt }).changes === 1
+  );
+}
+
 export function clearLease(db: DatabaseSync, id: string): void {
   db.prepare('UPDATE items SET lease_holder = NULL, lease_expires_at = NULL WHERE id = ?').run(id);
 }

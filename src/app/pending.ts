@@ -12,7 +12,7 @@ import {
 import { quoteAgent } from '../core/quote.ts';
 import { timeText } from '../core/time.ts';
 import { selectOpenQuestions } from '../store/conversation.ts';
-import { selectStateEntries } from '../store/queries.ts';
+import { selectEvents, selectStateEntries } from '../store/queries.ts';
 import { selectOpenEscalations } from '../store/secretary.ts';
 import { listBandeja } from './bandeja.ts';
 import { workerLimitOf, workersByBoard } from './board-workers.ts';
@@ -24,6 +24,7 @@ import { scanned } from './overlap.ts';
 import { listAgents } from './presence.ts';
 import { secretaryStatus } from './secretary.ts';
 import { secretaryWaiting } from './secretary-waiting.ts';
+import { stepFactsOf } from './step-facts.ts';
 
 // What waits for the person, read from the records as they stand now (F4): the items on their turn
 // (a question to answer, a review, a step of their own), the ones an agent left stuck, the
@@ -245,17 +246,28 @@ function queuesOf(ctx: Context, items: readonly Item[], now: Clock): BoardQueue[
   if (waiting.length === 0) return [];
   const workers = workersByBoard(ctx.db, items, listAgents(ctx.db, now), at);
   return liveBoards(ctx).flatMap(({ collection, def }) => {
-    const ids = waiting.filter((item) => item.collection === collection).map(({ id }) => id);
-    return ids.length === 0
-      ? []
-      : [
-          {
-            board: collection,
-            waiting: ids,
-            workers: (workers.get(collection) ?? []).map(({ name }) => name),
-            limit: workerLimitOf(def),
-          },
-        ];
+    const mine = waiting.filter((item) => item.collection === collection);
+    const ids = mine.map(({ id }) => id);
+    if (ids.length === 0) return [];
+    // Approved is not landed, and a bounce says why (src/app/step-facts.ts).
+    const facts = mine.map((item) => ({
+      id: item.id,
+      ...stepFactsOf(def, item, selectEvents(ctx.db, item.id)),
+    }));
+    const landing = facts.filter(({ landing: yes }) => yes).map(({ id }) => id);
+    const bounced = facts.flatMap(({ id, bounced: back }) =>
+      back ? [{ id, reason: back.reason }] : [],
+    );
+    return [
+      {
+        board: collection,
+        waiting: ids,
+        workers: (workers.get(collection) ?? []).map(({ name }) => name),
+        limit: workerLimitOf(def),
+        ...(landing.length === 0 ? {} : { landing }),
+        ...(bounced.length === 0 ? {} : { bounced }),
+      },
+    ];
   });
 }
 
@@ -329,9 +341,21 @@ function lineOf(entry: PendingEntry): string {
 
 // A board's queue for a worker, and what the secretary does about it: nobody works it, launch one;
 // one works it, two items wait and the board takes another, launch the second without asking.
-function queueLine({ board, waiting, workers, limit }: BoardQueue): string {
+function queueLine({ board, waiting, workers, limit, landing, bounced }: BoardQueue): string {
   const who = workers.length === 0 ? 'no worker' : `worked by ${workers.join(', ')}`;
-  const head = `${board}: ${waiting.length} waiting for an agent (${waiting.join(', ')}), ${who}; the board takes ${limit === 1 ? 'one worker' : `${limit} workers`}.`;
+  // Approved is not done: say which wait to land, and which came back after approval and why, in
+  // plain words, so the person is never told they are done or lost.
+  const notes = [
+    ...(landing ?? []).map(
+      (id) =>
+        ` ${id} approved, waiting to land (an agent merges it into main; it is not done yet).`,
+    ),
+    ...(bounced ?? []).map(
+      ({ id, reason }) =>
+        ` ${id} came back after approval: it conflicted with a change that landed first${reason ? ` (${quoteAgent(reason)})` : ''}, so an agent merges main into it and it goes through review again.`,
+    ),
+  ].join('');
+  const head = `${board}: ${waiting.length} waiting for an agent (${waiting.join(', ')}), ${who}; the board takes ${limit === 1 ? 'one worker' : `${limit} workers`}.${notes}`;
   if (workers.length === 0)
     return `${head} Launch its worker: otea prompt --role worker --board ${board}.`;
   if (workers.length < limit && waiting.length >= 2)

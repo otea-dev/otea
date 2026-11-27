@@ -161,11 +161,25 @@ export type AgentRow = {
   // Its harness loaded Otea's server, and it works through the command line (P6-R2-10).
   mcpUnused: boolean;
   state: AgentDoing;
+  // Whole minutes since its last sign while it still works (its session runs, so it is no silence)
+  // once past HUSHED_AFTER_MIN: the menu says «callado hace N min», softly; null otherwise.
+  hushed: number | null;
   // Since when it is in that state, and the item it is about (none while idle with no past act).
   since: number;
   item: HeldItem | null;
   lastSeen: string;
 };
+
+// A working agent that gave no sign for this long reads «callado hace N min» in the menu: still at
+// work (its session runs), but the person may want to look.
+export const HUSHED_AFTER_MIN = 15;
+
+function hushedMinutes(a: Pick<Agent, 'lastSeen' | 'actedAt'>, now: number): number | null {
+  const last = Math.max(Date.parse(a.lastSeen) || 0, Date.parse(a.actedAt ?? '') || 0);
+  if (last === 0) return null;
+  const minutes = Math.floor((now - last) / 60_000);
+  return minutes >= HUSHED_AFTER_MIN ? minutes : null;
+}
 
 // The harness an agent works through: its MCP client's name, else the one its profile names (a
 // command-line agent names it there), else the command line.
@@ -245,6 +259,7 @@ export function agentRows(
       mcpMissing: a.mcp ? a.mcp === 'missing' : a.mcpMissing === true,
       mcpUnused: a.mcp === 'unused',
       state,
+      hushed: working ? hushedMinutes(a, now) : null,
       since: st.since,
       item: st.item ? { id: st.item.id, title: st.item.title, look: lookOf(st.item, now) } : null,
       lastSeen: a.lastSeen,

@@ -322,8 +322,15 @@ export function requestChangedOf(
   events: Parameters<typeof requestChangedAfterHandoff>[0],
 ): RequestChanged | undefined {
   if (item.turn !== 'human') return undefined;
-  const changed = requestChangedAfterHandoff(events);
-  const parts = liveBoardOf(ctx, item.collection)?.def.parts;
+  const def = liveBoardOf(ctx, item.collection)?.def;
+  // What the person asked for: the title and the board's form; off a board, the title and the
+  // description. Anything else is bookkeeping.
+  const asked = new Set(def ? def.form.map(({ ref }) => ref) : ['description']);
+  const changed = requestChangedAfterHandoff(
+    events,
+    (field) => field === 'title' || asked.has(field),
+  );
+  const parts = def?.parts;
   if (!changed || !parts) return changed;
   return {
     ...changed,

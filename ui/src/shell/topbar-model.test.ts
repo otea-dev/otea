@@ -279,6 +279,26 @@ describe('the agents menu’s rows', () => {
     expect(row).toMatchObject({ state: 'wait', working: false, item: { id: 'CRI-1' } });
   });
 
+  // H2 (field study 4): a worker at a long step whose session runs is working, never «sin señal»;
+  // past a quarter of an hour with no sign the menu only says, softly, how long it has been quiet.
+  it('says how long a working agent has been quiet once it is past a quarter of an hour', () => {
+    const held = item({
+      id: 'CRE-50',
+      title: 'Pruebas largas',
+      state: 'sconcept',
+      lease: { holder: 'Kiln', expiresAt: inMinutes(10) },
+    });
+    const working = (quiet: number) =>
+      agentRows(
+        [agent('Kiln', { holding: ['CRE-50'], status: 'working', lastSeen: ago(quiet) })],
+        [held],
+        NOW,
+      )[0];
+
+    expect(working(5)).toMatchObject({ state: 'work', silent: false, hushed: null });
+    expect(working(20)).toMatchObject({ state: 'work', silent: false, hushed: 20 });
+  });
+
   it('tags a command-line agent with the harness its profile names', () => {
     const [row] = agentRows([agent('Quill', { harness: 'cli', profile: opus })], items, NOW);
     expect(row?.harness).toBe('claude-code');

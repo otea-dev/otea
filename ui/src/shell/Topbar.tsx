@@ -398,6 +398,9 @@ function RowDoing({ row, now }: { row: AgentRow; now: number }) {
       <span className="verb">{verb}</span>
       <span className="id">{it.id}</span>
       <span className="tx">{it.title}</span>
+      {row.hushed === null ? null : (
+        <span className="tx">{t('shell.row.hushed', { minutes: row.hushed })}</span>
+      )}
     </span>
   );
 }

@@ -343,6 +343,7 @@ import {
   rewritesRemote,
   tipOf,
 } from './gitrepo.ts';
+import { missedLately, noteMiss } from './harness-miss.ts';
 import {
   gitHookOf,
   type HookChange,
@@ -1990,7 +1991,7 @@ const next: Command = {
       };
     });
     // What it claims, it does in a session whose process Otea notes (H2).
-    if (claim) await noteWorkerHarnessAfter(input);
+    if (claim) noteWorkerHarnessAfter(input);
     return answered;
   },
 };
@@ -2787,11 +2788,18 @@ function workerHarnessUnknown(project: Project, input: Input): boolean {
   return harness === null || !processAlive(harness);
 }
 
-// How long the command that starts a worker's work waits for the process table, once per session:
-// a busy machine answers slowly, and the worker's wait notes it then.
+// How long the lookup of a worker's harness may take: it runs after the command's answer, in the
+// background of the same process, and a busy machine answers slowly.
 const WORKER_HARNESS_READ_MS = 3000;
 
-async function noteWorkerHarnessAfter(input: Input): Promise<void> {
+// After a command that starts a worker's work: reads the process table once if its harness is not
+// noted yet. Best effort and never in the command's way: the answer is returned at once and the
+// lookup runs while the process is still alive (it ends with it), and a lookup that fails is
+// remembered for a while (harness-miss.ts) so the claims after it do not pay again.
+function noteWorkerHarnessAfter(input: Input): void {
+  if (input.channel !== 'cli' || input.actor.kind !== 'agent') return;
+  const me = input.actor.name;
+  if (missedLately(input.cwd, me)) return;
   let unknown = false;
   try {
     unknown = withProject(input.cwd, (project) => workerHarnessUnknown(project, input));
@@ -2799,17 +2807,18 @@ async function noteWorkerHarnessAfter(input: Input): Promise<void> {
     return;
   }
   if (!unknown) return;
+  void lookUpWorkerHarness(input, me).catch(() => noteMiss(input.cwd, me));
+}
+
+async function lookUpWorkerHarness(input: Input, me: string): Promise<void> {
   const table = await listProcesses(AbortSignal.timeout(WORKER_HARNESS_READ_MS));
   const pid = table && harnessOf(table.rows, STARTED_BY);
-  if (!table || pid === undefined || pid === process.pid) return;
-  const known = isKnownHarness(table.rows, pid);
-  try {
-    withProject(input.cwd, (project) =>
-      noteHarness(project.db, input.actor.name, pid, systemClock, known),
-    );
-  } catch {
-    // The project is gone: nothing to note it for.
+  if (!table || pid === undefined || pid === process.pid) {
+    noteMiss(input.cwd, me);
+    return;
   }
+  const known = isKnownHarness(table.rows, pid);
+  withProject(input.cwd, (project) => noteHarness(project.db, me, pid, systemClock, known));
 }
 
 // The secretary's wait (otea wait --secretary): returns for a message from the person, a Bandeja
@@ -3142,7 +3151,7 @@ const claim: Command = {
         text,
       };
     });
-    await noteWorkerHarnessAfter(input);
+    noteWorkerHarnessAfter(input);
     return claimed;
   },
 };

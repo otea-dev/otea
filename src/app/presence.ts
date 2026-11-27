@@ -25,6 +25,7 @@ import {
   type NameOffer,
   type ProfileView,
   profileView,
+  renewLease,
   saveHarness,
   saveMcpLoad,
   saveNameOffer,
@@ -595,6 +596,19 @@ export function keepLeasesOfAgentsThere(
   now: Clock = systemClock,
   processes: (pid: number) => boolean = processAlive,
 ): void {
+  // A read is no reason to fail: a handle that cannot write (read-only, busy) skips the renewal.
+  try {
+    renewLapsingLeases(db, now, processes);
+  } catch {
+    // Nothing to renew now; the next look tries again.
+  }
+}
+
+function renewLapsingLeases(
+  db: DatabaseSync,
+  now: Clock,
+  processes: (pid: number) => boolean,
+): void {
   const at = now();
   const soon = leaseExpiry(at, LEASE_RENEW_AHEAD_MS);
   const due = selectLeases(db).filter(({ lease }) => lease.expiresAt < soon);
@@ -603,16 +617,29 @@ export function keepLeasesOfAgentsThere(
   const last = lookedAt.get(db);
   const stamp = Date.parse(at);
   if (last && last.key === key && Math.abs(stamp - last.at) < LOOK_AGAIN_MS) return;
-  const there = new Set(
-    listAgents(db, () => at, processes)
-      .filter((agent) => agent.there && agent.role !== 'secretary')
-      .map(({ name }) => name),
-  );
-  const until = leaseExpiry(at, DEFAULT_LEASE_TTL_MS);
+  // Each holder that is there, with when its silence began: its last sign.
+  const there = new Map<string, number>();
+  for (const agent of listAgents(db, () => at, processes)) {
+    if (!agent.there || agent.role === 'secretary') continue;
+    there.set(
+      agent.name,
+      Math.max(Date.parse(agent.lastSeen), Date.parse(agent.actedAt ?? agent.lastSeen)),
+    );
+  }
   let left = 0;
   for (const { id, lease } of due) {
-    if (there.has(lease.holder)) takeLease(db, id, { holder: lease.holder, expiresAt: until }, at);
-    else left += 1;
+    const silentSince = there.get(lease.holder);
+    if (silentSince === undefined) {
+      left += 1;
+      continue;
+    }
+    // A default lease from now, never past the silence the desk tolerates (THERE_FOR_MS after the
+    // holder's last sign), so a session that hangs does not hold the item for ever.
+    const until = new Date(
+      Math.min(stamp + DEFAULT_LEASE_TTL_MS, silentSince + THERE_FOR_MS),
+    ).toISOString();
+    // Written only if the lease is still the one read: a release or a take since wins.
+    if (!renewLease(db, id, lease, until)) left += 1;
   }
   if (left > 0) lookedAt.set(db, { key, at: stamp });
   else lookedAt.delete(db);

@@ -44,8 +44,20 @@ export function requestChangedText(changed: RequestChanged): string {
 const text = (value: unknown): string | null =>
   value === null || value === undefined ? null : String(value);
 
+// A subagent of the agent that handed it in works under its name and a role (quill-haiku): it is
+// the same hand, never someone changing the request. A number alone after the name is another
+// session of the agent (claude-2), as presence.ts isSubagent says.
+function ownSubagent(name: string, parent: string): boolean {
+  return name.startsWith(`${parent}-`) && !/^\d+$/.test(name.slice(parent.length + 1));
+}
+
 // `events`: the item's, oldest first. Whether the item waits for the person is the caller's to ask.
-export function requestChangedAfterHandoff(events: readonly Event[]): RequestChanged | undefined {
+// `isRequest`: whether a field is what the person asked for (its title and the board's form fields):
+// a branch pushed, a link or a checklist edited since is bookkeeping, no change of the request.
+export function requestChangedAfterHandoff(
+  events: readonly Event[],
+  isRequest: (field: string) => boolean = () => true,
+): RequestChanged | undefined {
   const handoff = events.findLastIndex(({ type }) => type === 'transitioned');
   const handed = events[handoff];
   if (handed?.actor.kind !== 'agent') return undefined;
@@ -53,10 +65,12 @@ export function requestChangedAfterHandoff(events: readonly Event[]): RequestCha
   let last: Event | undefined;
   for (const event of events.slice(handoff + 1)) {
     if (event.type !== 'updated' || event.actor.name === handed.actor.name) continue;
+    if (event.actor.kind === 'agent' && ownSubagent(event.actor.name, handed.actor.name)) continue;
     const changes = event.data.changes;
     if (typeof changes !== 'object' || changes === null) continue;
-    last = event;
     for (const [field, change] of Object.entries(changes)) {
+      if (!isRequest(field)) continue;
+      last = event;
       const { from, to } = change as { from?: unknown; to?: unknown };
       const known = merged.get(field);
       merged.set(field, { field, from: known ? known.from : text(from), to: text(to) });

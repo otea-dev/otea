@@ -84,6 +84,25 @@ describe('a request that changed after its delivery was handed in', () => {
     expect(shown().requestChanged).toBeUndefined();
   });
 
+  // Review of H2: only what the person asked for counts. A field the board keeps for bookkeeping
+  // (here its checklist), or an edit by a subagent of the agent that handed it in, says nothing.
+  it('flags the request’s own words, not bookkeeping fields nor the handing agent’s subagents', () => {
+    deliver();
+
+    updateItem(
+      project,
+      { id, actor: { kind: 'agent', name: 'quill-haiku' }, title: 'Rana 2' },
+      now,
+    );
+    expect(shown().requestChanged).toBeUndefined();
+
+    updateItem(project, { id, actor: you, title: 'Sapo' }, now);
+    expect(shown().requestChanged).toMatchObject({
+      by: 'human',
+      changes: [{ field: 'title', from: 'Rana 2', to: 'Sapo' }],
+    });
+  });
+
   it('tells the secretary in the wake for the delivery', () => {
     deliver();
     rewrite('Sapo', 'Rápido');

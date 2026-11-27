@@ -40,6 +40,7 @@ export const shell = {
   'shell.row.idle': 'escuchando · libre desde {time}',
   'shell.row.connected': 'conectado · libre; verá lo nuevo cuando vuelva a esperar',
   'shell.row.silent': 'sin señal en',
+  'shell.row.hushed': '· sin novedades hace {minutes} min',
   'shell.row.noProfile': 'no toma pasos hasta declarar modelo y esfuerzo',
   'shell.flag.noProfile': 'sin perfil',
   'shell.flag.unconfirmed': 'sin confirmar',
