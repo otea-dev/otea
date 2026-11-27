@@ -504,6 +504,27 @@ describe('the role prompts', () => {
       expect(withCode).toContain('otea land sync <');
     });
 
+    // A decision is the person's, one at a time: a permission that lives only in an agent's memory
+    // is invisible and cannot be revoked, so no role offers one or takes one.
+    it(`has every role refuse a standing permission and ask each time (${lang})`, () => {
+      const roles = [
+        rolePrompt('worker', lang, { board: 'Cambios', name: 'ana' }),
+        rolePrompt('refiner', lang, { name: 'ana-ref' }),
+        rolePrompt('secretary', lang, { name: 'ana' }),
+      ];
+      for (const text of roles) {
+        const rule =
+          text
+            .split('\n')
+            .find((line) =>
+              (lang === 'es' ? /permiso permanente/ : /standing permission/).test(line),
+            ) ?? '';
+        expect(rule).toMatch(lang === 'es' ? /desde ahora/ : /from now on/);
+        expect(rule).toMatch(lang === 'es' ? /pregunta cada vez/ : /ask each time/);
+        expect(rule).toMatch(lang === 'es' ? /todavía no/ : /not supported yet/);
+      }
+    });
+
     // Field study 3 (S1 P2): a remote added after init reached the person as a technical question.
     it(`has the worker put the remote-added question to the person in plain words, with options (${lang})`, () => {
       const text = rolePrompt('worker', lang, { board: 'Cambios', name: 'ana' });
