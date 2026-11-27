@@ -64,9 +64,10 @@ describe('the conversation from the secretary', () => {
       expect(read.out).toContain(`otea say "<text>" --reply-to ${sent.id} --as sol`);
       expect(conversation()[0]?.delivery).toBe('read');
 
-      // Read: the wait has nothing more to say.
-      const idle = await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1');
-      expect(idle.code).toBe(13);
+      // Read is not answered: a wait that begins now brings the message back, saying it was read.
+      const again = await otea('wait', '--secretary', '--as', 'sol', '--json');
+      expect(JSON.parse(again.out)).toMatchObject({ kind: 'person_message', ref: String(sent.id) });
+      expect(JSON.parse(again.out).text).toContain('already read');
 
       const said = await otea(
         'say',
@@ -77,6 +78,9 @@ describe('the conversation from the secretary', () => {
         'sol',
       );
       expect(said.out).toContain(`Said as message ${sent.id + 1}, answering ${sent.id}.`);
+      // Answered: the wait has nothing more to say.
+      const idle = await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1');
+      expect(idle.code).toBe(13);
       expect(conversation().map(({ author, by, text }) => [author, by, text])).toEqual([
         ['person', 'human', 'the Aprobar button is hidden on the phone'],
         ['secretary', 'sol', 'Fixing it now.'],
