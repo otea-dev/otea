@@ -54,11 +54,24 @@ function putBox(box: HTMLElement, top: number) {
   box.scrollTop = top;
 }
 
+// Where the foot of the conversation is as the person should find it: its very end, unless what
+// stands at the foot (the newest turn, or the questions waiting) is taller than the box, as on a
+// phone on its side. Then its top shows, and the rest is a scroll away: a card cut at the top, with
+// its first line gone, reads as broken.
+export function footOf(box: HTMLElement): number {
+  const end = box.scrollHeight;
+  const turns = box.querySelectorAll<HTMLElement>('.hb-lanes > .hb-turn');
+  const last = turns.item(turns.length - 1);
+  if (!last || last.offsetHeight + 16 <= box.clientHeight) return end;
+  const top = last.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+  return Math.max(0, Math.min(end, top - 16));
+}
+
 // Scrolls a box to a place the way the app moves things: it settles, never jumps. The foot is
 // followed as it moves: the page can grow under the newest message while it settles.
 function scrollBox(box: HTMLElement, top: number | 'foot') {
   const from = box.scrollTop;
-  const place = () => Math.max(0, top === 'foot' ? box.scrollHeight : top);
+  const place = () => Math.max(0, top === 'foot' ? footOf(box) : top);
   const to = place();
   if (reduced() || Math.abs(to - from) < 8) {
     putBox(box, to);
@@ -148,7 +161,12 @@ export function HablarView({
     [turns, items, app.now, filter],
   );
   const counts = useMemo(() => cardCounts(turns, items, app.now), [turns, items, app.now]);
-  const away = awayOf(secretary);
+  // On the phone, without the PC, what shows of the secretary is the last the phone kept, and it may
+  // say «conectado» or «desconectado» for a PC nobody can reach: the offline line says it all, and
+  // the secretary's state and its away strip wait for the next answer. (The desk has room for both
+  // lines and keeps them.)
+  const offline = app.sync.offline && app.phone;
+  const away = offline ? null : awayOf(secretary);
 
   // A link to a Bandeja note (a notice): the tab that holds it shows, the note scrolls into view and
   // lights for a moment, once its entries are read.
@@ -334,7 +352,7 @@ export function HablarView({
     const observer = new ResizeObserver(() => {
       if (!near.current || wanted !== undefined) return;
       if (performance.now() < (settling.get(box) ?? 0)) return;
-      putBox(box, box.scrollHeight);
+      putBox(box, footOf(box));
     });
     // Its whole box: a toast's room at the foot is the thread's padding, which the content box
     // does not see.
@@ -385,7 +403,7 @@ export function HablarView({
 
   const name = app.project?.name ?? '';
   const none = convo.status === 'ready' && secretary === null;
-  const status = secretary && secretary.state !== 'offline' ? secretary : null;
+  const status = !offline && secretary && secretary.state !== 'offline' ? secretary : null;
   return (
     <div className="hb" data-tab={tab} data-empty={turns.length === 0 || undefined}>
       <section className="hb-main">
@@ -509,7 +527,7 @@ export function HablarView({
                     scroller={scroller}
                     onFirst={() => {
                       const box = scroller.current;
-                      if (box && wanted === undefined) putBox(box, box.scrollHeight);
+                      if (box && wanted === undefined) putBox(box, footOf(box));
                     }}
                   />
                 </>

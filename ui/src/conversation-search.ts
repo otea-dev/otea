@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { messageSnippet } from '../../src/core/conversation.ts';
 import { fetchConversation } from './api.ts';
-import type { Message, MessageKind } from './conversation.ts';
+import { type Message, type MessageKind, quotedSnippet } from './conversation.ts';
 
 // Searching what was said in Hablar (field study 3: a consultation about «backoff» was not found
 // by the search, which looked only at items). The server searches the conversation by words
@@ -27,7 +26,8 @@ export function hitsOf(messages: readonly Message[], max = 12): Hit[] {
     .map((message) => ({
       root: message.root,
       kind: message.kind,
-      text: messageSnippet(message.text, 120),
+      // A preview, cut where it is: its backticks go (a cut in a span leaves a mark with no mate).
+      text: quotedSnippet(message.text, 120),
       at: message.at,
     }));
 }

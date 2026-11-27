@@ -551,15 +551,13 @@
   .app {
     padding-top: env(safe-area-inset-top, 0px);
   }
-  /* The bottom bar's height, one number for what stands above it (the install banner) and what
-     ends clear of it (the pages). */
+  /* The bottom bar's height, one number for what ends clear of it (the pages). */
   :root {
     --tabbar-h: calc(74px + env(safe-area-inset-bottom, 0px));
   }
-  /* Every page ends clear of the bottom bar, and of the install banner while that is up
-     (InstallBanner.tsx measures it into --install-h). */
+  /* Every page ends clear of the bottom bar. */
   .view > * {
-    padding-bottom: calc(var(--tabbar-h) + 16px + var(--install-h, 0px));
+    padding-bottom: calc(var(--tabbar-h) + 16px);
   }
 
   /* The bottom bar (mobile mock 1, 4): Hablar · Te toca · Nuevo · Panel, solid on the screen's foot. One
@@ -1487,10 +1485,88 @@
   height: calc(94dvh - var(--kb, 0px));
   max-height: calc(94dvh - var(--kb, 0px));
 }
+/* The sheet is a column the reader fills, so its foot (the note and Aprobar / Devolver) stands at
+   the sheet's bottom even when the file is short, instead of right under it with the sheet empty
+   beneath (field study 5). A tall file scrolls the sheet, and the foot sticks as before. */
+.nsheet.p-read {
+  display: flex;
+  flex-direction: column;
+}
+.nsheet.p-read > [data-i]:last-child {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
 .p-read .ev-reader {
-  display: grid;
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
   gap: 10px;
   min-width: 0;
+}
+.p-read .ev-reader-foot {
+  margin-top: auto;
+}
+/* the picture runs the sheet's whole width (below), and the foot over it does too: its covering
+   background reaches the edge, so no sliver of the file shows beside it */
+.p-read .ev-reader-foot {
+  margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  padding-inline: max(16px, env(safe-area-inset-left, 0px));
+}
+/* One row of tools under the file's name: which side, compare (an icon), and the zoom. Before, the
+   compare button took a row of its own at the width of its words, and the three zoom buttons
+   another, both flush right, at the size of a thumb each. */
+.p-read .ev-reader-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.p-read .ev-reader-pair {
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  min-width: 0;
+}
+.p-read .ev-reader-pair > span:first-child {
+  display: none;
+}
+.p-read .ev-reader-pair[data-blind] > span:first-child {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.p-read .ev-compare-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding-inline: 12px;
+}
+.p-read .ev-compare-btn .ic {
+  display: block;
+}
+.p-read .ev-compare-btn .lb {
+  display: none;
+}
+.p-read .ev-reader-zoom {
+  flex: none;
+  margin-left: auto;
+  gap: 2px;
+}
+.p-read .ev-reader-zoom .btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+/* the picture runs the sheet's whole width: the stage's own frame and dots stay for the desk */
+.p-read .ev-reader-view {
+  margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+}
+/* a short screen keeps the picture: the foot says its count and its moves, not the sentence under
+   them */
+@media (max-height: 640px) {
+  .p-read .ev-reader-notice {
+    display: none;
+  }
 }
 .p-read .ev-reader-bar {
   position: sticky;
@@ -1851,48 +1927,30 @@
 }
 
 /* ───────── install Otea on the home screen: the first open in a phone's browser ───────── */
-/* Above the tab bar, in reach of the thumb: at the top it lay over the page's own header (its title
-   and first line). The first-run language note takes that place until it is answered, so the banner
-   waits for it. */
+/* Never over the page (field study 5: a card over the rows of Te toca and the foot of Hablar): a
+   quiet note in the header of Te toca, in the page's flow, on a rule like a margin note. A phone on
+   its side has no room for it (below), and Preferencias offers it again. */
 .install-banner {
   display: none;
 }
 @media (max-width: 720px) {
-  /* ...and on a page with its moves docked it would lie over Aprobar and Devolver, and over the
-     next-step card that rests at the foot of Te toca (P7-F1): the card goes first, once, and the
-     banner comes when it is put away. */
-  body:has(.language-note-host) .install-banner,
-  body:has(.p-dock) .install-banner,
-  body:has(.nextstep) .install-banner {
-    display: none;
-  }
-  /* Hablar's foot is the composer's: the banner never lies over it or over the thread above it,
-     and a toast is never under it (one thing at a time above the tab bar). */
-  body:has(.hb-composer) .install-banner,
-  body:has(.toast) .install-banner {
-    display: none;
-  }
   .install-banner {
-    position: fixed;
-    bottom: calc(var(--tabbar-h) + 10px);
-    left: max(12px, env(safe-area-inset-left, 0px));
-    right: max(12px, env(safe-area-inset-right, 0px));
-    z-index: 34;
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 12px 14px 12px;
-    border: 1px solid var(--rule);
-    border-radius: 12px;
-    background: var(--sheet);
-    box-shadow: 0 14px 34px -18px var(--shadow);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 14px;
+    margin: 12px 0 2px;
+    padding: 2px 0 2px 13px;
+    border-left: 2px solid var(--rule-2);
   }
   .install-banner h2 {
-    font: 500 15px / 1.35 var(--sans);
+    flex: 1 1 100%;
+    font: 500 13.5px / 1.4 var(--sans);
     color: var(--ink);
   }
   .install-banner p {
-    font: 400 13.5px / 1.45 var(--sans);
+    flex: 1 1 100%;
+    font: 400 13px / 1.45 var(--sans);
     color: var(--ink-2);
     overflow-wrap: anywhere;
   }
@@ -1903,8 +1961,11 @@
   .install-acts {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 4px;
+    gap: 6px;
+    margin-top: 2px;
+  }
+  .install-acts .btn {
+    min-height: 40px;
   }
 }
 
@@ -1958,7 +2019,26 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-
+}
+/* 320 px: the project pill, the magnifier and the connection pill together need more than the bar
+   has (the pill lay under the magnifier, and «Sin conexión» was cut). The project's name gives way
+   first, with an ellipsis; the magnifier keeps its place beside it. */
+@media (max-width: 360px) {
+  .tb-start {
+    min-width: 100px;
+  }
+  .pill {
+    min-width: 100px;
+    column-gap: 7px;
+    padding-left: 10px;
+  }
+  .tb-end .apill {
+    padding: 0 10px;
+    gap: 6px;
+    font-size: 13px;
+  }
+}
+@media (max-width: 720px) {
   /* The sheet keeps one height as the results come and go, and sits on the keyboard (--kb). */
   .nsheet.search {
     bottom: var(--kb, 0px);
@@ -2098,9 +2178,22 @@
     position: static;
     flex: none;
   }
-  /* the install banner keeps to its instruction: its notes wait for a taller screen */
-  .install-banner .install-note {
+  /* a phone on its side has no room for the install note: it is left for the next open */
+  .install-banner {
     display: none;
+  }
+  /* the reader on its side: the picture first. Its foot keeps only the two moves; the dots, the
+     note box and the count wait for an upright phone (they took the whole window, and the file
+     none of it) */
+  .p-read .ev-lane,
+  .p-read .ev-reader-note,
+  .p-read .ev-reader-seen {
+    display: none;
+  }
+  .p-read .ev-reader-bar .btn,
+  .p-read .ev-compare-btn,
+  .p-read .ev-reader-zoom .btn {
+    min-height: 36px;
   }
 }
 /* the smallest phones on their side (568 x 320): one step slimmer again */

@@ -11,6 +11,7 @@ import { Swap } from '../../kit/Swap.tsx';
 import { LaneHead } from '../../lanes/LaneHead.tsx';
 import { LaneList } from '../../lanes/LaneList.tsx';
 import { noAgents } from '../../listening.ts';
+import { InstallBanner } from '../../offline/InstallBanner.tsx';
 import { QueuedCaptures } from '../../offline/QueuedCaptures.tsx';
 import { discard, useQueue } from '../../offline/queue-store.ts';
 import {
@@ -132,7 +133,10 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
     if (entry) return app.go(entryRoute(entry));
     return app.route.item === id ? app.closeItem() : app.openItem(id);
   };
-  const away = atasco ? null : offlineWithWaiting(app.pending);
+  // On the phone without the PC the secretary's state is the last one kept: the offline line says
+  // the PC is out of reach, and this card waits for an answer to be true.
+  const away =
+    atasco || (app.sync?.offline === true && app.phone) ? null : offlineWithWaiting(app.pending);
   // No item on any board (every project has Pedidos, so never no board): the project's own page.
   const empty =
     app.items.status === 'ready' &&
@@ -198,6 +202,8 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
             </Swap>
           </div>
           {recap ? <Recap today={today} phone={app.phone} /> : null}
+          {/* The phone's first open in a browser: a quiet note in the header, never over the page. */}
+          {app.phone ? <InstallBanner /> : null}
         </header>
         {atasco ? null : (
           <QueuedCaptures captures={queue.captures} onDiscard={(id) => void discard(id)} />

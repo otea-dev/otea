@@ -25,6 +25,7 @@ import {
   turnAt,
   turnsOf,
 } from './conversation.ts';
+import { hitsOf } from './conversation-search.ts';
 import { ago, item, NOW } from './derive/fixtures.ts';
 import type { Item } from './types.ts';
 
@@ -494,6 +495,27 @@ describe('a quoted snippet', () => {
     const snippet = quotedSnippet(said, 40);
     expect(snippet).not.toContain('`');
     expect(snippet).toContain('corre otea');
+  });
+
+  // Field study 5 (D2): «Lo que salió» showed «corre `otea pending` si hace falta» in its cards, a
+  // preview, with the backticks as written, in the serif.
+  it('is what the cards of «Lo que salió» and a search hit show, never the backticks', () => {
+    const person = say({
+      author: 'person',
+      text: 'Resúmeme qué me espera hoy y corre `otea pending` si hace falta.',
+      kind: 'consultation',
+    });
+    const reply = say({
+      author: 'secretary',
+      replyTo: person.id,
+      root: person.id,
+      kind: 'consultation',
+      text: 'Corrí `otea pending`: te esperan 2 revisiones.',
+    });
+    const [card] = cardsOf(turnsOf([person, reply]), new Map(), NOW);
+    expect(card?.title).toBe('Resúmeme qué me espera hoy y corre otea pending si hace falta.');
+    expect(card?.answer).toBe('Corrí otea pending: te esperan 2 revisiones.');
+    expect(hitsOf([person])[0]?.text).not.toContain('`');
   });
 });
 

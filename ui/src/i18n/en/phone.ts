@@ -240,16 +240,21 @@ export const phone = {
   'phone.ts.ledger':
     'The HTTPS certificate is public: the name {host} is listed in the Certificate Transparency logs, which anyone can read.',
   // The installed app over HTTPS: without the computer, the queue, updates (offline/)
-  'offline.noReach': 'I can’t reach your computer.',
+  // One word for being without the computer: «No connection» (the pill, the line, each page's
+  // notes). What changes is the cause, which follows, and what can still be done.
+  'offline.head': 'No connection',
+  'offline.askLocal': 'Otea is not answering on this computer.',
   'offline.askTailscale': 'Is Tailscale connected on this phone? Is Otea open on your computer?',
   'offline.askLan':
     'Is this phone on the same Wi‑Fi as your computer? Is Otea open on your computer?',
-  'offline.closed': 'Otea is not open on your computer.',
-  'offline.askClosed': 'Open it there: the desktop app or otea serve.',
+  'offline.askClosed':
+    'Otea is not open on your computer. Open it there: the desktop app or otea serve.',
   'offline.nothingSaved': 'this phone has nothing saved from this project yet',
-  'offline.readQueue': 'read-only · new items wait in the queue',
+  'offline.noData': 'no data',
+  // What can be done without the computer: read; what is captured (New, a note) waits in the
+  // queue. A message to the secretary is not captured: Talk writes again once the PC is back.
+  'offline.readQueue': 'read-only · what you capture waits in the queue',
   'offline.retry': 'Retry',
-  'offline.oteaDown': 'Otea is not answering',
   'offline.synced': 'last synced {time}',
   'offline.readOnly': 'read-only',
   'offline.updated': 'Otea updated',

@@ -18,7 +18,8 @@ export const detail = {
   'detail.evidence': 'Evidence',
   'detail.missing': 'missing to complete',
   'detail.readOnly': 'Read-only. Run {command} to act from this browser.',
-  'detail.offline': 'No connection to your computer: you can act once it is back.',
+  // The line over the page says «No connection»; these say what that means for this page.
+  'detail.offline': 'You can act once the connection is back.',
   'detail.archived':
     'Read-only: {board} is archived. Restore it in Studio’s Archived to work on this item.',
   'detail.receipt': '{state} · now {turn} · {ago}',
@@ -414,7 +415,7 @@ export const detail = {
   'sheet.missing.title': 'Item not found',
   'sheet.missing.text':
     'There is no item {id} in this project. It may have been deleted, or the link may be wrong.',
-  'sheet.unreached.title': 'No connection to your computer',
+  'sheet.unreached.title': 'No connection',
   'sheet.unreached.text': '{id} opens when your computer answers again.',
   'sheet.yourTurn': 'your turn',
   'sheet.typeBoard': '{type} · {board}',
@@ -530,7 +531,7 @@ export const detail = {
   'sheet.qa.delegate': 'You decide',
   'sheet.qa.delegated': 'You left the decision to the agent',
   'sheet.qa.goesOn': '{agent} goes on with what you say',
-  'sheet.qa.offline': 'No connection to your computer: you can answer once it is back.',
+  'sheet.qa.offline': 'You can answer once the connection is back.',
   'pick.label': 'Pick an option',
   'pick.recommended': 'recommended',
   'pick.comment': 'A comment for the agent (optional)',

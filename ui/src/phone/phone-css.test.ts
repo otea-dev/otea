@@ -65,17 +65,19 @@ describe('the bottom buttons', () => {
 
   it('keeps the last row clear of them on every page', () => {
     expect(rules(phone, '.view > *')).toMatch(
-      /padding-bottom:\s*calc\(var\(--tabbar-h\) \+ 16px \+ var\(--install-h, 0px\)\)/,
+      /padding-bottom:\s*calc\(var\(--tabbar-h\) \+ 16px\)/,
     );
-    // The tab bar's height is one number: the pages and the install banner above it share it.
+    // The tab bar's height is one number: the pages share it.
     expect(rules(phone, '.tabbar')).toMatch(/min-height:\s*var\(--tabbar-h\)/);
-    expect(rules(phone, '.install-banner')).toMatch(/bottom:\s*calc\(var\(--tabbar-h\)/);
   });
 
-  it('never lies over what the page rests on its foot: the install banner waits for it (P7-F1)', () => {
-    // The language note, a docked page and the next-step card each take the foot of the screen.
-    for (const rest of ['.language-note-host', '.p-dock', '.nextstep'])
-      expect(rules(phone, `body:has(${rest}) .install-banner`), rest).toMatch(/display:\s*none/);
+  // Field study 5 (D2): the install card lay over the rows of Te toca and the foot of Hablar, and no
+  // rule could keep it off every page (P7-F1 hid it behind a list of what it must not cover). It is
+  // a note in the page's flow, in Te toca's header, and a phone on its side has no room for it.
+  it('never lies over a page: the install note is in the flow and gone on a short screen', () => {
+    expect(rules(phone, '.install-banner')).not.toMatch(/position:\s*(fixed|absolute|sticky)/);
+    expect(rules(phone, '.install-banner')).toMatch(/display:\s*none/);
+    expect(phoneCss).not.toMatch(/body:has\([^)]*\) \.install-banner/);
   });
 });
 

@@ -59,6 +59,15 @@ svg.ic {
 code {
   font-family: var(--mono);
 }
+/* inline code in words an agent wrote (components/Ticked.tsx): a small mono chip, wherever it stands
+   (a question, a row's quote, an option), never raw marks in the serif */
+code.tick {
+  padding: 0 0.32em;
+  border-radius: 4px;
+  background: var(--well);
+  font: 400 0.88em / inherit var(--mono);
+  overflow-wrap: anywhere;
+}
 /* a command's word (CommandWords): the line wraps between words, never at an option's hyphen */
 .nw {
   white-space: nowrap;
@@ -114,7 +123,10 @@ code {
   color: var(--ink-3);
   display: inline-block;
   position: relative;
-  clip-path: inset(-3px -4px);
+  /* Digits only reach the line box's edge, never past it: a clip with room above (-3px) showed the
+     foot of the digit that was rolling out as a bar over the new one («5» with a mark over it, in
+     the day's recap and the review's count). Sideways, room for the roll's blur. */
+  clip-path: inset(0 -4px);
   vertical-align: baseline;
 }
 .n .nv {

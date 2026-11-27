@@ -16,10 +16,13 @@ import { Button } from '../kit/index.ts';
 import { type InstallOffer, installOffer } from './install-offer.ts';
 import { canPromptInstall, onInstallPrompt, promptInstall } from './register.ts';
 
-// The phone's first open in the browser: a small banner, «Instalar Otea en tu inicio», over the
-// tab bar. With the browser's own prompt it installs in one tap; elsewhere it gives this browser's
-// steps. Dismissed once, it stays gone on this browser (Preferencias offers it again); inside the
-// installed app it never shows. On iPhone it says notifications need Otea on the Home Screen.
+// The phone's first open in the browser: a quiet note in the header of Te toca, «Instalar Otea en tu
+// inicio», in the page's own flow (it was a card over the page's foot, over the rows and the
+// composer: field study 5). With the browser's own prompt it installs in one tap; elsewhere it
+// gives this browser's steps. Dismissed once, it stays gone on this browser (Preferencias offers it
+// again); inside the installed app it never shows, and a phone on its side has no room for it (it is
+// not counted as seen there, so it comes on the next open). On iPhone it says notifications need
+// Otea on the Home Screen.
 
 const STEPS: Record<Exclude<InstallOffer, 'none' | 'prompt'>, PlainKey> = {
   ios: 'install.ios',
@@ -46,24 +49,18 @@ export function InstallBannerView({
 }: InstallBannerViewProps) {
   const box = useRef<HTMLElement>(null);
   const shown = offer !== 'none';
-  // Its height, for the page to end clear of it (phone.css pads the views by --install-h): the
-  // banner lies over the foot of the page, and must never cover the last row. A page that hides it
-  // (Hablar's composer, a docked move) leaves it at 0: only a banner on screen counts as shown.
+  // Only a banner with a height counts as seen: a screen that hides it (a phone on its side) leaves
+  // it at 0, and it is still due on the next open.
   useEffect(() => {
     const el = box.current;
-    const root = document.documentElement;
     if (!shown || !el) return;
     const measure = () => {
-      root.style.setProperty('--install-h', `${el.offsetHeight}px`);
       if (el.offsetHeight > 0) onSeen?.();
     };
     measure();
     const seen = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     seen?.observe(el);
-    return () => {
-      seen?.disconnect();
-      root.style.removeProperty('--install-h');
-    };
+    return () => seen?.disconnect();
   }, [shown, onSeen]);
   if (!shown) return null;
   return (
@@ -88,7 +85,12 @@ export function InstallBannerView({
   );
 }
 
+// Nothing to offer where there is no browser (a page drawn to markup).
 export function InstallBanner() {
+  return typeof window === 'undefined' ? null : <InstallBannerLive />;
+}
+
+function InstallBannerLive() {
   const app = useApp();
   // Dismissed by the person, or already on screen on an earlier load: either way it is not due.
   // What this load shows is decided once, so the banner stays while it is read.

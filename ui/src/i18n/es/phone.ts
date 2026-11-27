@@ -244,17 +244,22 @@ export const phone = {
   'phone.ts.ledger':
     'El certificado HTTPS es público: el nombre {host} queda en los registros de Certificate Transparency, que cualquiera puede leer.',
   // La app instalada por HTTPS: sin el equipo, la cola, las actualizaciones (offline/)
-  'offline.noReach': 'No llego a tu equipo.',
+  // One word for being without the computer: «Sin conexión» (the pill, the line, each page's
+  // notes). What changes is the cause, which follows, and what can still be done.
+  'offline.head': 'Sin conexión',
+  'offline.askLocal': 'Otea no responde en este equipo.',
   'offline.askTailscale':
     '¿Tailscale está conectado en este teléfono? ¿Otea está abierto en tu equipo?',
   'offline.askLan':
     '¿Este teléfono está en la misma wifi que tu equipo? ¿Otea está abierto en tu equipo?',
-  'offline.closed': 'Otea no está abierto en tu equipo.',
-  'offline.askClosed': 'Ábrelo allí: la app de escritorio u otea serve.',
+  'offline.askClosed':
+    'Otea no está abierto en tu equipo. Ábrelo allí: la app de escritorio u otea serve.',
   'offline.nothingSaved': 'este teléfono todavía no guardó nada de este proyecto',
-  'offline.readQueue': 'solo lectura · lo nuevo queda en cola',
+  'offline.noData': 'sin datos',
+  // What can be done without the computer: read; what is captured (Nuevo, a note) waits in the
+  // queue. A message to the secretary is not captured: Hablar writes again once the PC is back.
+  'offline.readQueue': 'solo lectura · lo que captures queda en cola',
   'offline.retry': 'Reintentar',
-  'offline.oteaDown': 'Otea no responde',
   'offline.synced': 'última sincronización {time}',
   'offline.readOnly': 'solo lectura',
   'offline.updated': 'Otea se actualizó',

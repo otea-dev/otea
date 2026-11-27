@@ -20,7 +20,8 @@ export const detail = {
   'detail.evidence': 'Evidencia',
   'detail.missing': 'falta para completar',
   'detail.readOnly': 'Solo lectura. Ejecuta {command} para actuar desde este navegador.',
-  'detail.offline': 'Sin conexión con tu equipo: podrás actuar cuando vuelva a conectarse.',
+  // The line over the page says «Sin conexión»; these say what that means for this page.
+  'detail.offline': 'Podrás actuar cuando vuelva la conexión.',
   'detail.archived':
     'Solo lectura: {board} está archivado. Restáuralo en Archivados, en Studio, para trabajar en este ítem.',
   'detail.receipt': '{state} · ahora es {turn} · {ago}',
@@ -422,7 +423,7 @@ export const detail = {
   'sheet.missing.title': 'Ítem no encontrado',
   'sheet.missing.text':
     'No hay ningún ítem {id} en este proyecto. Puede que se haya borrado o que el enlace tenga un error.',
-  'sheet.unreached.title': 'Sin conexión con tu equipo',
+  'sheet.unreached.title': 'Sin conexión',
   'sheet.unreached.text': '{id} se abre cuando tu equipo vuelva a responder.',
   'sheet.yourTurn': 'tu turno',
   'sheet.typeBoard': '{type} · {board}',
@@ -538,7 +539,7 @@ export const detail = {
   'sheet.qa.delegate': 'Decide tú',
   'sheet.qa.delegated': 'Le dejaste la decisión al agente',
   'sheet.qa.goesOn': '{agent} sigue con lo que digas',
-  'sheet.qa.offline': 'Sin conexión con tu equipo: podrás responder cuando vuelva a conectarse.',
+  'sheet.qa.offline': 'Podrás responder cuando vuelva la conexión.',
   'pick.label': 'Elige una opción',
   'pick.recommended': 'recomendada',
   'pick.comment': 'Un comentario para el agente (opcional)',

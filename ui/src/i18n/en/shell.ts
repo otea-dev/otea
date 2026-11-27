@@ -19,7 +19,7 @@ export const shell = {
     other: '{count} more waiting in {where}',
   },
   'shell.agentsTitle': 'Agents',
-  'shell.offline': 'Offline',
+  'shell.offline': 'No connection',
   'shell.agentsIn': 'agents in {project}',
   'shell.pill.none': 'No agents',
   'shell.pill.working': { one: '{count} working', other: '{count} working' },

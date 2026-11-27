@@ -7,14 +7,29 @@ import { C } from '../motion/curves.ts';
 
 const ROW = '.nav > .nrow, .nav > button, .nav > a';
 
+// A title that can be long is held to two lines with an ellipsis (lanes.css): a lane row's, or any
+// element with `.clamp`. Its whole text is its tip, said only while it is cut. One rule for every
+// list, so a long title never takes the room of the rows under it.
+export const CLAMPED = '.clamp, .row .t';
+
+// Whether an element's text goes past its box (cut by the clamp or by its width).
+export function isCut(box: { scrollHeight: number; clientHeight: number }): boolean {
+  return box.scrollHeight > box.clientHeight + 1;
+}
+
 // A tip is said unless its words are already written beside it: an unfolded rail's row, unless the
 // row's tip says more than its label (data-tip-more: a board's yours / open).
 export function tipWanted(at: { folded: boolean; row: boolean; more: boolean }): boolean {
   return at.folded || !at.row || at.more;
 }
 
+const words = (el: HTMLElement): string =>
+  el.dataset.tip ?? (el.matches(CLAMPED) ? (el.textContent ?? '').trim() : '');
+
 function shows(el: HTMLElement): boolean {
-  if (!el.isConnected || !el.dataset.tip) return false;
+  if (!el.isConnected || !words(el)) return false;
+  // A clamped title with no tip of its own says its words only when they do not fit.
+  if (el.dataset.tip === undefined && !isCut(el)) return false;
   return tipWanted({
     folded: !!el.closest('.app[data-folded]'),
     row: el.matches(ROW),
@@ -38,10 +53,12 @@ export function Tooltip() {
           tip.setAttribute('role', 'tooltip');
           document.body.appendChild(tip);
         }
-        tip.textContent = el.dataset.tip ?? '';
+        tip.textContent = words(el);
         const r = el.getBoundingClientRect();
         const right = !!el.closest('.rail');
-        tip.style.left = `${right ? r.right + 8 : r.left}px`;
+        // Never past the window's edge: a long title's tip is a column up to 380 px wide.
+        const at = right ? r.right + 8 : r.left;
+        tip.style.left = `${Math.max(8, Math.min(at, window.innerWidth - tip.offsetWidth - 8))}px`;
         tip.style.top = `${right ? r.top + r.height / 2 - 11 : r.bottom + 6}px`;
         tip.animate(
           [
@@ -66,14 +83,15 @@ export function Tooltip() {
         () => t.remove(),
       );
     };
+    const tipped = `[data-tip], ${CLAMPED}`;
     const over = (e: Event) => {
-      const el = (e.target as Element | null)?.closest?.<HTMLElement>('[data-tip]');
+      const el = (e.target as Element | null)?.closest?.<HTMLElement>(tipped);
       if (el === on) return;
       if (el) show(el, 350);
       else hide();
     };
     const focus = (e: Event) => {
-      const el = (e.target as Element | null)?.closest?.<HTMLElement>('[data-tip]');
+      const el = (e.target as Element | null)?.closest?.<HTMLElement>(tipped);
       if (el && (e.target as HTMLElement).matches(':focus-visible')) show(el, 0);
     };
     document.addEventListener('mouseover', over);

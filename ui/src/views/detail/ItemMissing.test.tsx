@@ -40,7 +40,7 @@ describe('the sheet of an item that is not there', () => {
     const html = renderToStaticMarkup(
       createElement(ItemMissing, { id: 'PEN-3', phone: true, offline: true, onClose: () => {} }),
     );
-    expect(html).toContain('Sin conexión con tu equipo');
+    expect(html).toContain('Sin conexión');
     expect(html).toContain('PEN-3 se abre cuando tu equipo vuelva a responder.');
     expect(html).not.toContain('Ítem no encontrado');
   });

@@ -115,7 +115,8 @@ export const hablar = {
   'file.otherBare': 'Archivo',
   'hablar.tooBig': 'Pasa el límite de {mb} MB',
   'hablar.failed': 'No se envió ({message}). Inténtalo de nuevo.',
-  'hablar.offline': 'Sin conexión con tu equipo: podrás escribir cuando vuelva.',
+  'hablar.offline': 'Sin conexión: podrás escribir cuando vuelva.',
+  'hablar.placeholderOffline': 'Podrás escribir al volver',
   'hablar.readOnly':
     'Este navegador solo puede leer la conversación. Para escribir, abre Otea desde tu equipo con otea open.',
   'hablar.suggestions': 'Sugerencias',

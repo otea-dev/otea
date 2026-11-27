@@ -138,66 +138,132 @@
   grid-row: 1 / span 2;
 }
 
+/* The phone: one quiet line, a dot, «Sin conexión», the hour of the last sync, Reintentar; a tap on
+   it opens the cause and what still works. It is the offline.tsx's `data-phone` markup: the line is
+   a button of its own, Reintentar stands beside it, the opened part under both. */
 @media (max-width: 720px) {
   .app[data-offline] {
     grid-template-rows: 56px auto minmax(0, 1fr);
-  }
-  /* Two lines at 390: what is wrong and read-only, then since when. */
-  .offline-bar {
-    align-items: flex-start;
-    margin: 0 0 6px;
-  }
-  .offline-bar .ob-dot {
-    margin-top: 5px;
-  }
-  .offline-bar .ob-text {
-    white-space: normal;
-  }
-  .offline-bar .ob-sep {
-    display: none;
-  }
-  .offline-bar .ob-when {
-    display: block;
-  }
-  /* At 390: the question, since when, then read-only and Reintentar on their own row. */
-  .offline-bar[data-ask] {
-    flex-wrap: wrap;
-  }
-  .offline-bar[data-ask] .ob-text {
-    flex-basis: calc(100% - 20px);
-  }
-  .offline-bar[data-ask] .ob-ask {
-    display: block;
-    margin-top: 2px;
-  }
-  .offline-bar[data-ask] .ob-ro {
-    margin-left: 15px;
-    align-self: center;
-  }
-  .offline-bar[data-ask] .ob-retry {
-    margin-left: auto;
-    min-height: 40px;
   }
   .queued {
     padding-left: 0;
   }
 }
+.offline-bar[data-phone] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  margin: 0 0 6px;
+  padding: 0 8px 0 0;
+  font: 400 13.5px / 1.35 var(--sans);
+}
+.offline-bar[data-phone] .ob-line {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 4px 0 13px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.offline-bar[data-phone] .ob-line:focus-visible {
+  outline: 2px solid var(--you);
+  outline-offset: -2px;
+}
+.offline-bar[data-phone] .ob-text {
+  flex: 0 1 auto;
+}
+.offline-bar[data-phone] .ob-text b {
+  font-family: var(--sans);
+  font-weight: 500;
+  font-size: 13.5px;
+}
+.offline-bar[data-phone] .ob-when {
+  font: 400 12px / 1 var(--mono);
+  color: var(--ink-3);
+}
+.offline-bar[data-phone] .ob-line > .ic {
+  flex: none;
+  color: var(--ink-3);
+  transition: transform 240ms var(--o-settle);
+}
+.offline-bar[data-phone][data-open] .ob-line > .ic {
+  transform: rotate(180deg);
+}
+.offline-bar[data-phone] .ob-retry {
+  min-height: 36px;
+  padding: 4px 12px;
+}
+/* the opened part: why, since when, what still works, in the page's own words */
+.offline-bar[data-phone] .ob-more {
+  flex: 0 0 100%;
+  min-width: 0;
+  padding: 4px 13px 11px 29px;
+  border-top: 1px solid var(--rule);
+}
+.offline-bar[data-phone] .ob-more[hidden] {
+  display: none;
+}
+.offline-bar[data-phone] .ob-more p {
+  margin: 4px 0 0;
+}
+.offline-bar[data-phone] .ob-ask {
+  font: 400 13.5px / 1.4 var(--sans);
+  color: var(--ink);
+}
+.offline-bar[data-phone] .ob-since,
+.offline-bar[data-phone] .ob-ro {
+  font: 400 12px / 1.45 var(--mono);
+  color: var(--ink-3);
+}
 
-/* A screen too short for it (a phone on its side, 390 px or less of height): the notice is one
-   line, what is wrong and Reintentar; what to check and since when stay for a taller screen. */
+/* 320 px: the hour keeps its place on the line, so the chevron gives its room (the line is still
+   the button that opens the cause) */
+@media (max-width: 360px) {
+  .offline-bar[data-phone] .ob-line {
+    gap: 7px;
+    padding-left: 11px;
+  }
+  .offline-bar[data-phone] .ob-line > .ic {
+    display: none;
+  }
+  .offline-bar[data-phone] .ob-retry {
+    padding-inline: 10px;
+  }
+}
+
+/* A screen too short for it (a phone on its side, 500 px or less of height): the line stays the
+   line, and what to check waits for a taller screen. */
 @media (max-height: 500px) {
   .app[data-offline] {
     grid-template-rows: 48px auto minmax(0, 1fr);
   }
-  .offline-bar,
-  .offline-bar[data-ask] {
+  .offline-bar {
     flex-wrap: nowrap;
     align-items: center;
     margin: 0 0 4px;
     padding: 4px 10px;
   }
-  .offline-bar .ob-dot {
-    margin-top: 0;
+  .offline-bar[data-phone] {
+    padding: 3px 6px 3px 0;
+  }
+  .offline-bar[data-phone] .ob-line {
+    min-height: 32px;
+  }
+  .offline-bar[data-phone] .ob-retry {
+    min-height: 30px;
+  }
+  .offline-bar[data-phone] .ob-line > .ic,
+  .offline-bar[data-phone] .ob-more {
+    display: none;
   }
   .offline-bar .ob-text,
   .offline-bar[data-ask] .ob-text {
@@ -207,28 +273,38 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .offline-bar[data-phone] .ob-text {
+    flex: 0 1 auto;
+  }
   .offline-bar .ob-ask,
-  .offline-bar[data-ask] .ob-ask,
   .offline-bar .ob-sep,
-  .offline-bar .ob-when,
-  .offline-bar .ob-ro,
-  .offline-bar[data-ask] .ob-ro {
+  .offline-bar .ob-ro {
     display: none;
   }
-  .offline-bar[data-ask] .ob-retry,
   .offline-bar .ob-retry {
     min-height: 32px;
     margin-left: auto;
   }
 }
 @media (max-height: 360px) {
-  .offline-bar,
-  .offline-bar[data-ask] {
+  .offline-bar {
     margin-bottom: 2px;
     padding: 2px 8px;
   }
-  .offline-bar[data-ask] .ob-retry,
+  .offline-bar[data-phone] {
+    padding: 2px 6px 2px 0;
+  }
+  .offline-bar[data-phone] .ob-line {
+    min-height: 28px;
+  }
+  .offline-bar[data-phone] .ob-retry {
+    min-height: 26px;
+  }
   .offline-bar .ob-retry {
     min-height: 28px;
   }
+}
+/* the item page carries its own line (PhoneItem), and its title starts under it with air */
+.p-item > .offline-bar {
+  margin-bottom: 14px;
 }

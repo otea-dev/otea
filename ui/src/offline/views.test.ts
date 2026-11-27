@@ -24,7 +24,7 @@ describe('the offline line', () => {
     );
 
     expect(html).toContain('role="status"');
-    expect(html).toContain('No llego a tu equipo.');
+    expect(html).toContain('<b>Sin conexión</b>');
     expect(html).toContain('última sincronización 14:32');
     expect(html).toContain('solo lectura');
   });
@@ -41,16 +41,36 @@ describe('the offline line', () => {
     expect(syncedTime(at(9, 5, 12), at(10, 0), 'en')).toMatch(/Nov 12.*09:05|12 Nov.*09:05/);
   });
 
+  // One word for being offline, whatever the cause (field study 5: «No llego a tu equipo», «Otea no
+  // responde» and «Sin conexión con tu equipo» on one screen); the cause is what follows it.
+  it('says one thing for every cause, and the cause after it', () => {
+    setLanguage('es');
+    const heads = [
+      downWords('localhost'),
+      downWords('desk.tail1.ts.net', true),
+      downWords('192.168.1.24', true),
+      downWords('desk.tail1.ts.net', true, true),
+    ].map(({ head }) => head);
+    expect(new Set(heads)).toEqual(new Set(['Sin conexión']));
+    setLanguage('en');
+    expect(downWords('desk.tail1.ts.net', true).head).toBe('No connection');
+  });
+
   it('on this computer it is Otea that does not answer', () => {
     setLanguage('es');
-    expect(downWords('localhost')).toEqual({ head: 'Otea no responde', ask: null });
+    expect(downWords('localhost')).toEqual({
+      head: 'Sin conexión',
+      ask: 'Otea no responde en este equipo.',
+      local: true,
+    });
   });
 
   it('through Tailscale it asks whether Tailscale is connected on the phone and Otea is open', () => {
     setLanguage('es');
     expect(downWords('desk.tail1.ts.net', true)).toEqual({
-      head: 'No llego a tu equipo.',
+      head: 'Sin conexión',
       ask: '¿Tailscale está conectado en este teléfono? ¿Otea está abierto en tu equipo?',
+      local: false,
     });
     // The origin says it, whatever the screen.
     expect(downWords('Desk.Tail1.TS.NET').ask).toContain('Tailscale');
@@ -60,8 +80,9 @@ describe('the offline line', () => {
     setLanguage('es');
     for (const host of ['192.168.1.24', 'desk.local', 'localhost']) {
       expect(downWords(host, true)).toEqual({
-        head: 'No llego a tu equipo.',
+        head: 'Sin conexión',
         ask: '¿Este teléfono está en la misma wifi que tu equipo? ¿Otea está abierto en tu equipo?',
+        local: false,
       });
     }
     expect(downWords('192.168.1.24').ask).toContain('wifi');
@@ -71,11 +92,12 @@ describe('the offline line', () => {
   it('says Otea is not open on the computer when the door answers with nothing behind it', () => {
     setLanguage('es');
     expect(downWords('desk.tail1.ts.net', true, true)).toEqual({
-      head: 'Otea no está abierto en tu equipo.',
-      ask: 'Ábrelo allí: la app de escritorio u otea serve.',
+      head: 'Sin conexión',
+      ask: 'Otea no está abierto en tu equipo. Ábrelo allí: la app de escritorio u otea serve.',
+      local: false,
     });
     setLanguage('en');
-    expect(downWords('desk.tail1.ts.net', true, true).head).toBe(
+    expect(downWords('desk.tail1.ts.net', true, true).ask).toContain(
       'Otea is not open on your computer.',
     );
   });
@@ -106,7 +128,7 @@ describe('the offline line', () => {
         queues: true,
       }),
     );
-    expect(html).toContain('solo lectura · lo nuevo queda en cola');
+    expect(html).toContain('solo lectura · lo que captures queda en cola');
   });
 
   it('offers Reintentar, which tries the PC again', () => {
@@ -132,7 +154,7 @@ describe('the offline line', () => {
         onRetry: () => {},
       }),
     );
-    expect(en).toContain('I can’t reach your computer.');
+    expect(en).toContain('<b>No connection</b>');
     expect(en).toContain('>Retry</button>');
   });
 });

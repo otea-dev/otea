@@ -160,7 +160,9 @@
 .hb-away-toggle[aria-expanded="true"] > .ic {
   transform: rotate(180deg);
 }
-.hb-away-copy {
+/* the doubled class outweighs the phone's «every button is a positioning context» rule (phone.css
+   :is(…, .btn, …)), which pulled it out of the line */
+.hb-away .hb-away-head > .hb-away-copy.btn {
   position: absolute;
   right: 40px;
   top: 50%;
@@ -1747,12 +1749,13 @@ button.hb-kid:hover {
     -webkit-line-clamp: 2;
     white-space: normal;
   }
-  .hb-away-copy {
+  .hb-away .hb-away-head > .hb-away-copy.btn {
     right: 44px;
     margin-top: -20px;
     width: 40px;
     height: 40px;
     padding: 0;
+    justify-content: center;
   }
   .hb-away-copy .lb {
     display: none;
@@ -1808,6 +1811,14 @@ button.hb-kid:hover {
     scrollbar-width: none;
     -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 30px), transparent);
     mask-image: linear-gradient(to right, #000 calc(100% - 30px), transparent);
+  }
+  /* without the PC nothing can be written: its suggestions would be dead chips, and the room is the
+     thread's */
+  .hb-composer[data-offline] .hb-suggs {
+    display: none;
+  }
+  .hb-composer[data-offline] textarea::placeholder {
+    font-size: 14px;
   }
   .hb-attach,
   .hb-send {
@@ -1956,12 +1967,23 @@ button.hb-kid:hover {
   .hb-note-off {
     display: none;
   }
+  /* the thread is a small window here: what scrolls out under the tabs fades out, never ends in a
+     hard cut through a line */
+  .hb-chat {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14px);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 14px);
+  }
 }
 /* on the phone on its side, one row over the conversation: the tabs, and at its end «Te toca
    ahora» as a count and a tap (its rows open over the thread, never push it down). The heading and
    the status are left to a screen reader: the bottom bar says where you are, and the agents pill
    says who is connected. The strip of the secretary away stays one line of its own. */
 @media (max-width: 720px) and (max-height: 500px) {
+  /* without the PC nothing can be written, and the thread is the window left: the composer waits
+     (the line over the page says why) */
+  .hb-composer[data-offline] {
+    display: none;
+  }
   .hb-main {
     position: relative;
   }
@@ -2003,6 +2025,21 @@ button.hb-kid:hover {
 @media (max-width: 720px) and (max-height: 360px) {
   .hb-main {
     padding-top: 2px;
+  }
+  /* the secretary's strip is a line of 36 px here, and «Copiar» a 32 px button in it: the thread
+     is what the height is for */
+  .hb-away {
+    margin-bottom: 4px;
+  }
+  .hb-away-toggle {
+    min-height: 36px;
+    padding-block: 2px;
+  }
+  .hb-away .hb-away-head > .hb-away-copy.btn {
+    width: 36px;
+    height: 32px;
+    min-height: 32px;
+    margin-top: -16px;
   }
   .hb-te {
     top: 2px;

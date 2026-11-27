@@ -561,61 +561,70 @@ export function EvidenceReader({
           ))}
         </nav>
       ) : null}
-      {pair ? (
-        <div className="ev-reader-pair">
-          <span>
-            {t(blind ? 'evidence.reader.sideBlind' : 'evidence.reader.side', {
-              side: roleWord(shown) ?? '',
-            })}
-          </span>
-          {blind && note ? (
-            <BlindPick
-              ids={[pair.before.id, pair.after.id]}
-              shown={shown}
-              side={(roleWord(shown) ?? 'A') as 'A' | 'B'}
-              note={note}
-            />
+      {/* The tools are one row on the phone (the desk lays them out as it always did): which side
+          you are looking at, compare, and the zoom. */}
+      {pair || zoomable ? (
+        <div className="ev-reader-tools">
+          {pair ? (
+            <div className="ev-reader-pair" data-blind={blind ? 'true' : undefined}>
+              <span>
+                {t(blind ? 'evidence.reader.sideBlind' : 'evidence.reader.side', {
+                  side: roleWord(shown) ?? '',
+                })}
+              </span>
+              {blind && note ? (
+                <BlindPick
+                  ids={[pair.before.id, pair.after.id]}
+                  shown={shown}
+                  side={(roleWord(shown) ?? 'A') as 'A' | 'B'}
+                  note={note}
+                />
+              ) : null}
+              <button
+                type="button"
+                className="btn quiet sm ev-compare-btn"
+                aria-pressed={compared}
+                onClick={() => setComparing(!compared)}
+              >
+                <Icon name="compare" />
+                <span className="lb">
+                  {t(blind ? 'evidence.reader.compareBlind' : 'evidence.reader.compare')}
+                </span>
+              </button>
+            </div>
           ) : null}
-          <button
-            type="button"
-            className="btn quiet sm"
-            aria-pressed={compared}
-            onClick={() => setComparing(!compared)}
-          >
-            {t(blind ? 'evidence.reader.compareBlind' : 'evidence.reader.compare')}
-          </button>
-        </div>
-      ) : null}
-      {zoomable ? (
-        <div className="ev-reader-zoom">
-          <button
-            type="button"
-            className="btn quiet sm icon"
-            disabled={zoom <= ZOOM_MIN}
-            aria-label={t('evidence.pdf.zoomOut')}
-            onClick={() => setZoom(zoomOut(zoom))}
-          >
-            −
-          </button>
-          <button
-            type="button"
-            className="btn quiet sm"
-            aria-pressed={zoom === 1}
-            aria-label={t('evidence.pdf.fit')}
-            title={t('evidence.pdf.fit')}
-            onClick={() => setZoom(1)}
-          >
-            {zoom === 1 ? t('evidence.pdf.fitShort') : `${Math.round(zoom * 100)} %`}
-          </button>
-          <button
-            type="button"
-            className="btn quiet sm icon"
-            disabled={zoom >= ZOOM_MAX}
-            aria-label={t('evidence.pdf.zoomIn')}
-            onClick={() => setZoom(zoomIn(zoom))}
-          >
-            +
-          </button>
+          {zoomable ? (
+            <div className="ev-reader-zoom">
+              <button
+                type="button"
+                className="btn quiet sm icon"
+                disabled={zoom <= ZOOM_MIN}
+                aria-label={t('evidence.pdf.zoomOut')}
+                onClick={() => setZoom(zoomOut(zoom))}
+              >
+                −
+              </button>
+              <button
+                type="button"
+                className="btn quiet sm"
+                aria-pressed={zoom === 1}
+                aria-label={t('evidence.pdf.fit')}
+                title={t('evidence.pdf.fit')}
+                onClick={() => setZoom(1)}
+              >
+                {zoom === 1 ? t('evidence.pdf.fitShort') : `${Math.round(zoom * 100)} %`}
+              </button>
+              <button
+                type="button"
+                className="btn quiet sm icon"
+                disabled={zoom >= ZOOM_MAX}
+                aria-label={t('evidence.pdf.zoomIn')}
+                onClick={() => setZoom(zoomIn(zoom))}
+              >
+                +
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: a click on a line picks it for the note; the note is also sent without one */}

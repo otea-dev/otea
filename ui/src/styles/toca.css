@@ -251,7 +251,7 @@
     padding: 18px 18px 14px 20px;
   }
   /* Compact on a phone: the three things and their names, the notes under them left out, so the
-     card stays short beside the install banner. */
+     card stays short. */
   .ns-move {
     min-height: 48px;
   }

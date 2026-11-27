@@ -514,10 +514,10 @@ export function titleOf(turn: Turn): string {
   // tap on one of its options («Sí, encárgalo»).
   const root = turn.messages[0];
   if (root && root.author !== 'person' && root.options.length > 0) {
-    return messageSnippet(splitQuestion(root.text).lead, 90);
+    return quotedSnippet(splitQuestion(root.text).lead, 90);
   }
   const first = turn.person[0] ?? turn.messages[0];
-  return first ? messageSnippet(first.text, 90) : '';
+  return first ? quotedSnippet(first.text, 90) : '';
 }
 
 // A turn the person began and the secretary answered, and never classified: ordinary talk it did
@@ -542,7 +542,7 @@ function unclassifiedCard(turn: Turn, items: ReadonlyMap<string, Item>, now: num
     kind: null,
     title: titleOf(turn),
     at: turn.at,
-    answer: reply ? messageSnippet(reply.text, 140) : null,
+    answer: reply ? quotedSnippet(reply.text, 140) : null,
     chips: branchOf(turn, items, now),
     asks: false,
     taking: false,
@@ -579,7 +579,7 @@ export function cardsOf(
       kind,
       title: titleOf(turn),
       at: turn.at,
-      answer: kind === 'consultation' && reply ? messageSnippet(reply.text, 140) : null,
+      answer: kind === 'consultation' && reply ? quotedSnippet(reply.text, 140) : null,
       chips,
       asks: chips.some((chip) => chip.asks),
       taking,

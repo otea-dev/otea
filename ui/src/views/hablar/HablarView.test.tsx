@@ -995,6 +995,49 @@ describe('the secretary thinking', () => {
     }
   });
 
+  // Field study 5 (D2): a phone with no PC and the secretary away showed the pill, a card saying so,
+  // «sol está conectado» (the last it had kept, for a PC out of reach), the secretary's strip and a
+  // footnote under the composer, and «queda en cola» beside «podrás escribir cuando vuelva». The
+  // offline line over the page (the app's, not this view's) says it; nothing here repeats it or
+  // says what the phone cannot know.
+  it('on a phone without the PC says nothing about the secretary, and nothing twice', async () => {
+    const view = conversation({
+      messages: read,
+      secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 2 },
+      waiting: { count: 2, since: ago(120) },
+    });
+    const offline = { offline: true, syncedAt: NOW };
+
+    const phone = await open(view, { phone: true, pending: yours, sync: offline });
+    expect(q(phone.root, '.hb-away')).toBeNull();
+    expect(q(phone.root, '.hb-status')).toBeNull();
+    // The writing box says it is closed, in its own words; no note under it.
+    expect(q<HTMLTextAreaElement>(phone.root, '.hb-input textarea')?.placeholder).toBe(
+      'Podrás escribir al volver',
+    );
+    expect(q(phone.root, '.hb-note')).toBeNull();
+    // What waits for you is still there (it is read, not written, so it works from what was kept).
+    expect(q(phone.root, '.hb-te')).not.toBeNull();
+    page?.unmount();
+
+    // The desk has room for both lines and keeps them.
+    const desk = await open(view, { phone: false, pending: yours, sync: offline });
+    expect(q(desk.root, '.hb-away')).not.toBeNull();
+    expect(text(q(desk.root, '.hb-note'))).toContain('podrás escribir cuando vuelva');
+  });
+
+  it('says the secretary is connected only while the PC answers, on the phone', async () => {
+    const view = conversation({
+      messages: read,
+      secretary: { name: 'quill', state: 'connected', since: null, pending: 0 },
+    });
+    const live = await open(view, { phone: true });
+    expect(text(q(live.root, '.hb-status'))).toContain('quill está conectado');
+    page?.unmount();
+    const kept = await open(view, { phone: true, sync: { offline: true, syncedAt: NOW } });
+    expect(q(kept.root, '.hb-status')).toBeNull();
+  });
+
   // R2 (field study 4, V4): the desk told a person already at the computer that the secretary
   // «se reinicia en tu equipo, no desde aquí». That is for the phone; the desk says where to paste.
   it('says where the secretary restarts in words that fit where you are', async () => {
@@ -1120,7 +1163,7 @@ describe('the composer', () => {
     const { root } = await open(conversation(), { sync: { offline: true, syncedAt: null } });
     await typeInto(q<HTMLTextAreaElement>(root, '.hb-input textarea'), 'hola');
     expect(q<HTMLButtonElement>(root, '.hb-send')?.disabled).toBe(true);
-    expect(text(q(root, '.hb-note'))).toContain('Sin conexión con tu equipo');
+    expect(text(q(root, '.hb-note'))).toContain('Sin conexión: podrás escribir cuando vuelva');
   });
 });
 

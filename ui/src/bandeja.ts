@@ -4,7 +4,7 @@ import type {
   BandejaState,
   FromBandeja,
 } from '../../src/core/bandeja.ts';
-import { messageSnippet } from '../../src/core/conversation.ts';
+import { quotedSnippet } from './conversation.ts';
 
 // The Bandeja on the page (src/app/bandeja.ts): the person's rough captures with where each stands,
 // and the words the desk says it with.
@@ -20,9 +20,10 @@ export function stateKey(entry: BandejaEntry): `bandeja.st.${BandejaState}` {
   return `bandeja.st.${entry.state}`;
 }
 
-// The first line of what was captured: the title of its row. A capture of only files has none.
+// The first line of what was captured: the title of its row, a preview (no backticks). A capture of
+// only files has none.
 export function entryTitle(entry: Pick<BandejaEntry, 'text'>, max = 120): string {
-  return messageSnippet(entry.text, max);
+  return quotedSnippet(entry.text, max);
 }
 
 // Whether the entry is done with: filed as an item, or closed with a reason.

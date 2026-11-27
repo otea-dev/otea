@@ -393,7 +393,11 @@ div.tip[role="tooltip"] {
   background: var(--ink);
   color: var(--ground);
   font: 400 11.5px / 1.2 var(--mono);
-  white-space: nowrap;
+  /* a short tip stays on one line; a whole long title (a clamped row's) wraps in a column of its own */
+  max-width: min(380px, calc(100vw - 16px));
+  white-space: normal;
+  width: max-content;
+  overflow-wrap: anywhere;
 }
 
 /* ---- today's primitives, for the components not restyled yet ---- */

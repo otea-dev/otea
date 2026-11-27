@@ -1173,6 +1173,14 @@
 .ev-reader-pair > span:first-child {
   margin-right: auto;
 }
+/* the pair of tools and the zoom lay out as separate rows here; the phone makes them one row
+   (phone.css), and wears the compare button as an icon */
+.ev-reader-tools {
+  display: contents;
+}
+.ev-compare-btn .ic {
+  display: none;
+}
 .ev-reader-decide {
   display: flex;
   align-items: center;

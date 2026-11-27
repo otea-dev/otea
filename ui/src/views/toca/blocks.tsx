@@ -412,7 +412,11 @@ function TocaRow({
           <div className="p-said" data-leaf="">
             <AgentMark name={delivered.agent} />
             <span>
-              {delivered.note ? <q>{delivered.note}</q> : null}
+              {delivered.note ? (
+                <q>
+                  <Ticked text={delivered.note} />
+                </q>
+              ) : null}
               {delivered.note && files ? ' · ' : null}
               {files}
             </span>

@@ -60,6 +60,10 @@ export function Composer({ onSent }: { onSent: () => void }) {
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT)}px`;
+    // It scrolls only once it has reached its tallest: a box that fits its words draws no scroll
+    // bar (a phone drew a grey bar between the words and Enviar when the line was a pixel taller
+    // than the box).
+    el.style.overflowY = el.scrollHeight > MAX_HEIGHT ? 'auto' : 'hidden';
   }, [text]);
 
   const add = (files: File[]) => {
@@ -121,6 +125,7 @@ export function Composer({ onSent }: { onSent: () => void }) {
       className="hb-composer"
       aria-label={t('hablar.composer')}
       data-over={over || undefined}
+      data-offline={offline || undefined}
       onDragOver={(event) => {
         if (!canWrite) return;
         event.preventDefault();
@@ -204,7 +209,16 @@ export function Composer({ onSent }: { onSent: () => void }) {
           value={text}
           disabled={!canWrite}
           aria-label={t('hablar.composer')}
-          placeholder={t(app.phone ? 'hablar.placeholderShort' : 'hablar.placeholder')}
+          // Without the PC nothing can be written here (a message is never queued: Hablar's talk
+          // waits for the PC; what is captured in Nuevo is what queues). On the phone the field
+          // says so itself.
+          placeholder={t(
+            app.phone
+              ? offline
+                ? 'hablar.placeholderOffline'
+                : 'hablar.placeholderShort'
+              : 'hablar.placeholder',
+          )}
           enterKeyHint={app.phone ? 'enter' : 'send'}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={onKeyDown}
@@ -228,9 +242,13 @@ export function Composer({ onSent }: { onSent: () => void }) {
           {t('hablar.failed', { message: error })}
         </p>
       ) : offline ? (
-        <p className="hb-note hb-note-off" role="status">
-          {t('hablar.offline')}
-        </p>
+        // The phone says it in the field's own words and the line over the page: a note under it
+        // would be a third «sin conexión».
+        app.phone ? null : (
+          <p className="hb-note hb-note-off" role="status">
+            {t('hablar.offline')}
+          </p>
+        )
       ) : !canWrite ? (
         <p className="hb-note" role="status">
           {t('hablar.readOnly')}

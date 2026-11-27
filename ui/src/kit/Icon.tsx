@@ -117,6 +117,9 @@ export const IC = {
   red: '<path d="M13.5 6.5h-4v-4M9.5 6.5l4.5-4.5M2.5 9.5h4v4M6.5 9.5 2 14"/>',
   note: '<path d="M3 3.5h10v7H7.5L4.5 13v-2.5H3z"/>',
   bell: '<path d="M4 11V7.5a4 4 0 0 1 8 0V11l1 1.5H3z"/><path d="M6.6 14h2.8"/>',
+  // two pictures side by side: before and after
+  compare:
+    '<rect x="2.2" y="3.2" width="5" height="9.6" rx="1.2"/><rect x="8.8" y="3.2" width="5" height="9.6" rx="1.2"/>',
 } as const;
 
 export type MockIconName = keyof typeof IC;
