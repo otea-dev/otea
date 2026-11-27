@@ -19,9 +19,9 @@ describe('notifyOffer', () => {
       'desktop',
     ],
     [
-      'offers nothing in a plain browser on this computer: the phone and the desktop app are told',
+      'points a plain browser on this computer to the phone: that is where they arrive',
       { target: 'desktop', key: null },
-      null,
+      'on-phone',
     ],
     ['offers push to a phone on HTTPS', {}, 'push'],
     [

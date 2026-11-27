@@ -338,6 +338,8 @@ export const phone = {
   'notify.needsHome':
     'On iPhone, notifications reach Otea only once it is on the Home Screen (see above) and opened from there.',
   'notify.unsupported': 'This browser does not receive notifications.',
+  'notify.onPhone':
+    'Notifications arrive on the phone: install Otea on it (home screen) and turn them on in its Preferences.',
   'notify.blocked':
     'Notifications are blocked for Otea. Allow them in this browser’s settings for this site.',
   'notify.failed': 'They could not be turned on. Try again.',

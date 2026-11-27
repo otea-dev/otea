@@ -3,7 +3,8 @@ import type { Platform } from '../home-screen.ts';
 
 // What Preferencias › Avisos offers here. Notifications reach the phone (Web Push, which browsers
 // allow only on HTTPS, and on iPhone only to an app on the home screen) and the desktop app (the
-// system's own notifications). A plain browser on this computer is neither: it offers nothing.
+// system's own notifications). A plain browser on this computer is neither: it says where they
+// come (the phone).
 
 // GET /api/notify: whose notices, the key to subscribe with, and what they are told.
 export type NotifyView = {
@@ -32,6 +33,8 @@ export type NotifyPlace = {
 
 export type NotifyOffer =
   | 'desktop'
+  // A plain browser on the computer gets none itself: one line says where they arrive.
+  | 'on-phone'
   | 'push'
   | 'needs-https'
   | 'needs-home-screen'
@@ -39,7 +42,7 @@ export type NotifyOffer =
   | 'blocked';
 
 export function notifyOffer(place: NotifyPlace): NotifyOffer | null {
-  if (place.target === 'desktop') return place.desktopApp ? 'desktop' : null;
+  if (place.target === 'desktop') return place.desktopApp ? 'desktop' : 'on-phone';
   if (place.key === null) return 'needs-https';
   // Safari on iPhone has Web Push only for an app added to the home screen.
   if (place.platform === 'ios' && !place.standalone) return 'needs-home-screen';

@@ -155,9 +155,14 @@ export function NotifyChoices({ prefs, projects, onChange }: NotifyChoicesProps)
 const WHY: Partial<
   Record<
     NotifyOffer,
-    'notify.needsHttps' | 'notify.needsHome' | 'notify.unsupported' | 'notify.blocked'
+    | 'notify.needsHttps'
+    | 'notify.needsHome'
+    | 'notify.unsupported'
+    | 'notify.blocked'
+    | 'notify.onPhone'
   >
 > = {
+  'on-phone': 'notify.onPhone',
   'needs-https': 'notify.needsHttps',
   'needs-home-screen': 'notify.needsHome',
   unsupported: 'notify.unsupported',

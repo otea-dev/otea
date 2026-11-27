@@ -347,6 +347,8 @@ export const phone = {
   'notify.needsHome':
     'En iPhone, los avisos llegan a Otea solo cuando está en la pantalla de inicio (arriba) y la abres desde ahí.',
   'notify.unsupported': 'Este navegador no recibe avisos.',
+  'notify.onPhone':
+    'Los avisos llegan al teléfono: instala Otea en él (pantalla de inicio) y actívalos desde sus Preferencias.',
   'notify.blocked':
     'Los avisos de Otea están bloqueados. Permítelos en los ajustes de este navegador para este sitio.',
   'notify.failed': 'No se pudieron activar. Vuelve a intentarlo.',
