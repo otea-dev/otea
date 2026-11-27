@@ -11,7 +11,11 @@ export function FromTurns({ turns }: { turns: readonly FromMessage[] | undefined
   return (
     <p className="hb-from">
       <SecretaryMark />
-      <a href={hablarHash({ turn: first.id })}>{t('hablar.from', { snippet: first.snippet })}</a>
+      <a href={hablarHash({ turn: first.id })}>
+        {first.snippet.trim() === ''
+          ? t('hablar.from.file')
+          : t('hablar.from', { snippet: first.snippet })}
+      </a>
       {more.length > 0 ? (
         <span className="hb-turns">{t('hablar.from.more', { count: more.length })}</span>
       ) : null}

@@ -1324,3 +1324,55 @@ p.st-lines {
   position: absolute;
   inset: -10px -8px;
 }
+
+/* «Detalles técnicos»: what only a reader of code uses (the branch, the diff, the test output, the
+   files two changes share) folded under a review that leads with words and pictures. Closed; its
+   summary says how many notices wait inside, so a closed fold never hides a problem. */
+.tech {
+  margin: 12px 0 8px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.tech > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 44px;
+  padding: 11px 2px;
+  list-style: none;
+  cursor: pointer;
+  font: 500 13px / 1.3 var(--sans);
+  color: var(--ink-2);
+}
+.tech > summary::-webkit-details-marker {
+  display: none;
+}
+.tech > summary::before {
+  content: "";
+  flex: none;
+  align-self: center;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentcolor;
+  border-bottom: 1.5px solid currentcolor;
+  transform: rotate(-45deg);
+  transition: transform 240ms var(--o-settle);
+}
+.tech[open] > summary::before {
+  transform: rotate(45deg);
+}
+.tech > summary small {
+  font: 400 12px / 1.3 var(--mono);
+  color: var(--warn);
+}
+.tech > summary:focus-visible {
+  outline: 2px solid var(--you);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.tech-body {
+  padding: 2px 0 12px;
+}
+.tech-body > .bstrip:first-child {
+  margin-top: 0;
+}

@@ -26,6 +26,54 @@ afterEach(() => {
   localStorage.clear();
 });
 
+// H3 (field study 4): the banner sat over the thread and the composer visit after visit, until it
+// was dismissed. It shows once: what has been on screen is not offered again on a later load.
+describe('Install on the phone banner, once', () => {
+  it('is offered the next time only if it was never on screen', async () => {
+    const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(120);
+    const first = mount(
+      <AppTestProvider value={app}>
+        <InstallBanner />
+      </AppTestProvider>,
+    );
+    await act(async () => undefined);
+    // It stays for this visit...
+    expect(first.root.textContent).toContain('Install Otea');
+    first.unmount();
+
+    // ...and a later load does not offer it again.
+    const next = mount(
+      <AppTestProvider value={app}>
+        <InstallBanner />
+      </AppTestProvider>,
+    );
+    await act(async () => undefined);
+    expect(next.root.textContent).not.toContain('Install Otea');
+    next.unmount();
+
+    // A banner that was never on screen (a page hid it: height 0) is still due.
+    localStorage.clear();
+    height.mockReturnValue(0);
+    const hidden = mount(
+      <AppTestProvider value={app}>
+        <InstallBanner />
+      </AppTestProvider>,
+    );
+    await act(async () => undefined);
+    hidden.unmount();
+    height.mockReturnValue(120);
+    const later = mount(
+      <AppTestProvider value={app}>
+        <InstallBanner />
+      </AppTestProvider>,
+    );
+    await act(async () => undefined);
+    expect(later.root.textContent).toContain('Install Otea');
+    later.unmount();
+    height.mockRestore();
+  });
+});
+
 describe('Install on the phone banner', () => {
   it('keeps the banner and gives the steps when the browser prompt fails, with no flick before', async () => {
     let fail: (e: Error) => void = () => undefined;

@@ -298,11 +298,30 @@ describe('Te espera', () => {
     expect(blocks[1]).toMatchObject({ kind: 'row', inert: false, lane: 'you' });
     const gone = elsewhereBlocks({ ...salinas, unavailable: 'The data is missing' });
     expect(gone.find((block) => block.kind === 'row')).toMatchObject({ inert: true });
-    // The step in words, in the language on screen, never its id.
+    // What the row asks of you, in words and in the language on screen: never a step or a column
+    // name (field study 4: «Hacerlo (en revisión)»), never its id.
     const html = renderToStaticMarkup(
       createElement('div', null, (blocks[1] as { content: ReactNode }).content),
     );
-    expect(html).toContain('Refinar (en revisión)');
+    expect(html).toContain('para revisar');
+    expect(html).not.toContain('Refinar');
+    // A question says who asks.
+    const asked = elsewhereBlocks({
+      ...salinas,
+      waiting: [
+        {
+          ...item({ id: 'SAL-13', title: 'Cartel', turn: 'human' }),
+          state: 'sk3j9x__doing',
+          stateName: 'Hacerlo',
+          asks: { question: 1, by: 'quill', text: '¿Verde?', at: ago(3) },
+        },
+      ],
+    });
+    const question = renderToStaticMarkup(
+      createElement('div', null, (asked[1] as { content: ReactNode }).content),
+    );
+    expect(question).toContain('te pregunta quill');
+    expect(question).not.toContain('Hacerlo');
     // The same id lives in several projects: the project's name goes right after it.
     expect(html).toContain(
       '<span class="id">SAL-12</span><span class="mpt"><span class="sep">·</span><span class="pid">Salinas</span></span>',

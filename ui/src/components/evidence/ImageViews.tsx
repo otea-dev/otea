@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { comparePair, nudgeSplit, splitAt, stepIndex } from '../../evidence.ts';
+import { byViewport, comparePair, nudgeSplit, splitAt, stepIndex } from '../../evidence.ts';
 import { useFileUrl } from '../../evidence-files.ts';
 import { t } from '../../i18n/i18n.ts';
 import { Button, Icon } from '../../kit/index.ts';
@@ -20,12 +20,32 @@ function altOf(evidence: Evidence): string {
   return evidence.caption ?? evidence.filename;
 }
 
+// A capture this much taller than wide is a whole page, not a screen: a phone's 390 x 844 is 2.2.
+export const TALL = 3;
+
+// What a picture needs to say it is tall (a full-page capture): the reader fits it to the width and
+// scrolls it down, where fitting the height left a sliver 130 px wide.
+function useTall(): {
+  'data-tall'?: '';
+  onLoad: (event: SyntheticEvent<HTMLImageElement>) => void;
+} {
+  const [tall, setTall] = useState(false);
+  return {
+    ...(tall ? { 'data-tall': '' as const } : {}),
+    onLoad: (event) => {
+      const { naturalWidth, naturalHeight } = event.currentTarget;
+      setTall(naturalWidth > 0 && naturalHeight > naturalWidth * TALL);
+    },
+  };
+}
+
 export function ImageSingle({ evidence }: { evidence: Evidence }) {
   const fileUrl = useFileUrl();
+  const tall = useTall();
   return (
     <figure className="ev-figure">
       <div className="ev-stage well">
-        <img className="ev-img ev-set" src={fileUrl(evidence)} alt={altOf(evidence)} />
+        <img className="ev-img ev-set" src={fileUrl(evidence)} alt={altOf(evidence)} {...tall} />
       </div>
       <figcaption>
         <FileMeta evidence={evidence} />
@@ -205,6 +225,25 @@ function Framed({ evidence, label }: { evidence: Evidence; label: string }) {
         <FileMeta evidence={evidence} />
       </figcaption>
     </figure>
+  );
+}
+
+// A compare part's shots, one compare for each viewport they were taken at (phone first, each named),
+// never a shot of one size laid over a shot of another. Shots whose names say no viewport are one
+// plain compare.
+export function ImageCompares({ evidence }: { evidence: Evidence[] }) {
+  const groups = byViewport(evidence);
+  const [only] = groups;
+  if (groups.length < 2 || !only) return <ImageCompare evidence={evidence} />;
+  return (
+    <>
+      {groups.map(({ key, files }) => (
+        <section key={key ?? 'any'} className="ev-viewport">
+          {key ? <h4 className="ev-viewport-h">{t(`evidence.viewport.${key}`)}</h4> : null}
+          <ImageCompare evidence={files} />
+        </section>
+      ))}
+    </>
   );
 }
 

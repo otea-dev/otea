@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   blindPartsOf,
+  byViewport,
   comparePair,
   emptyText,
   evidenceOf,
@@ -10,10 +11,12 @@ import {
   logView,
   moduleTitle,
   nudgeSplit,
+  pairIn,
   parseDiff,
   sideWord,
   splitAt,
   stepIndex,
+  viewportOf,
 } from './evidence.ts';
 import type { Evidence, LayoutEntry, TypeView } from './types.ts';
 
@@ -107,6 +110,71 @@ describe('comparePair', () => {
 
     expect(comparePair([b1, a1, b2])).toEqual({ before: b2, after: a1 });
     expect(comparePair([b1])).toEqual({ before: b1, after: undefined });
+  });
+});
+
+// H3 (field study 4, U7): «antes-1280.png» was laid over «despues-390.png», and the slider of a
+// desktop shot against a phone shot judged nothing. A pair is two shots of one viewport.
+describe('the viewport a screenshot was taken at', () => {
+  it('reads it from the name: a size, a width, or a word', () => {
+    const at = (name: string) => viewportOf(name);
+    expect(at('antes-390.png')).toBe('phone');
+    expect(at('despues_390x844.png')).toBe('phone');
+    expect(at('after-1280.png')).toBe('desktop');
+    expect(at('cam4-768-despues.png')).toBe('tablet');
+    expect(at('movil-antes.png')).toBe('phone');
+    expect(at('home-desktop.png')).toBe('desktop');
+    expect(at('antes.png')).toBeNull();
+    expect(at('captura-2026-11-27.png')).toBeNull();
+  });
+});
+
+describe('pairing before and after by viewport', () => {
+  const shots = {
+    b1280: evidence('antes-1280.png', { role: 'before', module: 'shots' }),
+    a1280: evidence('despues-1280.png', { role: 'after', module: 'shots' }),
+    b390: evidence('antes-390.png', { role: 'before', module: 'shots' }),
+    a390: evidence('despues-390.png', { role: 'after', module: 'shots' }),
+  };
+
+  it('pairs the shown shot with the other side of its own viewport, whatever came first', () => {
+    const files = [shots.b1280, shots.b390, shots.a1280, shots.a390];
+    expect(pairIn(files, shots.a390)).toEqual({ before: shots.b390, after: shots.a390 });
+    expect(pairIn(files, shots.a1280)).toEqual({ before: shots.b1280, after: shots.a1280 });
+    expect(pairIn(files, shots.b390)).toEqual({ before: shots.b390, after: shots.a390 });
+  });
+
+  it('offers no pair for a shot whose other side is of another viewport', () => {
+    expect(pairIn([shots.b1280, shots.a390], shots.a390)).toBeNull();
+  });
+
+  it('still pairs shots whose names say nothing of a viewport', () => {
+    const b = evidence('antes.png', { role: 'before', module: 'shots' });
+    const a = evidence('despues.png', { role: 'after', module: 'shots' });
+    expect(pairIn([b, a], a)).toEqual({ before: b, after: a });
+  });
+
+  it('compares the latest of each side within one viewport', () => {
+    const files = [shots.b1280, shots.b390, shots.a1280, shots.a390];
+    expect(comparePair(files)).toEqual({ before: shots.b390, after: shots.a390 });
+    expect(comparePair([shots.b1280, shots.a390])).toEqual({
+      before: undefined,
+      after: shots.a390,
+    });
+  });
+
+  it('groups a module’s shots by viewport, each group with both of its sides', () => {
+    const lone = evidence('antes.png', { role: 'before', module: 'shots' });
+    const groups = byViewport([shots.b1280, shots.b390, shots.a1280, shots.a390, lone]);
+    expect(groups.map(({ key }) => key)).toEqual(['phone', 'desktop']);
+    expect(groups[0]?.files.map(({ filename }) => filename)).toEqual([
+      'antes-390.png',
+      'despues-390.png',
+    ]);
+    // A shot with no viewport in its name joins the groups that lack its side.
+    expect(byViewport([lone, shots.a390]).map(({ files }) => files.length)).toEqual([2]);
+    // Nothing to tell apart: one group, the shots as they are.
+    expect(byViewport([lone]).map(({ key }) => key)).toEqual([null]);
   });
 });
 

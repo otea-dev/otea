@@ -99,6 +99,11 @@ export const shell = {
   'prefs.dek':
     'Lo tuyo, no del proyecto: cómo se ve y habla Otea para ti, qué te avisa y tu sesión. Lo del proyecto está en Configuración.',
   'prefs.sec.appearance': 'Apariencia',
+  'prefs.sec.review': 'Revisiones',
+  'prefs.review.full': 'Todo',
+  'prefs.review.plain': 'En palabras sencillas',
+  'prefs.review.note':
+    'En palabras sencillas, una revisión empieza por lo que cambió y las imágenes; la rama, el diff, la salida de las pruebas y los archivos que comparten dos cambios esperan tras «Detalles técnicos». El celular siempre se lee así.',
   'prefs.sec.notify': 'Avisos',
   'prefs.sec.window': 'Ventana',
   'prefs.sec.app': 'Aplicación',

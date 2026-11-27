@@ -135,6 +135,12 @@
   width: min(520px, calc(100vw - 32px));
   margin-left: calc(min(520px, calc(100vw - 32px)) / -2);
 }
+/* Over Hablar the foot of the screen is the composer's (its words, Enviar, the files): the toast
+   stands above it, whatever the composer's height (Composer measures --above-composer). */
+body:has(.hb-composer) .toast:not(.at-top) {
+  top: auto;
+  bottom: var(--above-composer, 22px);
+}
 /* While the desk reader is open its foot holds the note box and the moves: a toast goes over the top
    bar instead of covering them (DR3-14). */
 @media (min-width: 721px) {

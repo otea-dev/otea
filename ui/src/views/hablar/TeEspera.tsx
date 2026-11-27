@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { postEscalationDismiss } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
+import { splitQuestion } from '../../conversation.ts';
 import { waitedText } from '../../derive/when.ts';
 import { language, t } from '../../i18n/i18n.ts';
 import { Icon } from '../../kit/Icon.tsx';
@@ -61,13 +62,30 @@ export type TeEsperaProps = {
   onJump: (entry: PendingEntry) => void;
 };
 
+// How many rows show before «Ver todas»: a long list never takes the room of the conversation
+// (field study 4: eight reviews were half of the desk and 40% of the phone). On the phone the strip
+// is one line beyond PHONE_ROWS rows, until the head is tapped.
+export const SHOWN_ROWS = 3;
+export const PHONE_ROWS = 2;
+
+// What a row says: a question by the question itself, the rest by its text or its title.
+export function rowText(entry: PendingEntry): string {
+  if (entry.text !== undefined && ANSWERED_BELOW.includes(entry.kind)) {
+    return splitQuestion(entry.text).lead;
+  }
+  return entry.text ?? entry.title;
+}
+
 export function TeEspera({ pending, onJump }: TeEsperaProps) {
   const app = useApp();
   // What the person chose by tapping the head; until then it opens as the content asks.
   const [chosen, setChosen] = useState<boolean | undefined>();
+  const [all, setAll] = useState(false);
   if (!pending || (pending.count === 0 && pending.blocks.length === 0)) return null;
   const { entries, blocks } = pending;
-  const open = chosen ?? opensByDefault(entries);
+  const roomy = !app.phone || entries.length + blocks.length <= PHONE_ROWS;
+  const open = chosen ?? (opensByDefault(entries) && roomy);
+  const shown = all ? entries : entries.slice(0, SHOWN_ROWS);
   return (
     <section className="hb-te" data-enter="fade" aria-label={t('hablar.te.title')}>
       <button
@@ -88,7 +106,7 @@ export function TeEspera({ pending, onJump }: TeEsperaProps) {
               {blockText(block)}
             </li>
           ))}
-          {entries.map((entry) => (
+          {shown.map((entry) => (
             <li
               key={`${entry.kind}:${entry.ref}:${entry.signal ?? ''}`}
               data-dismissable={entry.signal === undefined ? undefined : ''}
@@ -100,7 +118,7 @@ export function TeEspera({ pending, onJump }: TeEsperaProps) {
                 onClick={() => onJump(entry)}
               >
                 <span className="hb-te-ref">{entry.kind === 'secretary' ? '' : entry.ref}</span>
-                <span className="hb-te-t">{entry.text ?? entry.title}</span>
+                <span className="hb-te-t">{rowText(entry)}</span>
                 <span className="hb-te-k">
                   {t(`hablar.te.k.${entry.kind}`, { agent: entry.by ?? '' })}
                 </span>
@@ -124,6 +142,13 @@ export function TeEspera({ pending, onJump }: TeEsperaProps) {
               ) : null}
             </li>
           ))}
+          {entries.length > SHOWN_ROWS ? (
+            <li className="hb-te-foot">
+              <button type="button" className="hb-te-more" onClick={() => setAll(!all)}>
+                {all ? t('hablar.te.fewer') : t('hablar.te.all', { count: entries.length })}
+              </button>
+            </li>
+          ) : null}
         </ul>
       ) : null}
     </section>

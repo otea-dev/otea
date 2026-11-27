@@ -444,6 +444,9 @@
   .row .m .bd {
     display: none;
   }
+  .row .m .pw {
+    display: inline-flex;
+  }
   .sec h2 {
     font-size: 19px;
   }
@@ -1504,6 +1507,11 @@
   height: auto;
   touch-action: pinch-zoom;
 }
+/* A whole-page capture is read down its width, as on the desk: fitted to the height it was a sliver
+   (field study 4). The sheet scrolls; a pinch zooms. */
+.p-read .ev-stage img[data-tall] {
+  max-height: none;
+}
 .p-read .ev-code {
   font-size: 12px;
 }
@@ -1856,6 +1864,12 @@
   body:has(.language-note-host) .install-banner,
   body:has(.p-dock) .install-banner,
   body:has(.nextstep) .install-banner {
+    display: none;
+  }
+  /* Hablar's foot is the composer's: the banner never lies over it or over the thread above it,
+     and a toast is never under it (one thing at a time above the tab bar). */
+  body:has(.hb-composer) .install-banner,
+  body:has(.toast) .install-banner {
     display: none;
   }
   .install-banner {

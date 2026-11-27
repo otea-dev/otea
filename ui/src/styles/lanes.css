@@ -400,6 +400,13 @@
 .m .stp.you {
   color: var(--you-ink);
 }
+.m .stp.warn {
+  color: var(--warn);
+}
+/* what the row asks of you, in words: only where the phone has no column for it */
+.m .pw {
+  display: none;
+}
 .row .a {
   font-size: 13px;
   color: var(--ink);

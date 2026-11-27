@@ -92,7 +92,7 @@ export function ToastHost() {
   const sweep = useRef<number | undefined>(undefined);
   useEffect(() => () => clearTimeout(sweep.current), []);
   const seen = useRef(seenAtMount());
-  const dwell = useRef({ left: DWELL, t0: 0, timer: 0 });
+  const dwell = useRef({ left: DWELL, t0: 0, timer: 0, due: Number.POSITIVE_INFINITY });
   const replaced = useRef(false);
   const pendingNode = useRef(false);
 
@@ -111,10 +111,12 @@ export function ToastHost() {
   const arm = () => {
     clearTimeout(dwell.current.timer);
     dwell.current.t0 = performance.now();
+    dwell.current.due = dwell.current.t0 + dwell.current.left;
     dwell.current.timer = window.setTimeout(close, dwell.current.left);
   };
   const pause = () => {
     clearTimeout(dwell.current.timer);
+    dwell.current.due = Number.POSITIVE_INFINITY;
     dwell.current.left = Math.max(
       1200,
       dwell.current.left - (performance.now() - dwell.current.t0),
@@ -248,6 +250,21 @@ export function ToastHost() {
   }, [msgs]);
 
   useEffect(() => () => clearTimeout(dwell.current.timer), []);
+
+  // A page that was in the background (a phone locked, a hidden tab) throttles its timers: its
+  // toast sat there an hour over Te toca (field study 4). Back in view, a toast past its time goes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: close reads refs only
+  useEffect(() => {
+    const check = () => {
+      if (document.visibilityState === 'visible' && performance.now() > dwell.current.due) close();
+    };
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('focus', check);
+    return () => {
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('focus', check);
+    };
+  }, []);
 
   const gone = useSyncExternalStore(subscribe, sentAway, () => 0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: when an opening sends one away only

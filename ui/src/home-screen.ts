@@ -57,6 +57,26 @@ export function hintDismissed(store: Store | undefined): boolean {
   }
 }
 
+// The hint was on screen once: it shows once, and a later load does not offer it again (the
+// Preferencias entry still does). Dismissed is the person's own no; this is what Otea did.
+export const HOME_HINT_SEEN_KEY = 'otea.homeScreenHintSeen';
+
+export function hintSeen(store: Store | undefined): boolean {
+  try {
+    return store?.getItem(HOME_HINT_SEEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function noteHintSeen(store: Store | undefined): void {
+  try {
+    store?.setItem(HOME_HINT_SEEN_KEY, '1');
+  } catch {
+    // nowhere to keep it: the hint may show again next time, nothing else changes
+  }
+}
+
 export function dismissHint(store: Store | undefined): void {
   try {
     store?.setItem(HOME_HINT_KEY, 'dismissed');

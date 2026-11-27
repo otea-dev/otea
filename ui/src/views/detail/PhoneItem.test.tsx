@@ -191,8 +191,13 @@ describe('reviewing an item on the phone', () => {
     expect(at('Ya cruzan.')).toBeLessThan(at('puente.png'));
     expect(at('puente.png')).toBeLessThan(at('El último se queda.'));
     // Who, type, board and the rest fold under Detalles, after the delivery.
-    expect(at('Detalles')).toBeGreaterThan(at('El último se queda.'));
+    expect(html.lastIndexOf('Detalles')).toBeGreaterThan(at('El último se queda.'));
     expect(html).toMatch(/class="p-more"[^>]*aria-expanded="false"/);
+    // H3: the picture comes first; the code file waits behind «Detalles técnicos», closed.
+    expect(at('Detalles técnicos')).toBeGreaterThan(at('puente.png'));
+    expect(at('wolf.ts')).toBeGreaterThan(at('Detalles técnicos'));
+    expect(html).toContain('<details class="tech"');
+    expect(html).not.toContain('<details class="tech" open');
   });
 
   // Field study 3: the handoff note was one long paragraph in the big serif, with the evidence

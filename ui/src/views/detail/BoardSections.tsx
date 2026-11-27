@@ -42,6 +42,7 @@ import { type MergeOnly, mergeOnlyText } from './merge-only.ts';
 import type { MergedOutside } from './merged-outside.ts';
 import { type Overlap, overlapNotice } from './overlaps.ts';
 import { type RoundSame, roundSameText } from './round-same.ts';
+import { TechDetails } from './TechDetails.tsx';
 
 // The item page of a Studio board (the mock's itemHtml, 75-cover.js): what its step waits for in
 // the checklist's words (F12), the protected branch after the buttons (F10), the notes of every
@@ -338,6 +339,30 @@ export function WaitChecklist({
   );
 }
 
+// How many notices a branch line carries besides the branch itself (what a closed «Detalles
+// técnicos» says on its summary, so the fold never hides a problem).
+export function branchNoticeCount(o: {
+  behind?: unknown;
+  drift?: unknown;
+  off?: unknown;
+  files?: unknown;
+  same?: unknown;
+  merge?: unknown;
+  waits?: unknown;
+  overlaps?: readonly unknown[];
+}): number {
+  return [
+    o.behind,
+    o.drift,
+    o.off,
+    o.files,
+    o.same,
+    o.merge,
+    o.waits,
+    (o.overlaps?.length ?? 0) > 0,
+  ].filter(Boolean).length;
+}
+
 // "Rama feat/x en api · se puede subir / congelada mientras la revisas / se puede fusionar".
 // Under it, what a clone without Otea's hook pushed to the branch since the handoff (P3C-R3-1).
 // In its land step, when the PC saw it merged outside Otea, it says so instead (P1-R3-9); under
@@ -354,8 +379,12 @@ export function BranchLine({
   merge = null,
   waits,
   behind = null,
+  plain = false,
 }: {
   strip: BranchStrip | null;
+  // The review is in plain words (the phone, or the person chose it): the branch and everything
+  // that speaks of it sit folded behind «Detalles técnicos», their count on its summary.
+  plain?: boolean;
   // A Done item landed on the remote's base while the local one stayed behind.
   behind?: LocalBehind | null;
   drift?: Drift | null;
@@ -380,8 +409,9 @@ export function BranchLine({
     </div>
   ) : null;
   if (!behind && !drift && !off && !files && !same && !merge && !waits && overlaps.length === 0)
-    return line;
-  return (
+    return plain ? <TechDetails>{line}</TechDetails> : line;
+  const notices = branchNoticeCount({ behind, drift, off, files, same, merge, waits, overlaps });
+  const lines = (
     <>
       {line}
       {behind ? (
@@ -435,6 +465,7 @@ export function BranchLine({
       <OverlapLine item={item} overlaps={overlaps} />
     </>
   );
+  return plain ? <TechDetails notices={notices}>{lines}</TechDetails> : lines;
 }
 
 // Every other open change that shares files, said once: a line, and the files of each folded.

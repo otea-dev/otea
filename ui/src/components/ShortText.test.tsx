@@ -64,6 +64,29 @@ describe("an agent's question", () => {
     expect(html).toContain('st-clamp');
   });
 
+  // H3 (field study 4, U1): the card showed «Aprobaste el arreglo.» and «ver más»; the question
+  // itself (and what it would authorise) sat behind the fold, under buttons that already answered.
+  it('always shows the question itself; only its context folds behind «see more»', () => {
+    const text =
+      'Aprobaste el arreglo. El proyecto no tiene remoto: no puedo subir la rama a ningún lado, ' +
+      'sólo unirla a main en tu copia local. Esa unión se deshace con un revert, pero cambia los ' +
+      'archivos que tienes abiertos. ¿La integro en tu copia principal?';
+    const html = ask(text);
+    const shown = textOf(html);
+    expect(shown).toContain('¿La integro en tu copia principal?');
+    expect(shown).not.toContain('Aprobaste el arreglo.');
+    expect(shown).toContain('see more');
+    expect(html).toContain('aria-label="¿La integro en tu copia principal?"');
+  });
+
+  it('leads with the last question when the context has questions of its own', () => {
+    const shown = textOf(
+      ask('¿Viste el cartel? Quedó en verde.\nLo pasé a crema para probar. ¿Lo dejo así?'),
+    );
+    expect(shown).toContain('¿Lo dejo así?');
+    expect(shown).not.toContain('Lo pasé a crema');
+  });
+
   it('shows a short question whole, with nothing to unfold', () => {
     const html = ask('¿Corto el parpadeo del menú o de la barra?');
     expect(html).toContain('¿Corto el parpadeo del menú o de la barra?');

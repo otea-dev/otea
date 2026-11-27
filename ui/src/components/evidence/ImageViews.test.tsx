@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { setLanguage } from '../../i18n/i18n.ts';
 import type { Evidence } from '../../types.ts';
-import { ImageCompare, ImageGallery } from './ImageViews.tsx';
+import { ImageCompare, ImageCompares, ImageGallery } from './ImageViews.tsx';
 import { ItemReview } from './item-evidence.ts';
 
 const image = (id: number): Evidence => ({
@@ -31,6 +31,44 @@ describe('ImageCompare, blind', () => {
     expect(html).toContain('aria-label="Divisor entre A y B"');
     expect(html).not.toMatch(/antes|después/);
     setLanguage('en');
+  });
+});
+
+// H3 (field study 4, U7): a module with shots at two sizes drew one compare of whichever pair came
+// last. Each viewport gets its own compare, named, the phone first, and never a desktop shot
+// against a phone shot.
+describe('ImageCompares, by viewport', () => {
+  const shot = (id: number, filename: string, role: 'before' | 'after'): Evidence => ({
+    ...image(id),
+    role,
+    filename,
+  });
+  const files = [
+    shot(1, 'antes-1280.png', 'before'),
+    shot(2, 'despues-1280.png', 'after'),
+    shot(3, 'antes-390.png', 'before'),
+    shot(4, 'despues-390.png', 'after'),
+  ];
+
+  it('draws one compare per viewport, each with its own two files', () => {
+    const html = renderToStaticMarkup(<ImageCompares evidence={files} />);
+    const blocks = html.split('class="ev-compare"').slice(1);
+    expect(blocks).toHaveLength(2);
+    const names = (block: string) =>
+      [...block.matchAll(/alt="[^"]*?([a-z]+-\d+\.png)"/g)].map((m) => m[1]);
+    expect(new Set(names(blocks[0] ?? ''))).toEqual(new Set(['antes-390.png', 'despues-390.png']));
+    expect(new Set(names(blocks[1] ?? ''))).toEqual(
+      new Set(['antes-1280.png', 'despues-1280.png']),
+    );
+    // Named in words, the phone first.
+    expect(html.indexOf('Phone')).toBeGreaterThan(-1);
+    expect(html.indexOf('Phone')).toBeLessThan(html.indexOf('Desktop'));
+  });
+
+  it('is one plain compare, with no viewport heading, when the shots name one viewport', () => {
+    const html = renderToStaticMarkup(<ImageCompares evidence={files.slice(2)} />);
+    expect(html.split('class="ev-compare"')).toHaveLength(2);
+    expect(html).not.toContain('Phone');
   });
 });
 

@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { FOLD_CHARS, FOLD_LINES, splitReply } from '../conversation.ts';
+import { FOLD_CHARS, FOLD_LINES, splitQuestion, splitReply } from '../conversation.ts';
 import { t } from '../i18n/i18n.ts';
 import { NoteText } from './NoteText.tsx';
 
@@ -16,8 +16,12 @@ export function ShortText({
   text,
   markdown = false,
   leadClass,
+  question = false,
 }: {
   text: string;
+  // The text is a question to you: its question leads, whatever sentence comes first, and what
+  // folds is its context (a card's buttons answer it, so it is read before them).
+  question?: boolean;
   // The text is Markdown (a note): its lists and code are drawn; a question is plain words.
   markdown?: boolean;
   // The class of the conclusion, the surface's own voice.
@@ -54,7 +58,7 @@ export function ShortText({
       </>
     );
   }
-  const reply = splitReply(text);
+  const reply = question ? splitQuestion(text) : splitReply(text);
   const draw = (words: string, className: string) =>
     markdown ? (
       <NoteText text={words} className={className} />

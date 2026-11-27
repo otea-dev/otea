@@ -65,6 +65,7 @@ import {
 } from './phone-review.ts';
 import type { Pick } from './pick.ts';
 import { takePick } from './pick-intent.ts';
+import { TechDetails } from './TechDetails.tsx';
 
 // Reviewing an item on the phone (mobile mock 2, 2b): what was delivered first (the round's note,
 // its evidence, what you asked the round before), the rounds of the step as one segment (Ronda N ·
@@ -90,6 +91,10 @@ type PhoneItemProps = {
   // The route, the hand and wait checklists: drawn by the sheet, placed here.
   route: ReactNode;
   checks: ReactNode;
+  // The branch and what Otea says of it: folded with the diff and the test output behind
+  // «Detalles técnicos» under the delivery, and how many notices wait in it.
+  technical?: ReactNode;
+  technicalNotices?: number;
   details: ReactNode;
   detailsSummary: string;
   // On a board, the fields the agents filled in (findings, options, sources), drawn as the desk
@@ -477,8 +482,14 @@ function RoundView({
   handed,
   blind,
   gaps,
+  technical,
+  technicalNotices,
 }: {
   r: PhoneRound;
+  // The branch and what Otea says of it (the newest round's), for the fold of technical details,
+  // with how many notices wait in it.
+  technical?: ReactNode;
+  technicalNotices?: number | undefined;
   // What the step asks of its evidence that is not attached, on the newest round only.
   gaps?: Gaps | undefined;
   // The compare parts judged blind, by module id: their files are never marked (P5-R2-2).
@@ -502,7 +513,6 @@ function RoundView({
         <Lab x={newest && r.n > 1 ? t('phone.r.newIn', { n: r.n }) : t('toca.round', { n: r.n })}>
           {t('phone.r.delivered')}
         </Lab>
-        {handed?.length ? <HandedList fields={handed} agent={r.by} /> : null}
         {r.note ? (
           <ShortText markdown leadClass="p-text" text={r.note} />
         ) : handed?.length ? null : (
@@ -524,17 +534,40 @@ function RoundView({
       ) : null}
       <section className="p-part" data-c>
         <Lab x={evidenceWords(images.length, files.length) || '—'}>{t('sheet.evidence')}</Lab>
-        <Files
-          evidence={r.evidence}
-          noted={notes?.noted}
-          marks={prior ? fileMarks(prior.evidence, r.evidence, blind) : undefined}
-          parts={parts}
-          decide={decide}
-          comment={comment}
-          onSeen={onSeen}
-        />
+        {/* What a person judges comes first (the pictures); the diff, the test output and the files
+            that only a reader of code uses are folded behind «Detalles técnicos». */}
+        {images.length > 0 || files.length === 0 ? (
+          <Files
+            evidence={images}
+            noted={notes?.noted}
+            marks={prior ? fileMarks(prior.evidence, r.evidence, blind) : undefined}
+            parts={parts}
+            decide={decide}
+            comment={comment}
+            onSeen={onSeen}
+          />
+        ) : null}
         {gaps ? <EvidenceGaps gaps={gaps} required /> : null}
       </section>
+      {/* One fold for what only a reader of code uses: the branch and what Otea says of it, the
+          fields the step handed off (the branch, the commit), the diff and the test output. */}
+      {technical || handed?.length || files.length > 0 ? (
+        <TechDetails notices={technicalNotices}>
+          {technical}
+          {handed?.length ? <HandedList fields={handed} agent={r.by} /> : null}
+          {files.length > 0 ? (
+            <Files
+              evidence={files}
+              noted={notes?.noted}
+              marks={prior ? fileMarks(prior.evidence, r.evidence, blind) : undefined}
+              parts={parts}
+              decide={decide}
+              comment={comment}
+              onSeen={onSeen}
+            />
+          ) : null}
+        </TechDetails>
+      ) : null}
       {r.asked ? (
         <section className="p-part" data-c>
           <Lab>{t('phone.r.asked', { n: r.asked.n })}</Lab>
@@ -1005,6 +1038,8 @@ export function PhoneItem(p: PhoneItemProps) {
           onSeen={markSeen}
           handed={shown === newest ? handed : undefined}
           gaps={shown === newest ? gaps : undefined}
+          technical={shown === newest ? p.technical : undefined}
+          technicalNotices={shown === newest ? p.technicalNotices : undefined}
           blind={blind}
         />
       ) : null}

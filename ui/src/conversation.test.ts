@@ -16,6 +16,7 @@ import {
   piecesOf,
   rowsOf,
   type SecretaryStatus,
+  splitQuestion,
   splitReply,
   thinkingRoot,
   turnAt,
@@ -308,6 +309,32 @@ describe('texts to paste, in fenced blocks', () => {
   });
 });
 
+describe('a question leading its card', () => {
+  it('takes the last sentence that ends in a question mark, with the rest as its context', () => {
+    const reply = splitQuestion(
+      'Aprobaste el arreglo. No hay remoto, así que solo uno a main en tu copia. ¿La integro?',
+    );
+    expect(reply.lead).toBe('¿La integro?');
+    expect(reply.rest).toBe(
+      'Aprobaste el arreglo. No hay remoto, así que solo uno a main en tu copia.',
+    );
+    expect(reply.folds).toBe(true);
+  });
+
+  it('starts at the inverted mark when the question shares its sentence with a statement', () => {
+    expect(splitQuestion('Ya probé el modo oscuro y se ve bien ¿lo sigo con el menú?').lead).toBe(
+      '¿lo sigo con el menú?',
+    );
+  });
+
+  it('keeps the usual lead when the question is the first sentence, or there is none', () => {
+    expect(splitQuestion('¿Corto el menú? Es largo.')).toEqual(
+      splitReply('¿Corto el menú? Es largo.'),
+    );
+    expect(splitQuestion('Elegí cómo seguir.')).toEqual(splitReply('Elegí cómo seguir.'));
+  });
+});
+
 describe('a reply folding', () => {
   // The first sentence does not end at the number of a list item.
   it('does not split a line after a bare number', () => {
@@ -404,6 +431,20 @@ describe('plain words with ids and links', () => {
       { kind: 'text', text: 'Subí change/CHA-5-undo-delete-v2 y ' },
       { kind: 'item', id: 'CHA-5' },
       { kind: 'text', text: ' sigue en curso.' },
+    ]);
+  });
+
+  // H3 (field study 4, U4): «(carpeta CAM-5)» named the test folder, which happens to be called as
+  // the item, and linked to the item right in an instruction to close processes by hand.
+  it('does not link an id that names a folder or a path', () => {
+    const known = new Set(['CAM-5']);
+    expect(piecesOf('Cierra lo abierto (carpeta CAM-5).', known)).toEqual([
+      { kind: 'text', text: 'Cierra lo abierto (carpeta CAM-5).' },
+    ]);
+    expect(piecesOf('Delete the folder CAM-5 first, then CAM-5 again.', known)).toEqual([
+      { kind: 'text', text: 'Delete the folder CAM-5 first, then ' },
+      { kind: 'item', id: 'CAM-5' },
+      { kind: 'text', text: ' again.' },
     ]);
   });
 

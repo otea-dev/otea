@@ -9,7 +9,7 @@ import { AgentMark } from '../kit/Marks.tsx';
 import { LaneHead } from '../lanes/LaneHead.tsx';
 import { type LaneBlock, LaneList } from '../lanes/LaneList.tsx';
 import { lookOf } from '../lanes/looks.ts';
-import { keptStateWord, stateWord } from '../preset-words.ts';
+import { stateWord } from '../preset-words.ts';
 import { agentsAcross, inboxOf, itemHref, projectHref, waitingIn, whereOf } from '../projects.ts';
 import { hablarHash } from '../selection.ts';
 import { capped } from '../topics.ts';
@@ -173,6 +173,11 @@ export function hereBlocks(
                 <span className="bdc">{it.collection}</span>
                 <span className="bds">› {state}</span>
               </span>
+              {/* The phone has no column for what it asks of you: it says so here, in words. */}
+              <span className="mpt pw">
+                <span className="sep">·</span>
+                <span className={sec === 'atasco' ? 'stp warn' : 'stp you'}>{a}</span>
+              </span>
             </div>
           </div>
           <div className={sec === 'atasco' ? 'a warn' : 'a'} data-leaf="">
@@ -232,7 +237,9 @@ export function elsewhereBlocks(project: ProjectOverview): LaneBlock[] {
             </span>
             <span className="mpt">
               <span className="sep">·</span>
-              <span className="stp you">{keptStateWord(it.stateName ?? it.state)}</span>
+              <span className="stp you">
+                {it.asks ? t('projects.row.asks', { agent: it.asks.by }) : t('projects.row.review')}
+              </span>
             </span>
           </div>
         </div>

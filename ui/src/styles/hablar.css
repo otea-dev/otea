@@ -141,8 +141,30 @@
   max-width: 100%;
 }
 /* the `.hb-away span` grow rule is for the sentence, not the prompt mark inside the command */
-.hb-away .pj-cmd span {
+.hb-away .pj-cmd span,
+.hb-away .btn span {
   flex: none;
+}
+.hb-away > .btn {
+  flex: none;
+  margin-top: 2px;
+}
+/* the commands are the second way to bring it back: folded, in the page's own words */
+.hb-cmds {
+  flex: 1 1 100%;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.hb-cmds summary {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  cursor: pointer;
+  color: var(--you-ink);
+}
+.hb-cmds p {
+  margin: 6px 0 4px;
 }
 
 /* «Te espera»: what waits for you, pinned over the conversation (never inside it, so it is never
@@ -255,6 +277,22 @@
 }
 .hb-te-dismiss:hover:not(:disabled) {
   background: var(--hov);
+}
+/* the rest of a long list sits behind «Ver todas»: three rows show, never half the screen */
+.hb-te-foot {
+  padding: 0 12px;
+}
+.hb-te-more {
+  min-height: 32px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  font: 500 12.5px / 1.3 var(--sans);
+  color: var(--you-ink);
+  cursor: pointer;
+}
+.hb-te-more:hover {
+  text-decoration: underline;
 }
 .hb-te-ref {
   font: 400 11.5px / 1.3 var(--mono);
@@ -1608,10 +1646,8 @@ button.hb-kid:hover {
     margin: 8px 0 0;
     padding: 8px 8px 8px 12px;
   }
-  /* the suggestions start a conversation: once there is one, the phone's room goes to it */
-  .hb:not([data-empty]) .hb-suggs {
-    display: none;
-  }
+  /* the suggestions stay on the phone too, as one row to swipe (field study 4: a phone with a
+     conversation showed none, and «¿Qué me espera hoy?» sent the person to the desk) */
   .hb-suggs {
     flex-wrap: nowrap;
     overflow-x: auto;

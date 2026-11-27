@@ -255,6 +255,11 @@ export const detail = {
   'evidence.noAfter': 'no after yet',
   'evidence.alt': '{side}: {alt}',
   'evidence.howToCompare': 'How to compare',
+  'tech.title': 'Technical details',
+  'tech.notices': { one: '{count} notice', other: '{count} notices' },
+  'evidence.viewport.phone': 'Phone',
+  'evidence.viewport.tablet': 'Tablet',
+  'evidence.viewport.desktop': 'Desktop',
   'evidence.slider': 'slider',
   'evidence.sideBySide': 'side by side',
   'evidence.md.noImage':
@@ -748,8 +753,9 @@ export const detail = {
   'bi.branch.merge': 'can be merged',
   'bi.branch.merged': 'merged',
   'bi.branch.landed': 'merged in {step}',
-  'bi.branch.landing': 'an agent lands it in {base} now, as the {step} step says',
-  'bi.branch.landingOwn': 'an agent pushes {base} to the remote now',
+  // «next», never «now»: with no worker connected the line under it says nobody has taken it yet.
+  'bi.branch.landing': 'an agent lands it in {base} next, as the {step} step says',
+  'bi.branch.landingOwn': 'an agent pushes {base} to the remote next',
   'bi.branch.mergedLocal': 'in your local {base}; push it (git push {push} {base})',
   'bi.branch.mergedOutside':
     'in {base} already, merged outside Otea: an agent closes the {step} step',

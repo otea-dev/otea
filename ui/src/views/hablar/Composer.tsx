@@ -13,6 +13,7 @@ import {
   withFiles,
 } from '../../intake-files.ts';
 import { Icon } from '../../kit/index.ts';
+import { useClearAbove } from './clear-above.ts';
 
 // Where you write to your secretary: the words, files to attach (picked, pasted or dropped, the
 // way a new item takes them), three suggestions to start from, and Enviar. Dictation is the
@@ -40,6 +41,8 @@ export function Composer({ onSent }: { onSent: () => void }) {
   const [over, setOver] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
+  const box = useRef<HTMLFieldSetElement>(null);
+  useClearAbove(box);
   // The key of the send in flight or the last one that failed: the same words and files send again
   // under it; any change makes a new send.
   const attempt = useRef<{ sig: string; key: string } | null>(null);
@@ -113,6 +116,7 @@ export function Composer({ onSent }: { onSent: () => void }) {
 
   return (
     <fieldset
+      ref={box}
       className="hb-composer"
       aria-label={t('hablar.composer')}
       data-over={over || undefined}

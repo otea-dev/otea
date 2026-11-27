@@ -20,6 +20,7 @@ import type { Evidence, ItemView, TypeView } from '../../types.ts';
 import type { EvidenceGaps as Gaps } from './board-item.ts';
 import type { Facts } from './facts.ts';
 import { Structure } from './Structure.tsx';
+import { TechDetails } from './TechDetails.tsx';
 
 // The body (SPEC §10.3, mock:2740-2749): sections over hairlines, each named in its margin: what the
 // agent says, your notes, what you answered, the type's layout (its fields, options), the evidence,
@@ -84,6 +85,9 @@ export function bodySections(o: {
   facts: Facts;
   canWrite: boolean;
   now: number;
+  // A review in plain words: the pictures come first, and the diff, the logs and the files are
+  // folded behind «Detalles técnicos» (field study 4: the code came before the screenshots).
+  plain?: boolean;
   // Opens the reader, at a file or at the round's first.
   onRead?: ((id?: number) => void) | undefined;
   // On a Studio board: the long texts it shows as options side by side, the notes of each round
@@ -112,7 +116,7 @@ export function bodySections(o: {
       }
     | undefined;
 }): Sec[] {
-  const { item, type, facts, canWrite, now, board, onRead } = o;
+  const { item, type, facts, canWrite, now, board, onRead, plain = false } = o;
   let roundsDrawn = false;
   const out: Sec[] = [];
   const agent = facts.handed?.agent ?? facts.agent ?? '';
@@ -196,6 +200,8 @@ export function bodySections(o: {
 
   const { primary, sections } = detailBlocks(type, item.fields);
   const evidence: ReactNode[] = [];
+  // What only code readers use, when the review is plain.
+  const technical: ReactNode[] = [];
   // Rondas come after the deliverable, wherever the layout places them: what was handed in is
   // what the person reads first, as on the phone.
   const rounds: Sec[] = [];
@@ -288,7 +294,9 @@ export function bodySections(o: {
       const asked = gaps?.required.some(({ ref }) => ref === block.entry.id) === true;
       // On a board, a part nothing was attached to is drawn only when the step requires it.
       if (gaps && empty && !asked) return [];
-      evidence.push(
+      // Pictures and recordings are what a person judges; the rest is for reading code.
+      const shown = plain && !['images', 'recording'].includes(block.entry.module);
+      (shown ? technical : evidence).push(
         <EvidenceModule
           key={`m:${block.entry.id}`}
           slot={slotData(block.at)}
@@ -306,7 +314,9 @@ export function bodySections(o: {
       const rest = loose.filter((e) => !images.includes(e));
       if (images.length) evidence.push(<Figures key="figs" images={images} />);
       if (rest.length)
-        evidence.push(<EvidenceList key="loose" evidence={rest} canWrite={canWrite} />);
+        (plain ? technical : evidence).push(
+          <EvidenceList key="loose" evidence={rest} canWrite={canWrite} />,
+        );
     }
     return [];
   };
@@ -342,9 +352,11 @@ export function bodySections(o: {
           {canWrite && item.turn !== 'none' ? <AttachFile id={item.id} /> : null}
         </div>
         {evidence.length ||
+        technical.length ||
         (board?.gaps?.groups.length ?? 0) + (board?.gaps?.optional.length ?? 0) ? (
           <div className="evs">
             {evidence}
+            {technical.length ? <TechDetails>{technical}</TechDetails> : null}
             {board?.gaps ? <EvidenceGaps gaps={board.gaps} /> : null}
           </div>
         ) : (

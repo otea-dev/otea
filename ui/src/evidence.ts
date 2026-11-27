@@ -45,16 +45,84 @@ export function latestFirst(evidence: readonly Evidence[]): Evidence[] {
   return [...evidence].sort((a, b) => b.id - a.id);
 }
 
-// Pairs carry no id: a compare shows the latest before beside the latest after.
+// The viewport a screenshot was taken at, read from its name (an agent names them after the size it
+// shot: «antes-390.png», «despues_1280x800.png», «movil-antes.png»): phone, tablet or desktop, null
+// when the name says nothing. Evidence carries no dimensions, and a before shot at 1280 beside an
+// after shot at 390 judges nothing (field study 4: the compare paired them).
+export type Viewport = 'phone' | 'tablet' | 'desktop';
+
+const VIEWPORTS: readonly Viewport[] = ['phone', 'tablet', 'desktop'];
+
+const byWidth = (width: number): Viewport | null =>
+  width < 280 || width > 3840 || (width >= 2000 && width <= 2035)
+    ? null
+    : width <= 600
+      ? 'phone'
+      : width <= 1024
+        ? 'tablet'
+        : 'desktop';
+
+export function viewportOf(filename: string): Viewport | null {
+  const name = filename.toLowerCase().replace(/\.[a-z0-9]+$/, '');
+  const size = /(?:^|[^0-9])(\d{3,4})\s*[x×]\s*\d{3,4}(?![0-9])/.exec(name);
+  if (size) return byWidth(Number(size[1]));
+  const width = /(?:^|[-_.\s])(\d{3,4})(?:px)?(?=$|[-_.\s])/.exec(name);
+  if (width) {
+    const found = byWidth(Number(width[1]));
+    if (found) return found;
+  }
+  if (
+    /(?:^|[-_.\s])(?:movil|móvil|mobile|phone|celular|cel|telefono|teléfono)(?=$|[-_.\s])/.test(
+      name,
+    )
+  )
+    return 'phone';
+  if (/(?:^|[-_.\s])tablet(?=$|[-_.\s])/.test(name)) return 'tablet';
+  if (/(?:^|[-_.\s])(?:desktop|escritorio|compu|laptop|pc)(?=$|[-_.\s])/.test(name))
+    return 'desktop';
+  return null;
+}
+
+// The files of one side that stand beside a file of `viewport`: those of its own viewport, and those
+// that name none (nothing says they differ). A file of another viewport never does.
+function ofViewport(files: readonly Evidence[], viewport: Viewport | null): Evidence[] {
+  // A name that says nothing is paired with what is there: nothing tells them apart.
+  if (viewport === null) return [...files];
+  const own = files.filter((file) => viewportOf(file.filename) === viewport);
+  return own.length > 0 ? own : files.filter((file) => viewportOf(file.filename) === null);
+}
+
+// Pairs carry no id: a compare shows the latest before beside the latest after, of one viewport.
 export function comparePair(evidence: readonly Evidence[]): {
   before: Evidence | undefined;
   after: Evidence | undefined;
 } {
   const newest = latestFirst(evidence);
-  return {
-    before: newest.find(({ role }) => role === 'before'),
-    after: newest.find(({ role }) => role === 'after'),
-  };
+  const after = newest.find(({ role }) => role === 'after');
+  const befores = newest.filter(({ role }) => role === 'before');
+  if (!after) return { before: befores[0], after };
+  return { before: ofViewport(befores, viewportOf(after.filename))[0], after };
+}
+
+// A module's screenshots grouped by the viewport they were taken at, the phone first (where the
+// person reads), each with both of its sides. A file whose name says no viewport joins the groups
+// that lack its side; with no viewport named at all, everything is one group.
+export function byViewport(
+  files: readonly Evidence[],
+): { key: Viewport | null; files: Evidence[] }[] {
+  const named = VIEWPORTS.flatMap((key) => {
+    const own = files.filter((file) => viewportOf(file.filename) === key);
+    return own.length > 0 ? [{ key, files: own }] : [];
+  });
+  if (named.length === 0) return [{ key: null, files: [...files] }];
+  const unnamed = files.filter((file) => viewportOf(file.filename) === null);
+  return named.map(({ key, files: own }) => ({
+    key,
+    files: [
+      ...own,
+      ...unnamed.filter(({ role }) => role !== 'single' && !own.some((file) => file.role === role)),
+    ].sort((a, b) => files.indexOf(a) - files.indexOf(b)),
+  }));
 }
 
 // The two sides of a before/after of one part, when the file shown is one of them and the other is
@@ -64,9 +132,13 @@ export function pairIn(
   shown: Evidence,
 ): { before: Evidence; after: Evidence } | null {
   if (shown.role === 'single') return null;
-  const other = files.find(
-    (e) => e !== shown && e.module === shown.module && e.role !== 'single' && e.role !== shown.role,
+  const others = latestFirst(
+    files.filter(
+      (e) =>
+        e !== shown && e.module === shown.module && e.role !== 'single' && e.role !== shown.role,
+    ),
   );
+  const other = ofViewport(others, viewportOf(shown.filename))[0];
   if (!other) return null;
   return shown.role === 'before'
     ? { before: shown, after: other }

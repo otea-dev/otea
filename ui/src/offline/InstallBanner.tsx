@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '../app/context.tsx';
 import {
   browserStore,
   dismissHint,
   hintDismissed,
+  hintSeen,
   isStandalone,
   knownInstalled,
+  noteHintSeen,
   noteInstalled,
   platformOf,
 } from '../home-screen.ts';
@@ -31,6 +33,8 @@ export type InstallBannerViewProps = {
   onDismiss: () => void;
   // The install button found no browser prompt: say so above the steps.
   manual?: boolean;
+  // The banner is on screen (it has a height): it shows once.
+  onSeen?: () => void;
 };
 
 export function InstallBannerView({
@@ -38,24 +42,29 @@ export function InstallBannerView({
   onInstall,
   onDismiss,
   manual = false,
+  onSeen,
 }: InstallBannerViewProps) {
   const box = useRef<HTMLElement>(null);
   const shown = offer !== 'none';
   // Its height, for the page to end clear of it (phone.css pads the views by --install-h): the
-  // banner lies over the foot of the page, and must never cover the last row.
+  // banner lies over the foot of the page, and must never cover the last row. A page that hides it
+  // (Hablar's composer, a docked move) leaves it at 0: only a banner on screen counts as shown.
   useEffect(() => {
     const el = box.current;
     const root = document.documentElement;
-    if (!shown || !el || typeof ResizeObserver === 'undefined') return;
-    const measure = () => root.style.setProperty('--install-h', `${el.offsetHeight}px`);
+    if (!shown || !el) return;
+    const measure = () => {
+      root.style.setProperty('--install-h', `${el.offsetHeight}px`);
+      if (el.offsetHeight > 0) onSeen?.();
+    };
     measure();
-    const seen = new ResizeObserver(measure);
-    seen.observe(el);
+    const seen = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    seen?.observe(el);
     return () => {
-      seen.disconnect();
+      seen?.disconnect();
       root.style.removeProperty('--install-h');
     };
-  }, [shown]);
+  }, [shown, onSeen]);
   if (!shown) return null;
   return (
     <aside ref={box} className="install-banner" aria-labelledby="install-banner-title">
@@ -81,7 +90,12 @@ export function InstallBannerView({
 
 export function InstallBanner() {
   const app = useApp();
-  const [dismissed, setDismissed] = useState(() => hintDismissed(browserStore()));
+  // Dismissed by the person, or already on screen on an earlier load: either way it is not due.
+  // What this load shows is decided once, so the banner stays while it is read.
+  const [dismissed, setDismissed] = useState(
+    () => hintDismissed(browserStore()) || hintSeen(browserStore()),
+  );
+  const noteSeen = useCallback(() => noteHintSeen(browserStore()), []);
   const [canPrompt, setCanPrompt] = useState(canPromptInstall);
   const standalone = isStandalone(window.matchMedia, navigator);
   const [installed, setInstalled] = useState(() => knownInstalled(browserStore()));
@@ -122,6 +136,7 @@ export function InstallBanner() {
         });
       }}
       onDismiss={dismiss}
+      onSeen={noteSeen}
     />
   );
 }

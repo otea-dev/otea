@@ -169,6 +169,41 @@ export function splitReply(text: string): Reply {
   return { lead: `${lead}${mark}`, rest, folds: lines > FOLD_LINES || rest.length > FOLD_CHARS };
 }
 
+// What a question to you leads with: the question itself (its last sentence that ends in «?», from
+// its «¿» when it has one), never the sentence that happens to come first. The buttons under a card
+// answer it, so it is read before them; the context (what was approved, what it would change) is
+// what folds. A text with no such question, or whose question already leads, is set as any reply.
+export function splitQuestion(text: string): Reply {
+  const usual = splitReply(text);
+  const lines = text.trim().split(/\r?\n/);
+  let found: { line: number; from: number; to: number } | undefined;
+  for (const [at, line] of lines.entries()) {
+    let from = 0;
+    while (from < line.length) {
+      const end = from + sentenceEnd(line.slice(from));
+      const sentence = line.slice(from, end);
+      if (/[?？]\s*$/.test(sentence)) {
+        found = { line: at, from: from + Math.max(0, sentence.lastIndexOf('¿')), to: end };
+      }
+      from = end;
+      while (line[from] === ' ') from += 1;
+    }
+  }
+  if (!found) return usual;
+  const question = (lines[found.line] ?? '').slice(found.from, found.to).trim();
+  // The question already is the first sentence.
+  if (found.line === 0 && found.from === 0) return usual;
+  const context = lines
+    .map((line, at) =>
+      at === found?.line
+        ? `${line.slice(0, found.from)}${line.slice(found.to)}`.trim()
+        : line.trim(),
+    )
+    .filter((line) => line !== '')
+    .join('\n');
+  return { lead: question, rest: context, folds: context !== '' };
+}
+
 // A text to copy inside a message: what the secretary pastes for another session to read (the
 // text of a worker or a refiner, when its harness cannot launch subagents). The secretary sets
 // each in a fenced block under its number (the secretary text says so); the page draws it apart,
@@ -272,13 +307,19 @@ const WORDS =
   /(https?:\/\/[^\s<>"')\]]+)|((?<![\w/.-])[A-Za-z][A-Za-z0-9]*-\d+(?![\w/]|-[A-Za-z0-9]))/g;
 const TRAILING = /[.,;:!?]+$/;
 
+// A word that looks like an item id after «carpeta» or «folder»: the name of a folder (a test's
+// working folder is often called as the item), not the item.
+const FOLDER = /(?:carpeta|folder|directorio|directory|ruta|path)\s+$/i;
+const namesAFolder = (text: string, at: number): boolean =>
+  FOLDER.test(text.slice(Math.max(0, at - 16), at));
+
 export function piecesOf(text: string, known: ReadonlySet<string>): Piece[] {
   const out: Piece[] = [];
   let from = 0;
   for (const match of text.matchAll(WORDS)) {
     const at = match.index;
     const [found, address] = match;
-    const isItem = address === undefined && known.has(found);
+    const isItem = address === undefined && known.has(found) && !namesAFolder(text, at);
     if (address === undefined && !isItem) continue;
     // A sentence's own punctuation after an address is not part of it.
     const url = address?.replace(TRAILING, '');

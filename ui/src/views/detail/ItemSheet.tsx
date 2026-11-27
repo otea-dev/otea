@@ -29,6 +29,7 @@ import {
 } from '../../listening.ts';
 import { BottomSheet } from '../../phone/BottomSheet.tsx';
 import { ItemTypeScope, stateWord, stateWordIn, typeWord } from '../../preset-words.ts';
+import { usePlainReview } from '../../review-detail.ts';
 import { roundsOf } from '../../rounds.ts';
 import { studioHash } from '../../selection.ts';
 import type { ItemView, RelatedItem } from '../../types.ts';
@@ -39,6 +40,7 @@ import { ItemTopics } from '../topics/ItemTopics.tsx';
 import { Acts, actsModeOf } from './Acts.tsx';
 import {
   BranchLine,
+  branchNoticeCount,
   DraftRequestLine,
   type DropChoice,
   DropDialog,
@@ -162,6 +164,9 @@ function dropReason(item: ItemView): string | undefined {
 
 export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheetProps) {
   const app = useApp();
+  // What only code readers use (branch, diff, checks) folds behind «Detalles técnicos»: always on
+  // the phone, and on the desk when the person chose it in Preferencias.
+  const plain = usePlainReview(app.phone);
   // The board this item is on, when Studio shapes it: Editar tablero opens its editor.
   const summaries = boardsOf(useBoards(app.version));
   const board = boardOfCollection(summaries, item.collection);
@@ -758,6 +763,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
     facts,
     canWrite,
     now,
+    plain,
     onRead: canRead ? onRead : undefined,
     board: live
       ? {
@@ -897,19 +903,6 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                 <>
                   {/* Its branch and where it stands: «fusionada» once merged, as on the desk (WF-3). */}
                   <RequestChangedLine changed={item.requestChanged} />
-                  <BranchLine
-                    strip={strip}
-                    behind={behind}
-                    drift={drift}
-                    outside={outside}
-                    off={off}
-                    files={files}
-                    same={same}
-                    item={item.id}
-                    overlaps={overlaps}
-                    merge={merge}
-                    waits={item.landsAfter?.text}
-                  />
                   {hand.length ? (
                     <HandChecklist item={item} rows={hand} canWrite={app.session.canWrite} />
                   ) : null}
@@ -931,6 +924,33 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                   <ItemTopics item={item} canWrite={app.session.canWrite} />
                 </>
               }
+              technical={
+                strip || behind ? (
+                  <BranchLine
+                    strip={strip}
+                    behind={behind}
+                    drift={drift}
+                    outside={outside}
+                    off={off}
+                    files={files}
+                    same={same}
+                    item={item.id}
+                    overlaps={overlaps}
+                    merge={merge}
+                    waits={item.landsAfter?.text}
+                  />
+                ) : undefined
+              }
+              technicalNotices={branchNoticeCount({
+                behind,
+                drift,
+                off,
+                files,
+                same,
+                merge,
+                waits: item.landsAfter?.text,
+                overlaps,
+              })}
               details={<Details cells={cells} k={`${item.state}:${item.updatedAt}`} />}
               detailsSummary={[facts.agent, typeWord(type, item.type), item.collection]
                 .filter(Boolean)
@@ -1234,6 +1254,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                 overlaps={overlaps}
                 merge={merge}
                 waits={item.landsAfter?.text}
+                plain={plain}
               />
               {block?.request ? (
                 <DraftRequestLine

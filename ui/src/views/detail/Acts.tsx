@@ -431,7 +431,7 @@ export function Acts({
           <span>{ago}</span>
         </div>
         <div>
-          <ShortText text={facts.handed?.reason ?? ''} leadClass="q" />
+          <ShortText text={facts.handed?.reason ?? ''} leadClass="q" question />
           {options.length > 0 ? (
             <div className="opts">
               {options.map((o) => {

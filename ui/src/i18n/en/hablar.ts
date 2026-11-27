@@ -13,7 +13,10 @@ export const hablar = {
   'hablar.away': 'Your secretary has been offline since {since}. Your messages wait for it.',
   'hablar.awayUnknown': 'Your secretary is offline. Your messages wait for it.',
   'hablar.away.back':
-    'To bring it back: if its session is still open, ask your agent to run {command}. If you closed it, open a new one and paste what this prints:',
+    'It restarts on your computer, not from here: open a session of your agent and paste it this text. Your messages wait and it reads them when it is back.',
+  'hablar.away.cmds': 'Or with commands, in the terminal',
+  'hablar.away.cmdWait': 'If its session is still open, ask your agent to run:',
+  'hablar.away.cmdPrompt': 'If you closed it, open a new one and paste what this prints:',
   'hablar.waiting': { one: '{count} message waiting', other: '{count} messages waiting' },
   'hablar.none.title': 'No secretary yet',
   'hablar.none.text':
@@ -115,6 +118,7 @@ export const hablar = {
   'hablar.filter.request': 'Requests',
   'hablar.filter.consultation': 'Consultations',
   'hablar.from': 'came out of Talk · “{snippet}”',
+  'hablar.from.file': 'came out of Talk · your attachment',
   'hablar.from.more': { one: '+ {count} more turn', other: '+ {count} more turns' },
   // «Waiting for you»: what waits for you, pinned over the conversation, counted by Otea
   'hablar.te.title': 'Waiting for you',
@@ -128,6 +132,8 @@ export const hablar = {
   'hablar.te.sum.e': { one: '{count} notice', other: '{count} notices' },
   'hablar.te.k.escalation': '{agent} reports',
   'hablar.te.dismiss': 'Dismiss',
+  'hablar.te.all': 'See all {count}',
+  'hablar.te.fewer': 'Fewer',
   'bandeja.below': 'answer below, at the foot of the conversation',
   'hablar.te.k.review': 'review',
   'hablar.te.k.step': 'your step',

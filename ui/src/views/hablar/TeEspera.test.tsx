@@ -78,7 +78,7 @@ describe('the «Te espera» strip of Hablar', () => {
 
   it('opens when it holds what the conversation cannot answer, on the desk and the phone', () => {
     for (const phone of [false, true]) {
-      const html = render(pending([question, ...reviews]), { phone });
+      const html = render(pending([question, reviews[1] as PendingEntry]), { phone });
       expect(html).toContain('aria-expanded="true"');
       expect(html).toContain('CAM-7');
     }
@@ -127,6 +127,71 @@ describe('the «Te espera» strip of Hablar', () => {
 
     expect(html.match(/hb-te-dismiss/g)).toHaveLength(1);
     expect(html).toContain('Dismiss');
+  });
+
+  // H3 (field study 4, U4, U5, U8): 7 or 8 reviews took half the desk and 40% of the phone, over the
+  // conversation and the secretary's morning summary.
+  describe('with many things waiting', () => {
+    const many: PendingEntry[] = Array.from({ length: 8 }, (_, n) => ({
+      kind: 'review' as const,
+      ref: `CAM-${n + 10}`,
+      title: `Change ${n + 10}`,
+      since: ago(30 + n),
+    }));
+    const rowsOf = (root: HTMLElement) => root.querySelectorAll('.hb-te-row').length;
+
+    it('shows three rows on the desk and the rest behind «See all»', async () => {
+      const page = mount(
+        <AppTestProvider value={testApp({ now: NOW, phone: false })}>
+          <TeEspera pending={pending(many)} onJump={none} />
+        </AppTestProvider>,
+      );
+      await settle();
+      expect(rowsOf(page.root)).toBe(3);
+      const more = page.root.querySelector<HTMLElement>('.hb-te-more');
+      expect(more?.textContent).toContain('See all 8');
+
+      await press(more);
+
+      expect(rowsOf(page.root)).toBe(8);
+      expect(page.root.querySelector('.hb-te-more')?.textContent).toContain('Fewer');
+      page.unmount();
+    });
+
+    it('is one line on the phone beyond two rows, and opens to three with «See all»', async () => {
+      const page = mount(
+        <AppTestProvider value={testApp({ now: NOW, phone: true })}>
+          <TeEspera pending={pending(many)} onJump={none} />
+        </AppTestProvider>,
+      );
+      await settle();
+      expect(page.root.querySelector('.hb-te-head')?.getAttribute('aria-expanded')).toBe('false');
+      expect(rowsOf(page.root)).toBe(0);
+
+      await press(page.root.querySelector('.hb-te-head'));
+
+      expect(rowsOf(page.root)).toBe(3);
+      page.unmount();
+    });
+
+    it('stays open on the phone for two rows or fewer', () => {
+      const html = render(pending(many.slice(0, 2)), { phone: true });
+      expect(html).toContain('aria-expanded="true"');
+      expect(html.match(/hb-te-row/g)).toHaveLength(2);
+    });
+  });
+
+  it('names a question by the question itself, not by the sentence it starts with', () => {
+    const asked: PendingEntry = {
+      ...question,
+      kind: 'question',
+      ref: 'CAM-1',
+      by: 'quill',
+      text: 'Aprobaste el arreglo. No hay remoto y solo puedo unir a main en tu copia. ¿La integro?',
+    };
+    const html = render(pending([asked, ...reviews]));
+    expect(html).toContain('¿La integro?');
+    expect(html).not.toContain('Aprobaste el arreglo.');
   });
 
   describe('a row', () => {

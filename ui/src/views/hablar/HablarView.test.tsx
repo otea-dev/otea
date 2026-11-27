@@ -855,6 +855,32 @@ describe('the secretary thinking', () => {
     expect(text(away)).toContain('otea prompt --role secretary --as quill');
   });
 
+  // H3 (field study 4, U2 and U7 on the phone): the notice gave a terminal command and no way to
+  // copy what restarts it. The restart is on the computer: say so plainly, give the text to copy
+  // (the one the first run has), keep the commands as the second way, and say the messages wait.
+  it('says the restart is on the computer, copies the secretary text, and keeps the commands behind a fold', async () => {
+    const written: string[] = [];
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText: async (words: string) => void written.push(words) },
+    });
+    const { root } = await open(
+      conversation({
+        messages: read,
+        secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 1 },
+        waiting: { count: 1, since: ago(120) },
+      }),
+    );
+    const away = q(root, '.hb-away') as HTMLElement;
+
+    expect(text(away)).toContain('en tu computadora');
+    expect(text(away)).toContain('Tus mensajes esperan');
+    await press(buttonNamed(away, 'Copiar el texto del secretario'));
+    expect(written).toEqual(['Eres el secretario de este proyecto.']);
+    // The commands are a second way, folded: a person on a phone reads words first.
+    expect(q(away, 'details')?.hasAttribute('open')).toBe(false);
+  });
+
   it('marks a message it has not read yet as waiting', async () => {
     const { root } = await open(
       conversation({ messages: [say({ id: 1, author: 'person', delivery: 'pending' })] }),
@@ -1141,6 +1167,16 @@ describe('the way back from an item', () => {
     expect(link?.getAttribute('href')).toBe('#/hablar/7');
     expect(link?.textContent).toBe('salió de Hablar · «El botón queda tapado»');
     expect(text(q(page.root, '.hb-turns'))).toBe('+ 1 turno más');
+  });
+
+  // H3 (field study 4, U5): a message that was only a screenshot read «salió de Hablar · «»».
+  it('names a turn that was only an attachment, never empty quotes', () => {
+    page = mount(
+      <FromTurns turns={[{ id: 7, at: ago(5), author: 'person', kind: 'request', snippet: '' }]} />,
+    );
+    const link = q<HTMLAnchorElement>(page.root, 'a');
+    expect(link?.textContent).toBe('salió de Hablar · tu archivo adjunto');
+    expect(link?.textContent).not.toContain('«»');
   });
 
   it('says nothing for an item that did not come from a conversation', () => {

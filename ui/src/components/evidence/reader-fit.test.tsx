@@ -84,6 +84,34 @@ describe('the reader’s picture as notes are left on it', () => {
     host.remove();
   });
 
+  // H3 (field study 4, U2 and U7): a full-page capture (390 x 3200) fitted the view's height was a
+  // 118 px sliver nobody could judge, and «Ajustar al ancho» did not widen it. A capture that tall
+  // fits the width and the view scrolls down it, as a page is judged.
+  it('fits a very tall capture to the width, and an ordinary screenshot to the height', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const note: ReaderNote = { onSend: async () => true, left: [], pending: () => true };
+    act(() => root.render(<EvidenceReader evidence={[shot]} at={0} onAt={() => {}} note={note} />));
+    const img = host.querySelector<HTMLImageElement>('img.ev-img') as HTMLImageElement;
+    const loaded = (width: number, height: number) => {
+      Object.defineProperty(img, 'naturalWidth', { configurable: true, value: width });
+      Object.defineProperty(img, 'naturalHeight', { configurable: true, value: height });
+      act(() => {
+        img.dispatchEvent(new Event('load'));
+      });
+    };
+
+    loaded(390, 844);
+    expect(img.hasAttribute('data-tall')).toBe(false);
+    loaded(390, 3200);
+    expect(img.hasAttribute('data-tall')).toBe(true);
+    loaded(1280, 800);
+    expect(img.hasAttribute('data-tall')).toBe(false);
+    act(() => root.unmount());
+    host.remove();
+  });
+
   // P5-F9: the list's room is there before the first note, so leaving one moves nothing: the view
   // loses no height and the mark the person is working on stays where it was.
   it('keeps the notes list’s room from the start, empty, and fills it with the first note', () => {

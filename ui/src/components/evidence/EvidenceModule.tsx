@@ -7,7 +7,7 @@ import { EvidenceList } from '../EvidenceList.tsx';
 import { DiagramView } from './DiagramView.tsx';
 import { BlindPick } from './EvidenceViewer.tsx';
 import { FileView } from './FileViews.tsx';
-import { ImageCompare, ImageGallery, ImageSingle } from './ImageViews.tsx';
+import { ImageCompare, ImageCompares, ImageGallery, ImageSingle } from './ImageViews.tsx';
 import { ItemReview } from './item-evidence.ts';
 import { pickAt, READ_AT } from './reader-pick.ts';
 import { ReportOr } from './TestReportView.tsx';
@@ -173,7 +173,7 @@ export function NotableDiff({ evidence }: { evidence: Evidence }) {
 function Body({ entry, held, title }: { entry: LayoutEntry; held: Evidence[]; title: string }) {
   const { module, variant } = entry;
   if (module === 'images' && variant === 'compare')
-    return entry.blind ? <BlindCompare held={held} /> : <ImageCompare evidence={held} />;
+    return entry.blind ? <BlindCompare held={held} /> : <ImageCompares evidence={held} />;
   if (module === 'diagram') return <DiagramView evidence={held} />;
   if (module === 'images' && variant === 'gallery') {
     return <ImageGallery evidence={held} label={title} />;

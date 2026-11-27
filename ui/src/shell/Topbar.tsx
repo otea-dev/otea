@@ -384,7 +384,8 @@ function RowDoing({ row, now }: { row: AgentRow; now: number }) {
   if (row.state === 'idle' || !it) {
     const time = clockOf(Math.min(row.since, now));
     return (
-      <span className="held">
+      // `wrap`: the line is a sentence («verá lo nuevo cuando vuelva a esperar»), never cut at 390.
+      <span className="held wrap">
         <span className="verb">
           {row.waiting ? t('shell.row.idle', { time }) : t('shell.row.connected')}
         </span>

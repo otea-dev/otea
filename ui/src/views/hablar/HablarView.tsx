@@ -100,6 +100,36 @@ function NoSecretary() {
   );
 }
 
+// The secretary is away: it restarts on the computer, and the person may be on a phone. Plain words
+// first (where, and that the messages wait), then the text that makes an agent the secretary, to
+// copy, and the two commands as the second way, folded (field study 4: «pídele a tu agente que
+// ejecute otea wait…» was all a phone showed).
+function AwayHow({ name }: { name: string }) {
+  const load = useCallback(
+    (signal: AbortSignal) => fetchRolePrompt('secretary', { name }, signal),
+    [name],
+  );
+  const prompt = useRemote(load, useApp().version, 'live');
+  const text = prompt.status === 'ready' ? prompt.value.prompt : '';
+  const [copied, copy] = useCopy(text);
+  return (
+    <>
+      <p className="hb-back">{t('hablar.away.back')}</p>
+      <Button size="sm" variant="primary" disabled={text === ''} onClick={copy}>
+        <CopyGlyph />
+        {copied ? t('hablar.none.copied') : t('hablar.none.copy')}
+      </Button>
+      <details className="hb-cmds">
+        <summary>{t('hablar.away.cmds')}</summary>
+        <p>{t('hablar.away.cmdWait')}</p>
+        <CopyCommand command={`otea wait --secretary --as ${name}`} />
+        <p>{t('hablar.away.cmdPrompt')}</p>
+        <CopyCommand command={`otea prompt --role secretary --as ${name}`} />
+      </details>
+    </>
+  );
+}
+
 export function HablarView({
   turn,
   topic,
@@ -458,16 +488,7 @@ export function HablarView({
             {convo.status === 'ready' && convo.waiting.count > 0 ? (
               <b className="hb-wait">{t('hablar.waiting', { count: convo.waiting.count })}</b>
             ) : null}
-            {secretary ? (
-              <>
-                <p className="hb-back">
-                  {t('hablar.away.back', {
-                    command: `otea wait --secretary --as ${secretary.name}`,
-                  })}
-                </p>
-                <CopyCommand command={`otea prompt --role secretary --as ${secretary.name}`} />
-              </>
-            ) : null}
+            {secretary ? <AwayHow name={secretary.name} /> : null}
           </div>
         ) : null}
         <TeEspera pending={app.pending} onJump={jump} />

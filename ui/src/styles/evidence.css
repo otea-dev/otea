@@ -1334,6 +1334,11 @@
 .rd-main .ev-reader-view .ev-img {
   max-height: max(160px, calc(var(--fit-h, 100cqh) - 24px));
 }
+/* A whole-page capture (taller than three times its width) fits the width and the view scrolls down
+   it: fitted to the height it was a sliver nobody could read (field study 4). */
+.rd-main .ev-reader-view .ev-img[data-tall] {
+  max-height: none;
+}
 @media (max-width: 760px) {
   .rd-pane {
     grid-template-columns: minmax(0, 1fr);

@@ -461,6 +461,8 @@ export const surfaces = {
   'projects.act.atasco': 'Restart or reassign',
   'projects.sub.hands': 'handed over by {agent}',
   'projects.sub.asks': '{agent} asks',
+  'projects.row.asks': '{agent} asks you',
+  'projects.row.review': 'to review',
   'projects.sub.holds': '{agent} has it',
   'lan.dialogLead': 'Scan it with the phone on the same network. Each code lasts 10 minutes.',
   'lan.dialogLeadTailscale':

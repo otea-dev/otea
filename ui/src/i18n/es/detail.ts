@@ -254,6 +254,11 @@ export const detail = {
   'evidence.noAfter': 'todavía no hay después',
   'evidence.alt': '{side}: {alt}',
   'evidence.howToCompare': 'Cómo comparar',
+  'tech.title': 'Detalles técnicos',
+  'tech.notices': { one: '{count} aviso', other: '{count} avisos' },
+  'evidence.viewport.phone': 'Celular',
+  'evidence.viewport.tablet': 'Tableta',
+  'evidence.viewport.desktop': 'Escritorio',
   'evidence.slider': 'deslizador',
   'evidence.sideBySide': 'lado a lado',
   'evidence.md.noImage':
@@ -757,8 +762,8 @@ export const detail = {
   'bi.branch.merge': 'se puede fusionar',
   'bi.branch.merged': 'fusionada',
   'bi.branch.landed': 'fusionada en {step}',
-  'bi.branch.landing': 'un agente la integra en {base} ahora, como dice el paso {step}',
-  'bi.branch.landingOwn': 'un agente sube {base} al remoto ahora',
+  'bi.branch.landing': 'un agente la integra en {base} a continuación, como dice el paso {step}',
+  'bi.branch.landingOwn': 'un agente sube {base} al remoto a continuación',
   'bi.branch.mergedLocal': 'está en tu {base} local; súbelo (git push {push} {base})',
   'bi.branch.mergedOutside':
     'ya está en {base}, fusionada fuera de Otea: un agente cierra el paso {step}',

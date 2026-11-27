@@ -1214,14 +1214,14 @@ describe('branchSaid', () => {
       base: 'main',
     } as const;
     expect(branchSaid(landing)).toBe(
-      'un agente la integra en main ahora, como dice el paso Integrar',
+      'un agente la integra en main a continuación, como dice el paso Integrar',
     );
     const frozen = { tone: 'frozen', key: 'frozen', value: 'feat/x', step: 'Hacerlo' } as const;
     expect(branchSaid(frozen)).toBe(
       'los agentes no la tocan mientras la revisas; si alguien más sube, lo verás aquí',
     );
     setLanguage('en');
-    expect(branchSaid(landing)).toBe('an agent lands it in main now, as the Integrar step says');
+    expect(branchSaid(landing)).toBe('an agent lands it in main next, as the Integrar step says');
     expect(branchSaid(frozen)).toBe(
       'agents leave it alone while you review it; if anyone else pushes, it shows here',
     );

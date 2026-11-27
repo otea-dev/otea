@@ -2,7 +2,7 @@ import { type CSSProperties, type RefObject, useLayoutEffect, useRef, useState }
 import type { AnswerWords } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { ShortText } from '../../components/ShortText.tsx';
-import { type Chip, splitReply } from '../../conversation.ts';
+import { type Chip, splitQuestion } from '../../conversation.ts';
 import { t } from '../../i18n/i18n.ts';
 import { AgentMark, Button, Swap, toast } from '../../kit/index.ts';
 import { NodeGlyph } from '../../lanes/NodeGlyph.tsx';
@@ -194,7 +194,7 @@ export function AskBody({
     // sentence (the whole of a long one is read in the page, not at every focus).
     <fieldset
       className="hb-ask"
-      aria-label={splitReply(text).lead}
+      aria-label={splitQuestion(text).lead}
       data-answered={said !== null ? '' : undefined}
       data-bare={bare ? '' : undefined}
     >
@@ -206,7 +206,7 @@ export function AskBody({
               {t('sheet.qa.asks', { agent: by })} · {about}
             </span>
           </div>
-          <ShortText text={text} leadClass="hb-q" />
+          <ShortText text={text} leadClass="hb-q" question />
         </>
       )}
       {said !== null || gone ? (

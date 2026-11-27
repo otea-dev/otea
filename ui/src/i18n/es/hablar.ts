@@ -15,7 +15,10 @@ export const hablar = {
   'hablar.away': 'Tu secretario está desconectado desde {since}. Tus mensajes lo esperan.',
   'hablar.awayUnknown': 'Tu secretario está desconectado. Tus mensajes lo esperan.',
   'hablar.away.back':
-    'Para traerlo de vuelta: si su sesión sigue abierta, pídele a tu agente que ejecute {command}. Si la cerraste, abre una nueva y pega lo que imprime esto:',
+    'Se reinicia en tu computadora, no desde aquí: abre una sesión de tu agente y pégale este texto. Tus mensajes esperan y los lee al volver.',
+  'hablar.away.cmds': 'O con comandos, en la terminal',
+  'hablar.away.cmdWait': 'Si su sesión sigue abierta, pídele a tu agente que ejecute:',
+  'hablar.away.cmdPrompt': 'Si la cerraste, abre una nueva y pega lo que imprime:',
   'hablar.waiting': { one: '{count} mensaje esperando', other: '{count} mensajes esperando' },
   'hablar.none.title': 'Todavía no hay secretario',
   'hablar.none.text':
@@ -117,6 +120,7 @@ export const hablar = {
   'hablar.filter.request': 'Pedidos',
   'hablar.filter.consultation': 'Consultas',
   'hablar.from': 'salió de Hablar · «{snippet}»',
+  'hablar.from.file': 'salió de Hablar · tu archivo adjunto',
   'hablar.from.more': { one: '+ {count} turno más', other: '+ {count} turnos más' },
   // «Te espera»: lo que te espera, fijo sobre la conversación, contado por Otea
   'hablar.te.title': 'Te espera',
@@ -130,6 +134,8 @@ export const hablar = {
   'hablar.te.sum.e': { one: '{count} aviso', other: '{count} avisos' },
   'hablar.te.k.escalation': '{agent} avisa',
   'hablar.te.dismiss': 'Descartar',
+  'hablar.te.all': 'Ver todas ({count})',
+  'hablar.te.fewer': 'Menos',
   'bandeja.below': 'responde abajo, al final de la conversación',
   'hablar.te.k.review': 'revisión',
   'hablar.te.k.step': 'tu paso',

@@ -97,6 +97,11 @@ export const shell = {
   'prefs.dek':
     'Yours, not the project’s: how Otea looks and speaks for you, what it tells you and your session. The project’s own are under Settings.',
   'prefs.sec.appearance': 'Appearance',
+  'prefs.sec.review': 'Reviews',
+  'prefs.review.full': 'Everything',
+  'prefs.review.plain': 'In plain words',
+  'prefs.review.note':
+    'In plain words a review leads with what changed and the pictures; the branch, the diff, the test output and the files two changes share wait behind “Technical details”. The phone always reads this way.',
   'prefs.sec.notify': 'Notifications',
   'prefs.sec.window': 'Window',
   'prefs.sec.app': 'App',
