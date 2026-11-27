@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { postEscalationDismiss } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { waitedText } from '../../derive/when.ts';
 import { language, t } from '../../i18n/i18n.ts';
 import { Icon } from '../../kit/Icon.tsx';
+import { toast } from '../../kit/index.ts';
 import type { Pending, PendingEntry, PendingKind, QueueBlock } from '../../pending.ts';
 
 // «Te espera»: everything that waits for you, pinned over the conversation, computed by Otea
@@ -87,7 +89,10 @@ export function TeEspera({ pending, onJump }: TeEsperaProps) {
             </li>
           ))}
           {entries.map((entry) => (
-            <li key={`${entry.kind}:${entry.ref}`}>
+            <li
+              key={`${entry.kind}:${entry.ref}:${entry.signal ?? ''}`}
+              data-dismissable={entry.signal === undefined ? undefined : ''}
+            >
               <button
                 type="button"
                 className="hb-te-row"
@@ -103,6 +108,20 @@ export function TeEspera({ pending, onJump }: TeEsperaProps) {
                   {waitedText(entry.since, app.now)}
                 </time>
               </button>
+              {entry.kind === 'escalation' && entry.signal !== undefined ? (
+                <button
+                  type="button"
+                  className="hb-te-dismiss"
+                  disabled={!app.session.canWrite}
+                  onClick={() => {
+                    postEscalationDismiss(entry.signal ?? 0).catch((error: unknown) =>
+                      toast({ msg: error instanceof Error ? error.message : String(error) }),
+                    );
+                  }}
+                >
+                  {t('hablar.te.dismiss')}
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>

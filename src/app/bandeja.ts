@@ -16,6 +16,7 @@ import { OteaError } from '../core/errors.ts';
 import { evidenceTypeOf, MAX_EVIDENCE_BYTES, MAX_EVIDENCE_MB } from '../core/evidence.ts';
 import { assertAgentName } from '../core/item.ts';
 import type { BandejaAskFacts } from '../core/notify/signals.ts';
+import { plainLine, quoteAgent } from '../core/quote.ts';
 import { timeText } from '../core/time.ts';
 import {
   answerQuestionRow,
@@ -58,6 +59,11 @@ import { addWaitingSource } from './secretary-waiting.ts';
 function invalid(message: string): never {
   throw new OteaError('invalid_fields', message);
 }
+
+// What an agent writes into an entry (a refiner's question, the reason for closing one) is read by
+// the secretary and the person: a bound, as a capture has.
+export const MAX_QUESTION_CHARS = 2000;
+export const MAX_REASON_CHARS = 500;
 
 const MAX_NAME = 200;
 
@@ -274,13 +280,13 @@ export function takeBandeja(
     if (was.state === 'asking') {
       throw new OteaError(
         'invalid_transition',
-        `${was.ref} waits for the person's answer to your question "${was.asking?.text ?? ''}": it is taken again once they answer`,
+        `${was.ref} waits for the person's answer to your question ${quoteAgent(was.asking?.text ?? '')}: it is taken again once they answer`,
       );
     }
     if (was.state === 'closed') {
       throw new OteaError(
         'invalid_transition',
-        `${was.ref} is closed (${was.closeReason ?? 'no reason given'}): the person may reopen it`,
+        `${was.ref} is closed (${quoteAgent(was.closeReason ?? 'no reason given')}): the person may reopen it`,
       );
     }
     // An entry taken for a refiner that has not called otea yet is held only for the handover: its
@@ -363,7 +369,7 @@ export function closeBandeja(
     if (entry.state === 'closed') {
       throw new OteaError(
         'invalid_transition',
-        `${entry.ref} is closed already (${entry.closeReason ?? 'no reason given'})`,
+        `${entry.ref} is closed already (${quoteAgent(entry.closeReason ?? 'no reason given')})`,
       );
     }
     // A question that waits for the person is theirs to answer first: closing would leave it
@@ -371,8 +377,11 @@ export function closeBandeja(
     if (entry.state === 'asking') {
       throw new OteaError(
         'invalid_transition',
-        `${entry.ref} waits for the person's answer to "${entry.asking?.text ?? ''}": close it after they answer (they tap or write it on the desk)`,
+        `${entry.ref} waits for the person's answer to ${quoteAgent(entry.asking?.text ?? '')}: close it after they answer (they tap or write it on the desk)`,
       );
+    }
+    if (reason.length > MAX_REASON_CHARS) {
+      invalid(`Not closed: ${MAX_REASON_CHARS} characters at most for the reason, in one line`);
     }
     const holds = entry.state === 'refining' && entry.claimedBy === input.agent;
     if (!holds && secretaryName(project.db) !== input.agent) {
@@ -422,7 +431,7 @@ function requireHold(ctx: Context, id: number, agent: string, at: string): Bande
   if (entry.state === 'closed') {
     throw new OteaError(
       'invalid_transition',
-      `${entry.ref} is closed (${entry.closeReason ?? 'no reason given'})`,
+      `${entry.ref} is closed (${quoteAgent(entry.closeReason ?? 'no reason given')})`,
     );
   }
   if (entry.state !== 'refining' || entry.claimedBy !== agent) {
@@ -466,6 +475,11 @@ export function askOnBandeja(
     throw new OteaError(
       'reason_required',
       `Not asked on ${bandejaRef(input.id)}: say your question`,
+    );
+  }
+  if (text.length > MAX_QUESTION_CHARS) {
+    invalid(
+      `Not asked on ${bandejaRef(input.id)}: ${MAX_QUESTION_CHARS} characters at most, the question first; the rest goes in the item`,
     );
   }
   const checked = checkOptions(input.options, input.recommended);
@@ -539,6 +553,9 @@ export function answerBandeja(
       const text = (input.text ?? '').trim();
       if (text === '')
         throw new OteaError('reason_required', `Not answered on ${entry.ref}: say your answer`);
+      if (text.length > MAX_MESSAGE_CHARS) {
+        invalid(`An answer takes at most ${MAX_MESSAGE_CHARS} characters`);
+      }
       answer = { text, mode: 'text' };
     }
     if (!answerQuestionRow(project.db, input.id, open.question, answer, at)) {
@@ -673,8 +690,9 @@ function stateLine(entry: BandejaEntry): string {
     return `${STATE_WORD.refining} by ${entry.claimedBy ?? '?'} until ${timeText(entry.claimUntil ?? entry.at)}`;
   if (entry.state === 'filed') return `${STATE_WORD.filed} as ${entry.item ?? 'an item'}`;
   if (entry.state === 'closed')
-    return `${STATE_WORD.closed} by ${entry.closedBy ?? '?'}: ${entry.closeReason ?? 'no reason given'}`;
-  if (entry.state === 'asking') return `${STATE_WORD.asking}: "${entry.asking?.text ?? ''}"`;
+    return `${STATE_WORD.closed} by ${plainLine(entry.closedBy ?? '?', 60)}: ${quoteAgent(entry.closeReason ?? 'no reason given')}`;
+  if (entry.state === 'asking')
+    return `${STATE_WORD.asking}: ${quoteAgent(entry.asking?.text ?? '')}`;
   return STATE_WORD.waiting;
 }
 
@@ -699,7 +717,7 @@ export function entryText(
     );
     const answer = question.answer;
     return [
-      `  ${question.by} asked: "${question.text}"${options.length === 0 ? '' : ` Options: ${options.join(' · ')}`}`,
+      `  ${plainLine(question.by, 60)} asked: ${quoteAgent(question.text, 1000)}${options.length === 0 ? '' : ` Options: ${options.join(' · ')}`}`,
       ...(answer === undefined
         ? ['  (the person has not answered yet)']
         : [

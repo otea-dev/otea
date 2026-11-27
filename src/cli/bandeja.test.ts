@@ -238,7 +238,7 @@ describe('the Bandeja from the refiner', () => {
       await otea('bandeja', 'take', 'B-1', '--for', 'lia', '--as', 'sol');
       const read = await otea('bandeja', 'B-1', '--as', 'lia');
       expect(read.out).toContain(
-        'lia asked: "Better how?" Options: 1. Faster · 2. Prettier (recommended)',
+        'lia asked: «Better how?» Options: 1. Faster · 2. Prettier (recommended)',
       );
       expect(read.out).toContain('The person chose option 2: "Prettier"');
 

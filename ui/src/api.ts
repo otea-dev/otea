@@ -730,6 +730,11 @@ export function postBandejaAnswer(id: number, given: AnswerGiven): Promise<Bande
   return post<BandejaEntry>(`/api/bandeja/${id}/answer`, given);
 }
 
+// The person sets an agent's escalation aside (the `signal` number of its row in Te espera).
+export function postEscalationDismiss(signal: number): Promise<{ ok: true }> {
+  return post<{ ok: true }>(`/api/escalations/${signal}/dismiss`, {});
+}
+
 // A note the secretary or its refiner closed, opened again by the person.
 export function postBandejaReopen(id: number): Promise<BandejaEntry> {
   return post<BandejaEntry>(`/api/bandeja/${id}/reopen`, {});

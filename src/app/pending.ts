@@ -7,13 +7,14 @@ import {
   pendingCounts,
   type QueueBlock,
 } from '../core/pending.ts';
+import { quoteAgent } from '../core/quote.ts';
 import { timeText } from '../core/time.ts';
 import { selectOpenQuestions } from '../store/conversation.ts';
 import { selectStateEntries } from '../store/queries.ts';
 import { selectOpenEscalations } from '../store/secretary.ts';
 import { listBandeja } from './bandeja.ts';
 import type { Context } from './context.ts';
-import { parseEscalation } from './escalate.ts';
+import { escalationShown, parseEscalation } from './escalate.ts';
 import { type Clock, type Item, listItems, systemClock, workflowOf } from './items.ts';
 import { landWaitOf, liveBoardOf } from './next.ts';
 import { scanned } from './overlap.ts';
@@ -91,7 +92,14 @@ export function offItemOf(ctx: Context, now: Clock = systemClock): PendingEntry[
       turn: message.root,
     });
   }
-  const escalated = secretaryAway(ctx, now) ? selectOpenEscalations(ctx.db) : [];
+  // What agents escalated: the person's own while the secretary is away, and once it was delivered
+  // twice or waited a while unacted, even with the secretary connected (never lost to a wait whose
+  // output nobody read).
+  const away = secretaryAway(ctx, now);
+  const nowMs = Date.parse(at);
+  const escalated = selectOpenEscalations(ctx.db).filter((kept) =>
+    escalationShown(kept, away, nowMs),
+  );
   if (escalated.length > 0) {
     const titles = new Map(listItems(ctx, {}, now).map((item) => [item.id, item.title]));
     for (const entry of notes) titles.set(entry.ref, messageSnippet(entry.text));
@@ -100,6 +108,7 @@ export function offItemOf(ctx: Context, now: Clock = systemClock): PendingEntry[
       const ref = kept.ref ?? '';
       out.push({
         kind: 'escalation',
+        signal: kept.id,
         ref,
         title: titles.get(ref) ?? ref,
         since: kept.at,
@@ -256,7 +265,8 @@ export function pendingLine(pending: Pending, agent?: string): string {
 const ago = (since: string | null): string => (since === null ? '' : ` (since ${timeText(since)})`);
 
 function lineOf(entry: PendingEntry): string {
-  const quoted = (text: string) => `"${messageSnippet(text, 160)}"`;
+  // Titles, questions and escalations were written by agents: quoted as data, on one line.
+  const quoted = (text: string) => quoteAgent(text, 160);
   const options =
     entry.options === undefined || entry.options.length === 0
       ? ''

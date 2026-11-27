@@ -4,7 +4,12 @@ import { z } from 'zod';
 import type { GivenAnswer, MessageFileInput } from '../app/conversation.ts';
 import type { EvidenceFile } from '../app/evidence.ts';
 import type { Performer } from '../core/authority.ts';
-import { MAX_MESSAGE_FILES, MESSAGE_KINDS, type MessageKind } from '../core/conversation.ts';
+import {
+  MAX_MESSAGE_CHARS,
+  MAX_MESSAGE_FILES,
+  MESSAGE_KINDS,
+  type MessageKind,
+} from '../core/conversation.ts';
 import {
   EVIDENCE_ROLES,
   type EvidenceRole,
@@ -541,7 +546,7 @@ export async function answerRequest(c: Context): Promise<{ text: string }> {
 // a question that has since changed is refused.
 const question = z.number().int().positive();
 const ChosenAnswerBody = z.union([
-  z.object({ question, text: z.string() }).strict(),
+  z.object({ question, text: z.string().max(MAX_MESSAGE_CHARS) }).strict(),
   z.object({ question, option: z.number().int().positive() }).strict(),
   z.object({ question, delegate: z.literal(true) }).strict(),
 ]);

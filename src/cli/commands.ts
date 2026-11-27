@@ -12,7 +12,7 @@ import {
   type Submitted,
   submitAgentDraft,
 } from '../app/agent-draft.ts';
-import { holdAgentHome } from '../app/agent-home.ts';
+import { holdAgentHome, homeKeeper } from '../app/agent-home.ts';
 import { promptFacts, promptKindOf, roleBoard } from '../app/agent-prompts.ts';
 import {
   type AgentsMdAction,
@@ -199,6 +199,7 @@ import {
 import {
   ackSecretaryReturns,
   declareSecretary,
+  isSecretaryAct,
   requireSecretary,
   secretaryStatus,
   secretaryWake,
@@ -278,6 +279,7 @@ import {
   SIGNIN_LINK_LIFETIME_MS,
 } from '../server/signin-links.ts';
 import { ensureUiToken, readUiToken } from '../server/token.ts';
+import { transaction } from '../store/database.ts';
 import {
   type EventFilter,
   findAgent,
@@ -482,10 +484,9 @@ function seen(project: Project, input: Input, actor: Actor = input.actor): void 
   // Any call of it keeps what it holds (P1-R3-6).
   renewLeases(project.db, actor.name);
   keepHeldEntries(project, actor.name);
-  // The secretary acting on what its wait returned: any command but another secretary wait.
-  if (input.command !== undefined && !(input.command === 'wait' && input.flag('secretary'))) {
-    ackSecretaryReturns(project.db, actor.name);
-  }
+  // The secretary acting on what its wait returned: a command that acts (say, create...), not one
+  // that only looks, which would lose what a wait running in the background returned unread.
+  if (isSecretaryAct(input.command)) ackSecretaryReturns(project.db, actor.name);
 }
 
 // Runs a command seen as `actor`: noted first, so the command finds it, and forgotten again when it
@@ -2703,12 +2704,24 @@ async function listenWhile<T>(
           boards,
         )
       : undefined;
+  // A wait of hours writes nothing: its beat keeps the agent's home (app/agent-home.ts).
+  const keepHome =
+    input.actor.kind === 'agent'
+      ? homeKeeper(
+          project,
+          me,
+          process.env,
+          systemClock,
+          input.channel === 'mcp' ? process.ppid : undefined,
+        )
+      : undefined;
   const beat = heard
     ? {
         beat: {
           everyMs: heard.everyMs,
           run: () => {
             heardAt = heard.run();
+            keepHome?.();
           },
         },
       }
@@ -2791,8 +2804,8 @@ async function waitForSecretary(input: Input): Promise<Output> {
         '\n',
       ),
     };
-  });
-  owner.release();
+    // Released however it ends: a refusal (not the secretary) must not wait out the early listing.
+  }).finally(() => owner.release());
   if ('data' in result) return result;
   if (result.stopped === 'timeout') {
     const within = /^\d+$/.test(timeout ?? '') ? `${timeout}s` : timeout;
@@ -3217,31 +3230,34 @@ const profileCommandSpec: Command = {
     const effort = option('effort');
     const given = option('harness');
     const role = option('role');
-    return withAgent(input, (project) => {
-      // The secretary role first: refused (a project has one), nothing else is declared.
-      const roled = role === undefined ? undefined : declareSecretary(project.db, actor.name);
-      const known = findProfile(project.db, actor.name);
-      const out = ((): Output => {
-        if (model === undefined && effort === undefined && given === undefined) {
-          if (!known) {
-            const text = `${actor.name} has no profile yet: declare it with ${profileCommand(actor.name, channel)}`;
-            return { data: { agent: actor.name, profile: null, confirmed: false }, text };
+    return withAgent(input, (project) =>
+      // The role and the profile are declared together or not at all: a role refused (a project
+      // has one), or an option that is wrong, leaves nothing declared.
+      transaction(project.db, () => {
+        const roled = role === undefined ? undefined : declareSecretary(project.db, actor.name);
+        const known = findProfile(project.db, actor.name);
+        const out = ((): Output => {
+          if (model === undefined && effort === undefined && given === undefined) {
+            if (!known) {
+              const text = `${actor.name} has no profile yet: declare it with ${profileCommand(actor.name, channel)}`;
+              return { data: { agent: actor.name, profile: null, confirmed: false }, text };
+            }
+            const view = profileView(known.profile);
+            return {
+              data: { agent: actor.name, profile: view, confirmed: known.confirmed },
+              text: profileText(actor.name, view, known.confirmed, channel),
+            };
           }
-          const view = profileView(known.profile);
-          return {
-            data: { agent: actor.name, profile: view, confirmed: known.confirmed },
-            text: profileText(actor.name, view, known.confirmed, channel),
-          };
-        }
-        const declared = declareFromOptions(input, project, { model, effort, given });
-        return { data: declared, text: profileText(actor.name, declared.profile, true, channel) };
-      })();
-      if (roled === undefined) return out;
-      return {
-        data: { ...(out.data as object), role: roled.role, replaced: roled.replaced },
-        text: `${out.text}\n${secretaryRoleLine(actor.name, roled.replaced)}`,
-      };
-    });
+          const declared = declareFromOptions(input, project, { model, effort, given });
+          return { data: declared, text: profileText(actor.name, declared.profile, true, channel) };
+        })();
+        if (roled === undefined) return out;
+        return {
+          data: { ...(out.data as object), role: roled.role, replaced: roled.replaced },
+          text: `${out.text}\n${secretaryRoleLine(actor.name, roled.replaced)}`,
+        };
+      }),
+    );
   },
 };
 
@@ -5395,8 +5411,7 @@ const bandejaTake: Command = {
       );
       if (!('found' in waited)) return waited;
       return show(project, waited.found, actor.name, false);
-    });
-    owner.release();
+    }).finally(() => owner.release());
     if ('data' in result) return result;
     if (result.stopped === 'timeout') {
       const within = /^\d+$/.test(timeout ?? '') ? `${timeout}s` : timeout;

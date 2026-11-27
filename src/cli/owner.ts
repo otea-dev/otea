@@ -168,10 +168,17 @@ const WINDOWS_LISTING =
 // The busy Windows runner answered WMI after 20 s; the owner check waits for it in the background.
 const LISTING_TIMEOUT_MS = 60_000;
 
-function run(
+// A listing with the command line of every process runs past execFile's default 1 MB on a busy
+// Windows machine.
+const LISTING_MAX_BYTES = 16 * 1024 * 1024;
+
+// What a program prints, or undefined when it cannot be read; `warn` is told why, once (an aborted
+// listing, one nobody waits for any more, is no trouble).
+export function readListing(
   command: string,
   args: readonly string[],
   signal: AbortSignal,
+  warn: (line: string) => void = warnListing,
 ): Promise<string | undefined> {
   return new Promise((resolve) => {
     execFile(
@@ -179,11 +186,29 @@ function run(
       args as string[],
       // From the temp folder: on Windows a process holds the folder it runs in, and the listing
       // may outlive this command for a moment; it must never keep the project's folder busy.
-      { cwd: tmpdir(), encoding: 'utf8', timeout: LISTING_TIMEOUT_MS, windowsHide: true, signal },
-      (error, stdout) => resolve(error ? undefined : stdout),
+      {
+        cwd: tmpdir(),
+        encoding: 'utf8',
+        timeout: LISTING_TIMEOUT_MS,
+        windowsHide: true,
+        signal,
+        maxBuffer: LISTING_MAX_BYTES,
+      },
+      (error, stdout) => {
+        if (error && !signal.aborted) {
+          warn(
+            `Otea could not read the process table (${basename(command)}: ${error.message.split('\n')[0]}): it cannot tell when this agent's session ends`,
+          );
+        }
+        resolve(error ? undefined : stdout);
+      },
     );
   });
 }
+
+const warnListing = (line: string) => process.stderr.write(`${line}\n`);
+
+const run = readListing;
 
 // The ps of the MSYS that runs `start` (Git Bash's usr/bin, next to its sh.exe), if it is one.
 function posixLister(rows: readonly ProcessRow[], start: number): string | undefined {

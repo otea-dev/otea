@@ -3,7 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createItem } from '../app/items.ts';
 import { listAgents } from '../app/presence.ts';
 import { openProject, type Project } from '../app/project.ts';
-import { emitSecretarySignal, secretaryWake, startSecretaryWait } from '../app/secretary.ts';
+import {
+  emitSecretarySignal,
+  secretaryName,
+  secretaryWake,
+  startSecretaryWait,
+} from '../app/secretary.ts';
 import { UNHEARD_GRACE_MS } from '../core/notify/signals.ts';
 import type { SecretarySignalKind } from '../core/secretary.ts';
 import {
@@ -87,6 +92,26 @@ describe('the secretary and its wait', () => {
       );
     });
 
+    // G1: the role was declared first, so a bad --effort left the agent the secretary with an error.
+    it('declares nothing when its options are wrong: the agent does not become the secretary', async () => {
+      const { code } = await otea(
+        'profile',
+        '--role',
+        'secretary',
+        '--as',
+        'sol',
+        '--model',
+        'claude-opus-5-5',
+        '--effort',
+        'very high!',
+        '--harness',
+        'claude-code',
+      );
+
+      expect(code).not.toBe(0);
+      expect(inProject((project) => secretaryName(project.db))).toBeUndefined();
+    });
+
     it('is no part of a connect --check, which declares nothing', async () => {
       const { code, err } = await otea('connect', '--as', 'sol', '--role', 'secretary', '--check');
 
@@ -145,7 +170,7 @@ describe('the secretary and its wait', () => {
 
       expect(await waiting.done).toBe(0);
       expect(waiting.out()).toContain('Bandeja (b-1)');
-      await otea('profile', '--as', 'sol');
+      await otea('say', 'Looking at it.', '--as', 'sol');
       const again = await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1');
       expect(again.code).toBe(13);
       expect(again.err).toContain('Nothing reached the secretary within 1s');
@@ -160,8 +185,8 @@ describe('the secretary and its wait', () => {
       expect(again.code).toBe(0);
       expect(again.out).toContain('(m-1)');
 
-      // The secretary acts (here: any command of its own), and it is not returned again.
-      await otea('profile', '--as', 'sol');
+      // The secretary acts (it says something), and it is not returned again.
+      await otea('say', 'Looking at it.', '--as', 'sol');
       const done = await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1');
       expect(done.code).toBe(13);
     });
@@ -190,7 +215,7 @@ describe('the secretary and its wait', () => {
         const { out } = await otea('wait', '--secretary', '--as', 'sol', '--json');
         kinds.push(JSON.parse(out).kind);
         // The secretary acts on each before it waits again.
-        await otea('profile', '--as', 'sol');
+        await otea('say', 'Looking at it.', '--as', 'sol');
       }
 
       expect(kinds).toEqual(['person_message', 'bandeja_item', 'escalation']);

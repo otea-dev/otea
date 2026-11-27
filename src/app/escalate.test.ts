@@ -2,12 +2,23 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { selectOpenEscalations } from '../store/secretary.ts';
 import { addCollection } from './collections.ts';
-import { ESCALATION_MAX_CHARS, escalateToSecretary, MAX_OPEN_PER_AGENT } from './escalate.ts';
+import {
+  dismissOpenEscalation,
+  ESCALATION_MAX_CHARS,
+  escalateToSecretary,
+  MAX_OPEN_PER_AGENT,
+} from './escalate.ts';
 import { createItem } from './items.ts';
 import { pendingOf, pendingText } from './pending.ts';
 import type { Project } from './project.ts';
-import { declareSecretary, secretaryWake, startSecretaryWait } from './secretary.ts';
+import {
+  declareSecretary,
+  secretaryStatus,
+  secretaryWake,
+  startSecretaryWait,
+} from './secretary.ts';
 import { secretaryWaiting } from './secretary-waiting.ts';
 import { memoryContext, projectOf, REVIEWS } from './testing.ts';
 
@@ -88,6 +99,66 @@ describe('escalating to the secretary', () => {
     it('tells the worker the person sees it directly', () => {
       expect(say('a problem', 'kiln', 90 * MIN).secretaryState).toBe('offline');
       expect(say('another', 'kiln', 2000).secretaryState).not.toBe('offline');
+    });
+  });
+
+  // G1: what an agent flagged is never lost to a wait whose output nobody read.
+  describe('never lost while the secretary is connected', () => {
+    const escalations = (at: number) =>
+      pendingOf(project, clock(at)).entries.filter(({ kind }) => kind === 'escalation');
+
+    it('is not dropped after its returns: it stays open and the person sees it', () => {
+      say('a problem');
+      // Two waits return it, a third has nothing left to give it; the secretary acted on none.
+      for (const at of [3000, 4000, 5000]) {
+        secretaryWake(project, startSecretaryWait(clock(at)), clock(at));
+      }
+
+      expect(secretaryWaiting(project.db).count).toBe(1);
+      // Connected a moment ago (a wait beat), yet the person is shown it.
+      expect(escalations(5000)).toEqual([expect.objectContaining({ by: 'kiln' })]);
+    });
+
+    it('is shown once it waited ten minutes unacted, not before', () => {
+      say('a problem');
+
+      // 'sol' was heard at the start and not gone yet (it holds the role 30 minutes).
+      expect(escalations(2 * MIN)).toEqual([]);
+      expect(secretaryStatus(project.db, clock(11 * MIN))?.state).not.toBe('offline');
+      expect(escalations(11 * MIN)).toHaveLength(1);
+    });
+
+    it('can be dismissed by the person, which ends it for the secretary too', () => {
+      say('a problem');
+      for (const at of [3000, 4000]) {
+        secretaryWake(project, startSecretaryWait(clock(at)), clock(at));
+      }
+      const [shown] = escalations(5000);
+
+      dismissOpenEscalation(project, shown?.signal ?? -1, clock(6000));
+
+      expect(escalations(7000)).toEqual([]);
+      expect(secretaryWaiting(project.db).count).toBe(0);
+      expect(() => dismissOpenEscalation(project, shown?.signal ?? -1, clock(8000))).toThrow(
+        /not open/,
+      );
+    });
+  });
+
+  describe('what was acked long ago', () => {
+    it('is pruned after 30 days, what is open or recent is kept', () => {
+      say('old problem');
+      const [old] = selectOpenEscalations(project.db);
+      project.db
+        .prepare('UPDATE secretary_signals SET acked_at = ? WHERE id = ?')
+        .run(clock(1000)(), old?.id ?? 0);
+
+      say('new problem', 'kiln', 31 * 24 * 60 * MIN);
+
+      const kept = project.db.prepare('SELECT text FROM secretary_signals').all() as {
+        text: string;
+      }[];
+      expect(kept.map(({ text }) => text)).toEqual(['kiln says: «new problem»']);
     });
   });
 

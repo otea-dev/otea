@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { messageSnippet } from '../core/conversation.ts';
 import { REPLY_WINDOW_MS, type SecretaryFacts } from '../core/notify/signals.ts';
-import { countPending, selectRepliesSince } from '../store/conversation.ts';
+import { countPending, selectOpenQuestions, selectRepliesSince } from '../store/conversation.ts';
 import { selectOpenEscalations } from '../store/secretary.ts';
 import { type Clock, systemClock } from './items.ts';
 import { secretaryStatus } from './secretary.ts';
@@ -58,6 +58,15 @@ export function secretaryFacts(
       turn: root,
       by,
       text: messageSnippet(text, 140),
+    })),
+    // A question with options is told as a question (an `ask`), never also as a reply
+    // (selectRepliesSince leaves it out).
+    questions: selectOpenQuestions(db).map(({ id, root, by, text, options }) => ({
+      id,
+      turn: root,
+      by,
+      text: messageSnippet(text, 140),
+      options,
     })),
     waiting: secretaryWaiting(db),
   };

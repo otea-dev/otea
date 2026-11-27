@@ -132,10 +132,41 @@ describe('the secretary', () => {
         expect(declareSecretary(ctx.db, 'luna', stamp(later), gone).replaced).toBe('sol');
       });
 
+      // G1: harnessOf may pick an intermediary that lives one command (bwrap, docker exec, ssh):
+      // trusting it at once would read the secretary offline between two waits.
+      describe('with a process seen by one wait only', () => {
+        const only = (pid: number) => (other: number) => other === pid;
+
+        it('is no proof that its session ended: it may be an intermediary that ended with its command', () => {
+          noteHarness(ctx.db, 'sol', 4242, stamp(T0));
+
+          expect(secretaryStatus(ctx.db, stamp(T0 + 3000), gone)?.state).toBe('connected');
+        });
+
+        it('is the session once the next wait found the same process above it', () => {
+          noteHarness(ctx.db, 'sol', 4242, stamp(T0));
+          noteHarness(ctx.db, 'sol', 4242, stamp(T0 + 1000));
+
+          expect(secretaryStatus(ctx.db, stamp(T0 + 3000), gone)?.state).toBe('offline');
+          expect(secretaryStatus(ctx.db, stamp(T0 + 3000), only(4242))?.state).toBe('connected');
+        });
+
+        it('stays unproven while every wait finds another process', () => {
+          noteHarness(ctx.db, 'sol', 4242, stamp(T0));
+          noteHarness(ctx.db, 'sol', 4243, stamp(T0 + 1000));
+
+          expect(secretaryStatus(ctx.db, stamp(T0 + 3000), gone)?.state).toBe('connected');
+        });
+      });
+
       // Its harness session (noted by its wait) is the one process left to ask about.
       describe('with the harness session it runs under noted', () => {
         const harness = 4242;
-        beforeEach(() => noteHarness(ctx.db, 'sol', harness, stamp(T0)));
+        // Noted by two waits: the same process above both (see above).
+        beforeEach(() => {
+          noteHarness(ctx.db, 'sol', harness, stamp(T0));
+          noteHarness(ctx.db, 'sol', harness, stamp(T0));
+        });
         const only = (pid: number) => (other: number) => other === pid;
 
         // A harness id that runs may be another process's by now (Windows hands ids out within

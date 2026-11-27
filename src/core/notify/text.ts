@@ -116,6 +116,13 @@ export type NoticeProject = { id: string; name: string };
 
 export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticeProject): NoticeText {
   const words = WORDS[lang];
+  // A notice takes the place of the one with its tag on the person's screen: the tag names the
+  // project and what the notice is about (a turn, a note, an item), so one project's notice never
+  // wipes another's, nor a reply to one turn that to another.
+  const tagOf = (...parts: (string | number | undefined)[]) =>
+    [...parts.slice(0, 1), project?.id, ...parts.slice(1)]
+      .filter((part) => part !== undefined)
+      .join('-');
   if (notice.kind === 'group') {
     const title = words.group[notice.of](notice.count);
     return {
@@ -133,7 +140,7 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
     return {
       title: words.secretary_reply(by),
       body: line ? short(line, MAX_QUESTION) : words.replyBody,
-      tag: 'otea-hablar-reply',
+      tag: tagOf('otea-hablar-reply', notice.turn),
       url: hablarUrl(notice.turn),
       item: null,
     };
@@ -142,12 +149,23 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
     return {
       title: words.secretary_offline(),
       body: words.offlineBody(notice.count ?? 0),
-      tag: 'otea-hablar-offline',
+      tag: tagOf('otea-hablar-offline'),
       url: hablarUrl(),
       item: null,
     };
   }
   const said = notice.kind === 'turn' ? words.turn : words[notice.kind](by);
+  // The secretary's own question with options (told as an item's is): Hablar opens at its turn.
+  if (notice.kind === 'ask' && notice.item.startsWith('hablar:')) {
+    const question = clean(notice.text);
+    return {
+      title: said,
+      body: question ? withOptions(short(question, MAX_QUESTION), notice.options) : words.replyBody,
+      tag: tagOf('otea-hablar-ask', notice.turn),
+      url: hablarUrl(notice.turn),
+      item: null,
+    };
+  }
   // A question goes in the notice itself, with the item's id in the title.
   const question = notice.kind === 'ask' ? clean(notice.text) : undefined;
   const title = question ? `${said} · ${notice.item}` : said;
@@ -158,7 +176,7 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
       body: question
         ? withOptions(short(question, MAX_QUESTION), notice.options)
         : short(`${notice.item} · ${notice.title}`),
-      tag: `otea-bandeja-${notice.item}`,
+      tag: tagOf('otea-bandeja', notice.item),
       url: bandejaUrl(notice.item),
       item: null,
     };
@@ -169,7 +187,7 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
     body: question
       ? withOptions(short(question, MAX_QUESTION), notice.options)
       : short(`${notice.item} · ${notice.title}`),
-    tag: `otea-item-${notice.item}`,
+    tag: tagOf('otea-item', notice.item),
     url: itemUrl(notice.item),
     item: notice.item,
   };

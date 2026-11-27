@@ -74,6 +74,9 @@ export type SecretaryFacts = {
   // The secretary's replies to the person from the last REPLY_WINDOW_MS: `turn` is the person's
   // message that began the turn, `text` the reply's first line.
   replies: { id: number; turn: number; by: string; text: string }[];
+  // Its questions with options to tap that the person has not answered: an agent's question, told
+  // as an item's is (not its plain notices, nor the replies above). `turn` is the turn they sit in.
+  questions?: { id: number; turn: number; by: string; text: string; options: string[] }[];
   // What waits for the secretary unattended: the person's messages not read yet (and, with the
   // Bandeja, the captures not taken), and the oldest one's time.
   waiting: { count: number; since: string | null };
@@ -90,6 +93,18 @@ export function secretarySignalsOf(facts: SecretaryFacts | undefined, now: numbe
     turn,
     ...(text === '' ? {} : { text }),
   }));
+  for (const { id, turn, by, text, options } of facts.questions ?? []) {
+    out.push({
+      key: `secretary_ask:${id}`,
+      kind: 'ask',
+      item: `hablar:${turn}`,
+      title: '',
+      by,
+      ...(text === '' ? {} : { text }),
+      options,
+      turn,
+    });
+  }
   const { waiting } = facts;
   // The key holds the time it was last heard: once it is back and goes offline again it is a new
   // stretch, and told anew; within one stretch it is told once.

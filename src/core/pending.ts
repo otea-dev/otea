@@ -39,6 +39,8 @@ export type PendingEntry = {
   recommended?: number;
   // A secretary question: the turn of Hablar it sits in.
   turn?: number;
+  // An escalation: the number the person dismisses it by.
+  signal?: number;
 };
 
 // A review that holds the rest of a board's queue: the board works straight on its base (or lands in

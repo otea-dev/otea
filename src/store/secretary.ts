@@ -5,7 +5,7 @@ import type { AgentRole, SecretarySignalKind } from '../core/secretary.ts';
 // (secretary_signals) and the stretches a board has gone unheard (unheard_stretches).
 //
 // A signal or a stretch is *returned* by a wait (taken_at / told_at), and *acked* once the secretary
-// acted: its next otea command that is no secretary wait (ackReturned). Until then a later wait
+// acted: a command that acts, not one that only looks (ackReturned). Until then a later wait
 // returns it again (app/secretary.ts), so a response lost with a killed wait is never lost.
 
 // Gives an agent a role, or takes it back (null). The agent is noted as seen `at` when it was not
@@ -63,12 +63,39 @@ export function selectOpenSignals(db: DatabaseSync): SignalRecord[] {
 }
 
 // What agents escalated that the secretary has not acted on yet, oldest first.
-export function selectOpenEscalations(
-  db: DatabaseSync,
-): { id: number; ref: string | null; text: string; at: string }[] {
-  const sql = `SELECT id, ref, COALESCE(text, '') AS text, at FROM secretary_signals
+export type EscalationRecord = {
+  id: number;
+  ref: string | null;
+  text: string;
+  at: string;
+  // How many waits returned it to the secretary.
+  deliveries: number;
+};
+
+export function selectOpenEscalations(db: DatabaseSync): EscalationRecord[] {
+  const sql = `SELECT id, ref, COALESCE(text, '') AS text, at, deliveries FROM secretary_signals
     WHERE kind = 'escalation' AND acked_at IS NULL ORDER BY id`;
-  return db.prepare(sql).all() as { id: number; ref: string | null; text: string; at: string }[];
+  return db.prepare(sql).all() as EscalationRecord[];
+}
+
+// The person sets an escalation aside: it is done with, whether the secretary acted or not. True
+// when it was open.
+export function dismissEscalation(db: DatabaseSync, id: number, at: string): boolean {
+  const sql = `UPDATE secretary_signals SET acked_at = :at
+    WHERE id = :id AND kind = 'escalation' AND acked_at IS NULL`;
+  return Number(db.prepare(sql).run({ id, at }).changes) === 1;
+}
+
+// What was acked before `before` is no record anyone reads: it goes.
+export function pruneSecretary(db: DatabaseSync, before: string): void {
+  db.prepare('DELETE FROM secretary_signals WHERE acked_at IS NOT NULL AND acked_at < :before').run(
+    {
+      before,
+    },
+  );
+  db.prepare('DELETE FROM unheard_stretches WHERE acked_at IS NOT NULL AND acked_at < :before').run(
+    { before },
+  );
 }
 
 export function countPendingSignals(db: DatabaseSync): number {

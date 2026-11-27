@@ -44,6 +44,7 @@ type Why =
   | 'not_agent'
   | 'not_person'
   | 'empty'
+  | 'too_long'
   | 'not_working'
   | 'asking'
   | 'none_open'
@@ -73,6 +74,9 @@ export type AskInput = {
 
 export type AskResult = { question: ItemQuestion; text: string };
 
+// A question is read by the person, the secretary and the next agent: a few lines, never a wall.
+export const MAX_QUESTION_CHARS = 2000;
+
 // The board and the step an agent is doing on the item, or the refusal of a question on it.
 function doing(ctx: Context, item: ItemRecord): { board: LiveBoard; step: string } {
   const board = liveBoardOf(ctx, item.collection);
@@ -99,6 +103,13 @@ export function askQuestion(ctx: Context, input: AskInput, now = systemClock): A
     refuse('forbidden', id, 'not_agent', `Not asked: only an agent asks the person on ${id}`);
   const text = input.text.trim();
   if (text === '') refuse('reason_required', id, 'empty', `Not asked on ${id}: say your question`);
+  if (text.length > MAX_QUESTION_CHARS)
+    refuse(
+      'invalid_fields',
+      id,
+      'too_long',
+      `Not asked on ${id}: ${MAX_QUESTION_CHARS} characters at most, the question first; the rest goes on the item`,
+    );
   const checked = checkOptions(input.options, input.recommended);
   if ('problem' in checked)
     refuse('invalid_fields', id, 'options', `Not asked on ${id}: ${checked.problem}`);

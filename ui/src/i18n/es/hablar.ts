@@ -106,6 +106,7 @@ export const hablar = {
   'hablar.te.k.secretary': '{agent} pregunta',
   'hablar.te.sum.e': { one: '{count} aviso', other: '{count} avisos' },
   'hablar.te.k.escalation': '{agent} avisa',
+  'hablar.te.dismiss': 'Descartar',
   'bandeja.below': 'responde abajo, al final de la conversación',
   'hablar.te.k.review': 'revisión',
   'hablar.te.k.step': 'tu paso',

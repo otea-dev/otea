@@ -196,7 +196,7 @@ describe('the Bandeja without a refiner session', () => {
 
       expect(() =>
         closeBandeja(project, { id: 1, agent: 'sol', reason: 'dup' }, clock(2000)),
-      ).toThrow(/waits for the person's answer to "Better how\?"/);
+      ).toThrow(/waits for the person's answer to «Better how\?»/);
       expect(requireEntry(project, 1, clock(2000)).state).toBe('asking');
 
       answerBandeja(project, { id: 1, question: 1, option: 1 }, clock(3000));

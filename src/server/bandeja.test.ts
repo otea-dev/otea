@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { askOnBandeja, closeBandeja, fileBandeja, takeBandeja } from '../app/bandeja.ts';
 import { addCollection } from '../app/collections.ts';
 import { pairDevice } from '../app/devices.ts';
+import { escalateToSecretary } from '../app/escalate.ts';
 import { createItem } from '../app/items.ts';
 import type { Project } from '../app/project.ts';
 import { declareSecretary } from '../app/secretary.ts';
@@ -135,6 +136,53 @@ describe('the Bandeja over the API', () => {
     // Any announced change reads it again.
     await capture('second note');
     expect(await count()).toBe(1);
+  });
+
+  // G1: a secretary that went quiet writes nothing; the kept answer must not hide it for 3 s.
+  it('reads /pending again when the secretary’s liveness changed with no write announced', async () => {
+    declareSecretary(project.db, 'sol');
+    const state = async () =>
+      ((await (await call('/pending')).json()) as { secretary: { state: string } }).secretary.state;
+    expect(await state()).not.toBe('offline');
+
+    const longAgo = new Date(Date.now() - 45 * 60_000).toISOString();
+    project.db
+      .prepare(
+        "UPDATE agents SET last_seen = ?, acted_at = ?, listening_at = NULL WHERE name = 'sol'",
+      )
+      .run(longAgo, longAgo);
+
+    expect(await state()).toBe('offline');
+  });
+
+  // G1: what an agent flagged to an absent secretary is the person's, who can set it aside.
+  it('lets the person dismiss an escalation, once', async () => {
+    declareSecretary(project.db, 'sol');
+    const item = createItem(project, {
+      collection: 'tasks',
+      title: 'Retry',
+      fields: { description: 'D' },
+      actor: { kind: 'agent', name: 'kiln' },
+    }).id;
+    escalateToSecretary(project, { agent: 'kiln', about: item, text: 'The push failed.' });
+    const longAgo = new Date(Date.now() - 45 * 60_000).toISOString();
+    project.db
+      .prepare(
+        "UPDATE agents SET last_seen = ?, acted_at = ?, listening_at = NULL WHERE name = 'sol'",
+      )
+      .run(longAgo, longAgo);
+    const read = async () =>
+      (await (await call('/pending')).json()) as { entries: { kind: string; signal?: number }[] };
+    const [shown] = (await read()).entries;
+    expect(shown).toMatchObject({ kind: 'escalation' });
+
+    const dismissed = await call(`/escalations/${shown?.signal}/dismiss`, { method: 'POST' });
+
+    expect(dismissed.status).toBe(200);
+    expect((await read()).entries).toEqual([]);
+    expect((await call(`/escalations/${shown?.signal}/dismiss`, { method: 'POST' })).status).toBe(
+      404,
+    );
   });
 
   it('keeps the images and files sent with it, and serves them back as what they are', async () => {
@@ -282,6 +330,27 @@ describe('the Bandeja over the API', () => {
         (await call('/bandeja/9/answer', { method: 'POST', body: { question: 1, option: 1 } }))
           .status,
       ).toBe(404);
+      expect((await listed())[0]?.state).toBe('asking');
+    });
+
+    // G1: an answer is a few words; megabytes would flood what the refiner and the secretary read.
+    it('refuses an answer far past a message’s size, and a kind correction with a body of megabytes', async () => {
+      const huge = 'x'.repeat(2_000_000);
+      const answer = await call('/bandeja/1/answer', {
+        method: 'POST',
+        body: { question: 1, text: huge },
+      });
+      expect(answer.status).toBe(413);
+      const justOver = await call('/bandeja/1/answer', {
+        method: 'POST',
+        body: { question: 1, text: 'x'.repeat(20_001) },
+      });
+      expect(justOver.status).toBe(400);
+      const kind = await call('/conversation/messages/1/kind', {
+        method: 'POST',
+        body: { kind: 'request', pad: huge },
+      });
+      expect(kind.status).toBe(413);
       expect((await listed())[0]?.state).toBe('asking');
     });
 

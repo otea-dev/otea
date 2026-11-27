@@ -413,6 +413,21 @@ describe('notifications on the server', () => {
       await subscribe(cookie);
     });
 
+    // G1: one source that throws used to end the whole look, silently.
+    it('still tells what an item needs when the Bandeja’s source throws, and logs it', async () => {
+      project.db.exec('DROP TABLE bandeja_questions');
+      project.db.exec('DROP TABLE bandeja_attachments');
+      project.db.exec('DROP TABLE bandeja_entries');
+
+      toReview(first);
+      await pass(1000);
+      await pass(GATHER_MS);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.payload).toMatchObject({ item: first });
+      expect(logged.some((line) => /Bandeja/.test(line))).toBe(true);
+    });
+
     it('pushes to the phone when something becomes yours, after a moment, once', async () => {
       toReview(first);
       await pass(1000);
@@ -424,7 +439,7 @@ describe('notifications on the server', () => {
           payload: {
             title: 'memory · Te toca',
             body: `${first} · Ship the login`,
-            tag: `otea-item-${first}`,
+            tag: `otea-item-memory-aaaaaa-${first}`,
             url: `/p/memory-aaaaaa/#/i/${first}`,
             item: first,
           },
@@ -539,7 +554,7 @@ describe('notifications on the server', () => {
             payload: {
               title: 'memory · lia te pregunta · B-1',
               body: '¿Solo Aprobar o todas las acciones fijas?\n1) Solo Aprobar  2) Todas',
-              tag: 'otea-bandeja-B-1',
+              tag: 'otea-bandeja-memory-aaaaaa-B-1',
               url: '/p/memory-aaaaaa/#/hablar/B-1',
               item: null,
             },
@@ -618,8 +633,42 @@ describe('notifications on the server', () => {
             payload: {
               title: 'memory · sage te respondió',
               body: 'Va bien, lo reviso hoy.',
-              tag: 'otea-hablar-reply',
+              tag: `otea-hablar-reply-memory-aaaaaa-${asked.id}`,
               url: `/p/memory-aaaaaa/#/hablar/${asked.id}`,
+              item: null,
+            },
+          },
+        ]);
+        await pass(GATHER_MS);
+        await pass(SPACING_MS);
+        expect(sent).toHaveLength(1);
+      });
+
+      // G1 (SPEC decision 7: an agent's question pushes): the secretary asking with options to tap
+      // is a question the person must answer; its news and plain notices are not pushed.
+      it('tells a question of its own with options, once, opening Hablar at it; its plain notices stay quiet', async () => {
+        await watching();
+        sayAsSecretary(project, { agent: 'sage', text: 'CAM-12 is ready for review.' }, stamp);
+        await pass(1000);
+        await pass(GATHER_MS);
+        expect(sent).toEqual([]);
+
+        const asked = sayAsSecretary(
+          project,
+          { agent: 'sage', text: 'Ship it today?', options: ['Yes', 'Wait'] },
+          stamp,
+        ).message;
+        await pass(1000);
+        await pass(GATHER_MS);
+
+        expect(sent).toEqual([
+          {
+            subscription: expect.objectContaining({ endpoint: endpoint() }),
+            payload: {
+              title: 'memory · sage te pregunta',
+              body: 'Ship it today?\n1) Yes  2) Wait',
+              tag: `otea-hablar-ask-memory-aaaaaa-${asked.root}`,
+              url: `/p/memory-aaaaaa/#/hablar/${asked.root}`,
               item: null,
             },
           },
@@ -669,7 +718,7 @@ describe('notifications on the server', () => {
               payload: {
                 title: 'memory · Tu secretario está desconectado',
                 body: 'Te esperan 2 mensajes',
-                tag: 'otea-hablar-offline',
+                tag: 'otea-hablar-offline-memory-aaaaaa',
                 url: '/p/memory-aaaaaa/#/hablar',
                 item: null,
               },

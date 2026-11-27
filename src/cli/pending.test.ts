@@ -83,7 +83,7 @@ describe('what waits for the person, from the secretary', () => {
       const { out } = await otea('pending', '--as', 'sol');
 
       expect(out).toContain('1 thing waits for the person');
-      expect(out).toContain(`${id} "Dark mode" waits for their review`);
+      expect(out).toContain(`${id} «Dark mode» waits for their review`);
     });
 
     it('says plainly when nothing waits', async () => {

@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   harnessOf,
   ownerChain,
+  readListing,
   readPosixTable,
   readProcessTable,
   watchOwner,
@@ -127,6 +128,33 @@ describe('the processes that own a command', () => {
       { pid: 500, parent: 600, name: 'sh.exe', path: 'C:\\Program Files\\Git\\usr\\bin\\sh.exe' },
       { pid: 4, parent: 0, name: 'System' },
     ]);
+  });
+
+  // G1: a busy Windows machine lists far more than execFile's default 1 MB; the listing then failed
+  // quietly and the session of an agent was never noted.
+  describe('reading the system’s listing', () => {
+    const program = (code: string) => [process.execPath, ['-e', code]] as const;
+
+    it('reads a listing of several megabytes', async () => {
+      const [command, args] = program("process.stdout.write('x'.repeat(3_000_000))");
+
+      const out = await readListing(command, args, new AbortController().signal, () => {});
+
+      expect(out?.length).toBe(3_000_000);
+    });
+
+    it('says what went wrong when it cannot read it, and answers nothing', async () => {
+      const [command, args] = program('process.exit(3)');
+      const told: string[] = [];
+
+      const out = await readListing(command, args, new AbortController().signal, (line) =>
+        told.push(line),
+      );
+
+      expect(out).toBeUndefined();
+      expect(told).toHaveLength(1);
+      expect(told[0]).toContain('process');
+    });
   });
 
   describe('Git Bash on Windows', () => {

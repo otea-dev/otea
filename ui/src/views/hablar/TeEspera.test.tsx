@@ -110,6 +110,24 @@ describe('the «Te espera» strip of Hablar', () => {
     expect(html).not.toContain('Te toca</button>');
   });
 
+  // G1: what an agent flagged can be set aside by the person; nothing else here can.
+  it('offers to dismiss an agent’s notice, and nothing else', () => {
+    const notice: PendingEntry = {
+      kind: 'escalation',
+      ref: 'CAM-5',
+      title: 'Retry',
+      since: ago(30),
+      by: 'kiln',
+      text: 'The push failed.',
+      signal: 7,
+    };
+
+    const html = render(pending([notice, ...reviews]));
+
+    expect(html.match(/hb-te-dismiss/g)).toHaveLength(1);
+    expect(html).toContain('Dismiss');
+  });
+
   describe('a row', () => {
     afterEach(() => vi.restoreAllMocks());
 

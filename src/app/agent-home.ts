@@ -45,6 +45,34 @@ function lapsed(
   return launcher !== undefined && home.launcher !== null && launcher !== home.launcher;
 }
 
+// How often a wait keeps its agent's home: well inside HOME_HOLD_MS.
+const HOME_KEEP_MS = 10 * 60_000;
+
+// Keeps the home of an agent that is only waiting (a secretary's wait lasts hours and writes
+// nothing, so its home would lapse after HOME_HOLD_MS and the next write would be refused): the
+// returned function is called on each beat of the wait, and renews the home at most every
+// HOME_KEEP_MS. Where the home is another project's, or the registry cannot be read, it does
+// nothing: a wait binds nothing new and fails nothing.
+export function homeKeeper(
+  project: Pick<Project, 'identity' | 'dataDir'>,
+  name: string,
+  env: Env = process.env,
+  now: Clock = systemClock,
+  launcher?: number,
+): (at?: Clock) => void {
+  let last = Date.parse(now());
+  return (at = systemClock) => {
+    const nowMs = Date.parse(at());
+    if (nowMs - last < HOME_KEEP_MS) return;
+    last = nowMs;
+    try {
+      holdAgentHome(project, name, 'write', env, at, launcher);
+    } catch {
+      // Another project's, or the registry is busy: the next beat looks again.
+    }
+  };
+}
+
 const where = (name: string, home: AgentHome, here: { id: string; name: string }) =>
   `${name} works in the project ${home.projectName} (${home.projectId}), but this folder is the project ${here.name} (${here.id}), and item ids repeat across projects: CAM-1 here is not CAM-1 there`;
 

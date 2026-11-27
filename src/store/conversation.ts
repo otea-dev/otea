@@ -393,6 +393,7 @@ export function selectRepliesSince(
       `SELECT m.id, m.root, m.author_name, m.text FROM conversation_messages m
        JOIN conversation_messages r ON r.id = m.root
        WHERE m.author = 'secretary' AND r.author = 'person' AND m.topic IS NULL AND m.at >= ?
+         AND m.options IS NULL
        ORDER BY m.id`,
     )
     .all(since) as { id: number; root: number; author_name: string; text: string }[];

@@ -115,6 +115,8 @@ export function createNotifier(
   let seen: Set<string> | undefined;
   // When each item's unheard stretch began; null for one already there when watching began.
   const unheardSince = new Map<string, number | null>();
+  // The keys each source showed at its last good look.
+  const kept = new Map<string, string[]>();
   let stopFeed: (() => void) | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
 
@@ -146,28 +148,50 @@ export function createNotifier(
 
   const scan = () => {
     const at = now();
-    let signals: ReturnType<typeof signalsOf>;
-    try {
+    // Each source on its own: one that throws is logged and the others still tell the person.
+    // Items that failed to read are no reason to forget what was already seen (a failed look would
+    // read as «everything went away»), so a failed look of the items ends this scan.
+    const fromSource = (name: string, read: () => ReturnType<typeof signalsOf>) => {
+      try {
+        return read();
+      } catch (error) {
+        options.log?.(`Otea notices: the ${name} could not be read: ${String(error)}`);
+        return undefined;
+      }
+    };
+    const clock = () => new Date(at).toISOString();
+    const items = fromSource('items', () => {
       const facts = factsOf(project, at);
       const unheard = new Set(facts.filter((f) => f.unheard).map(unheardKey));
       const told = settleUnheard(unheardSince, unheard, at, seen === undefined);
-      signals = [
-        ...signalsOf(
-          facts.map((f) => ({ ...f, unheard: told.has(unheardKey(f)) })),
-          at,
-        ),
-        ...secretarySignalsOf(
-          secretaryFacts(project.db, () => new Date(at).toISOString()),
-          at,
-        ),
-        // A refiner's question on a Bandeja note waits for the person as an item's does.
-        ...bandejaSignalsOf(bandejaAskFacts(project, () => new Date(at).toISOString())),
-      ];
-    } catch {
-      return;
-    }
+      return signalsOf(
+        facts.map((f) => ({ ...f, unheard: told.has(unheardKey(f)) })),
+        at,
+      );
+    });
+    if (items === undefined) return;
+    const secretary = fromSource('secretary', () =>
+      secretarySignalsOf(secretaryFacts(project.db, clock), at),
+    );
+    // A refiner's question on a Bandeja note waits for the person as an item's does.
+    const bandeja = fromSource('Bandeja', () => bandejaSignalsOf(bandejaAskFacts(project, clock)));
+    const signals = [...items, ...(secretary ?? []), ...(bandeja ?? [])];
+    // A source that could not be read keeps what it showed before: those keys stay in `seen`, so a
+    // notice waiting for them is not dropped, and they are not told again when it reads again.
+    const carried = [
+      ...(secretary === undefined ? (kept.get('secretary') ?? []) : []),
+      ...(bandeja === undefined ? (kept.get('Bandeja') ?? []) : []),
+    ];
+    kept.set(
+      'secretary',
+      (secretary ?? []).map(({ key }) => key),
+    );
+    kept.set(
+      'Bandeja',
+      (bandeja ?? []).map(({ key }) => key),
+    );
     const fresh = freshSignals(seen, signals);
-    seen = new Set(signals.map(({ key }) => key));
+    seen = new Set([...signals.map(({ key }) => key), ...carried]);
     const targets = listeners();
     for (const id of planners.keys()) {
       if (!targets.some((target) => target.id === id)) planners.delete(id);
@@ -200,6 +224,7 @@ export function createNotifier(
     timer = undefined;
     seen = undefined;
     unheardSince.clear();
+    kept.clear();
     planners.clear();
   };
 

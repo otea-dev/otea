@@ -148,6 +148,34 @@ describe('one live worker per board', () => {
     );
   });
 
+  // G1: the last 400 events of the project were read, so a busy minute of other work pushed a
+  // worker's handoff out of sight and a second worker was let in.
+  it('still counts the worker that handed off a moment ago after a flood of other events', () => {
+    declareSecretary(ctx.db, 'sol', at(0), running);
+    const [first, second] = [change('A'), change('B')] as [string, string];
+    seeAgent(ctx.db, { agent: 'ana-cambios', channel: 'cli', call: true }, at(1000));
+    appendEvent(ctx.db, {
+      itemId: first,
+      type: 'transitioned',
+      actor: agent('ana-cambios'),
+      at: at(1000)(),
+      data: { from: 'sanalyse', to: 'sanalyse__review' },
+    });
+    for (let n = 0; n < 450; n += 1) {
+      appendEvent(ctx.db, {
+        itemId: second,
+        type: 'noted',
+        actor: you,
+        at: at(1500)(),
+        data: { text: `note ${n}` },
+      });
+    }
+
+    expect(() => claim('bea-cambios', second, 2000)).toThrow(
+      expect.objectContaining({ code: 'not_claimable' }),
+    );
+  });
+
   it('takes no stand in a project with no secretary: agents are free to share a board', () => {
     const [first, second] = [change('A'), change('B')] as [string, string];
     claim('ana-cambios', first);

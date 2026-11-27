@@ -101,11 +101,8 @@ describe('the secretary seen offline once its process is gone', () => {
   it('reads offline within seconds of its wait process being killed, long before the 30-minute hold', async () => {
     const child = startWait();
     await until(() => stateNow() === 'listening', 30_000);
-    // On Linux and macOS the process table reads at once, so this wait has noted its harness (the
-    // test's own worker) before it is killed; on Windows it often has not. Either way is a state
-    // the next test must not inherit.
-    await until(() => typeof harnessNoted() === 'number', 30_000);
-
+    // A harness this one wait finds above it is only a candidate (G1), never trusted to say
+    // «ended» alone, so this test depends on the wait process alone.
     const killedAt = Date.now();
     process.kill(child.pid as number);
     await until(() => stateNow() === 'offline', 8_000);
@@ -117,10 +114,14 @@ describe('the secretary seen offline once its process is gone', () => {
   // background, answers when it returns, and waits again. Killed between two waits, nothing of
   // Otea's runs, and it stayed «conectado» for the whole 30-minute hold.
   it('reads offline within seconds of its harness being killed between two waits', async () => {
+    // The harness runs two waits one after the other (a wait returns, it answers, it waits again):
+    // the second finding the same process above it makes that process the session (G1: one wait
+    // alone only names a candidate, which may be an intermediary that ends with its command).
     const starter = [
-      "const c = require('node:child_process').spawn(process.execPath, process.argv.slice(1), { detached: true, stdio: 'ignore' });",
-      'c.unref();',
-      'console.log(c.pid);',
+      "const { spawn } = require('node:child_process');",
+      'const args = process.argv.slice(1);',
+      "const run = (n) => { const c = spawn(process.execPath, args, { detached: true, stdio: 'ignore' }); console.log(c.pid); if (n > 1) c.on('exit', () => run(n - 1)); };",
+      'run(2);',
       'setTimeout(() => {}, 120_000);',
     ].join(' ');
     const harness = spawn(
@@ -140,9 +141,12 @@ describe('the secretary seen offline once its process is gone', () => {
       { cwd: repo.dir, env: { ...process.env }, stdio: ['ignore', 'pipe', 'ignore'] },
     );
     children.push(harness);
-    const wait = await new Promise<number>((resolve) =>
-      harness.stdout.setEncoding('utf8').once('data', (line: string) => resolve(Number(line))),
-    );
+    const pids: number[] = [];
+    harness.stdout.setEncoding('utf8').on('data', (text: string) => {
+      for (const line of text.split('\n')) if (line.trim() !== '') pids.push(Number(line));
+    });
+    await until(() => pids.length >= 1, 30_000);
+    const wait = pids[0] as number;
     try {
       await until(() => stateNow() === 'listening', 30_000);
       // The person writes at once, before the wait has read the processes above it: it returns and
@@ -154,8 +158,12 @@ describe('the secretary seen offline once its process is gone', () => {
         project.db.close();
       }
       await until(() => !processAlive(wait), 30_000);
-      // The wait noted the harness session before it ended.
-      expect(harnessNoted()).toBe(harness.pid);
+      // The second wait starts at once and returns for the same unread message.
+      await until(() => pids.length >= 2, 30_000);
+      const second = pids[1] as number;
+      await until(() => !processAlive(second), 30_000);
+      // Both found the harness above them: it is the session now.
+      await until(() => harnessNoted() === harness.pid, 30_000);
       expect(stateNow()).toBe('connected');
 
       const killedAt = Date.now();
@@ -164,7 +172,7 @@ describe('the secretary seen offline once its process is gone', () => {
 
       expect(Date.now() - killedAt).toBeLessThan(8_000);
     } finally {
-      if (processAlive(wait)) process.kill(wait);
+      for (const pid of pids) if (processAlive(pid)) process.kill(pid);
     }
-  }, 90_000);
+  }, 120_000);
 });

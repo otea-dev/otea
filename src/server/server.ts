@@ -27,6 +27,7 @@ import {
   turnsOfItem,
 } from '../app/conversation.ts';
 import { deviceByToken, listDevices, touchDevice } from '../app/devices.ts';
+import { dismissOpenEscalation } from '../app/escalate.ts';
 import { listEvents } from '../app/events.ts';
 import { attachFiles, createItemWithEvidence } from '../app/intake.ts';
 import { searchItems } from '../app/item-search.ts';
@@ -358,6 +359,7 @@ function tooLarge(): never {
 
 // A tap or a few words: 20 000 characters at four bytes each, and room for the JSON around them.
 const MAX_ANSWER_BYTES = MAX_MESSAGE_CHARS * 4 + 1024;
+const MAX_KIND_BYTES = 1024;
 
 function answerTooLarge(): never {
   throw new RejectedRequest(
@@ -555,7 +557,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
   // process writes (the database's data version moves), or PENDING_KEPT_MS passes, for what the
   // clock alone changes (a lease running out, the secretary going quiet). It does not subscribe to
   // the feed: a listener of its own would keep the feed polling with no desk open.
-  let pendingKept: { at: number; version: number; value: Pending } | undefined;
+  let pendingKept: { at: number; version: string; value: Pending } | undefined;
   const feed: ChangeFeed = {
     ...live.feed,
     notify: () => {
@@ -614,7 +616,9 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
       // of the Bandeja and of the secretary, the review that holds a board's queue (app/pending.ts).
       .get('/pending', (c) => {
         const now = Date.now();
-        const version = dataVersion(project.db);
+        // A secretary that went quiet, or an agent whose process ended, writes nothing: liveness is
+        // part of the key, so the desk's refetch after that change never reads the old answer.
+        const version = `${dataVersion(project.db)}${livenessSignature(project.db)}`;
         if (
           !pendingKept ||
           pendingKept.version !== version ||
@@ -623,6 +627,13 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
           pendingKept = { at: now, version, value: pendingOf(project) };
         }
         return c.json(pendingKept.value);
+      })
+      // The person sets an escalation aside (Te espera): whether the secretary acted on it or not.
+      .post('/escalations/:id/dismiss', (c) => {
+        assertWritable(c, auth);
+        dismissOpenEscalation(project, messageIdOf(c.req.param('id')));
+        feed.notify();
+        return c.json({ ok: true });
       })
       // What to paste into an agent's chat (Conectar un agente, the empty project): the first contact,
       // one more agent joining, or one more board; without a kind, the project's moment.
@@ -1023,13 +1034,18 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
         },
       )
       // The person's one-tap correction of what the secretary made of a turn.
-      .post('/conversation/messages/:id/kind', async (c) => {
-        assertWritable(c, auth);
-        const kind = await kindRequest(c);
-        const message = correctKind(project, messageIdOf(c.req.param('id')), kind);
-        feed.notify();
-        return c.json(message);
-      })
+      .post(
+        '/conversation/messages/:id/kind',
+        // A kind is one word: a few bytes of JSON, so anything large is refused before it is read.
+        bodyLimit({ maxSize: MAX_KIND_BYTES, onError: answerTooLarge }),
+        async (c) => {
+          assertWritable(c, auth);
+          const kind = await kindRequest(c);
+          const message = correctKind(project, messageIdOf(c.req.param('id')), kind);
+          feed.notify();
+          return c.json(message);
+        },
+      )
       // The person's tap on a question of the secretary's: their own message, in reply to it.
       .post(
         '/conversation/messages/:id/answer',
@@ -1084,18 +1100,22 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
         return c.json(entry, replayed ? 200 : 201);
       })
       // The person's answer to a question a refiner asked on an entry, from the phone too.
-      .post('/bandeja/:id/answer', async (c) => {
-        assertWritable(c, auth);
-        const given = await chosenAnswerRequest(c);
-        const { question, ...words } = given;
-        const entry = answerBandeja(project, {
-          id: bandejaIdOf(c.req.param('id')),
-          question,
-          ...words,
-        });
-        feed.notify();
-        return c.json(entry);
-      })
+      .post(
+        '/bandeja/:id/answer',
+        bodyLimit({ maxSize: MAX_ANSWER_BYTES, onError: answerTooLarge }),
+        async (c) => {
+          assertWritable(c, auth);
+          const given = await chosenAnswerRequest(c);
+          const { question, ...words } = given;
+          const entry = answerBandeja(project, {
+            id: bandejaIdOf(c.req.param('id')),
+            question,
+            ...words,
+          });
+          feed.notify();
+          return c.json(entry);
+        },
+      )
       // The person reopens a note the secretary or its refiner closed: it waits for the secretary
       // again.
       .post('/bandeja/:id/reopen', (c) => {
@@ -1127,14 +1147,18 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
       })
       // The person's answer to an agent's question, from the phone too: the turn goes back to the
       // agent, in the same round.
-      .post('/items/:id/answer', async (c) => {
-        assertWritable(c, auth);
-        const given = await chosenAnswerRequest(c);
-        const id = c.req.param('id');
-        answerQuestion(project, { id, ...given, ...HUMAN_IN_UI });
-        feed.notify();
-        return c.json(showItem(project, id, HUMAN_IN_UI));
-      })
+      .post(
+        '/items/:id/answer',
+        bodyLimit({ maxSize: MAX_ANSWER_BYTES, onError: answerTooLarge }),
+        async (c) => {
+          assertWritable(c, auth);
+          const given = await chosenAnswerRequest(c);
+          const id = c.req.param('id');
+          answerQuestion(project, { id, ...given, ...HUMAN_IN_UI });
+          feed.notify();
+          return c.json(showItem(project, id, HUMAN_IN_UI));
+        },
+      )
       // The person lets an item go on without a file its step asks for (a screenshot an agent
       // with no browser cannot make): its handoff then passes, and the review says so.
       .post('/items/:id/waive', async (c) => {

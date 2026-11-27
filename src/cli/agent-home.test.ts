@@ -2,7 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { holdAgentHome } from '../app/agent-home.ts';
+import { holdAgentHome, homeKeeper } from '../app/agent-home.ts';
 import { openRegistry } from '../app/home.ts';
 import { systemClock } from '../app/items.ts';
 import { openProject } from '../app/project.ts';
@@ -268,6 +268,29 @@ describe('an agent belongs to the project it works in', () => {
       expect(home.project_id).toBe(idOf(a.dir));
     } finally {
       registry.close();
+    }
+  });
+
+  // G1: a secretary waits for hours, and a wait is no command: its home must not lapse for it.
+  it('keeps the home of an agent that only waits, so a wait of hours is no silence', async () => {
+    const inA = openProject(a.dir);
+    const inB = openProject(b.dir);
+    try {
+      const start = Date.now();
+      const at = (minutes: number) => () => new Date(start + minutes * 60_000).toISOString();
+      holdAgentHome(inA, me, 'write', process.env, at(0));
+      const beat = homeKeeper(inA, me, process.env, at(0));
+
+      // The wait beats every minute for 80 minutes.
+      for (let minute = 1; minute <= 80; minute++) beat(at(minute));
+
+      // Its last write was 80 minutes ago, yet B still finds the name taken.
+      expect(() => holdAgentHome(inB, me, 'write', process.env, at(81))).toThrow(
+        /works in the project/,
+      );
+    } finally {
+      inA.db.close();
+      inB.db.close();
     }
   });
 

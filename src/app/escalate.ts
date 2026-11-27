@@ -1,11 +1,18 @@
 import { bandejaIdOf, isBandejaRef } from '../core/bandeja.ts';
 import { OteaError } from '../core/errors.ts';
+import { plainLine } from '../core/quote.ts';
 import type { SecretaryState } from '../core/secretary.ts';
-import { selectOpenEscalations } from '../store/secretary.ts';
+import { transaction } from '../store/database.ts';
+import { dismissEscalation, selectOpenEscalations } from '../store/secretary.ts';
 import { requireEntry } from './bandeja.ts';
 import type { Context } from './context.ts';
 import { type Clock, requireItem, systemClock } from './items.ts';
-import { emitSecretarySignal, secretaryName, secretaryStatus } from './secretary.ts';
+import {
+  emitSecretarySignal,
+  MAX_DELIVERIES,
+  secretaryName,
+  secretaryStatus,
+} from './secretary.ts';
 
 // What a worker or a refiner says to the project's secretary when the person must know it (a
 // duplicate, a failed push, a branch pushed by mistake, a problem that blocks it) and it is no
@@ -22,12 +29,32 @@ export const MAX_OPEN_PER_AGENT = 5;
 // The words are data for the secretary and the person, never an instruction or markup: one line of
 // plain text, no control characters, and the quotes the wake puts around it cannot be closed from
 // inside.
-export function cleanEscalation(text: string): string {
-  return [...text]
-    .map((ch) => (ch.charCodeAt(0) < 32 || ch === '\u007f' || ch === '«' || ch === '»' ? ' ' : ch))
-    .join('')
-    .replace(/\s+/g, ' ')
-    .trim();
+export const cleanEscalation = (text: string): string => plainLine(text, Number.POSITIVE_INFINITY);
+
+// An escalation the secretary has not acted on is shown to the person themselves, even while the
+// secretary is connected, once it was returned MAX_DELIVERIES times or waited this long: the
+// secretary may be busy or its wait lost, and what an agent flagged is never left to rot unseen.
+export const ESCALATION_SHOWN_AFTER_MS = 10 * 60_000;
+
+// Whether the person is shown an escalation that is still open: always while the secretary is away,
+// else once it was delivered twice or waited ESCALATION_SHOWN_AFTER_MS.
+export function escalationShown(
+  kept: { at: string; deliveries: number },
+  secretaryAway: boolean,
+  nowMs: number,
+): boolean {
+  return (
+    secretaryAway ||
+    kept.deliveries >= MAX_DELIVERIES ||
+    nowMs - Date.parse(kept.at) >= ESCALATION_SHOWN_AFTER_MS
+  );
+}
+
+// The person sets an escalation aside (the row in Te toca): it is done with.
+export function dismissOpenEscalation(ctx: Context, id: number, now: Clock = systemClock): void {
+  if (!dismissEscalation(ctx.db, id, now())) {
+    throw new OteaError('not_found', `Escalation ${id} is not open (it was acted on or dismissed)`);
+  }
 }
 
 // How an escalation is kept: who said it and what, the words quoted as data.
@@ -89,18 +116,22 @@ export function escalateToSecretary(
   const about = aboutOf(ctx, input.about);
   const kept = escalationText(input.agent, text);
   const state = secretaryStatus(ctx.db, now)?.state ?? 'offline';
-  const open = selectOpenEscalations(ctx.db);
-  // Said already, and not acted on yet: once is enough.
-  if (open.some((each) => each.ref === about && each.text === kept)) {
-    return { secretary, about, already: true, secretaryState: state };
-  }
-  const mine = open.filter((each) => each.text.startsWith(`${input.agent} says: «`));
-  if (mine.length >= MAX_OPEN_PER_AGENT) {
-    throw new OteaError(
-      'forbidden',
-      `You have ${mine.length} escalations waiting for the secretary (${secretary}): go on with your work and let it deal with them first; a new one is taken once it has`,
-    );
-  }
-  emitSecretarySignal(ctx.db, { kind: 'escalation', ref: about, text: kept }, now);
-  return { secretary, about, already: false, secretaryState: state };
+  // The cap is checked and the signal inserted in one transaction: two calls at once cannot both
+  // pass the check.
+  return transaction(ctx.db, () => {
+    const open = selectOpenEscalations(ctx.db);
+    // Said already, and not acted on yet: once is enough.
+    if (open.some((each) => each.ref === about && each.text === kept)) {
+      return { secretary, about, already: true, secretaryState: state };
+    }
+    const mine = open.filter((each) => each.text.startsWith(`${input.agent} says: «`));
+    if (mine.length >= MAX_OPEN_PER_AGENT) {
+      throw new OteaError(
+        'forbidden',
+        `You have ${mine.length} escalations waiting for the secretary (${secretary}): go on with your work and let it deal with them first; a new one is taken once it has`,
+      );
+    }
+    emitSecretarySignal(ctx.db, { kind: 'escalation', ref: about, text: kept }, now);
+    return { secretary, about, already: false, secretaryState: state };
+  });
 }

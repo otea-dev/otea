@@ -34,6 +34,12 @@ export function transaction<T>(db: DatabaseSync, fn: () => T): T {
   }
 }
 
+// Runs `fn` in the transaction already open on `db`, or opens one: for a step that is atomic alone
+// and also part of a larger atomic action (a command that declares two things or none).
+export function joinTransaction<T>(db: DatabaseSync, fn: () => T): T {
+  return db.isTransaction ? fn() : transaction(db, fn);
+}
+
 export function dataVersion(db: DatabaseSync): number {
   return Number(db.prepare('PRAGMA data_version').get()?.data_version);
 }

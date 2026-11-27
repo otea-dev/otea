@@ -62,7 +62,7 @@ export function workersByBoard(
     if (holder && isThere(holder)) add(collection, holder.name, live?.expiresAt ?? null);
   }
   const since = Date.parse(at) - BETWEEN_ITEMS_MS;
-  for (const work of selectRecentAgentWork(db)) {
+  for (const work of selectRecentAgentWork(db, new Date(since).toISOString())) {
     const agent = byName.get(work.agent);
     if (!agent?.live || agent.sessionEnded || Date.parse(work.at) < since) continue;
     // The step it did: a claim or a release of an item still being done, or a move out of a doing

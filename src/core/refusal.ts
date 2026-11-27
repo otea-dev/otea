@@ -147,6 +147,7 @@ export type RefusalDetails =
         | 'not_person'
         | 'not_agent'
         | 'empty'
+        | 'too_long'
         | 'not_working'
         | 'asking'
         | 'none_open'

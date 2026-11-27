@@ -399,13 +399,25 @@ export type AgentWork = {
   state: string;
 };
 
-export function selectRecentAgentWork(db: DatabaseSync, limit = 400): AgentWork[] {
+// What agents did to move an item since `since` (an ISO time): claims, releases and moves. By time
+// and type, not by a count of the newest events: a busy minute of notes and evidence must never
+// push a worker's handoff out of what is read.
+export function selectRecentAgentWork(db: DatabaseSync, since: string): AgentWork[] {
+  // Events are appended in time order: walk back from the newest until one is older than `since`
+  // (no index on time), and read everything after that one.
+  let floor = 0;
+  for (const row of db.prepare('SELECT id, at FROM events ORDER BY id DESC').iterate()) {
+    if (String(row.at) < since) {
+      floor = Number(row.id);
+      break;
+    }
+  }
   const sql = `SELECT e.actor_name AS agent, i.collection AS collection, e.at AS at, e.type AS type,
       e.data AS data, i.state AS state
-    FROM (SELECT * FROM events ORDER BY id DESC LIMIT :limit) e
-    JOIN items i ON i.id = e.item_id
-    WHERE e.actor_kind = 'agent' AND e.type IN ('claimed', 'released', 'transitioned')`;
-  const rows = db.prepare(sql).all({ limit }) as {
+    FROM events e JOIN items i ON i.id = e.item_id
+    WHERE e.id > :floor AND e.actor_kind = 'agent'
+      AND e.type IN ('claimed', 'released', 'transitioned') AND e.at >= :since`;
+  const rows = db.prepare(sql).all({ floor, since }) as {
     agent: string;
     collection: string;
     at: string;
@@ -838,10 +850,20 @@ export function selectListening(db: DatabaseSync): Map<string, string> {
 // otea commands), noted by its wait, which reads the process table. Kept after the wait ends: it is
 // the one process that says the agent's session is over while no otea process runs. An agent heard
 // through an MCP server has its harness noted by that server (`listening_harness` is its launcher).
+//
+// A process found above one wait only is a candidate, stored negated (-pid): the first wait of a
+// session may pick an intermediary that lives one command (bwrap, docker exec, ssh, wsl.exe), whose
+// end says nothing of the session. Found above the next wait too (the same id), it is the harness
+// (+pid) and may say «ended». Another id restarts the candidate. No column: a negative id is read
+// as «not trusted yet» (selectListenerProcesses).
 export function saveHarness(db: DatabaseSync, agent: string, pid: number): void {
+  const row = db
+    .prepare('SELECT listening_harness AS harness FROM agents WHERE name = :agent')
+    .get({ agent }) as { harness: number | null } | undefined;
+  const next = row?.harness === pid || row?.harness === -pid ? pid : -pid;
   db.prepare(
-    'UPDATE agents SET listening_harness = :pid WHERE name = :agent AND listening_session IS NULL',
-  ).run({ agent, pid });
+    'UPDATE agents SET listening_harness = :next WHERE name = :agent AND listening_session IS NULL',
+  ).run({ agent, next });
 }
 
 // Forgets a harness noted for the command line once it is gone: the agent speaking again is another
@@ -881,7 +903,11 @@ export function selectListenerProcesses(db: DatabaseSync): Map<string, ListenerP
       {
         session: row.listening_session,
         waiter: row.listening_waiter,
-        harness: row.listening_session === null ? row.listening_harness : null,
+        // A candidate (negated, see saveHarness) is not a harness yet.
+        harness:
+          row.listening_session === null && (row.listening_harness ?? 0) > 0
+            ? row.listening_harness
+            : null,
       },
     ]),
   );

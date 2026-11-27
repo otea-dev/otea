@@ -16,6 +16,7 @@ import {
 import { OteaError } from '../core/errors.ts';
 import { evidenceTypeOf, MAX_EVIDENCE_BYTES, MAX_EVIDENCE_MB } from '../core/evidence.ts';
 import type { Actor } from '../core/item.ts';
+import { plainLine, quoteAgent } from '../core/quote.ts';
 import type { SecretaryStatus } from '../core/secretary.ts';
 import { clockText, timeText } from '../core/time.ts';
 import { selectEntryOfItem } from '../store/bandeja.ts';
@@ -457,7 +458,12 @@ export function traceAnswer(
     text: trace.text,
     at: now(),
     read: true,
-    choice: { mode: trace.mode, option: trace.option, about: trace.about, asked: trace.asked },
+    choice: {
+      mode: trace.mode,
+      option: trace.option,
+      about: trace.about,
+      asked: plainLine(trace.asked),
+    },
   });
 }
 
@@ -587,7 +593,9 @@ function choiceHeads(message: Message): string[] {
   const { choice } = message;
   if (choice === null) return [];
   if (choice.about !== null)
-    return [`answered ${choice.about}'s question${choice.asked ? ` "${choice.asked}"` : ''}`];
+    return [
+      `answered ${choice.about}'s question${choice.asked ? ` ${quoteAgent(choice.asked)}` : ''}`,
+    ];
   if (choice.mode === 'delegated')
     return ['answer to your question: left the decision to you, your call'];
   if (choice.mode === 'option') return [`answer to your question: chose option ${choice.option}`];
@@ -604,7 +612,8 @@ export function messagesText(
 ): string {
   return messages
     .map((message) => {
-      const who = message.author === 'person' ? 'person' : `${message.author} ${message.by}`;
+      const who =
+        message.author === 'person' ? 'person' : `${message.author} ${plainLine(message.by, 60)}`;
       const heads = [
         `${who}, ${timeText(message.at)}`,
         ...(message.replyTo === null ? [] : [`reply to ${message.replyTo}`]),

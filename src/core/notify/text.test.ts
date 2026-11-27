@@ -142,6 +142,40 @@ describe('noticeText', () => {
     );
   });
 
+  // G1: a notice replaces the one with the same tag on the person's screen, so the tag names the
+  // project and the thing it is about: B's notice must not wipe A's, nor one turn's reply another's.
+  describe('what replaces what on the screen', () => {
+    const web = { id: 'tienda-web-x1', name: 'tienda-web' };
+    const api = { id: 'api-z9', name: 'api' };
+    const tagOf = (notice: Notice, project: { id: string; name: string }) =>
+      noticeText(notice, 'en', project).tag;
+    const reply = (turn: number): Notice => ({
+      kind: 'secretary_reply',
+      item: `hablar:${turn}`,
+      title: '',
+      by: 'sage',
+      turn,
+      text: 'ok',
+    });
+    const offline: Notice = {
+      kind: 'secretary_offline',
+      item: 'hablar:offline',
+      title: '',
+      count: 1,
+    };
+    const note: Notice = { kind: 'ask', item: 'B-1', title: 'n', by: 'lia', text: 'which?' };
+
+    it('keeps two projects apart, for every kind', () => {
+      for (const notice of [review, reply(4), offline, note]) {
+        expect(tagOf(notice, web)).not.toBe(tagOf(notice, api));
+      }
+    });
+
+    it('keeps two replies to different turns apart', () => {
+      expect(tagOf(reply(4), web)).not.toBe(tagOf(reply(5), web));
+    });
+  });
+
   describe('the secretary', () => {
     const reply: Notice = {
       kind: 'secretary_reply',
@@ -156,7 +190,7 @@ describe('noticeText', () => {
       expect(noticeText(reply, 'es')).toEqual({
         title: 'sage te respondió',
         body: 'Listo el pedido',
-        tag: 'otea-hablar-reply',
+        tag: 'otea-hablar-reply-4',
         url: '/#/hablar/4',
         item: null,
       });

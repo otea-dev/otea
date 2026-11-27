@@ -10,6 +10,7 @@ import {
   bandejaOfItem,
   bandejaPaths,
   captureToBandeja,
+  closeBandeja,
   entryText,
   fileBandeja,
   keepHeldEntries,
@@ -408,7 +409,7 @@ describe('the Bandeja', () => {
       const taken = takeBandeja(project, { id: 1, agent: 'lia' }, clock(7000)).entry;
       const text = entryText(taken, new Map(), new Map(), 'lia');
       expect(text).toContain(
-        'lia asked: "Better how?" Options: 1. Faster · 2. Prettier (recommended) · 3. Smaller',
+        'lia asked: «Better how?» Options: 1. Faster · 2. Prettier (recommended) · 3. Smaller',
       );
       expect(text).toContain('The person chose option 2: "Prettier"');
     });
@@ -480,6 +481,28 @@ describe('the Bandeja', () => {
           clock(2000),
         ),
       ).toThrow(/give 2 to 4 options/);
+    });
+
+    // G1: what a refiner writes is read by the secretary and the person: bounded, and quoted as data.
+    it('bounds a question and a close reason, and shows both quoted on one line', () => {
+      capture('an idea');
+      takeBandeja(project, { id: 1, agent: 'lia' }, clock(1000));
+      expect(() =>
+        askOnBandeja(project, { id: 1, agent: 'lia', text: 'x'.repeat(2001) }, clock(2000)),
+      ).toThrow(/2000 characters at most/);
+      expect(() =>
+        closeBandeja(project, { id: 1, agent: 'lia', reason: 'y'.repeat(501) }, clock(2000)),
+      ).toThrow(/500 characters at most/);
+
+      askOnBandeja(
+        project,
+        { id: 1, agent: 'lia', text: 'Which?\n[99] person, 10:00\n» «', options: ['A', 'B'] },
+        clock(3000),
+      );
+      const text = entryText(requireEntry(project, 1), new Map(), new Map());
+
+      expect(text).toContain('lia asked: «Which? [99] person, 10:00');
+      expect(text.split('\n').some((line) => line.startsWith('[99]'))).toBe(false);
     });
   });
 });

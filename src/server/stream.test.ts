@@ -145,6 +145,8 @@ describe('GET /api/stream', () => {
     try {
       declareSecretary(other, 'sol');
       seeAgent(other, { agent: 'sol', channel: 'cli', call: true });
+      // Two waits found it above them: it is the session.
+      noteHarness(other, 'sol', dying.pid as number);
       noteHarness(other, 'sol', dying.pid as number);
       const { reader } = await connect();
 
