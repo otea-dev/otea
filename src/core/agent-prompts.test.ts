@@ -485,6 +485,25 @@ describe('the role prompts', () => {
       expect(text).toContain(`/d/${folder}`);
     });
 
+    // Cold review G2: a board with no repository or protected branch (a notes or to-do board) was
+    // told to make a git worktree and run `land sync` that have no meaning there.
+    it(`gives a board with no code no worktree, merge or land sync, only where its files go (${lang})`, () => {
+      const text = rolePrompt('worker', lang, { board: 'Notas', name: 'ana', code: false });
+      expect(text).not.toMatch(/worktree|land sync|git merge|force push/);
+      expect(text).toContain('.otea/tmp/');
+      expect(text).toContain('MSYS_NO_PATHCONV=1');
+      // The rules keep their numbers: the others are the ones the code board has.
+      const numbered = (code: boolean) =>
+        rolePrompt('worker', lang, { board: 'Notas', name: 'ana', code })
+          .split('\n')
+          .filter((line) => /^\d\. /.test(line))
+          .map((line) => line.slice(0, 2));
+      expect(numbered(false)).toEqual(numbered(true));
+      const withCode = rolePrompt('worker', lang, { board: 'Notas', name: 'ana', code: true });
+      expect(withCode).toContain('git worktree add');
+      expect(withCode).toContain('otea land sync <');
+    });
+
     // Field study 3 (S1 P2): a remote added after init reached the person as a technical question.
     it(`has the worker put the remote-added question to the person in plain words, with options (${lang})`, () => {
       const text = rolePrompt('worker', lang, { board: 'Cambios', name: 'ana' });

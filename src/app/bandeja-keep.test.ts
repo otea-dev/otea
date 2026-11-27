@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { BANDEJA_HANDOVER_MS, BANDEJA_LEASE_MS } from '../core/bandeja.ts';
+import { BANDEJA_LEASE_MS } from '../core/bandeja.ts';
 import {
   answerBandeja,
   askOnBandeja,
@@ -49,57 +49,27 @@ describe('the Bandeja without a refiner session', () => {
   const capture = (text: string, at = 1000) => captureToBandeja(project, { text }, clock(at)).entry;
   const wake = (at: number) => secretaryWake(project, startSecretaryWait(clock(at)), clock(at));
 
-  describe('a note taken for a refiner that never shows', () => {
-    it('comes back to the secretary after the handover, not after the whole lease', () => {
+  describe('a note the refiner holds', () => {
+    it('is kept for the whole lease by any call of the refiner, and the secretary hears nothing meanwhile', () => {
       capture('an idea');
-      takeBandeja(project, { id: 1, agent: 'sol', on: 'sol-refiner' }, clock(1000));
-      expect(wake(1000 + MIN)).toBeUndefined();
-
-      expect(wake(1000 + BANDEJA_HANDOVER_MS)).toMatchObject({
-        kind: 'bandeja_item',
-        ref: 'B-1',
-      });
-      expect(requireEntry(project, 1, clock(1000 + BANDEJA_HANDOVER_MS))).toMatchObject({
-        state: 'waiting',
-        claimedBy: null,
-      });
-      expect(BANDEJA_HANDOVER_MS).toBeLessThan(BANDEJA_LEASE_MS);
-    });
-
-    it('is kept for the whole lease once the refiner itself calls otea', () => {
-      capture('an idea');
-      takeBandeja(project, { id: 1, agent: 'sol', on: 'sol-refiner' }, clock(1000));
+      takeBandeja(project, { id: 1, agent: 'sol-refiner' }, clock(1000));
 
       keepHeldEntries(project, 'sol-refiner', clock(MIN));
 
       expect(requireEntry(project, 1, clock(MIN)).claimUntil).toBe(
         new Date(T0 + MIN + BANDEJA_LEASE_MS).toISOString(),
       );
-      expect(wake(1000 + BANDEJA_HANDOVER_MS + MIN)).toBeUndefined();
+      expect(wake(MIN + BANDEJA_LEASE_MS - 1)).toBeUndefined();
     });
 
-    it('never cuts the lease of a refiner that already holds it: taking it for them again keeps the whole lease', () => {
+    it('lets the secretary refine it itself once the lease ran out', () => {
       capture('an idea');
-      takeBandeja(project, { id: 1, agent: 'sol', on: 'sol-refiner' }, clock(1000));
-      keepHeldEntries(project, 'sol-refiner', clock(MIN));
+      takeBandeja(project, { id: 1, agent: 'sol-refiner' }, clock(1000));
 
-      takeBandeja(project, { id: 1, agent: 'sol', on: 'sol-refiner' }, clock(2 * MIN));
-
-      expect(requireEntry(project, 1, clock(2 * MIN)).claimUntil).toBe(
-        new Date(T0 + 2 * MIN + BANDEJA_LEASE_MS).toISOString(),
-      );
-      expect(wake(2 * MIN + BANDEJA_HANDOVER_MS + MIN)).toBeUndefined();
-    });
-
-    it('lets the secretary refine it itself once it came back', () => {
-      capture('an idea');
-      takeBandeja(project, { id: 1, agent: 'sol', on: 'sol-refiner' }, clock(1000));
-
-      const late = 1000 + BANDEJA_HANDOVER_MS;
+      const late = 1000 + BANDEJA_LEASE_MS;
       const mine = takeBandeja(project, { id: 1, agent: 'sol' }, clock(late));
 
       expect(mine.entry).toMatchObject({ state: 'refining', claimedBy: 'sol' });
-      expect(mine.entry.claimUntil).toBe(new Date(T0 + late + BANDEJA_LEASE_MS).toISOString());
     });
   });
 

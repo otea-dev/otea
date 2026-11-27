@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { BANDEJA_LEASE_MS, isBandejaRef } from '../core/bandeja.ts';
-import { saveRole } from '../store/secretary.ts';
 import {
   answerBandeja,
   askOnBandeja,
@@ -228,46 +227,6 @@ describe('the Bandeja', () => {
       const later = takeBandeja(project, { id: 1, agent: 'max' }, clock(1000 + BANDEJA_LEASE_MS));
 
       expect(later.entry).toMatchObject({ state: 'refining', claimedBy: 'max' });
-    });
-
-    it('lets the secretary take it for the refiner it launches, and nobody else', () => {
-      capture('an idea');
-      expect(() => takeBandeja(project, { id: 1, agent: 'max', on: 'lia' }, clock(1000))).toThrow(
-        /Only the project's secretary takes an entry for a refiner/,
-      );
-
-      // For a refiner that is no agent here (a typo, or one that never called otea), nothing is held.
-      expect(() => takeBandeja(project, { id: 1, agent: 'sol', on: 'lia' }, clock(1500))).toThrow(
-        /lia is not an agent of this project \(it has not called otea\) nor your subagent \(sol-<role>\)/,
-      );
-      expect(requireEntry(project, 1, clock(1500)).state).toBe('waiting');
-      // The person's name is no refiner at all.
-      expect(() => takeBandeja(project, { id: 1, agent: 'sol', on: 'human' }, clock(1500))).toThrow(
-        /human/,
-      );
-      expect(() =>
-        takeBandeja(project, { id: 1, agent: 'sol', on: 'Not A Name' }, clock(1500)),
-      ).toThrow();
-      expect(requireEntry(project, 1, clock(1500))).toMatchObject({
-        state: 'waiting',
-        claimedBy: null,
-      });
-
-      // A subagent of the secretary (sol-<role>) has not called otea yet when the entry is taken for
-      // it: that is allowed, and it takes the entry itself when it starts.
-      const held = takeBandeja(project, { id: 1, agent: 'sol', on: 'sol-refiner' }, clock(2000));
-      expect(held.entry.claimedBy).toBe('sol-refiner');
-      expect(wake(3000)).toBeUndefined();
-      expect(takeBandeja(project, { id: 1, agent: 'sol-refiner' }, clock(4000)).renewed).toBe(true);
-    });
-
-    it('lets the secretary take it for an agent already known here', () => {
-      capture('an idea');
-      saveRole(project.db, 'lia', null, clock(1600)());
-
-      const held = takeBandeja(project, { id: 1, agent: 'sol', on: 'lia' }, clock(2000));
-
-      expect(held.entry.claimedBy).toBe('lia');
     });
 
     it('is refused for an entry that is not there', () => {

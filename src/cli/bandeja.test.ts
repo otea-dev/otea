@@ -102,17 +102,19 @@ describe('the Bandeja from the refiner', () => {
       expect(again.out).toContain('Still holding B-1');
     });
 
-    it('lets the secretary take it for the refiner it launches, and nobody else', async () => {
+    it('is taken only by the refiner itself: the secretary never takes a note for one (no --for)', async () => {
       capture('an idea');
 
-      const refused = await otea('bandeja', 'take', 'B-1', '--for', 'lia', '--as', 'max');
-      expect(refused.code).toBe(7);
-      expect(refused.err).toContain("Only the project's secretary takes an entry for a refiner");
+      // The secretary's own text says never to take a note for a refiner, so the help says nothing
+      // of it and the option does not exist.
+      const command = COMMANDS.find(({ name }) => name === 'bandeja take');
+      expect(command?.summary).not.toMatch(/--for|for a refiner it launches/);
+      expect(Object.keys(command?.options ?? {})).not.toContain('for');
 
-      const done = await otea('bandeja', 'take', 'B-1', '--for', 'lia', '--as', 'sol');
-      expect(done.out).toContain('Took B-1 for lia');
-      expect(entries()[0]).toMatchObject({ state: 'refining', claimedBy: 'lia' });
-      expect((await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1')).code).toBe(13);
+      const refused = await otea('bandeja', 'take', 'B-1', '--for', 'lia', '--as', 'sol');
+      expect(refused.code).not.toBe(0);
+      expect(refused.err).toMatch(/Unknown option '?--for/);
+      expect(entries()[0]).toMatchObject({ state: 'waiting', claimedBy: null });
     });
 
     it('makes no entry: nothing on the command line or in MCP captures as the person', async () => {
@@ -120,15 +122,10 @@ describe('the Bandeja from the refiner', () => {
       expect(add.code).not.toBe(0);
       expect(entries()).toEqual([]);
 
-      // The person's name takes nothing, nor is it a refiner the secretary takes for.
+      // The person's name takes nothing.
       capture('a real capture');
       const forged = await otea('bandeja', 'take', 'B-1', '--as', 'human');
-      const forgedFor = await otea('bandeja', 'take', 'B-1', '--for', 'human', '--as', 'sol');
-      const stranger = await otea('bandeja', 'take', 'B-1', '--for', 'nobody-yet', '--as', 'sol');
       expect(forged.code).not.toBe(0);
-      expect(forgedFor.code).not.toBe(0);
-      expect(stranger.code).toBe(7);
-      expect(stranger.err).toContain('nobody-yet is not an agent of this project');
       expect(entries()).toEqual([expect.objectContaining({ ref: 'B-1', state: 'waiting' })]);
 
       const server = createMcpServer(COMMANDS, { cwd: repo.dir, agent: 'sol', warn: () => {} });
@@ -235,7 +232,7 @@ describe('the Bandeja from the refiner', () => {
 
       const woke = JSON.parse((await otea('wait', '--secretary', '--as', 'sol', '--json')).out);
       expect(woke).toMatchObject({ kind: 'bandeja_item', ref: 'B-1' });
-      await otea('bandeja', 'take', 'B-1', '--for', 'lia', '--as', 'sol');
+      await otea('bandeja', 'take', 'B-1', '--as', 'lia');
       const read = await otea('bandeja', 'B-1', '--as', 'lia');
       expect(read.out).toContain(
         'lia asked: «Better how?» Options: 1. Faster · 2. Prettier (recommended)',

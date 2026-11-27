@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { basename } from 'node:path';
 import {
-  BANDEJA_HANDOVER_MS,
   BANDEJA_LEASE_MS,
   type BandejaEntry,
   type BandejaQuestion,
@@ -14,7 +13,6 @@ import { checkOptions, DELEGATED } from '../core/board/questions.ts';
 import { MAX_MESSAGE_CHARS, MAX_MESSAGE_FILES, messageSnippet } from '../core/conversation.ts';
 import { OteaError } from '../core/errors.ts';
 import { evidenceTypeOf, MAX_EVIDENCE_BYTES, MAX_EVIDENCE_MB } from '../core/evidence.ts';
-import { assertAgentName } from '../core/item.ts';
 import type { BandejaAskFacts } from '../core/notify/signals.ts';
 import { plainLine, quoteAgent } from '../core/quote.ts';
 import { timeText } from '../core/time.ts';
@@ -39,7 +37,6 @@ import {
   selectEntryRows,
 } from '../store/bandeja.ts';
 import { transaction } from '../store/database.ts';
-import { findAgent } from '../store/queries.ts';
 import { saveRole, selectRoles } from '../store/secretary.ts';
 import type { Context } from './context.ts';
 import { type MessageFileInput, traceAnswer } from './conversation.ts';
@@ -239,35 +236,15 @@ export function listBandeja(
 
 export type Held = { entry: BandejaEntry; renewed: boolean };
 
-// A refiner takes an entry to work on it, for a lease: two never hold one at once. The secretary may
-// take it on behalf of the refiner it launches (`on`), so its own wait stops returning the entry
-// while the refiner starts. A refiner that already holds it keeps it (the lease starts again).
+// A refiner takes an entry to work on it, for a lease: two never hold one at once. Only the refiner
+// itself takes a note (the secretary never takes one for it). A refiner that already holds it keeps
+// it (the lease starts again).
 export function takeBandeja(
   project: Project,
-  input: { id: number; agent: string; on?: string | undefined },
+  input: { id: number; agent: string },
   now: Clock = systemClock,
 ): Held {
   const { id, agent } = input;
-  const holder = input.on ?? agent;
-  if (input.on !== undefined && input.on !== agent && secretaryName(project.db) !== agent) {
-    throw new OteaError(
-      'forbidden',
-      `Only the project's secretary takes an entry for a refiner it launched (--for); take it yourself with --as ${input.on}`,
-    );
-  }
-  if (input.on !== undefined && input.on !== agent) {
-    // A real refiner: a valid agent name (never the person's), either already known here or a
-    // subagent of the secretary (<its name>-<role>, how the role text names the ones it launches:
-    // it has not called otea yet when the secretary takes the entry for it). Any other name that
-    // never called otea cannot be told from a typo, and the entry would be held by nobody.
-    assertAgentName(input.on);
-    if (!findAgent(project.db, input.on) && !input.on.startsWith(`${agent}-`)) {
-      throw new OteaError(
-        'forbidden',
-        `${input.on} is not an agent of this project (it has not called otea) nor your subagent (${agent}-<role>). Name the refiner you launch ${agent}-refiner, or let it take the entry itself (otea bandeja take ${bandejaRef(id)} --as ${input.on})`,
-      );
-    }
-  }
   return transaction(project.db, () => {
     const at = now();
     const was = requireEntry(project, id, () => at);
@@ -289,22 +266,14 @@ export function takeBandeja(
         `${was.ref} is closed (${quoteAgent(was.closeReason ?? 'no reason given')}): the person may reopen it`,
       );
     }
-    // An entry taken for a refiner that has not called otea yet is held only for the handover: its
-    // first call (keepHeldEntries) makes it the whole lease, and one that never calls leaves the
-    // entry to the secretary again soon.
-    // A refiner that already holds it keeps its whole lease: the secretary taking it for them again
-    // never cuts it short.
-    const handover = holder !== agent && !(was.state === 'refining' && was.claimedBy === holder);
-    const until = new Date(
-      Date.parse(at) + (handover ? BANDEJA_HANDOVER_MS : BANDEJA_LEASE_MS),
-    ).toISOString();
-    if (!holdEntry(project.db, id, holder, at, until)) {
+    const until = new Date(Date.parse(at) + BANDEJA_LEASE_MS).toISOString();
+    if (!holdEntry(project.db, id, agent, at, until)) {
       throw new OteaError(
         'forbidden',
         `${was.ref} is held by ${was.claimedBy ?? 'another refiner'} until ${timeText(was.claimUntil ?? at)}: take another entry, or wait for it`,
       );
     }
-    return { entry: requireEntry(project, id, () => at), renewed: was.claimedBy === holder };
+    return { entry: requireEntry(project, id, () => at), renewed: was.claimedBy === agent };
   });
 }
 

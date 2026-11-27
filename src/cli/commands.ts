@@ -13,7 +13,7 @@ import {
   submitAgentDraft,
 } from '../app/agent-draft.ts';
 import { holdAgentHome, homeKeeper } from '../app/agent-home.ts';
-import { promptFacts, promptKindOf, roleBoard } from '../app/agent-prompts.ts';
+import { promptFacts, promptKindOf, roleFacts } from '../app/agent-prompts.ts';
 import {
   type AgentsMdAction,
   assertPinned,
@@ -1770,7 +1770,7 @@ function projectRolePrompt(
     throw error;
   }
   try {
-    const board = facts.board === undefined ? {} : { board: roleBoard(project, facts.board) };
+    const board = facts.board === undefined ? {} : roleFacts(project, facts.board);
     return rolePrompt(role, asked ?? projectLanguage(project), { ...facts, ...board });
   } finally {
     project.db.close();
@@ -5346,10 +5346,9 @@ const BANDEJA_RECHECK_MS = 5000;
 const bandejaTake: Command = {
   name: 'bandeja take',
   summary:
-    'Take a Bandeja entry (B-3) to refine it: held 30 minutes (acting on it renews), no other refiner takes it. --next takes the next free one (yours first), --wait waits for it. The secretary takes one for a refiner it launches with --for',
+    'Take a Bandeja entry (B-3) to refine it: held 30 minutes (acting on it renews), no other refiner takes it. --next takes the next free one (yours first), --wait waits for it. Only the refiner itself takes a note: the secretary never takes one for it',
   args: ['id?'],
   options: {
-    for: { placeholder: 'refiner' },
     next: { flag: true },
     wait: { flag: true },
     timeout: { placeholder: 'duration' },
@@ -5357,7 +5356,6 @@ const bandejaTake: Command = {
   execute: async (input) => {
     const [id] = input.args;
     const { actor } = input;
-    const on = input.option('for');
     const next = input.flag('next');
     const waits = input.flag('wait');
     if (next && id !== undefined)
@@ -5367,28 +5365,20 @@ const bandejaTake: Command = {
         'Say which note: otea bandeja take B-3, or --next for the next one nobody holds',
       );
     if (waits && !next) throw new UsageError('--wait goes with --next');
-    if (next && on !== undefined)
-      throw new UsageError('--next takes the note for yourself: no --for');
-    const show = (project: Project, held: Held, who: string, handover: boolean) => {
+    const show = (project: Project, held: Held) => {
       const { entry, renewed } = held;
       const { paths, problems } = bandejaPaths(project, [entry]);
       const until = timeText(entry.claimUntil ?? entry.at);
-      const head = handover
-        ? `Took ${entry.ref} for ${who}: it holds it until ${until} (it has to call otea before then: that makes it the whole lease); it takes it itself with otea bandeja take ${entry.ref} --as ${who}.`
-        : `${renewed ? 'Still holding' : 'Took'} ${entry.ref} until ${until}.`;
+      const head = `${renewed ? 'Still holding' : 'Took'} ${entry.ref} until ${until}.`;
       return {
-        data: { entry, held: who },
+        data: { entry, held: actor.name },
         text: `${head}\n${entryText(entry, paths, problems, actor.name)}`,
       };
     };
     if (!next) {
       return withAgent(input, (project) => {
-        const held = takeBandeja(project, {
-          id: bandejaIdOf(id ?? ''),
-          agent: actor.name,
-          ...(on === undefined ? {} : { on }),
-        });
-        return show(project, held, on ?? actor.name, on !== undefined && on !== actor.name);
+        const held = takeBandeja(project, { id: bandejaIdOf(id ?? ''), agent: actor.name });
+        return show(project, held);
       });
     }
     const again = bandejaTakeNextCommand(actor.name);
@@ -5402,7 +5392,7 @@ const bandejaTake: Command = {
             text: `No note waits for a refiner (none is free: every one is filed, closed, held by another refiner or waiting for the person's answer). Wait for the next with ${again}.`,
           };
         }
-        return show(project, held, actor.name, false);
+        return show(project, held);
       });
     }
     // The wait of the project's one refiner: it hears the agent, but is no listener on the boards.
@@ -5424,7 +5414,7 @@ const bandejaTake: Command = {
         false,
       );
       if (!('found' in waited)) return waited;
-      return show(project, waited.found, actor.name, false);
+      return show(project, waited.found);
     }).finally(() => owner.release());
     if ('data' in result) return result;
     if (result.stopped === 'timeout') {

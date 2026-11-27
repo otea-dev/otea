@@ -12,12 +12,6 @@ import { OteaError } from './errors.ts';
 // it keeps the hold by acting (take again, ask, file); past it another refiner may take the entry.
 export const BANDEJA_LEASE_MS = 30 * 60_000;
 
-// How long an entry the secretary takes for a refiner it launches (`take --for`) stays held while
-// that refiner has not called otea: its first call makes it the whole lease. A refiner that never
-// shows (a harness with no subagents, one that did not start) leaves the entry waiting for the
-// secretary again within this, not after the whole lease (field study 3, S4).
-export const BANDEJA_HANDOVER_MS = 3 * 60_000;
-
 // Where an entry stands:
 //   waiting   nobody has it: the secretary is told
 //   refining  a refiner holds it (`claimedBy`)

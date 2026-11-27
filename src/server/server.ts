@@ -4,7 +4,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 import { agentDetail } from '../app/agent-detail.ts';
-import { promptFacts, promptKindOf, roleBoard } from '../app/agent-prompts.ts';
+import { promptFacts, promptKindOf, roleFacts } from '../app/agent-prompts.ts';
 import { askingItems, holderAsksOf } from '../app/asking.ts';
 import {
   answerBandeja,
@@ -656,7 +656,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
           return c.json({
             kind: role,
             prompt: rolePrompt(role, projectLanguage(project, env), {
-              ...(board ? { board: roleBoard(project, board) } : {}),
+              ...(board ? roleFacts(project, board) : {}),
               ...(name ? { name } : {}),
             }),
           });

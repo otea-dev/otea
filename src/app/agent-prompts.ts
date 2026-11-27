@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { JoinFacts, PromptKind } from '../core/agent-prompts.ts';
+import { guardedBranch } from '../core/board/model.ts';
 import { OteaError } from '../core/errors.ts';
 import { listBoardSummaries } from './boards.ts';
 import { getCollection } from './collections.ts';
@@ -28,6 +29,17 @@ export function roleBoard(ctx: Context, name: string): string {
       'A board is named without quotes, backticks or line breaks',
     );
   return getCollection(ctx.db, name).name;
+}
+
+// What a worker's text is filled with for a board: its name and whether its work is code, a git
+// repository whose board protects a branch. A notes or to-do board, or a folder with no git, gets
+// no worktree, merge or land sync in its text. A board with no live definition (one still on a
+// preset) says nothing about branches, so it follows the repository alone.
+export function roleFacts(ctx: Place, name: string): { board: string; code: boolean } {
+  const board = roleBoard(ctx, name);
+  const live = liveBoardOf(ctx, board);
+  const protectsBranch = live === undefined || guardedBranch(live.def) !== undefined;
+  return { board, code: isRepo(ctx) && protectsBranch };
 }
 
 // The project as an agent joining it reads it: each published board of the person's (Pedidos

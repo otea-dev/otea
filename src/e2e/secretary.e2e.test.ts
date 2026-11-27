@@ -202,7 +202,6 @@ describe('the secretary, end to end', () => {
       '30s',
     );
     expect(heard).toMatchObject({ kind: 'bandeja_item', ref: entry.ref });
-    await said('sol', 'bandeja', 'take', entry.ref, '--for', 'rita');
     await said('rita', 'bandeja', 'take', entry.ref);
     const refined = await agent<{ id: string }>(
       'rita',
