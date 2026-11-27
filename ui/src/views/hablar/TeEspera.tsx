@@ -140,7 +140,9 @@ export function TeEspera({ pending, onJump }: TeEsperaProps) {
                 data-kind={entry.kind}
                 onClick={() => onJump(entry)}
               >
-                <span className="hb-te-ref">{entry.kind === 'secretary' || entry.kind === 'worker' ? '' : entry.ref}</span>
+                <span className="hb-te-ref">
+                  {entry.kind === 'secretary' || entry.kind === 'worker' ? '' : entry.ref}
+                </span>
                 <span className="hb-te-t">{rowText(entry)}</span>
                 <span className="hb-te-k">
                   {t(`hablar.te.k.${entry.kind}`, { agent: entry.by ?? '' })}
