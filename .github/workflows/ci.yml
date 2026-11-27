@@ -20,8 +20,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    # A run takes under 5 minutes; a hang should fail long before the 6-hour default.
-    timeout-minutes: 15
+    # A run takes 5 minutes on Linux and about 15 on Windows; a hang should fail long before the
+    # 6-hour default.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
