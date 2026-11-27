@@ -32,8 +32,11 @@ const pending = (entries: PendingEntry[], over: Partial<Pending> = {}): Pending 
   ...over,
 });
 
-const render = (value: Pending | undefined, o: { phone?: boolean } = {}) =>
-  renderIn(testApp({ phone: o.phone ?? false }), <TeEspera pending={value} onJump={none} />);
+const render = (value: Pending | undefined, o: { phone?: boolean; short?: boolean } = {}) =>
+  renderIn(
+    testApp({ phone: o.phone ?? false, short: o.short ?? false }),
+    <TeEspera pending={value} onJump={none} />,
+  );
 
 // F4 (field study 3): a pending question sat far up the thread, off screen on the phone, and a
 // review waited 1.5 h without the secretary mentioning it. «Te espera» is pinned over the thread and
@@ -111,6 +114,16 @@ describe('the «Te espera» strip of Hablar', () => {
     };
     expect(render(pending([notice]))).toContain('aria-expanded="true"');
     expect(render(pending([notice]))).toContain('kiln reports');
+  });
+
+  // E1: a phone on its side has no height to spare: the strip opened by itself over a review and
+  // took what the conversation needed. On a short screen it is one line until the head is tapped.
+  it('stays one line on a short screen, whatever it holds', () => {
+    for (const phone of [false, true]) {
+      const html = render(pending([question, ...reviews]), { phone, short: true });
+      expect(html).toContain('aria-expanded="false"');
+      expect(html).not.toContain('Undo delete');
+    }
   });
 
   it('is one line when it only holds questions: the foot of the conversation answers them', () => {

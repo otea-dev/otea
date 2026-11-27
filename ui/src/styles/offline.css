@@ -182,3 +182,53 @@
     padding-left: 0;
   }
 }
+
+/* A screen too short for it (a phone on its side, 390 px or less of height): the notice is one
+   line, what is wrong and Reintentar; what to check and since when stay for a taller screen. */
+@media (max-height: 500px) {
+  .app[data-offline] {
+    grid-template-rows: 48px auto minmax(0, 1fr);
+  }
+  .offline-bar,
+  .offline-bar[data-ask] {
+    flex-wrap: nowrap;
+    align-items: center;
+    margin: 0 0 4px;
+    padding: 4px 10px;
+  }
+  .offline-bar .ob-dot {
+    margin-top: 0;
+  }
+  .offline-bar .ob-text,
+  .offline-bar[data-ask] .ob-text {
+    flex: 1;
+    flex-basis: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .offline-bar .ob-ask,
+  .offline-bar[data-ask] .ob-ask,
+  .offline-bar .ob-sep,
+  .offline-bar .ob-when,
+  .offline-bar .ob-ro,
+  .offline-bar[data-ask] .ob-ro {
+    display: none;
+  }
+  .offline-bar[data-ask] .ob-retry,
+  .offline-bar .ob-retry {
+    min-height: 32px;
+    margin-left: auto;
+  }
+}
+@media (max-height: 360px) {
+  .offline-bar,
+  .offline-bar[data-ask] {
+    margin-bottom: 2px;
+    padding: 2px 8px;
+  }
+  .offline-bar[data-ask] .ob-retry,
+  .offline-bar .ob-retry {
+    min-height: 28px;
+  }
+}

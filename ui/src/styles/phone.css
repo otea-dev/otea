@@ -2055,3 +2055,82 @@
     overflow-wrap: anywhere;
   }
 }
+
+/* ───────── a screen too short for the page (a phone on its side: 390 px, or 320) ─────────
+   The top bar and the bottom bar are slimmer, so what stands between them keeps the height. By
+   height alone, so it also holds for the phone layout of a window that is short. */
+@media (max-height: 500px) {
+  :root {
+    --tabbar-h: calc(46px + env(safe-area-inset-bottom, 0px));
+  }
+  .app {
+    grid-template-rows: 46px minmax(0, 1fr);
+  }
+  .topbar {
+    height: 46px;
+  }
+  .pill,
+  .apill {
+    height: 38px;
+  }
+  .tabbar {
+    align-items: center;
+    padding-top: 2px;
+    padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px));
+  }
+  .tabbar .tab {
+    min-height: 42px;
+    flex-direction: row;
+    justify-content: center;
+    gap: 8px;
+    padding-bottom: 0;
+  }
+  .tabbar .tab .ic {
+    width: 22px;
+    height: 22px;
+  }
+  .tabbar .disc {
+    width: 34px;
+    height: 34px;
+  }
+  /* the count follows the label on the same row, it no longer hangs over the icon's corner */
+  .tabbar .tbadge {
+    position: static;
+    flex: none;
+  }
+  /* the install banner keeps to its instruction: its notes wait for a taller screen */
+  .install-banner .install-note {
+    display: none;
+  }
+}
+/* the smallest phones on their side (568 x 320): one step slimmer again */
+@media (max-height: 360px) {
+  :root {
+    --tabbar-h: calc(40px + env(safe-area-inset-bottom, 0px));
+  }
+  .app,
+  .app[data-offline] {
+    grid-template-rows: 40px minmax(0, 1fr);
+  }
+  .app[data-offline] {
+    grid-template-rows: 40px auto minmax(0, 1fr);
+  }
+  .topbar {
+    height: 40px;
+  }
+  .pill,
+  .apill {
+    height: 34px;
+  }
+  .sbtn {
+    width: 34px;
+    height: 34px;
+  }
+  .tabbar .tab {
+    min-height: 36px;
+  }
+  .tabbar .disc {
+    width: 30px;
+    height: 30px;
+  }
+}

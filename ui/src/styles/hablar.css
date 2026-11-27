@@ -1933,3 +1933,90 @@ button.hb-kid:hover {
     animation-delay: 0ms;
   }
 }
+
+/* a screen too short for the conversation and what sits over it (a phone on its side): the
+   heading gives way to the status line (the bottom bar says where you are), and the suggestions
+   go (the composer stays), so the thread keeps the height */
+@media (max-height: 500px) {
+  .hb-main {
+    padding-top: 6px;
+  }
+  .hb-main > .head .kicker,
+  .hb-main > .head .dek,
+  .hb-main > .head .display {
+    display: none;
+  }
+  .hb-main > .head {
+    margin-bottom: 0;
+  }
+  .hb-suggs {
+    display: none;
+  }
+  /* the offline line over the page says it already */
+  .hb-note-off {
+    display: none;
+  }
+}
+/* on the phone on its side, one row over the conversation: the tabs, and at its end «Te toca
+   ahora» as a count and a tap (its rows open over the thread, never push it down). The heading and
+   the status are left to a screen reader: the bottom bar says where you are, and the agents pill
+   says who is connected. The strip of the secretary away stays one line of its own. */
+@media (max-width: 720px) and (max-height: 500px) {
+  .hb-main {
+    position: relative;
+  }
+  .hb-main > .head {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .hb-te {
+    position: absolute;
+    top: 6px;
+    right: 0;
+    z-index: 4;
+    margin: 0;
+    background: var(--sheet);
+  }
+  .hb-te-head {
+    padding: 6px 12px;
+    min-height: 34px;
+  }
+  .hb-te-sum {
+    display: none;
+  }
+  .hb-te:has(.hb-te-list) {
+    left: 0;
+    box-shadow: 0 14px 30px -14px var(--shadow);
+  }
+  .hb-te:has(.hb-te-list) .hb-te-sum {
+    display: inline;
+  }
+  .hb-te-list {
+    max-height: 46vh;
+  }
+}
+@media (max-width: 720px) and (max-height: 360px) {
+  .hb-main {
+    padding-top: 2px;
+  }
+  .hb-te {
+    top: 2px;
+  }
+  .hb-te-head {
+    min-height: 30px;
+    padding-block: 4px;
+  }
+  .hb-tabs {
+    padding-bottom: 2px;
+  }
+  .hb-attach,
+  .hb-send {
+    width: 36px;
+    height: 36px;
+  }
+}

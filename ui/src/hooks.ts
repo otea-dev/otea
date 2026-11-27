@@ -5,6 +5,7 @@ import { activeLease, type TimeCell, timeCell } from './lease.ts';
 import { afterFailure, type Remote } from './remote.ts';
 import { hideTier } from './row-grid.ts';
 import { type Route, routeFromHash } from './selection.ts';
+import { PHONE_QUERY, SHORT_QUERY } from './styles/phone-media.ts';
 import type { Item, Lease } from './types.ts';
 
 export type Connection = 'connecting' | 'live' | 'reconnecting';
@@ -163,11 +164,17 @@ export function useMediaQuery(query: string): boolean {
   return useSyncExternalStore(subscribe, () => window.matchMedia(query).matches);
 }
 
-// The phone: up to 720 px wide (SPEC §10.7, mock:893).
-export const PHONE_QUERY = '(max-width: 720px)';
+// The phone: up to 720 px wide (SPEC §10.7, mock:893), or on its side (styles/phone-media.ts, which
+// also puts it into the style sheets' phone queries).
+export { PHONE_QUERY };
 
 export function usePhone(): boolean {
   return useMediaQuery(PHONE_QUERY);
+}
+
+// A screen too short for the strips above the conversation: they fold to a line.
+export function useShort(): boolean {
+  return useMediaQuery(SHORT_QUERY);
 }
 
 // Marks an element (the list pane) with the hide tier its width puts it in (data-tier, see

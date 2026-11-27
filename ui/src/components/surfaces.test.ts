@@ -76,6 +76,7 @@ function fakeApp(o: Partial<App> = {}): App {
     feed,
     route: { view: 'toca' },
     phone: false,
+    short: false,
     go: noop,
     openItem: noop,
     closeItem: noop,

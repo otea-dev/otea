@@ -29,7 +29,7 @@ import {
   updateItemFields,
 } from '../api.ts';
 import type { IntakeParent } from '../components/NewItemForm.tsx';
-import { type Connection, usePhone, useRoute } from '../hooks.ts';
+import { type Connection, usePhone, useRoute, useShort } from '../hooks.ts';
 import { toast } from '../kit/pop/toast.tsx';
 import { rowOf } from '../lanes/dom.ts';
 import { landed } from '../motion/bus.ts';
@@ -87,6 +87,8 @@ export type AppData = {
   feed: FeedEvent[];
   route: Route;
   phone: boolean;
+  // A screen too short for the strips over a conversation (a phone on its side): they fold.
+  short: boolean;
 };
 
 export type AppActions = {
@@ -181,6 +183,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const data = useAppData();
   const route = useRoute();
   const phone = usePhone();
+  const short = useShort();
   const ref = useRef({ data, route });
   ref.current = { data, route };
 
@@ -317,6 +320,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     feed: data.feed,
     route,
     phone,
+    short,
     ...actions,
   };
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

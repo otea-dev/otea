@@ -181,12 +181,14 @@ const waits = (pending: Pending | undefined): pending is Pending =>
 
 export function TeEspera({ pending, onJump, away }: TeEsperaProps) {
   const app = useApp();
+  const short = app.short;
   // What the person chose by tapping the head; until then it opens as the content asks.
   const [chosen, setChosen] = useState<boolean | undefined>();
   if (away) return <AwayStrip away={away} pending={pending} onJump={onJump} />;
   if (!waits(pending)) return null;
   const { entries, blocks } = pending;
-  const roomy = !app.phone || entries.length + blocks.length <= PHONE_ROWS;
+  // A short screen (a phone on its side) is never roomy: the conversation keeps the height.
+  const roomy = !short && (!app.phone || entries.length + blocks.length <= PHONE_ROWS);
   const open = chosen ?? (opensByDefault(entries) && roomy);
   return (
     <section className="hb-te" data-enter="fade" aria-label={t('hablar.te.title')}>

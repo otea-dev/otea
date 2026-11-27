@@ -228,7 +228,7 @@ export function Composer({ onSent }: { onSent: () => void }) {
           {t('hablar.failed', { message: error })}
         </p>
       ) : offline ? (
-        <p className="hb-note" role="status">
+        <p className="hb-note hb-note-off" role="status">
           {t('hablar.offline')}
         </p>
       ) : !canWrite ? (
