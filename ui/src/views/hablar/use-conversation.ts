@@ -63,7 +63,9 @@ export function useConversation(): ConversationState {
         ? merged
         : merged.map((m) => {
             const kind = kinds.get(m.root);
-            return kind === undefined || kind === m.kind ? m : { ...m, kind, kindBy: 'person' };
+            return kind === undefined || kind === m.kind
+              ? m
+              : { ...m, kind, kindBy: 'person' as const };
           }),
     [merged, kinds],
   );

@@ -206,6 +206,7 @@ function Files({
   decide,
   comment,
   onSeen,
+  seen,
 }: {
   evidence: readonly Evidence[];
   // While you review: a comment left from the reader (it goes with a send-back).
@@ -218,6 +219,8 @@ function Files({
   marks?: ReadonlyMap<number, Mark> | undefined;
   // A file shown in the reader, opened or stepped to.
   onSeen?: ((id: number) => void) | undefined;
+  // The files opened in the reader: the lane draws them as discs.
+  seen?: ReadonlySet<number> | undefined;
 }) {
   const roleWord = useSideWord();
   const { images, files } = splitEvidence(evidence);
@@ -348,6 +351,7 @@ function Files({
               at={at}
               onAt={setAt}
               phone
+              seen={seen}
               decide={deciding}
               note={comment}
               draft={draft}
@@ -479,6 +483,7 @@ function RoundView({
   decide,
   comment,
   onSeen,
+  seen,
   handed,
   blind,
   gaps,
@@ -505,6 +510,7 @@ function RoundView({
   now: number;
   notes?: PhoneNotes | undefined;
   onSeen?: ((id: number) => void) | undefined;
+  seen?: ReadonlySet<number> | undefined;
 }) {
   const { images, files } = splitEvidence(r.evidence);
   return (
@@ -545,6 +551,7 @@ function RoundView({
             decide={decide}
             comment={comment}
             onSeen={onSeen}
+            seen={seen}
           />
         ) : null}
         {gaps ? <EvidenceGaps gaps={gaps} required /> : null}
@@ -564,6 +571,7 @@ function RoundView({
               decide={decide}
               comment={comment}
               onSeen={onSeen}
+              seen={seen}
             />
           ) : null}
         </TechDetails>
@@ -1036,6 +1044,7 @@ export function PhoneItem(p: PhoneItemProps) {
           decide={shown === newest ? readerDecide : undefined}
           comment={shown === newest ? p.notes?.review?.reader : undefined}
           onSeen={markSeen}
+          seen={seen}
           handed={shown === newest ? handed : undefined}
           gaps={shown === newest ? gaps : undefined}
           technical={shown === newest ? p.technical : undefined}

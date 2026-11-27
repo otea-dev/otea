@@ -135,9 +135,7 @@ describe('the topbar', () => {
     // Beside a working agent it is the small grey datum, never in warn.
     const busy = topbar({
       agents: [silent, agent('Scout', { holding: ['X'], profile: opus })],
-      items: [
-        item({ id: 'X', turn: 'agent', lease: { holder: 'Scout', expiresAt: inMinutes(20) } }),
-      ],
+      all: [item({ id: 'X', turn: 'agent', lease: { holder: 'Scout', expiresAt: inMinutes(20) } })],
     });
     expect(busy).toContain('<small class="wl">1 sin novedades</small>');
     expect(busy).not.toContain('warn-t');

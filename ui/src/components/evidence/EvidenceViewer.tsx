@@ -203,11 +203,14 @@ export function EvidenceReader({
   onDraft,
   draftPick = null,
   onDraftPick,
+  seen,
 }: {
   evidence: readonly Evidence[];
   at: number;
   onAt: (at: number) => void;
   phone?: boolean;
+  // The files opened in the reader, by evidence id: their nodes on the phone's lane are discs.
+  seen?: ReadonlySet<number> | undefined;
   decide?: ReaderDecide | undefined;
   note?: ReaderNote | undefined;
   start?: ReaderPick | undefined;
@@ -224,6 +227,15 @@ export function EvidenceReader({
 }) {
   const shown = evidence[at];
   const view = useRef<HTMLDivElement>(null);
+  const lane = useRef<HTMLElement>(null);
+  // The lane of files (phone) keeps the node shown in its middle as you step through the files.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on each file shown
+  useLayoutEffect(() => {
+    const strip = lane.current;
+    const node = strip?.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!strip || !node) return;
+    strip.scrollLeft = node.offsetLeft - (strip.clientWidth - node.offsetWidth) / 2;
+  }, [at]);
   const [pick, setPickHere] = useState<Picked | null>(draftPick);
   const setPick = (value: Picked | null) => {
     setPickHere(value);
@@ -534,6 +546,21 @@ export function EvidenceReader({
           <Icon name="right" />
         </button>
       </div>
+      {phone && evidence.length > 1 ? (
+        <nav className="ev-lane" aria-label={t('evidence.reader.files')} ref={lane}>
+          {evidence.map((e, i) => (
+            <button
+              key={e.id}
+              type="button"
+              className="ev-node"
+              aria-current={i === at ? 'true' : undefined}
+              aria-label={`${i + 1} · ${e.filename}`}
+              data-seen={seen?.has(e.id) ? 'true' : undefined}
+              onClick={() => onAt(i)}
+            />
+          ))}
+        </nav>
+      ) : null}
       {pair ? (
         <div className="ev-reader-pair">
           <span>

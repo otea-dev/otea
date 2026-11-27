@@ -65,7 +65,9 @@ describe('what the agent sheet says of an agent whose lease ran out', () => {
     const presence = kiln({ status: 'silent', live: false, holding: ['CRE-45'], lastSeen: ago(4) });
     const row = agentRows([presence], [live], NOW)[0];
     const html = renderToStaticMarkup(<Stand row={row} presence={presence} now={NOW} />);
-    expect(html).toMatch(/^Sin novedades desde las \d\d:\d\d: tiene <em>Cangrejo<\/em> en la mano\.$/);
+    expect(html).toMatch(
+      /^Sin novedades desde las \d\d:\d\d: tiene <em>Cangrejo<\/em> en la mano\.$/,
+    );
     expect(html).not.toContain('Ausente');
   });
 

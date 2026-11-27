@@ -92,7 +92,7 @@ export const phone = {
   'phone.r.same': 'same',
   'phone.r.changedFile': 'changed',
   'phone.r.read': 'Read {file}',
-  'phone.r.reader': 'Files',
+  'phone.r.reader': 'Reader',
   'phone.r.details': 'Details',
   'phone.r.request': 'The request',
   'phone.r.dock': 'Your verdict',
