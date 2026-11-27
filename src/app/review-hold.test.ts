@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { creatures } from '../core/board/testing.ts';
 import { OteaError } from '../core/errors.ts';
 import { insertEvidence } from '../store/queries.ts';
+import { detachEvidence } from './evidence.ts';
 import { createItem, getItem, updateItem } from './items.ts';
 import { approveItem, handoffItem, sendBackItem } from './next.ts';
 import type { Project } from './project.ts';
@@ -141,6 +142,15 @@ describe('an item that waits for the person’s review is not changed by an agen
     expect(mixed?.code).toBe('forbidden');
     expect(getItem(project, id).fields.fbiome).toBe('cswamp');
     expect(getItem(project, id).fields.fdesc).toBe('Lenta');
+  });
+
+  it('holds the files of the delivery too: an agent detaches nothing while the person reviews', () => {
+    const refused = refusal(() =>
+      detachEvidence(project, { id, evidence: 1, actor: agent('quill'), channel: 'cli' }, now),
+    );
+
+    expect(refused?.code).toBe('forbidden');
+    expect(refused?.message).toContain(`${id} waits for the person's review`);
   });
 
   it('lets an agent change it again once the person sent it back', () => {

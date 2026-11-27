@@ -44,7 +44,7 @@ import {
   selectEvidence,
 } from '../store/queries.ts';
 import { typeOfItem } from './collections.ts';
-import { requireWritableItem, systemClock } from './items.ts';
+import { assertNotInPersonsReview, requireWritableItem, systemClock } from './items.ts';
 import { assertMayWriteItem } from './lease-take.ts';
 import { boardModule, liveBoardOf } from './next.ts';
 import type { Project } from './project.ts';
@@ -369,7 +369,10 @@ export function attachEvidence(project: Project, input: AttachInput, now = syste
   };
   return transaction(project.db, () => {
     const item = requireWritableItem(project.db, input.id);
+    // A step that pushes the protected branch says first why (its branch is frozen); any other
+    // step in the person's review is held the same way, with the review's own words.
     refuseWhileFrozen(project, item, input.actor);
+    assertNotInPersonsReview(project, item, typeOfItem(project, item), input.actor);
     const at = now();
     const placed = placeFile(project, item, file, input.actor, at);
     const same = sameSinceMoved(project, item.id, placed);
@@ -400,6 +403,7 @@ export function detachEvidence(
 ): EvidenceRecord {
   return transaction(project.db, () => {
     const item = requireWritableItem(project.db, input.id);
+    assertNotInPersonsReview(project, item, typeOfItem(project, item), input.actor);
     const at = now();
     assertMayWriteItem(project, item, input.actor, at);
     const entry = selectEvidence(project.db, item.id).find(({ id }) => id === input.evidence);

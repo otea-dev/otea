@@ -449,19 +449,21 @@ export type UpdateItemInput = {
 // agent checks) is not the person's, and closes nothing here. The fields a board lets be filled at
 // any time (its estimates, `anytime`) are neither the request nor a handed field: an agent still
 // estimates them, as the person corrects them.
-function assertNotInPersonsReview(
+// The files of the delivery are held the same way (app/evidence.ts), on any step: `changed` is then
+// left out, and no field is exempt.
+export function assertNotInPersonsReview(
   ctx: Context,
   item: ItemRecord,
   type: ItemType,
   actor: Actor,
-  changed: readonly string[],
+  changed?: readonly string[],
 ): void {
   if (actor.kind !== 'agent' || turnOf(type.workflow, item.state) !== 'human') return;
   const board = liveBoardOf(ctx, item.collection);
   if (!board) return;
   const position = positionOf(item.state);
   if (isClosed(position) || position.phase !== 'review') return;
-  if (changed.every((key) => board.def.anytime.includes(key))) return;
+  if (changed?.every((key) => board.def.anytime.includes(key))) return;
   const secretary = selectRoles(ctx.db).get(actor.name) === 'secretary';
   const way = secretary
     ? `Ask them in one tap, with a card: otea say "<question>" --send-back ${item.id} --note "<their change, in their words>" --option "<send it back>" --option "<leave it>"`

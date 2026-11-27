@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createBoard, publishBoard, saveDraft } from '../app/boards.ts';
+import { attachEvidence } from '../app/evidence.ts';
 import { sendBackItem } from '../app/next.ts';
 import { openProject } from '../app/project.ts';
 import { creatures } from '../core/board/testing.ts';
@@ -96,6 +97,82 @@ describe('an item in the person’s review does not change under any agent name'
       await client.close();
     }
     expect(await request()).toBe('Lenta');
+  });
+
+  // The files of the delivery are what the person reviews: the same hold as for the request, on any
+  // step (not only one that pushes the protected branch).
+  const files = async () =>
+    (JSON.parse((await otea('show', 'CRI-1', '--json')).out) as { evidence: unknown[] }).evidence
+      .length;
+  const another = () => {
+    const path = join(repo.dir, 'other.png');
+    writeFileSync(path, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]));
+    return path;
+  };
+
+  it('refuses an attach from any name on the command line, exit 7, and adds no file', async () => {
+    for (const name of ['intruso', 'claude']) {
+      const refused = await as(name)('attach', 'CRI-1', another(), '--module', 'eart');
+
+      expect(refused.code, refused.err).toBe(7);
+      expect(refused.err).toContain("CRI-1 waits for the person's review");
+    }
+    expect(await files()).toBe(1);
+  });
+
+  it('points the secretary to the card that sends it back when it attaches', async () => {
+    await as('sol')('profile', '--role', 'secretary');
+
+    const refused = await as('sol')('attach', 'CRI-1', another(), '--module', 'eart');
+
+    expect(refused.code, refused.err).toBe(7);
+    expect(refused.err).toContain('--send-back CRI-1');
+    expect(await files()).toBe(1);
+  });
+
+  it('refuses an attach over MCP too', async () => {
+    const server = createMcpServer(COMMANDS, { cwd: repo.dir, warn: () => {} });
+    const client = new Client({ name: 'test', version: '0' });
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverSide);
+    await client.connect(clientSide);
+    try {
+      const reply = (await client.callTool({
+        name: 'attach',
+        arguments: { id: 'CRI-1', file: another(), module: 'eart', as: 'intruso' },
+      })) as { isError?: boolean; content: { text: string }[] };
+
+      expect(reply.isError).toBe(true);
+      expect(reply.content[0]?.text).toContain("CRI-1 waits for the person's review");
+    } finally {
+      await client.close();
+    }
+    expect(await files()).toBe(1);
+  });
+
+  it('lets the person attach on the desk, and an agent again once it is back with the worker', async () => {
+    const project = openProject(repo.dir);
+    try {
+      attachEvidence(project, {
+        id: 'CRI-1',
+        path: another(),
+        module: 'eart',
+        actor: { kind: 'human', name: 'human' },
+        channel: 'ui',
+      });
+      sendBackItem(
+        project,
+        { id: 'CRI-1', actor: { kind: 'human', name: 'human' }, channel: 'ui', reason: 'again' },
+        () => new Date().toISOString(),
+      );
+    } finally {
+      project.db.close();
+    }
+    expect(await files()).toBe(2);
+
+    const attached = await as('claude')('attach', 'CRI-1', another(), '--module', 'eart');
+
+    expect(attached.code, attached.err).toBe(0);
   });
 
   it('lets an agent change the request again once it is back with the worker', async () => {
