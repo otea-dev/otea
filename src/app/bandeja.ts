@@ -44,6 +44,7 @@ import type { Context } from './context.ts';
 import { type MessageFileInput, traceAnswer } from './conversation.ts';
 import { evidenceFile, namedReadPath, storeFile } from './evidence.ts';
 import { type Clock, requireItem, systemClock } from './items.ts';
+import { listAgents } from './presence.ts';
 import type { Project } from './project.ts';
 import { addSecretarySource, secretaryName } from './secretary.ts';
 import { addWaitingSource } from './secretary-waiting.ts';
@@ -589,12 +590,26 @@ export function bandejaOfItem(ctx: Context, item: string): FromBandeja | undefin
 // N»), beside the person's unread messages.
 addWaitingSource((db) => countWaitingEntries(db, systemClock()));
 
+// How long a note may wait for a refiner that is there (busy with another note) before it is the
+// secretary's: it takes the notes in turn, and the secretary taking one meanwhile is what the
+// refiner is for (field study 4, U6).
+export const REFINER_BUSY_MS = 10 * 60_000;
+
 addSecretarySource((ctx, now) => {
+  const at = Date.parse(now());
   const waiting = hydrate(ctx, selectEntryRows(ctx.db, 0), now()).filter(
     ({ state }) => state === 'waiting',
   );
   const [first] = waiting;
   if (first === undefined) return undefined;
+  // A refiner is there (connected, or at work on a note): the notes are its next. Only one that
+  // waited for it a long while, or with no refiner there, is the secretary's.
+  const refinerThere = listAgents(ctx.db, now).some(
+    ({ role, status }) =>
+      role === 'refiner' &&
+      (status === 'working' || status === 'listening' || status === 'connected'),
+  );
+  if (refinerThere && at - Date.parse(first.at) < REFINER_BUSY_MS) return undefined;
   const answered = first.questions.length > 0 ? ' (the person answered your question)' : '';
   const more = waiting.length > 1 ? ` (and ${waiting.length - 1} more)` : '';
   return {
