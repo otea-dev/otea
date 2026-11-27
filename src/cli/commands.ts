@@ -384,6 +384,7 @@ import {
   uninstallRepos,
   uninstallServer,
 } from './uninstall.ts';
+import { userPath } from './user-path.ts';
 import { OTEA_VERSION } from './version.ts';
 
 // The text names an item's type only when its collection's preset has several.
@@ -1177,7 +1178,7 @@ async function fieldFileValue(input: Input, path: string): Promise<string> {
   if (path === '-') {
     text = await input.stdin();
   } else {
-    const file = resolve(input.cwd, path);
+    const file = userPath(input.cwd, path);
     try {
       text = readFileSync(file, 'utf8');
     } catch {
@@ -1589,7 +1590,7 @@ function draftFile(cwd: string, file: string, piped?: string): string {
       'Nothing came on stdin: pipe the board JSON into otea board draft --file - (a here-document of your shell), give --file a path, or pass the JSON itself as --definition (over MCP, board_draft takes it as definition)',
     );
   }
-  const path = resolve(cwd, file);
+  const path = userPath(cwd, file);
   try {
     return readFileSync(path, 'utf8');
   } catch {
@@ -3788,7 +3789,7 @@ const attach: Command = {
     const caption = option('caption');
     const evidenceInput = {
       id,
-      path: resolve(cwd, file),
+      path: userPath(cwd, file),
       actor,
       channel,
       ...(role === undefined ? {} : { role }),
@@ -5417,7 +5418,7 @@ const say: Command = {
       const said = sayWithSendBack(project, {
         agent: actor.name,
         text,
-        files: input.options('file').map((path) => messageFileAt(resolve(cwd, path))),
+        files: input.options('file').map((path) => messageFileAt(userPath(cwd, path))),
         ...(replyTo === undefined ? {} : { replyTo: messageIdOf(replyTo) }),
         ...(kind === undefined ? {} : { kind }),
         links,
