@@ -232,6 +232,59 @@ function addTurn(
   }
 }
 
+// The topics of before the conversation (0.7) become consultations: each of their turns is kept
+// in the conversation as addTurn does for a new one, and the turn the topic leads to its items
+// (the links and its task). A topic that already has a message in the conversation was kept as it
+// went and is left alone, so this does nothing the second time. The topics stay readable as they are.
+export function keepOldTopicsAsConsultations(ctx: Context): void {
+  const waiting = ctx.db
+    .prepare(
+      `SELECT 1 FROM topics t
+       WHERE NOT EXISTS (SELECT 1 FROM conversation_messages m WHERE m.topic = t.id) LIMIT 1`,
+    )
+    .get();
+  if (waiting === undefined) return;
+  transaction(ctx.db, () => {
+    const turns = ctx.db
+      .prepare(
+        `SELECT u.topic_id AS topic, u.kind, u.text, u.full, u.actor_kind AS actorKind,
+                u.actor_name AS actorName, u.at
+         FROM topic_turns u JOIN topics t ON t.id = u.topic_id
+         WHERE u.kind <> 'event'
+           AND NOT EXISTS (SELECT 1 FROM conversation_messages m WHERE m.topic = t.id)
+         ORDER BY u.at, u.id`,
+      )
+      .all() as Array<{
+      topic: string;
+      kind: TopicTurnKind;
+      text: string;
+      full: string | null;
+      actorKind: Actor['kind'];
+      actorName: string;
+      at: string;
+    }>;
+    for (const turn of turns) {
+      mirrorTopicTurn(
+        ctx,
+        {
+          topic: turn.topic,
+          kind: turn.kind === 'answer' ? 'answer' : 'question',
+          text: turn.full ?? turn.text,
+          actor: { kind: turn.actorKind, name: turn.actorName },
+        },
+        () => turn.at,
+      );
+    }
+    const link = ctx.db.prepare(
+      `INSERT OR IGNORE INTO conversation_links (message_id, item_id, at)
+       SELECT (SELECT MIN(root) FROM conversation_messages WHERE topic = l.topic_id), l.item_id, l.at
+       FROM topic_links l JOIN items i ON i.id = l.item_id
+       WHERE l.topic_id = ? AND l.via <> 'dismissed'`,
+    );
+    for (const topic of new Set(turns.map((turn) => turn.topic))) link.run(topic);
+  });
+}
+
 function setState(ctx: Context, id: string, state: StoredState, at: string): void {
   ctx.db.prepare('UPDATE topics SET state = ?, updated_at = ? WHERE id = ?').run(state, at, id);
 }
