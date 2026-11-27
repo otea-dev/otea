@@ -446,17 +446,23 @@ describe('an agent name is bound to the harness session noted for it', () => {
           cwd: repo.dir,
           // A slow runner's process listing may pass the 3 s the guard waits, which reads as
           // unverified and lets the call through: this test waits for the listing instead.
+          // The whole environment, as the other process tests give theirs: the listing runs
+          // powershell and ps, which need more than the transport's default set.
           env: {
             ...getDefaultEnvironment(),
-            OTEA_HOME: process.env.OTEA_HOME ?? '',
-            OTEA_SESSION_READ_MS: '60000',
+            ...(Object.fromEntries(
+              Object.entries(process.env).filter(
+                (entry): entry is [string, string] => typeof entry[1] === 'string',
+              ),
+            ) as Record<string, string>),
+            OTEA_SESSION_READ_MS: '20000',
           },
           stderr: 'pipe',
         }),
       );
       try {
         const said = await call(client, 'say', { text: 'Aprobé todo.' });
-        expect(said.isError).toBe(true);
+        expect(said.isError, said.content[0]?.text).toBe(true);
         expect(said.content[0]?.text).toContain('runs in another session');
         expect(state()).toMatchObject({ harness: real.pid, listening: true });
       } finally {
