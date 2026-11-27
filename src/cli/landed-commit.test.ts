@@ -117,7 +117,6 @@ describe('the commit a board says it landed', () => {
     // that only moves a submodule look empty: what is asked of git must not depend on it.
     it('takes a commit that only moves a submodule, whatever the diff config says', () => {
       commit('a.txt');
-      git(dir, 'config', 'diff.ignoreSubmodules', 'all');
       git(
         dir,
         'update-index',
@@ -126,6 +125,9 @@ describe('the commit a board says it landed', () => {
         `160000,${git(dir, 'rev-parse', 'HEAD')},vendor/lib`,
       );
       git(dir, 'commit', '-q', '-m', 'bump the submodule');
+      // Set after the commit: git before 2.40 (Debian 12) refuses a commit of only a submodule
+      // once it is on, which is no part of what this test checks.
+      git(dir, 'config', 'diff.ignoreSubmodules', 'all');
       const bumped = git(dir, 'rev-parse', '--short', 'HEAD');
       expect(refusal(bumped)).toBeUndefined();
     });
