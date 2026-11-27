@@ -356,7 +356,9 @@ function isZombie(pid: number, probe: ProcessProbe): boolean {
   return false;
 }
 
-export function processAlive(pid: number, probe: ProcessProbe = SYSTEM_PROBE): boolean {
+export function processAlive(pid: number, given?: ProcessProbe | number): boolean {
+  // Passed straight to every/some/filter, the second argument is the array index, not a probe.
+  const probe = typeof given === 'object' && given !== null ? given : SYSTEM_PROBE;
   try {
     process.kill(pid, 0);
   } catch (error) {

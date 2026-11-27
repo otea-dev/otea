@@ -12,6 +12,14 @@ describe('processAlive', () => {
     ...over,
   });
 
+  // CI on PR #651: `chain.every(alive)` with alive = processAlive passed the array index as the
+  // probe, and a timer threw «reading 'endsWith'» long after the test that set it.
+  it('works as an array callback, where the second argument is an index', () => {
+    expect([here].every(processAlive)).toBe(true);
+    expect([here, 2 ** 22 + 12345].some(processAlive)).toBe(true);
+    expect([2 ** 22 + 12345].filter(processAlive)).toEqual([]);
+  });
+
   it('is true for a process that runs, and false for one that does not exist', () => {
     expect(processAlive(here)).toBe(true);
     expect(processAlive(2 ** 22 + 12345)).toBe(false);
