@@ -75,7 +75,7 @@ async function open(offline: boolean, onSent = vi.fn()) {
         // As the app gives it while the PC does not answer: the session reads as read-only, and
         // the capture goes to the queue (app/data.ts).
         session: { canWrite: !offline, canConfigure: true, canManageDevices: true },
-        canCapture: queue.available,
+        canCapture: !offline || queue.available,
       })}
     >
       <NoteCapture onSent={onSent} />

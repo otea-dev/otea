@@ -70,7 +70,9 @@ export function NoteCapture({
     if (autoFocus) field.current?.focus({ preventScroll: true });
   }, [autoFocus]);
 
-  const canWrite = app.session.canWrite;
+  // Online as the session allows; while the computer does not answer the session reads read-only,
+  // and a note still goes to the queue (app.canCapture).
+  const canWrite = app.canCapture;
   const words = text.trim();
   const large = drafts.find(({ file }) => tooLarge(file));
   const ready = (words !== '' || drafts.length > 0) && !large && canWrite && !busy;
