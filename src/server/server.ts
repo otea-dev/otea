@@ -6,6 +6,7 @@ import { getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 import { agentDetail } from '../app/agent-detail.ts';
 import { promptFacts, promptKindOf, roleFacts } from '../app/agent-prompts.ts';
+import { landedAhead } from '../app/approval-wait.ts';
 import { askingItems, holderAsksOf } from '../app/asking.ts';
 import {
   answerBandeja,
@@ -732,6 +733,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
               boards.find((board) => board.collection === item.collection)?.def,
               item,
               events,
+              landedAhead(scan, item),
             );
             // Held by an agent whose question waits for you on another item (P7-R3-9).
             const holderAsks = holderAsksOf(asking, item, at);
@@ -819,6 +821,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
         let item: ReturnType<typeof showItem> & {
           setAside?: { by: string; at: string };
           holderAsks?: { by: string; item: string };
+          landsAfter?: { first: string; text: string; overlap?: true };
           fromMessages?: FromMessage[];
           fromBandeja?: FromBandeja;
         };
@@ -835,8 +838,21 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
         if (setAside) item = { ...item, setAside };
         item = {
           ...item,
-          ...stepFactsOf(liveBoardOf(project, item.collection)?.def, item, item.events),
+          ...stepFactsOf(
+            liveBoardOf(project, item.collection)?.def,
+            item,
+            item.events,
+            landedAhead(project, item),
+          ),
         };
+        // Approved and waiting for an overlapping item to land first: the page says which, as the
+        // list's row does.
+        const landsAfter = landWaitOf(
+          scanned(project),
+          requireItem(project.db, item.id),
+          new Date().toISOString(),
+        );
+        if (landsAfter) item = { ...item, landsAfter };
         const holderAsks = holderAsksOf(askingItems(project.db), item, new Date().toISOString());
         if (holderAsks) item = { ...item, holderAsks };
         // The turns of the conversation it came from: the page links back to them.

@@ -367,9 +367,13 @@ export type Chip = {
   // The state's word key; it asks you (`asks`) when an agent's question waits for your answer.
   state: StateWord;
   asks: boolean;
+  // The items an approved item waits for, or merges main after: the word names them.
+  first?: string;
 };
 
 export type StateWord =
+  | 'hablar.st.waits'
+  | 'hablar.st.merging'
   | 'hablar.st.working'
   | 'hablar.st.queued'
   | 'hablar.st.waiting'
@@ -398,11 +402,15 @@ export function chipOf(id: string, items: ReadonlyMap<string, Item>, now: number
       ? 'hablar.st.yours'
       : waits && item.setAside
         ? 'hablar.st.aside'
-        : item.landing
-          ? 'hablar.st.landing'
-          : item.bounced && look !== 'working'
-            ? 'hablar.st.bounced'
-            : (`hablar.st.${look}` as StateWord);
+        : item.landing && item.landsAfter?.overlap
+          ? 'hablar.st.waits'
+          : item.merging && look !== 'working'
+            ? 'hablar.st.merging'
+            : item.landing
+              ? 'hablar.st.landing'
+              : item.bounced && look !== 'working'
+                ? 'hablar.st.bounced'
+                : (`hablar.st.${look}` as StateWord);
   return {
     id,
     look,
@@ -410,6 +418,7 @@ export function chipOf(id: string, items: ReadonlyMap<string, Item>, now: number
     agent: look === 'working' ? (activeLease(item.lease, now)?.holder ?? null) : null,
     state,
     asks,
+    ...(state === 'hablar.st.waits' && item.landsAfter ? { first: item.landsAfter.first } : {}),
   };
 }
 

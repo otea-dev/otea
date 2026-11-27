@@ -38,6 +38,7 @@ import {
   updateItemContent,
   updateItemState,
 } from '../store/queries.ts';
+import { approvalData } from './approval-wait.ts';
 import { type Asks, askingItems, withAsks } from './asking.ts';
 import { assertPicked, type ChoiceInput, recordChoice } from './choices.ts';
 import { collectionNamed, getCollection, presetOf, typeOfItem } from './collections.ts';
@@ -523,6 +524,7 @@ export function landMove(
       from: item.state,
       to,
       ...stateNames(workflow, { from: item.state, to }),
+      ...(board ? approvalData(ctx, item, to, actor) : {}),
       ...data,
       ...trail,
     },

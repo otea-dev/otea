@@ -103,6 +103,7 @@ export type SubKey =
   | 'toca.sub.landsAfter'
   | 'toca.sub.setAside'
   | 'toca.sub.bounced'
+  | 'toca.sub.merging'
   | 'toca.sub.didIt'
   | 'toca.sub.closedBy'
   | 'toca.sub.closedByYou'
@@ -178,7 +179,14 @@ export function rowCall(item: Item, sec: TocaSection, ctx: TocaContext): RowCall
     }
     case 'encamino': {
       // Approved is not landed: it says so until an agent has merged it (U1, field study 4).
-      const act = item.landing ? t('boardView.approvedLanding') : onTheWay(item, ctx);
+      const act =
+        item.landing && item.landsAfter?.overlap
+          ? t('boardView.approvedWaits', { first: item.landsAfter.first })
+          : item.merging
+            ? t('boardView.approvedMerging')
+            : item.landing
+              ? t('boardView.approvedLanding')
+              : onTheWay(item, ctx);
       // Set aside for later: who did, never «espera a un agente» (P7-R3-1).
       if (item.setAside) return { act, sub: sub('toca.sub.setAside', item.setAside.by) };
       const holder = activeLease(item.lease, now)?.holder;
@@ -189,6 +197,8 @@ export function rowCall(item: Item, sec: TocaSection, ctx: TocaContext): RowCall
       if (silent) return { act, sub: sub('toca.sub.silent', silent.agent) };
       if (holder) return { act, sub: sub('toca.sub.does', holder) };
       // Taken back after it was approved: a change landed first and this one conflicted with it.
+      if (item.merging && !item.landsAfter?.overlap)
+        return { act, sub: sub('toca.sub.merging', item.merging.after.join(', ')) };
       if (item.bounced) return { act, sub: sub('toca.sub.bounced') };
       // Approved, and another item lands in its base first (the line is on its page).
       if (item.landsAfter) return { act, sub: sub('toca.sub.landsAfter', item.landsAfter.first) };

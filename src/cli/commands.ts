@@ -23,6 +23,7 @@ import {
   oldMcpEntry,
   writeAgentsMd,
 } from '../app/agents.ts';
+import { mergeFirstLines } from '../app/approval-wait.ts';
 import {
   askOnBandeja,
   bandejaOfItem,
@@ -1497,6 +1498,7 @@ const show: Command = {
         stray?.text,
         ...(mergeOnly ? [mergeOnlyText(shown.id, mergeOnly)] : []),
         ...sharing.map((overlap) => overlapText(shown.id, overlap)),
+        ...mergeFirstLines(project, shown),
       ].filter((line): line is string => line !== undefined);
       const said =
         heads.length === 0

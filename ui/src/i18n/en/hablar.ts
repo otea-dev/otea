@@ -75,6 +75,8 @@ export const hablar = {
   'hablar.st.aside': 'set aside',
   'hablar.st.landing': 'approved · not landed yet',
   'hablar.st.bounced': 'back after a conflict',
+  'hablar.st.waits': 'approved · waits for {first}',
+  'hablar.st.merging': 'approved · merging main',
   'hablar.st.done': 'done',
   'hablar.st.dropped': 'discarded',
   'hablar.st.yours': 'your turn',

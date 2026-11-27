@@ -430,6 +430,8 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
     byYou: !!closedBy?.doneByPerson,
     aside: item.setAside?.by,
     landing: item.landing,
+    waits: item.landsAfter?.overlap ? item.landsAfter.first : undefined,
+    merging: item.merging?.after,
     bounced: item.bounced ? item.bounced.reason : undefined,
     asksOn: item.holderAsks,
     gone: gone

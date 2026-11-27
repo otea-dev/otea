@@ -69,6 +69,8 @@ export const toca = {
   'toca.sub.landsAfter': 'se integra después de {agent}',
   'toca.sub.setAside': '{agent} lo dejó para más adelante',
   'toca.sub.bounced': 'volvió: chocó con otro cambio ya integrado',
+  'toca.sub.merging':
+    'su agente integra main en él tras {agent}; revisas esa integración una sola vez',
   'toca.sub.didIt': 'lo hizo {agent}',
   'toca.sub.closedBy': 'lo cerró {agent}',
   'toca.sub.closedByYou': 'cerrado por ti',

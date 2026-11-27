@@ -153,9 +153,13 @@ export function listaBlocks(entries: readonly Entry[], ctx: RowCtx): LaneBlock[]
     const word =
       it.merge === 'waiting'
         ? t('boardView.approvedUnmerged')
-        : it.landing
-          ? t('boardView.approvedLanding')
-          : stateWordIn(ctx.collection.types, it.state);
+        : it.landing && it.landsAfter?.overlap
+          ? t('boardView.approvedWaits', { first: it.landsAfter.first })
+          : it.merging
+            ? t('boardView.approvedMerging')
+            : it.landing
+              ? t('boardView.approvedLanding')
+              : stateWordIn(ctx.collection.types, it.state);
     const when = whenText(it, ctx.now);
     const stuck = isStuck(it, ctx.now);
     const round = roundOf(it, ctx.feed, typeOf(it, ctx.collection));

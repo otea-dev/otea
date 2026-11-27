@@ -399,6 +399,14 @@ export function selectEventsOfTypes(db: DatabaseSync, types: readonly string[]):
   return (db.prepare(sql).all(...types) as EventRow[]).map(toEvent);
 }
 
+// The moves that carry a key of their data (`waits` on an approval that waited for others,
+// `waited` on a return to merge main), in commit order: a read of what few events say, not of all.
+export function selectMovesWith(db: DatabaseSync, key: 'waits' | 'waited'): EventRecord[] {
+  const sql = `SELECT * FROM events WHERE type = 'transitioned'
+    AND json_extract(data, '$.${key}') IS NOT NULL ORDER BY id`;
+  return (db.prepare(sql).all() as EventRow[]).map(toEvent);
+}
+
 // What agents did on the boards lately: the newest claims, releases and moves of theirs, with the
 // collection of the item each was on. The newest `limit` events are read, whatever their age.
 export type AgentWork = {

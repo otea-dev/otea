@@ -114,6 +114,7 @@ import {
   selectRelationsOf,
   selectStateEntries,
 } from '../store/queries.ts';
+import { landedAhead, mergeAfterText, mergeFirstLines } from './approval-wait.ts';
 import { crowdCheck } from './board-workers.ts';
 import { collectionNamed } from './collections.ts';
 import type { Context } from './context.ts';
@@ -1407,9 +1408,16 @@ export function landWaitOf(
   ctx: Context,
   item: ItemRecord,
   at: string,
-): { first: string; text: string } | undefined {
+): { first: string; text: string; overlap?: true } | undefined {
   const first = landTurnFor(ctx, item, '', at);
-  return first ? { first: first.first, text: landsFirstLine(item.id, first) } : undefined;
+  return first
+    ? {
+        first: first.first,
+        text: landsFirstLine(item.id, first),
+        // They change the same files: the approval waits for it (app/approval-wait.ts).
+        ...(first.overlap ? { overlap: true as const } : {}),
+      }
+    : undefined;
 }
 
 // What next says of an item it offers without claiming it: for OFFER_MS no other agent is offered it.
@@ -1581,6 +1589,7 @@ export function nextFor(
       collection: board.collection,
       text: [
         textFor(ctx, item, board.def, at, agent, look),
+        ...mergeFirstLines(ctx, item),
         ...mergeLines(toMerge),
         ...(later === undefined ? [] : [later]),
         ...setAsideCount(ctx, boards, options.collection === undefined ? undefined : named),
@@ -1872,6 +1881,13 @@ export function handoffItem(
       ...(input.reason === undefined ? {} : { reason: input.reason }),
     });
     if (!result.ok) refuse(board.def, item, result, input.way, facts);
+    // An approval that waited for overlapping items does not land as it is once they landed: the
+    // person reviews the merge of main into it once (app/approval-wait.ts).
+    if (input.actor.kind === 'agent' && isClosed(result.to)) {
+      const ahead = landedAhead(ctx, item);
+      if (ahead.length > 0)
+        throw new OteaError('invalid_transition', mergeAfterText(ctx, item, ahead));
+    }
     // A file new this round with the bytes of the round before is taken, and said (P5-F1).
     const repeated =
       step && input.actor.kind === 'agent'

@@ -225,6 +225,8 @@ export const board = {
   'boardView.round': 'round {n}',
   'boardView.approvedUnmerged': 'Approved, not landed yet',
   'boardView.approvedLanding': 'Approved · not landed yet',
+  'boardView.approvedWaits': 'Approved · waits for {first}',
+  'boardView.approvedMerging': 'Approved · merging main',
   'boardView.merged': 'landed',
   'boardView.queued': 'queued',
   'boardView.blocked': { one: 'waits for {count} blocker', other: 'waits for {count} blockers' },

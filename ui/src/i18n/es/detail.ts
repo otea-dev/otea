@@ -450,6 +450,10 @@ export const detail = {
   'sheet.stand.workingAsks': '{agent} lo tiene, pero espera tu respuesta en {item}.',
   'sheet.stand.landing':
     'Aprobado, pero todavía no está integrado: hasta que un agente lo integre no está hecho.',
+  'sheet.stand.approvedWaits':
+    'Aprobado · espera a {item}, que cambia los mismos archivos y se integra antes. Después su agente integra main en él y revisas esa integración una sola vez.',
+  'sheet.stand.approvedMerging':
+    'Aprobado. {item} se integró antes, así que su agente está integrando main en él: revisas esa integración una sola vez y luego se integra.',
   'sheet.stand.bounced':
     'Volvió a su paso porque, ya aprobado, chocó con otro cambio que se integró antes: «{why}». Se revisa de nuevo.',
   'sheet.stand.bouncedPlain':

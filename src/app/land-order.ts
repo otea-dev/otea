@@ -3,6 +3,7 @@ import { guardedBranch, stepById, workedBase } from '../core/board/model.ts';
 import { activeLease } from '../core/lease.ts';
 import { timeText } from '../core/time.ts';
 import { type ItemRecord, selectItems, selectStateEntries } from '../store/queries.ts';
+import { mergeReturns } from './approval-wait.ts';
 import type { Context } from './context.ts';
 import {
   itemOnBoard,
@@ -51,6 +52,39 @@ function landingIn(
     base,
     work: works,
   };
+}
+
+// The base an item that came back to merge main (app/approval-wait.ts) still lands in, with the
+// key of that base in its repo; undefined when its board protects no branch.
+function keyOf(board: LiveBoard, item: ItemRecord): { key: string; base: string } | undefined {
+  const guard = guardedBranch(board.def);
+  if (!guard) return undefined;
+  const repo = guard.guard.repo === undefined ? '' : item.fields[guard.guard.repo];
+  const base = guard.guard.base ?? 'the base';
+  return { key: `${typeof repo === 'string' ? repo.toLowerCase() : ''}\0${base}`, base };
+}
+
+// The other items an approved item shares files with that are still to land: on a land step, or
+// back from one to merge main and not landed yet. They are what its approval waits for, however the
+// person's order puts them: whichever lands second must merge main with the other's change in it.
+export function overlapPeers(ctx: Context, item: ItemRecord): string[] {
+  const board = liveBoardOf(ctx, item.collection);
+  const own = board && landingIn(board, item);
+  if (!own) return [];
+  const scan = scanned(ctx);
+  const returned = mergeReturns(ctx);
+  return liveBoards(ctx).flatMap((each) =>
+    selectItems(ctx.db, { collection: each.collection }).flatMap((other) => {
+      if (other.id === item.id) return [];
+      const key =
+        landingIn(each, other)?.key ?? (returned.has(other.id) ? keyOf(each, other)?.key : '');
+      return key === own.key &&
+        setAsideBy(ctx, other.id) === undefined &&
+        sharedFiles(scan, item, other).length > 0
+        ? [other.id]
+        : [];
+    }),
+  );
 }
 
 // An item of a board that works straight on its base that is committed there and waits for the
@@ -127,18 +161,28 @@ export function landsFirst(
   if (item.lease?.holder === agent) return undefined;
   // A landing never waits for someone else's work in progress on the base (it could take hours,
   // with approved work held back); work waits for landings and for other work.
+  // An item that came back to merge main after it was approved (app/approval-wait.ts) goes before
+  // what overlaps it until the person has reviewed that merge and it landed: the others would land
+  // past it, and it would conflict again when it came back.
+  const returned = mergeReturns(ctx);
   const waiting = liveBoards(ctx).flatMap((each) =>
     selectItems(ctx.db, { collection: each.collection }).flatMap((other) => {
-      const there = other.id === item.id ? undefined : landingIn(each, other);
-      return there?.key === own.key && (own.work || !there.work)
-        ? [{ item: other, board: each }]
+      if (other.id === item.id) return [];
+      const there = landingIn(each, other);
+      const merging = returned.has(other.id);
+      if (there?.key === own.key && (own.work || !there.work))
+        return [{ item: other, board: each, on: true, merging }];
+      const held = there === undefined && merging ? keyOf(each, other) : undefined;
+      return held?.key === own.key && !own.work
+        ? [{ item: other, board: each, on: false, merging }]
         : [];
     }),
   );
   // A landing under way: another item of the base an agent holds, unless that agent's session
   // ended (a claim takes its lease over then, P3C-R3-11). A lease that ran out while its holder's
   // session runs is still its holder's: it may be at work on a long step with no otea call.
-  const landing = waiting.flatMap(({ item: other }) => {
+  const landing = waiting.flatMap(({ item: other, on }) => {
+    if (!on) return [];
     const lease = activeLease(other.lease, at);
     const holder =
       lease && !sessionEnded(ctx.db, lease.holder, () => at)
@@ -198,27 +242,36 @@ export function landsFirst(
   // the item's change on the base first, and when it came back it would conflict, another review
   // round. One set aside for later is parked, and parked holds nothing up.
   const scan = scanned(ctx);
+  // One that came back to merge main goes first whatever the order, but only for the files it
+  // shares with the item; and it waits for none of the others, which wait for it.
+  const comesBack = returned.has(item.id);
   const ahead = waiting
-    .filter(
-      ({ item: other, board: each }) =>
-        before(other, item) &&
-        (!committed || holdsBase(ctx, each, other)?.key === own.key) &&
-        (takeable(each, other) ||
-          (setAsideBy(ctx, other.id) === undefined && sharedFiles(scan, item, other).length > 0)),
+    .filter(({ item: other, board: each, merging }) =>
+      merging
+        ? setAsideBy(ctx, other.id) === undefined && sharedFiles(scan, item, other).length > 0
+        : !comesBack &&
+          before(other, item) &&
+          (!committed || holdsBase(ctx, each, other)?.key === own.key) &&
+          (takeable(each, other) ||
+            (setAsideBy(ctx, other.id) === undefined && sharedFiles(scan, item, other).length > 0)),
     )
-    .map(({ item: other, board: each }) => ({ other, each }));
+    .map(({ item: other, board: each, merging }) => ({ other, each, merging }));
   const winner = ahead.reduce<(typeof ahead)[number] | undefined>(
-    (best, now) => (best === undefined || before(now.other, best.other) ? now : best),
+    (best, now) =>
+      best === undefined ||
+      (now.merging !== best.merging ? now.merging : before(now.other, best.other))
+        ? now
+        : best,
     undefined,
   );
   if (!winner) return undefined;
-  const { other: first, each } = winner;
+  const { other: first, each, merging } = winner;
   const overlap = sharedFiles(scan, item, first);
   const blocked = takeable(each, first) ? undefined : heldUpText(ctx, each, first, item.id);
   return {
     first: first.id,
     base: own.base,
-    place: placeText(priority.get(first.id), own.work),
+    place: merging ? 'its merge comes first' : placeText(priority.get(first.id), own.work),
     ...(own.work ? { work: true as const } : {}),
     ...(overlap.length > 0 ? { overlap } : {}),
     ...(blocked ? { blocked } : {}),
@@ -229,6 +282,8 @@ export function landsFirst(
 // behind it. A parked item never gets here (set aside holds nothing up).
 function heldUpText(ctx: Context, board: LiveBoard, item: ItemRecord, waiting: string): string {
   const matrix = `move ${waiting} above ${item.id} on the Matrix`;
+  if (mergeReturns(ctx).has(item.id))
+    return `${item.id} came back to merge main and waits for the review of that merge before it lands: review it, or send it back to let ${waiting} go on`;
   if (itemOnBoard(ctx, item, board.def).asking)
     return `${item.id} waits for your answer to its question: answer it, ${matrix}, or have its agent set it aside`;
   const left = leftFor(ctx, item.id);

@@ -442,6 +442,10 @@ export const detail = {
   'sheet.stand.working': '{agent} is on it.',
   'sheet.stand.workingAsks': '{agent} has it, but waits for your answer on {item}.',
   'sheet.stand.landing': 'Approved, but not landed yet: until an agent lands it, it is not done.',
+  'sheet.stand.approvedWaits':
+    'Approved · waits for {item}, which changes the same files and lands first. Then its agent merges main into it and you review that merge once.',
+  'sheet.stand.approvedMerging':
+    'Approved. {item} landed first, so its agent is merging main into it: you review that merge once, and then it lands.',
   'sheet.stand.bounced':
     'It came back to its step because, once approved, it conflicted with another change that landed first: “{why}”. It goes through review again.',
   'sheet.stand.bouncedPlain':

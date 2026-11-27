@@ -541,6 +541,32 @@ describe('what a request produced', () => {
     expect(chipOf('CAM-18', items, NOW).state).toBe('hablar.st.bounced');
   });
 
+  // R3: an approval that overlaps one still to land says what it waits for, and one whose agent
+  // merges main after it landed is no bounce.
+  it('names what an approved item waits for, and says it catches up, never back after a conflict', () => {
+    const waits = item({
+      id: 'CAM-19',
+      turn: 'agent',
+      landing: true,
+      landsAfter: { first: 'CAM-17', text: 'waits', overlap: true },
+    });
+    const queue = item({
+      id: 'CAM-20',
+      turn: 'agent',
+      landing: true,
+      landsAfter: { first: 'CAM-17', text: 'lands after' },
+    });
+    const merging = item({ id: 'CAM-21', turn: 'agent', merging: { after: ['CAM-17'] } });
+    const items = byId(waits, queue, merging);
+
+    expect(chipOf('CAM-19', items, NOW)).toMatchObject({
+      state: 'hablar.st.waits',
+      first: 'CAM-17',
+    });
+    expect(chipOf('CAM-20', items, NOW).state).toBe('hablar.st.landing');
+    expect(chipOf('CAM-21', items, NOW).state).toBe('hablar.st.merging');
+  });
+
   it('lists the chips in the order the secretary linked them, and the questions that wait', () => {
     const items = byId(working, queued, asking);
     const [turn] = turnsOf([

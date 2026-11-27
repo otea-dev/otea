@@ -78,6 +78,8 @@ export const hablar = {
   'hablar.st.aside': 'apartado',
   'hablar.st.landing': 'aprobado · falta integrar',
   'hablar.st.bounced': 'volvió por un choque',
+  'hablar.st.waits': 'aprobado · espera a {first}',
+  'hablar.st.merging': 'aprobado · integra main',
   'hablar.st.done': 'hecho',
   'hablar.st.dropped': 'descartado',
   'hablar.st.yours': 'te toca',

@@ -73,6 +73,11 @@ export type BoardQueue = {
   // ones taken back to their step after approval with the reason the agent gave. Absent when none.
   landing?: string[];
   bounced?: { id: string; reason: string | null }[];
+  // Of the approved ones, those that wait for an overlapping change to land first (`first`), and
+  // those whose agent merges main into them because overlapping ones landed ahead (`after`): the
+  // person reviews that merge once. Neither is a bounce.
+  waits?: { id: string; first: string }[];
+  merging?: { id: string; after: string[] }[];
 };
 
 export type PendingSecretary = {

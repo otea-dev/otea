@@ -236,6 +236,8 @@ export const board = {
   'boardView.round': 'ronda {n}',
   'boardView.approvedUnmerged': 'Aprobado, falta integrar',
   'boardView.approvedLanding': 'Aprobado · falta integrar',
+  'boardView.approvedWaits': 'Aprobado · espera a {first}',
+  'boardView.approvedMerging': 'Aprobado · integra main',
   'boardView.merged': 'ya integrado',
   'boardView.queued': 'en cola',
   'boardView.blocked': {

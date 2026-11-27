@@ -161,6 +161,18 @@ describe('what the sheet reads from the item', () => {
 describe('the standfirst (mock:2670-2678)', () => {
   const base = { agent: 'Mender', round: 1, question: false, own: false, quiet: null };
 
+  // R3: an approval that overlaps another waits for it, and its merge round is no bounce.
+  it('says an approved item waits for the overlapping one, then merges main after it', () => {
+    expect(standOf({ ...base, look: 'queued', landing: true, waits: 'CAM-2' })).toEqual({
+      key: 'sheet.stand.approvedWaits',
+      item: 'CAM-2',
+    });
+    expect(
+      standOf({ ...base, look: 'queued', bounced: null, merging: ['CAM-2', 'CAM-3'] }),
+    ).toEqual({ key: 'sheet.stand.approvedMerging', item: 'CAM-2, CAM-3' });
+    expect(standOf({ ...base, look: 'queued', landing: true }).key).toBe('sheet.stand.landing');
+  });
+
   it('says who hands it to you, and in which round', () => {
     expect(standOf({ ...base, look: 'yours' })).toEqual({
       key: 'sheet.stand.handed',

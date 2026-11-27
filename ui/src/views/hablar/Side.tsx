@@ -28,7 +28,7 @@ function Kid({ chip }: { chip: Chip }) {
       ) : null}
       <span className="hb-kst" data-state={chip.state}>
         {chip.agent ? <AgentMark name={chip.agent} decorative /> : null}
-        {t(chip.state)}
+        {t(chip.state, { first: chip.first ?? '' })}
       </span>
     </>
   );

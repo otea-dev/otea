@@ -53,7 +53,7 @@ function ItemChip({ chip }: { chip: Chip }) {
       <Swap k={chip.state} className="hb-st" as="span">
         <span data-state={chip.state}>
           {chip.agent ? <AgentMark name={chip.agent} decorative /> : null}
-          {t(chip.state)}
+          {t(chip.state, { first: chip.first ?? '' })}
         </span>
       </Swap>
     </>

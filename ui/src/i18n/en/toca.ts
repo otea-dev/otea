@@ -64,6 +64,7 @@ export const toca = {
   'toca.sub.landsAfter': 'lands after {agent}',
   'toca.sub.setAside': '{agent} set it aside for later',
   'toca.sub.bounced': 'it came back: it conflicted with a change that landed first',
+  'toca.sub.merging': 'its agent merges main into it after {agent}; you review that merge once',
   'toca.sub.didIt': 'done by {agent}',
   'toca.sub.closedBy': 'closed by {agent}',
   'toca.sub.closedByYou': 'closed by you',

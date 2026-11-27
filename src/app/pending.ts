@@ -17,6 +17,7 @@ import { timeText } from '../core/time.ts';
 import { selectOpenQuestions } from '../store/conversation.ts';
 import { selectEvents, selectStateEntries } from '../store/queries.ts';
 import { selectOpenEscalations } from '../store/secretary.ts';
+import { landedAhead } from './approval-wait.ts';
 import { listBandeja } from './bandeja.ts';
 import { workerLimitOf, workersByBoard } from './board-workers.ts';
 import type { Context } from './context.ts';
@@ -263,13 +264,24 @@ function queuesOf(ctx: Context, items: readonly Item[], now: Clock): BoardQueue[
     const ids = mine.map(({ id }) => id);
     if (ids.length === 0) return [];
     // Approved is not landed, and a bounce says why (src/app/step-facts.ts).
-    const facts = mine.map((item) => ({
-      id: item.id,
-      ...stepFactsOf(def, item, selectEvents(ctx.db, item.id)),
-    }));
+    const scan = scanned(ctx);
+    const facts = mine.map((item) => {
+      const wait = landWaitOf(scan, item, at);
+      return {
+        id: item.id,
+        ...stepFactsOf(def, item, selectEvents(ctx.db, item.id), landedAhead(scan, item)),
+        // Approved while an overlapping change was still to land: it waits for it
+        // (approval-wait.ts).
+        first: wait?.overlap ? wait.first : undefined,
+      };
+    });
     const landing = facts.filter(({ landing: yes }) => yes).map(({ id }) => id);
     const bounced = facts.flatMap(({ id, bounced: back }) =>
       back ? [{ id, reason: back.reason }] : [],
+    );
+    const waits = facts.flatMap(({ id, first }) => (first === undefined ? [] : [{ id, first }]));
+    const merging = facts.flatMap(({ id, merging: after }) =>
+      after ? [{ id, after: after.after }] : [],
     );
     return [
       {
@@ -279,6 +291,8 @@ function queuesOf(ctx: Context, items: readonly Item[], now: Clock): BoardQueue[
         limit: workerLimitOf(def),
         ...(landing.length === 0 ? {} : { landing }),
         ...(bounced.length === 0 ? {} : { bounced }),
+        ...(waits.length === 0 ? {} : { waits }),
+        ...(merging.length === 0 ? {} : { merging }),
       },
     ];
   });
@@ -422,15 +436,37 @@ function lineOf(entry: PendingEntry): string {
 
 // A board's queue for a worker, and what the secretary does about it: nobody works it, launch one;
 // one works it, two items wait and the board takes another, launch the second without asking.
-function queueLine({ board, waiting, workers, limit, landing, bounced }: BoardQueue): string {
+function queueLine({
+  board,
+  waiting,
+  workers,
+  limit,
+  landing,
+  bounced,
+  waits,
+  merging,
+}: BoardQueue): string {
   const who = workers.length === 0 ? 'no worker' : `worked by ${workers.join(', ')}`;
+  const waitFor = new Map((waits ?? []).map(({ id, first }) => [id, first]));
+  const mergesAfter = new Map((merging ?? []).map(({ id, after }) => [id, after]));
   // Approved is not done: say which wait to land, and which came back after approval and why, in
   // plain words, so the person is never told they are done or lost.
   const notes = [
-    ...(landing ?? []).map(
-      (id) =>
-        ` ${id} approved, waiting to land (an agent merges it into main; it is not done yet).`,
-    ),
+    ...(landing ?? []).map((id) => {
+      const first = waitFor.get(id);
+      const after = mergesAfter.get(id);
+      if (first !== undefined)
+        return ` ${id} approved, waits for ${first} to land first (they change the same files); then its agent merges main into it and the person reviews that merge once. It is not done yet.`;
+      if (after !== undefined)
+        return ` ${id} approved; ${after.join(', ')} landed first, so its agent merges main into it and the person reviews that merge once before it lands. It is not done yet.`;
+      return ` ${id} approved, waiting to land (an agent merges it into main; it is not done yet).`;
+    }),
+    ...[...mergesAfter]
+      .filter(([id]) => !(landing ?? []).includes(id))
+      .map(
+        ([id, after]) =>
+          ` ${id} is merging main after ${after.join(', ')} landed ahead of it; it comes back for one review of that merge, which is not a bounce.`,
+      ),
     ...(bounced ?? []).map(
       ({ id, reason }) =>
         ` ${id} came back after approval: it conflicted with a change that landed first${reason ? ` (${quoteAgent(reason)})` : ''}, so an agent merges main into it and it goes through review again.`,
