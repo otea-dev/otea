@@ -1132,7 +1132,9 @@ describe('the secretary away, or never there', () => {
     expect(text(q(root, '.hb-away-line'))).toBe(
       'Tu secretario está desconectado · 2 mensajes esperan',
     );
-    expect(q(root, '.hb-away-line')?.getAttribute('data-tip')).toMatch(
+    // Since when, and that the messages are kept, once the line is opened.
+    await press(q(root, '.hb-away-toggle'));
+    expect(text(q(root, '.hb-away-since'))).toMatch(
       /^Tu secretario está desconectado desde .+\. Tus mensajes se guardan hasta que vuelva\./,
     );
   });

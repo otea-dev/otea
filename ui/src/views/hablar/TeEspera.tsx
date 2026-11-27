@@ -224,7 +224,7 @@ function AwayStrip({
   const here = waits(pending) ? pending : undefined;
   const sentence =
     away.waiting > 0 ? t('hablar.away.short', { count: away.waiting }) : t('hablar.away.shortNone');
-  // Since when, on hover: the line itself is short on purpose.
+  // Since when and that the messages are kept: under the line, which is short on purpose.
   const since = away.since
     ? t('hablar.away', { since: momentLabel(away.since, app.now) })
     : t('hablar.awayUnknown');
@@ -238,9 +238,7 @@ function AwayStrip({
           onClick={() => setOpen(!open)}
         >
           <i aria-hidden="true" />
-          <span className="hb-away-line" data-tip={since}>
-            {sentence}
-          </span>
+          <span className="hb-away-line">{sentence}</span>
           {here ? (
             <span className="hb-te-n" data-tip={t('hablar.te.title')}>
               <span className="visually-hidden">{t('hablar.te.title')} </span>
@@ -253,6 +251,7 @@ function AwayStrip({
       </div>
       {open ? (
         <div className="hb-away-body">
+          <p className="hb-away-since">{since}</p>
           {away.name ? <AwayHow name={away.name} /> : null}
           {here ? (
             <div className="hb-away-te">

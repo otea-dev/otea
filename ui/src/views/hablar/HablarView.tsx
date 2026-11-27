@@ -336,7 +336,9 @@ export function HablarView({
       if (performance.now() < (settling.get(box) ?? 0)) return;
       putBox(box, box.scrollHeight);
     });
-    observer.observe(inner);
+    // Its whole box: a toast's room at the foot is the thread's padding, which the content box
+    // does not see.
+    observer.observe(inner, { box: 'border-box' });
     // The box itself too: the composer growing under it takes room from the foot.
     observer.observe(box);
     return () => observer.disconnect();

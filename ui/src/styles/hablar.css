@@ -175,8 +175,14 @@
   margin: 0;
   padding-inline: 13px;
 }
+.hb-away-body > .hb-away-since {
+  margin: 0;
+  padding: 9px 13px 0;
+  font-size: 13px;
+  color: var(--ink);
+}
 .hb-away .hb-back {
-  padding-top: 9px;
+  padding-top: 4px;
   font-size: 13px;
   color: var(--ink-2);
 }
@@ -1807,12 +1813,16 @@ button.hb-kid:hover {
   }
 }
 /* a very narrow line gives its count of what waits to the opened part: the sentence needs the room */
-@media (max-width: 360px) {
+@media (max-width: 420px) {
   .hb-away-toggle .hb-te-n {
     display: none;
   }
   .hb-away-toggle {
-    padding-right: 88px;
+    padding-right: 92px;
+  }
+  .hb-away-line {
+    font-size: 13px;
+    line-height: 1.35;
   }
 }
 /* a narrow list: the chip's words go under its id and state, so the title keeps room */
