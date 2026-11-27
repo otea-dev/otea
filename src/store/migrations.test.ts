@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openDatabase } from './database.ts';
@@ -87,6 +88,40 @@ describe('migrate', () => {
     migrate(db);
 
     expect(userVersion(db)).toBe(52);
+  });
+
+  // The desk and the agents' commands open a project the moment an upgrade lands: one that read the
+  // version before another finished must not run what the other already did (a duplicate column).
+  it('runs nothing twice when another process migrated since it read the version', () => {
+    const path = join(String(process.env.OTEA_HOME), 'concurrent-open.db');
+    const first = openDatabase(path);
+    const second = openDatabase(path);
+    try {
+      migrate(first, 30);
+      const stale = Number(userVersion(second));
+      migrate(first);
+      let lagging = true;
+      // `second` read the version before `first` migrated the rest: its first read is the old one.
+      const slow = new Proxy(second, {
+        get(target, key) {
+          if (key === 'prepare') {
+            return (sql: string) => {
+              if (!lagging || sql !== 'PRAGMA user_version') return target.prepare(sql);
+              lagging = false;
+              return { get: () => ({ user_version: stale }) };
+            };
+          }
+          const value = Reflect.get(target, key);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+
+      expect(() => migrate(slow)).not.toThrow();
+      expect(userVersion(second)).toBe(52);
+    } finally {
+      first.close();
+      second.close();
+    }
   });
 
   describe('from version 40, which kept a language on the project', () => {
