@@ -106,15 +106,14 @@ export function whereOf(project: Pick<ProjectOverview, 'paths'>): string | undef
 // (`C:\Users\ana\AppData\Local\Temp\run\scratch\shop` reads «…/scratch/shop», not the whole way).
 // The full path is the tooltip's.
 export function placeOf(path: string): string {
-  const parts = path
-    .replace(/\\/g, '/')
-    .replace(/^[A-Za-z]:/, '')
-    .split('/')
-    .filter(Boolean);
+  const slashed = path.replace(/\\/g, '/');
+  const drive = /^[A-Za-z]:/.exec(slashed)?.[0] ?? '';
+  const parts = slashed.slice(drive.length).split('/').filter(Boolean);
   const homed = (parts[0] === 'Users' || parts[0] === 'home') && parts.length > 2;
   const names = homed ? parts.slice(2) : parts;
   if (names.length === 0) return path;
-  const start = homed ? '~/' : '/';
+  // The home folder is «~/»; any other place keeps its drive, if it has one.
+  const start = homed ? '~/' : `${drive}/`;
   return names.length <= 3
     ? `${start}${names.join('/')}`
     : `${start}…/${names.slice(-2).join('/')}`;
