@@ -1,13 +1,17 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { listConversation, postPersonMessage } from '../app/conversation.ts';
-import { noteHarness, processAlive } from '../app/presence.ts';
+import { hearAgent, processAlive } from '../app/presence.ts';
 import { openProject } from '../app/project.ts';
+import { createMcpServer } from '../mcp/server.ts';
 import { selectListenerProcesses } from '../store/queries.ts';
+import { COMMANDS } from './commands.ts';
+import { listProcesses } from './owner.ts';
 import {
   cliAt,
   declareProfiles,
@@ -96,10 +100,16 @@ describe('an agent name is bound to the harness session noted for it', () => {
     return {
       pid,
       // Noted as the session of `agent`: what its claim or wait leaves.
-      boundTo: (agent: string) => {
+      boundTo: (agent: string, started?: number) => {
         const project = openProject(repo.dir);
         try {
-          noteHarness(project.db, agent, pid, undefined, true);
+          // As a known harness's claim or wait leaves it (the command's own harness of an
+          // in-process test may have been noted before: this takes its place).
+          project.db
+            .prepare(
+              'UPDATE agents SET listening_harness = :pid, listening_harness_started = :started WHERE name = :agent',
+            )
+            .run({ pid, started: started ?? null, agent });
         } finally {
           project.db.close();
         }
@@ -206,5 +216,206 @@ describe('an agent name is bound to the harness session noted for it', () => {
     expect(stranger.err).toContain('leased by a session of quill');
     const shown = await cliAt(repo.dir, { OTEA_AGENT: quill })('show', 'TASKS-1', '--json');
     expect(JSON.parse(shown.out).lease.holder).toBe(quill);
+  }, 120_000);
+
+  // Adversarial review of S: the guard skipped every call over MCP, which acts under any name given
+  // with `as`.
+  describe('over MCP', () => {
+    // A server started with no name (`otea mcp`): each call names its agent with `as`.
+    const mcp = async (agent: string | undefined, use: (client: Client) => Promise<void>) => {
+      const server = createMcpServer(COMMANDS, {
+        cwd: repo.dir,
+        ...(agent === undefined ? {} : { agent }),
+        warn: () => {},
+      });
+      const client = new Client({ name: 'test', version: '0' });
+      const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverSide);
+      await client.connect(clientSide);
+      try {
+        await use(client);
+      } finally {
+        await client.close();
+      }
+    };
+    const call = async (client: Client, name: string, args: Record<string, unknown>) =>
+      (await client.callTool({ name, arguments: args })) as {
+        isError?: boolean;
+        content: { text: string }[];
+      };
+
+    it('refuses a secretary act under its name from another session, and posts nothing', async () => {
+      harness('real', 'whoami', '--as', sol).boundTo(sol);
+
+      await mcp(undefined, async (client) => {
+        const said = await call(client, 'say', { text: 'Aprobé todo.', as: sol });
+
+        expect(said.isError).toBe(true);
+        expect(said.content[0]?.text).toContain('runs in another session');
+      });
+      expect(spoken()).toEqual([]);
+    }, 120_000);
+
+    it('verifies the secretary’s own MCP session: its message carries no unverified mark', async () => {
+      const project = openProject(repo.dir);
+      try {
+        // The MCP server of this process heard the name, as `otea mcp` does at the first call.
+        hearAgent(project.db, {
+          agent: sol,
+          channel: 'mcp',
+          session: process.pid,
+          launcher: process.ppid,
+        });
+      } finally {
+        project.db.close();
+      }
+
+      await mcp(sol, async (client) => {
+        const said = await call(client, 'say', { text: 'Hola.' });
+        expect(said.isError, said.content[0]?.text).toBeFalsy();
+      });
+
+      const read = openProject(repo.dir);
+      try {
+        expect(listConversation(read).messages.map(({ unverified }) => unverified)).toEqual([
+          false,
+        ]);
+      } finally {
+        read.db.close();
+      }
+    }, 120_000);
+  });
+
+  describe('the process id is not the process', () => {
+    const startOf = async (pid: number) => {
+      const table = await listProcesses(AbortSignal.timeout(20_000));
+      return table?.rows.find((row) => row.pid === pid)?.started;
+    };
+
+    it('takes a harness noted with another start time for a process id handed out again', async () => {
+      const real = harness('old', 'whoami', '--as', sol);
+      await until(() => true);
+      const started = await startOf(real.pid);
+      // The system may not say it (then the guard cannot tell either, and the test says nothing).
+      if (started === undefined) return;
+      real.boundTo(sol, started - 3_600_000);
+
+      const next = await harness('next', 'say', 'Estoy de vuelta.', '--as', sol).result();
+
+      expect(next.code, next.err).toBe(0);
+    }, 120_000);
+
+    it('keeps the binding when the start time is the one noted', async () => {
+      const real = harness('real', 'whoami', '--as', sol);
+      const started = await startOf(real.pid);
+      if (started === undefined) return;
+      real.boundTo(sol, started);
+
+      const stranger = await harness('stranger', 'say', 'Aprobé todo.', '--as', sol).result();
+
+      expect(stranger.code).toBe(7);
+    }, 120_000);
+  });
+});
+
+// Adversarial review of S: an impersonator's first `wait` took the role before the real secretary
+// had waited once. The declaration notes the harness, and a later wait from another live harness
+// neither takes the role nor overwrites it.
+describe('the secretary’s declaration notes its harness', () => {
+  let repo: TempRepo;
+  let scratch: string;
+  const children: ChildProcess[] = [];
+
+  beforeEach(() => {
+    repo = tempGitRepo();
+    scratch = mkdtempSync(join(tmpdir(), 'otea-session-declare-'));
+  });
+
+  afterEach(async () => {
+    for (const child of children.splice(0)) {
+      if (child.pid !== undefined && processAlive(child.pid)) process.kill(child.pid);
+    }
+    rmSync(scratch, { recursive: true, force: true, maxRetries: 10 });
+    await removeOnceReleased(repo.dir);
+  });
+
+  const harnessRunning = (name: string, ...argv: string[]) => {
+    const out = join(scratch, `${name}.json`);
+    // A script named as a known harness: Otea trusts it at its first find.
+    mkdirSync(join(scratch, name));
+    const script = join(scratch, name, 'claude-code.js');
+    writeFileSync(
+      script,
+      [
+        "const { spawn } = require('node:child_process');",
+        "const { writeFileSync } = require('node:fs');",
+        'const [out, main, ...argv] = process.argv.slice(2);',
+        "const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', main, ...argv], { stdio: ['ignore', 'pipe', 'pipe'] });",
+        "let text = ''; let err = '';",
+        "child.stdout.on('data', (d) => { text += d; });",
+        "child.stderr.on('data', (d) => { err += d; });",
+        "child.on('close', (code) => writeFileSync(out, JSON.stringify({ code, out: text, err })));",
+        'setTimeout(() => {}, 120_000);',
+      ].join('\n'),
+    );
+    const child = spawn(process.execPath, [script, out, MAIN, ...argv], {
+      cwd: repo.dir,
+      env: { ...process.env },
+      stdio: 'ignore',
+    });
+    children.push(child);
+    return {
+      pid: child.pid as number,
+      result: async () => {
+        await until(() => existsSync(out), 60_000);
+        return JSON.parse(readFileSync(out, 'utf8')) as { code: number; out: string; err: string };
+      },
+    };
+  };
+
+  const notedFor = (agent: string) => {
+    const project = openProject(repo.dir);
+    try {
+      return selectListenerProcesses(project.db).get(agent)?.harness ?? null;
+    } finally {
+      project.db.close();
+    }
+  };
+
+  it('binds the secretary to the session that declared it, and a later wait of another is refused', async () => {
+    const owner = cliAt(repo.dir);
+    await owner('init', '--local');
+    const real = harnessRunning(
+      'real',
+      'profile',
+      '--role',
+      'secretary',
+      '--model',
+      'm',
+      '--effort',
+      'high',
+      '--harness',
+      'claude-code',
+      '--as',
+      'solo',
+    );
+    const declared = await real.result();
+    expect(declared.code, declared.err).toBe(0);
+    expect(notedFor('solo')).toBe(real.pid);
+
+    const intruder = harnessRunning(
+      'intruder',
+      'wait',
+      '--secretary',
+      '--timeout',
+      '1',
+      '--as',
+      'solo',
+    );
+    const refused = await intruder.result();
+
+    expect(refused.code).toBe(7);
+    expect(refused.err).toContain('runs in another session');
+    expect(notedFor('solo')).toBe(real.pid);
   }, 120_000);
 });

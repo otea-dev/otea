@@ -871,21 +871,30 @@ export function selectListening(db: DatabaseSync): Map<string, string> {
 // by name (`known`: claude, codex...) is no intermediary and is trusted at the first find, so a
 // killed session still reads offline within seconds. No column: a negative id is read as «not
 // trusted yet» (selectListenerProcesses).
-export function saveHarness(db: DatabaseSync, agent: string, pid: number, known = false): void {
+export function saveHarness(
+  db: DatabaseSync,
+  agent: string,
+  pid: number,
+  known = false,
+  // When the process started (epoch ms): kept with its id, to tell it from another that got the
+  // same id later.
+  started?: number,
+): void {
   const row = db
     .prepare('SELECT listening_harness AS harness FROM agents WHERE name = :agent')
     .get({ agent }) as { harness: number | null } | undefined;
   const next = known || row?.harness === pid || row?.harness === -pid ? pid : -pid;
   db.prepare(
-    'UPDATE agents SET listening_harness = :next WHERE name = :agent AND listening_session IS NULL',
-  ).run({ agent, next });
+    `UPDATE agents SET listening_harness = :next, listening_harness_started = :started
+      WHERE name = :agent AND listening_session IS NULL`,
+  ).run({ agent, next, started: started ?? null });
 }
 
 // Forgets a harness noted for the command line once it is gone: the agent speaking again is another
 // session of it (a restart under the same name), which notes its own with its next wait.
 export function forgetHarness(db: DatabaseSync, agent: string, pid: number): void {
   db.prepare(
-    `UPDATE agents SET listening_harness = NULL
+    `UPDATE agents SET listening_harness = NULL, listening_harness_started = NULL
       WHERE name = :agent AND listening_session IS NULL AND listening_harness = :pid`,
   ).run({ agent, pid });
 }
@@ -895,6 +904,8 @@ export type ListenerProcesses = {
   waiter: number | null;
   // Only a command-line agent's: see saveHarness.
   harness: number | null;
+  // When that process started (epoch ms), when it was noted with it.
+  harnessStarted: number | null;
 };
 
 // The processes each agent was last heard listening through: its MCP server, its running wait, and
@@ -902,7 +913,8 @@ export type ListenerProcesses = {
 export function selectListenerProcesses(db: DatabaseSync): Map<string, ListenerProcesses> {
   const rows = db
     .prepare(
-      `SELECT name, listening_session, listening_waiter, listening_harness FROM agents
+      `SELECT name, listening_session, listening_waiter, listening_harness,
+              listening_harness_started FROM agents
         WHERE listening_session IS NOT NULL OR listening_waiter IS NOT NULL
           OR listening_harness > 0`,
     )
@@ -911,6 +923,7 @@ export function selectListenerProcesses(db: DatabaseSync): Map<string, ListenerP
     listening_session: number | null;
     listening_waiter: number | null;
     listening_harness: number | null;
+    listening_harness_started: number | null;
   }[];
   return new Map(
     rows.map((row) => [
@@ -923,6 +936,7 @@ export function selectListenerProcesses(db: DatabaseSync): Map<string, ListenerP
           row.listening_session === null && (row.listening_harness ?? 0) > 0
             ? row.listening_harness
             : null,
+        harnessStarted: row.listening_harness_started,
       },
     ]),
   );

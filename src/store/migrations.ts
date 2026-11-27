@@ -659,6 +659,12 @@ export const MIGRATIONS = [
   ALTER TABLE conversation_messages ADD COLUMN closed_at TEXT;
   ALTER TABLE conversation_messages ADD COLUMN closed_why TEXT;
   `,
+  // The start time (epoch ms, to the second) of the harness process noted for an agent, kept with
+  // its id: a process id the system hands out again is another process, and the binding of a name
+  // to its session (adversarial review of S) compares both.
+  `
+  ALTER TABLE agents ADD COLUMN listening_harness_started INTEGER;
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {

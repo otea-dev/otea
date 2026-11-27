@@ -611,11 +611,13 @@
 }
 /* a message of the secretary's that Otea could not tie to its session */
 .hb-unverified {
-  padding: 0 6px;
-  border: 1px solid var(--line, currentColor);
+  padding: 1px 8px;
+  border: 1px solid var(--warn);
   border-radius: 8px;
-  font-size: 11px;
-  color: var(--ink-2);
+  background: color-mix(in oklch, var(--warn) 14%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warn);
 }
 @keyframes hb-sweep {
   0% {

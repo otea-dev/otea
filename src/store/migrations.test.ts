@@ -59,7 +59,7 @@ describe('migrate', () => {
         'bandeja_questions',
       ]),
     );
-    expect(userVersion(db)).toBe(51);
+    expect(userVersion(db)).toBe(52);
   });
 
   // Cold review G2: what answers a message, and the notes and turns of an item by its id, were
@@ -86,7 +86,7 @@ describe('migrate', () => {
     migrate(db);
     migrate(db);
 
-    expect(userVersion(db)).toBe(51);
+    expect(userVersion(db)).toBe(52);
   });
 
   describe('from version 40, which kept a language on the project', () => {

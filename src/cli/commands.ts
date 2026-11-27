@@ -2835,7 +2835,10 @@ async function lookUpWorkerHarness(input: Input, me: string): Promise<void> {
     return;
   }
   const known = isKnownHarness(table.rows, pid);
-  withProject(input.cwd, (project) => noteHarness(project.db, me, pid, systemClock, known));
+  const started = table.rows.find((row) => row.pid === pid)?.started;
+  withProject(input.cwd, (project) =>
+    noteHarness(project.db, me, pid, systemClock, known, started),
+  );
 }
 
 // The secretary's wait (otea wait --secretary): returns for a message from the person, a Bandeja
@@ -2869,16 +2872,18 @@ async function waitForSecretary(input: Input): Promise<Output> {
   };
   const result = await withAgentWhile(input, async (project) => {
     requireSecretary(project.db, me);
-    const noted = Promise.all([owner.harness, owner.harnessKnown]).then(([pid, known]) => {
-      if (pid === undefined || pid === process.pid) return;
-      try {
-        // A harness known by name is the session at once; any other process is a candidate until
-        // a second wait finds it too (it may be an intermediary that ends with its command).
-        noteHarness(project.db, me, pid, systemClock, known);
-      } catch {
-        // The wait ended and closed the project first: nothing left to note it for.
-      }
-    });
+    const noted = Promise.all([owner.harness, owner.harnessKnown, owner.harnessStarted]).then(
+      ([pid, known, started]) => {
+        if (pid === undefined || pid === process.pid) return;
+        try {
+          // A harness known by name is the session at once; any other process is a candidate until
+          // a second wait finds it too (it may be an intermediary that ends with its command).
+          noteHarness(project.db, me, pid, systemClock, known, started);
+        } catch {
+          // The wait ended and closed the project first: nothing left to note it for.
+        }
+      },
+    );
     // A board the person publishes while it waits joins the catalog before the check reads its items.
     const secretaryWait = startSecretaryWait();
     const look = () => {
@@ -2947,14 +2952,16 @@ const wait: Command = {
       const me = input.actor.name;
       // A worker's harness session is noted once the owner watch has read the processes (H2).
       if (workerHarnessUnknown(project, input)) {
-        void Promise.all([owner.harness, owner.harnessKnown]).then(([pid, known]) => {
-          if (pid === undefined || pid === process.pid) return;
-          try {
-            noteHarness(project.db, me, pid, systemClock, known);
-          } catch {
-            // The wait ended and closed the project first: nothing left to note it for.
-          }
-        });
+        void Promise.all([owner.harness, owner.harnessKnown, owner.harnessStarted]).then(
+          ([pid, known, started]) => {
+            if (pid === undefined || pid === process.pid) return;
+            try {
+              noteHarness(project.db, me, pid, systemClock, known, started);
+            } catch {
+              // The wait ended and closed the project first: nothing left to note it for.
+            }
+          },
+        );
       }
       // An agent waiting for unclaimed agent work wakes only for an item next would offer it: one left for
       // or just offered to another agent would wake it to "nothing to do" again and again.

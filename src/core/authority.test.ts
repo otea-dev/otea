@@ -86,11 +86,10 @@ describe('availableMoves', () => {
 });
 
 describe('relayableMoves', () => {
-  it('lists the human moves a relayed decision may take from a state, once per target', () => {
-    expect(relayableMoves(tasks, 'review')).toEqual([
-      { to: 'discarded', by: 'human', reasonRequired: true, turn: 'none', closes: 'discarded' },
-    ]);
-    expect(relayableMoves(tasks, 'incomplete').map(({ to }) => to)).toEqual(['discarded']);
+  it('never lists a move that drops or finishes: that is the person’s tap, not a relayed sentence', () => {
+    // Tasks' only human move from review is the discard.
+    expect(relayableMoves(tasks, 'review')).toEqual([]);
+    expect(relayableMoves(tasks, 'incomplete')).toEqual([]);
   });
 
   it('offers nothing where every move belongs to the agent or the web UI', () => {

@@ -13,6 +13,9 @@ export type ProcessRow = {
   name: string;
   path?: string;
   command?: string;
+  // When it started (epoch ms, to the second), when the system says it: a process id handed out
+  // again is another process.
+  started?: number;
 };
 
 // The programs that only run a command for someone else: a harness runs `otea` through them (its
@@ -69,6 +72,18 @@ const WRAPPERS = new Set([
   'pnpm',
   'yarn',
   'winpty',
+  // Launchers of a script or a task a harness runs for its agent: they end with their command.
+  'python',
+  'python3',
+  'pythonw',
+  'py',
+  'uv',
+  'uvx',
+  'pipx',
+  'make',
+  'gmake',
+  'just',
+  'bunx',
 ]);
 
 // The program a process runs, by its name: `npm exec otea` (a process title) is npm.
@@ -149,15 +164,19 @@ export function isKnownHarness(rows: readonly ProcessRow[], pid: number): boolea
 // file follow, when Windows says it.
 export function readProcessTable(text: string): ProcessRow[] {
   return text.split(/\r?\n/).flatMap((line) => {
-    const match = /^\s*(\d+)\s+(\d+)\s+([^\t]+?)\s*(?:\t([^\t]*)(?:\t(.*?))?)?\s*$/.exec(line);
+    // A start time may close the line: a tab, @ and epoch milliseconds.
+    const match =
+      /^\s*(\d+)\s+(\d+)\s+([^\t]+?)\s*(?:\t([^\t]*)(?:\t(.*?))?)?(?:\t@(\d+))?\s*$/.exec(line);
     if (!match) return [];
-    const [, pid, parent, name, path, command] = match;
+    const [, pid, parent, name, path, command, started] = match;
     const row: ProcessRow = { pid: Number(pid), parent: Number(parent), name: name as string };
     return [
       {
         ...row,
         ...(path?.trim() ? { path: path.trim() } : {}),
         ...(command?.trim() ? { command: command.trim() } : {}),
+        // 0: the system did not say.
+        ...(started === undefined || Number(started) === 0 ? {} : { started: Number(started) }),
       },
     ];
   });
@@ -173,6 +192,20 @@ export function withCommands(rows: readonly ProcessRow[], text: string): Process
   return rows.map((row) => {
     const command = commands.get(row.pid);
     return command === undefined ? row : { ...row, command };
+  });
+}
+
+// The rows with the start time of each, from lines of "pid <start as ps -o lstart= prints it>".
+export function withStarts(rows: readonly ProcessRow[], text: string): ProcessRow[] {
+  const starts = new Map<number, number>();
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^\s*(\d+)\s+(.+?)\s*$/.exec(line);
+    const at = match ? Date.parse(match[2] as string) : Number.NaN;
+    if (match && !Number.isNaN(at)) starts.set(Number(match[1]), Math.floor(at / 1000) * 1000);
+  }
+  return rows.map((row) => {
+    const started = starts.get(row.pid);
+    return started === undefined ? row : { ...row, started };
   });
 }
 
@@ -217,7 +250,7 @@ export function withPosixParents(
 }
 
 const WINDOWS_LISTING =
-  "Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine | ForEach-Object { \"$($_.ProcessId) $($_.ParentProcessId) $($_.Name)`t$($_.ExecutablePath)`t$(($_.CommandLine -replace '[\\t\\r\\n]+', ' '))\" }";
+  "Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine,CreationDate | ForEach-Object { \"$($_.ProcessId) $($_.ParentProcessId) $($_.Name)`t$($_.ExecutablePath)`t$(($_.CommandLine -replace '[\\t\\r\\n]+', ' '))`t@$(if ($_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeSeconds() * 1000 } else { 0 })\" }";
 
 // The busy Windows runner answered WMI after 20 s; the owner check waits for it in the background.
 const LISTING_TIMEOUT_MS = 60_000;
@@ -289,7 +322,10 @@ export async function listProcesses(
     // tells it from any node (isKnownHarness). Without it the rows are still good.
     const commands = await run('ps', ['-A', '-o', 'pid=,args='], signal, () => {});
     const rows = readProcessTable(out);
-    return { rows: commands === undefined ? rows : withCommands(rows, commands), complete: true };
+    const named = commands === undefined ? rows : withCommands(rows, commands);
+    // When each started, from a third listing: a process id handed out again is another process.
+    const starts = await run('ps', ['-A', '-o', 'pid=,lstart='], signal, () => {});
+    return { rows: starts === undefined ? named : withStarts(named, starts), complete: true };
   }
   const out = await run(
     'powershell.exe',
@@ -319,6 +355,8 @@ export type OwnerWatch = {
   harness: Promise<number | undefined>;
   // Whether that process is a harness known by name (isKnownHarness); false while unknown.
   harnessKnown: Promise<boolean>;
+  // When that process started (epoch ms), when the system says.
+  harnessStarted: Promise<number | undefined>;
   // Ends an early listing still running (a watch started with `early` leaves it to its caller).
   release: () => void;
 };
@@ -355,6 +393,7 @@ export function watchOwner(
   parent.addEventListener('abort', onAbort, { once: true });
   const harness = Promise.withResolvers<number | undefined>();
   const known = Promise.withResolvers<boolean>();
+  const started = Promise.withResolvers<number | undefined>();
   const look = () => {
     if (listed) return;
     listed = true;
@@ -363,6 +402,7 @@ export function watchOwner(
       const pid = table ? harnessOf(table.rows, start) : undefined;
       harness.resolve(pid);
       known.resolve(table !== undefined && pid !== undefined && isKnownHarness(table.rows, pid));
+      started.resolve(table?.rows.find((row) => row.pid === pid)?.started);
     });
   };
   const timer = setInterval(() => {
@@ -379,6 +419,7 @@ export function watchOwner(
     listing.abort();
     harness.resolve(undefined);
     known.resolve(false);
+    started.resolve(undefined);
   };
   const stop = () => {
     clearInterval(timer);
@@ -396,6 +437,7 @@ export function watchOwner(
     started: start,
     harness: harness.promise,
     harnessKnown: known.promise,
+    harnessStarted: started.promise,
     release,
   };
 }

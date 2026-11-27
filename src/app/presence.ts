@@ -228,8 +228,16 @@ export function noteHarness(
   now: Clock = systemClock,
   // A harness known by name (claude, codex...): the session itself, trusted at the first find.
   known = false,
+  // When that process started (epoch ms), kept with its id.
+  started?: number,
+  alive: (pid: number) => boolean = processAlive,
 ): void {
-  saveHarness(db, agent, pid, known);
+  // The harness noted for a name that runs is not replaced by another's: a session that waits under
+  // the name of another live one (an impersonator's first wait) leaves the binding as it is, and is
+  // refused at its acts (cli/session-guard.ts). A new session takes over once that one is gone.
+  const bound = selectListenerProcesses(db).get(agent)?.harness ?? null;
+  if (bound !== null && bound !== pid && alive(bound)) return;
+  saveHarness(db, agent, pid, known, started);
   beatProcess(db, pid, now);
 }
 

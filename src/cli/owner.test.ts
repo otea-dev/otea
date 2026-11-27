@@ -64,6 +64,34 @@ describe('the processes that own a command', () => {
     expect(harnessOf(rows, 400)).toBe(700);
   });
 
+  // A harness may run otea from a script or a task: python, uv or make end with their command, so
+  // the harness is above them (adversarial review of S: the binding compares harnesses).
+  it.each(['python3', 'uv', 'make', 'py'])(
+    'walks up past %s, which ends with its command',
+    (launcher) => {
+      const rows = readProcessTable(
+        [
+          '700 1 claude\t/usr/bin/claude\tclaude',
+          '600 700 bash\t/bin/bash\tbash -c run',
+          `500 600 ${launcher}\t/usr/bin/${launcher}\t${launcher} run.py`,
+          '400 500 sh\t/bin/sh\tsh -c otea say',
+        ].join('\n'),
+      );
+
+      expect(harnessOf(rows, 400)).toBe(700);
+    },
+  );
+
+  it('reads the start time a listing gives, to the second, and none when the system gives 0', () => {
+    const rows = readProcessTable(
+      '700 1 claude\t/usr/bin/claude\tclaude\t@1764237600000\n600 700 sh\t/bin/sh\tsh -c x\t@0',
+    );
+
+    expect(rows[0]).toMatchObject({ pid: 700, command: 'claude', started: 1764237600000 });
+    expect(rows[1]).not.toHaveProperty('started');
+    expect(rows[1]?.command).toBe('sh -c x');
+  });
+
   it('takes node itself for the harness when it runs something that is no package runner', () => {
     const rows = readProcessTable(
       [
