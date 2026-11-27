@@ -11,6 +11,7 @@ import { isAgentName } from '../core/item.ts';
 import { activeLease, DEFAULT_LEASE_TTL_MS, leaseExpiry } from '../core/lease.ts';
 import { pathKey } from '../core/path-key.ts';
 import type { AgentRole } from '../core/secretary.ts';
+import { resetOwed } from '../store/conversation.ts';
 import {
   clearListening,
   clearWaiter,
@@ -239,6 +240,10 @@ export function noteHarness(
   if (bound !== null && bound !== pid && alive(bound)) return;
   saveHarness(db, agent, pid, known, started);
   beatProcess(db, pid, now);
+  // The secretary's session is another one: the messages the earlier sessions read and left
+  // unanswered are owed to it again, however many times they were told (a session that never
+  // declares the role again would otherwise find the returns used up).
+  if (bound !== pid && selectRoles(db).get(agent) === 'secretary') resetOwed(db);
 }
 
 // An agent speaks again: the harness noted for it that ended means another session of it (the same

@@ -305,6 +305,14 @@ describe('the role prompts', () => {
       expect(text).toContain('--reply-to <');
     });
 
+    // T1a: a session that died after reading a message and before answering it leaves it unanswered:
+    // the next session reads the conversation before it waits.
+    it(`has a new session read the conversation before it waits (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, {});
+      const listen = text.slice(text.search(/\n2\. /), text.search(/\n3\. /));
+      expect(listen).toContain('otea conversation --as <');
+    });
+
     // Field study 3: a secretary told to always reply to a message put its news under old messages
     // and changed the kind of the person's turns. News is a message of its own.
     it(`says its own news as a message with no --reply-to, and acts at once on a kind the person changed (${lang})`, () => {

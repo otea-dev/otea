@@ -7,6 +7,7 @@ import {
   sayAsSecretary,
 } from './conversation.ts';
 import { createItem } from './items.ts';
+import { noteHarness } from './presence.ts';
 import type { Project } from './project.ts';
 import { declareSecretary, secretaryWake, startSecretaryWait } from './secretary.ts';
 import { memoryContext, projectOf } from './testing.ts';
@@ -83,6 +84,20 @@ describe('a message the secretary read and did not answer is owed', () => {
     }).id;
     linkMessageToItem(project, 'sol', message.id, item, clock(5000));
     expect(waitAt(60_000)).toBeUndefined();
+  });
+
+  // T1a: a new session that never declares the role again (a harness restarted under the same name)
+  // is the next one to be told, whatever the sessions before it were told: the one noted for the
+  // secretary is another harness now.
+  it('comes back to a new harness session even after the earlier ones used up the returns', () => {
+    const message = written('gracias', 1000);
+    noteHarness(project.db, 'sol', 4001, clock(1500), true, 1, () => true);
+    for (let n = 0; n < 5; n++) waitAt(60_000 + n);
+    expect(waitAt(120_000)).toBeUndefined();
+
+    // Its harness is gone; a session under another one takes the name over.
+    noteHarness(project.db, 'sol', 4002, clock(130_000), true, 2, () => false);
+    expect(waitAt(140_000)).toMatchObject({ kind: 'person_message', ref: String(message.id) });
   });
 
   it('is let go after a few returns when the same session leaves it', () => {
