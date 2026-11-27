@@ -1,9 +1,11 @@
 import { isClosed, positionOf } from '../core/board/engine.ts';
+import { DONE } from '../core/board/model.ts';
 import { messageSnippet } from '../core/conversation.ts';
 import { activeLease } from '../core/lease.ts';
 import {
   type BoardQueue,
   type Pending,
+  type PendingDone,
   type PendingEntry,
   type PendingKind,
   pendingCounts,
@@ -313,6 +315,23 @@ function workerEntries(
   });
 }
 
+// How far back «what got done» looks.
+const DONE_FOR_MS = 24 * 60 * 60_000;
+
+function doneOf(ctx: Context, items: readonly Item[], now: Clock): PendingDone[] {
+  const since = Date.parse(now()) - DONE_FOR_MS;
+  const entered = selectStateEntries(ctx.db);
+  return items
+    .flatMap((item) => {
+      const position = positionOf(item.state);
+      const at = entered.get(item.id) ?? item.createdAt;
+      return isClosed(position) && position.closed === DONE && Date.parse(at) >= since
+        ? [{ id: item.id, title: item.title, at }]
+        : [];
+    })
+    .sort((a, b) => a.at.localeCompare(b.at));
+}
+
 export function pendingOf(
   ctx: Context,
   now: Clock = systemClock,
@@ -333,6 +352,7 @@ export function pendingOf(
         ? []
         : blocksOf(ctx, items, entries, now, options.landWait ?? landWaitOf),
     queues: options.blocks === false ? [] : queues,
+    ...(options.blocks === false ? {} : { done: doneOf(ctx, items, now) }),
     secretary: status
       ? {
           name: status.name,
@@ -415,15 +435,27 @@ const GROUPS: readonly { kinds: readonly PendingKind[]; head: string }[] = [
   { kinds: ['step'], head: 'Their own steps' },
 ];
 
+// What closed as Done in the last day, counted by Otea: the secretary answers «what got done?» from
+// this list, whole, never from memory (field study 4, U6: it said none, then 11 of 12).
+function doneLine(done: readonly PendingDone[]): string[] {
+  if (done.length === 0) return [];
+  const list = done.map(({ id, title, at }) => `${id} ${quoteAgent(title, 80)} (${timeText(at)})`);
+  return [
+    `Done in the last 24 hours (${done.length}): ${list.join('; ')}. This is the whole list, counted now: when the person asks what got done, answer from it, say the count it gives, and name items from it only.`,
+  ];
+}
+
 // What `otea pending` prints, for the secretary: the count, each thing with what it waits for and
 // since when, what holds a board's queue, and what to do with it.
 export function pendingText(pending: Pending): string {
   const { count, entries, blocks, queues } = pending;
   const loads = queues.map(queueLine);
+  const finished = doneLine(pending.done ?? []);
   if (count === 0) {
     return [
       'Nothing waits for the person: no review, question or step of their own. Do not say otherwise from memory.',
       ...loads,
+      ...finished,
     ].join('\n');
   }
   const counts = pendingCounts(entries);
@@ -448,6 +480,7 @@ export function pendingText(pending: Pending): string {
     ...sections,
     ...holds,
     ...loads,
+    ...finished,
     'This is the whole list, computed now: say it as it is, never add or drop one from memory. News they have not read goes as a notice (otea say "<text>" --links <ids>, no --reply-to).',
   ].join('\n');
 }

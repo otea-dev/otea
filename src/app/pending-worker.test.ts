@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { stateOf } from '../core/board/engine.ts';
+import { DONE } from '../core/board/model.ts';
 import { instantiate, requireTemplate } from '../core/board/templates.ts';
+import { appendEvent, updateItemState } from '../store/queries.ts';
 import type { Context } from './context.ts';
 import { createItem } from './items.ts';
 import { claimItem } from './leases.ts';
@@ -37,6 +40,31 @@ describe('a board with work and nobody on it waits for the person to open a work
           at(0),
         ).id,
     );
+  });
+
+  // U6 (field study 4): «Resúmeme lo que se hizo» was wrong both times (6 done, said none; 12 done,
+  // said 11): the secretary counted from memory. Otea counts what closed in the last day.
+  it('counts what was done in the last day, for the secretary to answer from', () => {
+    const [first, second] = ids;
+    for (const [id, minute] of [
+      [first, 2],
+      [second, 3],
+    ] as const) {
+      const state = stateOf({ closed: DONE });
+      updateItemState(ctx.db, id ?? '', state, at(minute)());
+      appendEvent(ctx.db, {
+        itemId: id ?? '',
+        type: 'transitioned',
+        actor: you,
+        at: at(minute)(),
+        data: { from: 'x', to: state },
+      });
+    }
+    const pending = pendingOf(ctx, at(10));
+    expect(pending.done?.map(({ id }) => id)).toEqual(ids.slice(0, 2));
+    expect(pendingText(pending)).toContain('Done in the last 24 hours (2)');
+    // A day later it is no news.
+    expect(pendingOf(ctx, at(26 * 60)).done).toEqual([]);
   });
 
   it('is an entry of its own once it has waited a few minutes, and goes with the worker', () => {

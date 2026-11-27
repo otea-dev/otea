@@ -84,7 +84,12 @@ export type PendingSecretary = {
   waiting: { count: number; since: string | null };
 };
 
+// What was done in the last day, as Otea counts it: what the secretary answers «what got done?» from.
+export type PendingDone = { id: string; title: string; at: string };
+
 export type Pending = {
+  // The items that closed as Done in the last 24 hours, oldest first (left out of the cheap count).
+  done?: PendingDone[];
   // How many things wait for the person.
   count: number;
   // In the order the person should look at them: what holds an agent up (questions) first, then
