@@ -117,7 +117,10 @@ describe('the topbar', () => {
 
   // An agent on a long command-line step gave no sign for a while: the pill said «Sin agentes»
   // over a menu that did not list it. Through the real wiring, pill and menu now say the same.
-  it('says «sin señal» on the pill and in the menu for an agent holding a lease that went silent', () => {
+  // R2 (field study 4, design): «sin señal» in warn read as a dead agent when the process was most
+  // likely at a long step. The pill and the menu say it softly («sin novedades», the words of «sin
+  // novedades hace N min»), in ink, never the warn colour: that is for an item stuck.
+  it('says «sin novedades» softly on the pill and in the menu for an agent holding a lease that went silent', () => {
     setLanguage('es');
     const silent = agent('Mender', {
       live: false,
@@ -126,8 +129,18 @@ describe('the topbar', () => {
       profile: opus,
     });
     const html = topbar({ agents: [silent] });
-    expect(html).toContain('<span>1 sin señal</span>');
+    expect(html).toContain('<span>1 sin novedades</span>');
+    expect(html).not.toContain('sin señal');
     expect(html).not.toContain('Sin agentes');
+    // Beside a working agent it is the small grey datum, never in warn.
+    const busy = topbar({
+      agents: [silent, agent('Scout', { holding: ['X'], profile: opus })],
+      items: [
+        item({ id: 'X', turn: 'agent', lease: { holder: 'Scout', expiresAt: inMinutes(20) } }),
+      ],
+    });
+    expect(busy).toContain('<small class="wl">1 sin novedades</small>');
+    expect(busy).not.toContain('warn-t');
 
     const rows = agentRows([silent], [], NOW);
     const menu = renderIn(
@@ -144,8 +157,12 @@ describe('the topbar', () => {
       }),
     );
     expect(menu).toContain('data-agent="Mender"');
-    expect(menu).toContain('<span class="verb">sin señal en</span><span class="id">ERR-231</span>');
-    expect(menu).toContain('1 sin señal');
+    expect(menu).toContain(
+      '<span class="verb">sin novedades en</span><span class="id">ERR-231</span>',
+    );
+    expect(menu).toContain('1 sin novedades');
+    expect(menu).not.toContain('sin señal');
+    expect(menu).not.toContain('warn');
     expect(menu).not.toContain('Todavía no hay agentes conectados');
   });
 

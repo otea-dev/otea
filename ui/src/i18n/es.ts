@@ -40,7 +40,7 @@ import type { Catalog } from './i18n.ts';
 //   triage            triaje
 //   brief             encargo
 //   template          plantilla
-//   agent status      trabajando, escuchando, conectado, sin señal, ausente (las del servidor; ninguna otra)
+//   agent status      trabajando, escuchando, conectado, sin novedades, ausente (las del servidor; ninguna otra)
 //   On the way        En camino
 //   Closed            Cerrados
 //   Questions for you Preguntas para ti

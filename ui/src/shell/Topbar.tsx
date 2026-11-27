@@ -326,9 +326,9 @@ export function PillWords({ summary }: { summary: PillSummary }) {
       {extra ? (
         <small
           className={
-            extra.kind === 'silent' || extra.kind === 'away' || extra.kind === 'silentAway'
-              ? 'wl warn-t'
-              : 'wl'
+            // Quiet is not stuck: its datum stays grey. An agent away on an item it left stuck is
+            // the one that asks for attention.
+            extra.kind === 'away' || extra.kind === 'silentAway' ? 'wl warn-t' : 'wl'
           }
         >
           {extra.kind === 'of'
@@ -371,7 +371,8 @@ function RowDoing({ row, now }: { row: AgentRow; now: number }) {
   if (row.state === 'silent') {
     const held = row.held[0];
     return (
-      <span className="held warn">
+      // In warn only when its item was left stuck (it is away); a quiet one is in ink.
+      <span className={row.quiet ? 'held warn' : 'held'}>
         {held ? <NodeGlyph look={held.look} size={14} /> : null}
         <span className="verb">
           {row.quiet ? t('shell.row.quiet', { time: clockOf(row.since) }) : t('shell.row.silent')}
@@ -446,7 +447,7 @@ export function AgentsMenuBody({
             {counts.silent ? (
               <>
                 {counts.holding || waiting || counts.connected ? ' · ' : null}
-                <span className="warn-t">{t('shell.pill.silent', { count: counts.silent })}</span>
+                <span>{t('shell.pill.silent', { count: counts.silent })}</span>
               </>
             ) : null}
             {counts.away ? (

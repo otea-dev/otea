@@ -989,8 +989,8 @@ export const detail = {
   'agent.stand.wait': 'Espera {answer} en {title}, desde hace {time}.',
   'agent.stand.answer': 'tu respuesta',
   'agent.stand.idle': 'En espera, libre desde hace {time}.',
-  'agent.stand.silent': 'Sin señal desde las {time}: tiene {title} en la mano.',
-  'agent.stand.silentFree': 'Sin señal desde las {time}.',
+  'agent.stand.silent': 'Sin novedades desde las {time}: tiene {title} en la mano.',
+  'agent.stand.silentFree': 'Sin novedades desde las {time}.',
   'agent.stand.away': 'Ausente: su última señal fue {time}.',
   'agent.stand.noProfile':
     'No toma pasos hasta declarar el modelo y el esfuerzo con los que trabaja.',

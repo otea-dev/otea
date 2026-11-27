@@ -122,7 +122,7 @@ describe('the project menu’s rows', () => {
       0,
     );
     expect(rows.find((r) => r.id === 'busy')?.line).toBe(
-      '2 te esperan · 2 trabajando · 1 sin señal',
+      '2 te esperan · 2 trabajando · 1 sin novedades',
     );
     // An away agent (it left an item stuck) says «ausente», apart from «sin señal».
     const away = projectRows(
@@ -135,7 +135,7 @@ describe('the project menu’s rows', () => {
       ],
       0,
     ).rows.find((r) => r.id === 'gone');
-    expect(away?.line).toBe('1 sin señal · 1 ausente');
+    expect(away?.line).toBe('1 sin novedades · 1 ausente');
     // Listening is not at work: nothing to report; an older server that sends no agents is the same.
     expect(rows.find((r) => r.id === 'calm')?.line).toBe('nada te espera');
     expect(rows.find((r) => r.id === 'old')?.line).toBe('nada te espera');

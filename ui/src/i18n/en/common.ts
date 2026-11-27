@@ -78,7 +78,7 @@ export const common = {
   'agent.status.working': 'working',
   'agent.status.listening': 'listening',
   'agent.status.connected': 'connected',
-  'agent.status.silent': 'no signal',
+  'agent.status.silent': 'quiet',
   'agent.status.away': 'away',
   'listen.noAgents': 'no agent is connected',
   'listen.noAgentsLead': 'No agent is connected.',
