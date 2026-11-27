@@ -54,6 +54,44 @@ describe('the item page body', () => {
     expect(rounds).toBeGreaterThan(deliverable);
   });
 
+  // U3 (field study 4): the approved outline came before the draft under review, which sat well
+  // below the fold. What the step in review handed in comes first; what was settled earlier follows.
+  it('puts what the step under review handed in before what was approved earlier', () => {
+    const content = {
+      ...type,
+      fields: [
+        { name: 'Sections', module: 'markdown' },
+        { name: 'Draft', module: 'markdown' },
+      ],
+      layout: { ...EMPTY, body: [{ field: 'Sections' }, { field: 'Draft' }] },
+    } as unknown as TypeView;
+    const keys = bodySections({
+      item: { ...item, fields: { Sections: 'one\ntwo', Draft: 'the whole text' } },
+      type: content,
+      facts: {} as Facts,
+      canWrite: false,
+      now: 0,
+      board: {
+        options: new Set(),
+        rounds: null,
+        roundsAfter: false,
+        sections: [],
+        steps: {
+          step: 'swrite',
+          def: {
+            parts: { fdraft: { name: 'Draft' }, foutline: { name: 'Sections' } },
+            steps: [
+              { id: 'soutline', hand: [{ ref: 'foutline', req: 'always' }] },
+              { id: 'swrite', hand: [{ ref: 'fdraft', req: 'always' }] },
+            ],
+          },
+        },
+      },
+    } as unknown as Parameters<typeof bodySections>[0]).map(({ key }) => key);
+
+    expect(keys.filter((key) => key.startsWith('f:'))).toEqual(['f:Draft', 'f:Sections']);
+  });
+
   // The old detail's empty boxes, gone: a long text nobody wrote is no section at all.
   it('draws a field section only for a value that is there', () => {
     const bug = officialType('bug-triage');

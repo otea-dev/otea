@@ -79,6 +79,30 @@ export function Plain({
   );
 }
 
+// Moves the field sections of the parts the step in view hands off ahead of the other field
+// sections, in the slots those occupy: the sections of any other kind stay where they are.
+function putHandedFirst(out: Sec[], rounds: BoardRounds): void {
+  const step =
+    rounds.step === undefined ? undefined : rounds.def.steps.find((s) => s.id === rounds.step);
+  if (!step) return;
+  const handed = new Set(
+    step.hand.flatMap(({ ref }) => {
+      const name = rounds.def.parts[ref]?.name;
+      return name === undefined ? [] : [`f:${name}`];
+    }),
+  );
+  const slots = out.flatMap(({ key }, at) => (key.startsWith('f:') ? [at] : []));
+  const fields = slots.map((at) => out[at]).filter((sec): sec is Sec => sec !== undefined);
+  const ordered = [
+    ...fields.filter(({ key }) => handed.has(key)),
+    ...fields.filter(({ key }) => !handed.has(key)),
+  ];
+  slots.forEach((at, i) => {
+    const sec = ordered[i];
+    if (sec) out[at] = sec;
+  });
+}
+
 export function bodySections(o: {
   item: ItemView;
   type: TypeView | undefined;
@@ -327,6 +351,9 @@ export function bodySections(o: {
     s.blocks.forEach((b, i) => {
       out.push(...fieldSecs(b, 100 * (s.index + 1) + i, s.title));
     });
+  // What the step under review handed in reads first; what was settled in an earlier step follows
+  // (the draft, not the approved outline above it).
+  if (board) putHandedFirst(out, board.steps);
   if (board?.rounds && board.roundsAfter && !roundsDrawn)
     rounds.push({
       key: 'r:notes',
