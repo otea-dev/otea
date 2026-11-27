@@ -429,8 +429,11 @@ describe('the conversation from the secretary', () => {
     });
 
     it('--from-message of a message that is no turn of the person’s is refused before the item is made', async () => {
-      person('hi');
+      const hi = person('hi');
       await otea('conversation', '--as', 'sol');
+      // Answered first: a say with no --reply-to joins the message that waits for an answer, so a
+      // notice of its own is one said when nothing waits.
+      await otea('say', 'Hello.', '--reply-to', String(hi.id), '--as', 'sol');
       await otea('say', 'A notice.', '--as', 'sol');
       const notice = conversation().at(-1)?.id;
 

@@ -66,6 +66,63 @@ describe('a message the secretary read and did not answer is owed', () => {
     expect(waitAt(230_000)).toBeUndefined();
   });
 
+  // Field study 5, V4: the secretary answered with a plain say and no --reply-to; the answer opened
+  // a turn of its own, so the person's message stayed «not answered yet» under the very answer, the
+  // desk said «arráncalo de nuevo» to a secretary that was listening, and its wait brought the
+  // message back.
+  it('is answered by a plain say with no --reply-to, which joins that message’s turn', () => {
+    const message = written('Resúmeme lo que se hizo', 1000);
+
+    const said = sayAsSecretary(
+      project,
+      { agent: 'sol', text: 'Se hicieron 9 cambios.' },
+      clock(5000),
+    );
+
+    expect(said.message.replyTo).toBe(message.id);
+    expect(said.message.root).toBe(message.root);
+    expect(waitAt(60_000)).toBeUndefined();
+  });
+
+  it('attaches to the latest message that waits, not to one already answered', () => {
+    const first = written('uno', 1000);
+    sayAsSecretary(project, { agent: 'sol', text: 'Uno.', replyTo: first.id }, clock(3000));
+    const second = written('dos', 10_000);
+
+    const said = sayAsSecretary(project, { agent: 'sol', text: 'Dos.' }, clock(15_000));
+
+    expect(said.message.replyTo).toBe(second.id);
+  });
+
+  it('stays a notice of its own when it names items, asks, or nothing waits', () => {
+    const item = createItem(project, {
+      collection: 'tasks',
+      title: 'Otro',
+      fields: { description: 'x' },
+      actor: { kind: 'human', name: 'p' },
+    });
+    const message = written('hola', 1000);
+
+    const notice = sayAsSecretary(
+      project,
+      { agent: 'sol', text: 'Listo para revisar.', links: [item.id] },
+      clock(5000),
+    );
+    const question = sayAsSecretary(
+      project,
+      { agent: 'sol', text: '¿Cuál?', options: ['A', 'B'] },
+      clock(5001),
+    );
+    expect(notice.message.replyTo).toBeNull();
+    expect(question.message.replyTo).toBeNull();
+    // The message still waits for its own answer.
+    expect(waitAt(60_000)).toMatchObject({ kind: 'person_message', ref: String(message.id) });
+
+    sayAsSecretary(project, { agent: 'sol', text: 'Hola.', replyTo: message.id }, clock(61_000));
+    const alone = sayAsSecretary(project, { agent: 'sol', text: 'Nada nuevo.' }, clock(62_000));
+    expect(alone.message.replyTo).toBeNull();
+  });
+
   it('is not brought back to the wait that was already running when it was read', () => {
     const running = startSecretaryWait(clock(0));
     const message = postPersonMessage(project, { text: 'hola' }, clock(1000)).message;

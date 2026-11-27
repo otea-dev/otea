@@ -82,7 +82,15 @@ export function turnsOf(messages: readonly Message[]): Turn[] {
     // A trace of an answer given to an agent's question is read at once and asks nothing of the
     // secretary; any other message of the person's is heard, then read, then answered.
     const heard = last.delivery !== 'pending' || last.heardAt !== null;
-    const waits = last.author !== 'person' || isTrace(last) ? null : heard ? 'reading' : 'pending';
+    // Items made from the turn are an answer as much as words: the secretary's wait counts it so
+    // too (selectOwed), and the desk never says «no ha respondido» under it (field study 5, V4).
+    const made = group.some((m) => m.links.length > 0);
+    const waits =
+      last.author !== 'person' || isTrace(last) || (made && heard)
+        ? null
+        : heard
+          ? 'reading'
+          : 'pending';
     turns.push({
       root,
       messages: group,

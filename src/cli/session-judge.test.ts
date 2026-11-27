@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Noted } from '../app/session-bound.ts';
 import type { ProcessRow } from './owner.ts';
-import { callerIn, judgeCaller } from './session-guard.ts';
+import { callerIn, judgeCaller, readMsOf } from './session-guard.ts';
 
 // Field study 5, V8: an orphan background process (no live parent, so no harness resolves from it)
 // said as the secretary while the real one ran. While the noted session runs, a caller the table
@@ -44,5 +44,19 @@ describe('the verdict on a caller read from the processes', () => {
   it('lets a new session take over once the noted harness is gone', () => {
     const gone = rows.filter((row) => row.pid !== 100);
     expect(judgeCaller(cli, callerIn(gone, 999)).verdict).toBe('gone');
+  });
+});
+
+// The caller sets its own environment: an impostor that could shorten the wait for the process
+// listing would make every listing time out, which reads as unverified and lets its act through.
+describe('how long the guard waits for the process listing', () => {
+  it('may be raised by the environment, never lowered below 3 s, and is capped', () => {
+    expect(readMsOf({})).toBe(3000);
+    expect(readMsOf({ OTEA_SESSION_READ_MS: '60000' })).toBe(60_000);
+    expect(readMsOf({ OTEA_SESSION_READ_MS: '1' })).toBe(3000);
+    expect(readMsOf({ OTEA_SESSION_READ_MS: '0' })).toBe(3000);
+    expect(readMsOf({ OTEA_SESSION_READ_MS: '-5' })).toBe(3000);
+    expect(readMsOf({ OTEA_SESSION_READ_MS: 'soon' })).toBe(3000);
+    expect(readMsOf({ OTEA_SESSION_READ_MS: '99999999' })).toBe(120_000);
   });
 });

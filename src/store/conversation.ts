@@ -195,6 +195,33 @@ export const OWED_RETURNS = 2;
 // How long a message stays owed: an older one is no wait's business.
 const OWED_FOR_MS = 24 * 60 * 60_000;
 
+// The latest message of the person's the secretary read and has not answered, as selectOwed counts
+// it (no message of the secretary's after it in its turn, nothing made from the turn, not a record
+// nor a tap on a card), however many times a wait brought it back: what a say with no --reply-to
+// answers (field study 5, V4). Undefined when there is none, or the latest read message is answered.
+export function selectLatestUnanswered(
+  db: DatabaseSync,
+  at: string,
+): { id: number; root: number } | undefined {
+  const since = new Date(Date.parse(at) - OWED_FOR_MS).toISOString();
+  const row = db
+    .prepare(
+      `SELECT m.id, m.root FROM conversation_messages m
+       WHERE m.author = 'person' AND m.read_at IS NOT NULL AND m.at >= :since
+         AND m.topic IS NULL AND m.about IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM conversation_messages r
+           WHERE r.root = m.root AND r.id > m.id AND r.author <> 'person')
+         AND NOT EXISTS (SELECT 1 FROM conversation_links l WHERE l.message_id = m.root)
+         AND NOT EXISTS (
+           SELECT 1 FROM conversation_messages q
+           WHERE q.id = m.reply_to AND q.action IS NOT NULL)
+       ORDER BY m.id DESC LIMIT 1`,
+    )
+    .get({ since }) as { id: number; root: number } | undefined;
+  return row;
+}
+
 // The person's messages the secretary read before `readBefore` (an ISO time) and has not answered:
 // no message of the secretary's after it in its turn, nothing made from the turn, and not a record
 // (a tap on an agent's question, a topic) or a tap on a card that acts by itself. Oldest first.

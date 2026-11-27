@@ -38,6 +38,7 @@ import {
   selectAnswerOf,
   selectDefaultTurn,
   selectKindNews,
+  selectLatestUnanswered,
   selectMessage,
   selectMessages,
   selectOpenQuestions,
@@ -354,6 +355,20 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
       );
     }
     replyTo = latest;
+  }
+  // A plain say with no --reply-to while a message of the person's waits for an answer is that
+  // answer: the desk and the secretary's wait count a message as answered only by a message in its
+  // own turn, so a standalone reply left it «not answered yet» under the very answer (field study
+  // 5, V4). A notice is no answer: one that names items (--links: the turn that waits has none),
+  // asks with options, carries a card or classifies a turn stays a message of its own.
+  if (
+    replyTo === undefined &&
+    input.kind === undefined &&
+    links.length === 0 &&
+    checked.options.length === 0 &&
+    action === undefined
+  ) {
+    replyTo = selectLatestUnanswered(project.db, now())?.id;
   }
   if (replyTo !== undefined) requireMessage(project, replyTo);
   const warnings: string[] = [];

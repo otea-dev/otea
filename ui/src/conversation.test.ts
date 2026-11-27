@@ -230,6 +230,17 @@ describe('the secretary thinking', () => {
     expect(thinkingRoot(turns, listening, NOW)).toBe(1);
   });
 
+  // Field study 5, V4: the secretary made the items and answered elsewhere; the desk kept saying it
+  // had not answered, under a turn the wait itself counts as answered.
+  it('never says it has not answered a turn the secretary made items from', () => {
+    const [turn] = turnsOf([
+      say({ id: 1, author: 'person', delivery: 'read', readAt: ago(5), heardAt: ago(5) }),
+      say({ id: 2, author: 'person', delivery: 'read', readAt: ago(5), links: ['CAM-1'], root: 1 }),
+    ]);
+    expect(turn?.waits).toBeNull();
+    expect(thinkingRoot(turn ? [turn] : [], listening, NOW)).toBeUndefined();
+  });
+
   it('is not thinking about a message it has not read, nor one it answered', () => {
     const pending = turnsOf([say({ id: 1, author: 'person', delivery: 'pending' })]);
     expect(pending[0]?.waits).toBe('pending');

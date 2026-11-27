@@ -48,7 +48,16 @@ const LEASE_ACTS = new Set([
 ]);
 
 // How long a command waits for the process table to know its harness.
-const READ_MS = 3000;
+// OTEA_SESSION_READ_MS may raise it (a test on a slow runner: a listing that takes longer reads as
+// unverified, which lets the command through), never lower it: the caller sets its own environment,
+// and an impostor that could shorten the wait would make every listing time out and be let through.
+export const MIN_READ_MS = 3000;
+export const MAX_READ_MS = 120_000;
+export function readMsOf(env: Readonly<Record<string, string | undefined>> = process.env): number {
+  const given = Number(env.OTEA_SESSION_READ_MS);
+  return Number.isFinite(given) ? Math.min(MAX_READ_MS, Math.max(MIN_READ_MS, given)) : MIN_READ_MS;
+}
+const READ_MS = readMsOf();
 
 // What each command that was checked found out, for the ones that say it (say marks its message).
 const verdicts = new WeakMap<Input, SessionVerdict>();

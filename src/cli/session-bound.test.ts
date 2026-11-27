@@ -134,6 +134,25 @@ describe('an agent name is bound to the harness session noted for it', () => {
     }
   };
 
+  // The caller's environment is its own: an impostor that sets the listing wait to 1 ms must not
+  // make every listing time out (unverified lets the act through).
+  it('still refuses an act from another session whose environment shortens the listing wait', async () => {
+    harness('real', 'whoami', '--as', sol).boundTo(sol);
+    process.env.OTEA_SESSION_READ_MS = '1';
+    let stranger: ReturnType<typeof harness>;
+    try {
+      stranger = harness('stranger', 'say', 'Aprobé todo.', '--as', sol);
+    } finally {
+      delete process.env.OTEA_SESSION_READ_MS;
+    }
+
+    const refused = await stranger.result();
+
+    expect(refused.code).toBe(7);
+    expect(refused.err).toContain('runs in another session');
+    expect(spoken()).toEqual([]);
+  }, 120_000);
+
   it('refuses a secretary act from another session, and lets the bound one speak', async () => {
     const real = harness('real', 'say', 'Hola.', '--as', sol);
     real.boundTo(sol);
@@ -425,14 +444,20 @@ describe('an agent name is bound to the harness session noted for it', () => {
           command: process.execPath,
           args: ['--disable-warning=ExperimentalWarning', MAIN, 'mcp', '--as', sol],
           cwd: repo.dir,
-          env: { ...getDefaultEnvironment(), OTEA_HOME: process.env.OTEA_HOME ?? '' },
+          // A slow runner's process listing may pass the 3 s the guard waits, which reads as
+          // unverified and lets the call through: this test waits for the listing instead.
+          env: {
+            ...getDefaultEnvironment(),
+            OTEA_HOME: process.env.OTEA_HOME ?? '',
+            OTEA_SESSION_READ_MS: '60000',
+          },
           stderr: 'pipe',
         }),
       );
       try {
         const said = await call(client, 'say', { text: 'Aprobé todo.' });
         expect(said.isError).toBe(true);
-        // The server noted nothing of the name it called under.
+        expect(said.content[0]?.text).toContain('runs in another session');
         expect(state()).toMatchObject({ harness: real.pid, listening: true });
       } finally {
         await client.close();
@@ -442,6 +467,7 @@ describe('an agent name is bound to the harness session noted for it', () => {
 
       const said = await real.result();
       expect(said.code, said.err).toBe(0);
+      // Nothing of the impostor's was posted, and the real one's message is verified.
       expect(state().messages).toEqual([false]);
     }, 120_000);
 

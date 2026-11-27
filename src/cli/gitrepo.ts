@@ -676,8 +676,7 @@ function behindState(
   return {
     base,
     remote,
-    target,
-    ...(local ? { local: true as const } : {}),
+    ...(local ? { local: true as const, target } : {}),
     behind,
     checkout,
     state,
