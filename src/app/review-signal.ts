@@ -21,5 +21,5 @@ export function signalReview(
     if (isClosed(position) || position.phase === 'doing') return;
   }
   if (![...selectRoles(ctx.db).values()].includes('secretary')) return;
-  insertSignal(ctx.db, { kind: 'ready_for_review', ref: item.id, text: `"${item.title}"` }, at);
+  insertSignal(ctx.db, { kind: 'ready_for_review', ref: item.id, text: item.title }, at);
 }

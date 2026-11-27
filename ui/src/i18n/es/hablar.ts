@@ -64,6 +64,7 @@ export const hablar = {
   'hablar.ask.answered': 'Respondiste: {text}',
   'hablar.ask.sent': 'Respuesta enviada.',
   'hablar.ask.gone': 'Respondida.',
+  'hablar.act.does': 'Devuelve {item} a {to} con esta nota',
   'hablar.act.note': 'La nota con la que se devuelve',
   'hablar.act.edit': 'Editar nota',
   'hablar.act.send': 'Devolver {item} con esta nota',

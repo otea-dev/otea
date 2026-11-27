@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { creatures } from '../core/board/testing.ts';
 import { insertEvidence } from '../store/queries.ts';
+import { addCollection } from './collections.ts';
 import { createItem, getItem, updateItem } from './items.ts';
 import { claimItem } from './leases.ts';
 import { handoffItem } from './next.ts';
 import { agentNotes, noteWaiting } from './notes.ts';
+import { waitBeat } from './presence.ts';
 import type { Project } from './project.ts';
 import { updateAndTell } from './relay-change.ts';
 import { declareSecretary } from './secretary.ts';
@@ -68,6 +70,52 @@ describe('the secretary reshapes an item and tells the worker on it', () => {
     expect(getItem(project, id).title).toBe('Rana veloz');
     claimItem(project, { id, actor: quill }, now);
     expect(agentNotes(project, id)?.text).toContain('The person wants it quick.');
+  });
+
+  // A change that cannot be told is not made: an item on no board has no note to leave its worker.
+  it('refuses to change what a worker holds on an item of no board, since it cannot tell it', () => {
+    addCollection(project, { name: 'tasks' });
+    const plain = createItem(
+      project,
+      {
+        collection: 'tasks',
+        title: 'Plain',
+        fields: { description: 'Now' },
+        actor: { kind: 'agent', name: 'sol' },
+      },
+      now,
+    ).id;
+    claimItem(project, { id: plain, actor: quill }, now);
+
+    expect(() =>
+      updateAndTell(
+        project,
+        { id: plain, fields: { description: 'Later' }, tell: 'The person changed it.', actor: sol },
+        now,
+      ),
+    ).toThrow(/quill/);
+    expect(getItem(project, plain).fields.description).toBe('Now');
+  });
+
+  // The lease is the one check the secretary goes over: another agent whose lease ran out but whose
+  // session runs still owns the item, and the secretary writes no more over it than anyone.
+  it('still refuses what the other write checks refuse: an item whose holder runs', () => {
+    const at = (offset: number) => () => new Date(T0 + offset).toISOString();
+    claimItem(project, { id, actor: quill }, at(0));
+    waitBeat(
+      project.db,
+      { agent: 'quill', channel: 'cli', waiter: process.pid },
+      at(21 * 60_000),
+    ).run();
+
+    expect(() =>
+      updateAndTell(
+        project,
+        { id, fields: { fdesc: 'Ágil' }, tell: 'Quick.', actor: sol },
+        at(21 * 60_000),
+      ),
+    ).toThrow(/still quill's/);
+    expect(getItem(project, id).fields.fdesc).toBe('Lenta');
   });
 
   it('is the secretary’s alone', () => {

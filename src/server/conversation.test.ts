@@ -483,6 +483,18 @@ describe('the conversation over the API', () => {
       expect(back()?.data).toMatchObject({ reason: 'Much less green.', channel: 'ui' });
     });
 
+    it('records that the person tapped on the desk, as the desk’s own move does', async () => {
+      const id = card();
+
+      await call(`/conversation/messages/${id}/answer`, {
+        method: 'POST',
+        body: { option: 1 },
+        headers: { 'x-otea-ui': '1' },
+      });
+
+      expect(back()?.data).toMatchObject({ surface: 'desk' });
+    });
+
     it('refuses a note on the other option, and a delegation, and moves nothing', async () => {
       const id = card();
 

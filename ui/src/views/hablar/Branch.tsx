@@ -145,7 +145,7 @@ export function AskBody({
   bare?: boolean;
   // The question sends an item back for you when you tap its first option, with this note: the card
   // shows the note, lets you edit it, and never leaves the decision to the secretary.
-  action?: { item: string; note: string };
+  action?: { item: string; note: string; to: string };
   send: (given: AnswerWords) => Promise<void>;
 }) {
   const app = useApp();
@@ -187,6 +187,9 @@ export function AskBody({
         <p className="hb-said">{said ?? t('hablar.ask.gone')}</p>
       ) : (
         <>
+          {action ? (
+            <p className="hb-does">{t('hablar.act.does', { item: action.item, to: action.to })}</p>
+          ) : null}
           {action && free === null ? (
             <blockquote className="hb-note" aria-label={t('hablar.act.note')}>
               {action.note}

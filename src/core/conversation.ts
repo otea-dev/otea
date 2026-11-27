@@ -64,7 +64,16 @@ export type MessageChoice = {
 // What the person's tap on the first option of a question performs, as the person: today only the
 // send-back of an item in their review, with the note the secretary drafted from their words (the
 // person may edit it before they tap). The secretary never performs it.
-export type MessageAction = { kind: 'send_back'; item: string; note: string };
+// `round`: the round of the item's review when the card was asked: the tap is about that delivery.
+// `to`: the name of the step it goes back to, which the desk says in its own words beside the first
+// option (never the secretary's label).
+export type MessageAction = {
+  kind: 'send_back';
+  item: string;
+  note: string;
+  round: number;
+  to: string;
+};
 
 export type Message = {
   id: number;

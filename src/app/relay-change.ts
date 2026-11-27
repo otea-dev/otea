@@ -5,7 +5,7 @@ import type { Actor } from '../core/item.ts';
 import { joinTransaction } from '../store/database.ts';
 import { getItem, type Item, systemClock, updateItem } from './items.ts';
 import { liveBoardOf } from './next.ts';
-import { relayChange } from './notes.ts';
+import { agentStepOf, relayChange } from './notes.ts';
 import type { Project } from './project.ts';
 import { requireSecretary } from './secretary.ts';
 
@@ -45,7 +45,9 @@ export function updateAndTell(
           {
             id: input.id,
             actor: input.actor,
-            overLease: true,
+            // Over a worker's lease only where the worker can be told: a change that cannot be told
+            // is not made (an item of no board, or not in an agent's step, keeps its lease check).
+            ...(agentStepOf(project, item) === undefined ? {} : { overLease: true as const }),
             ...(input.title === undefined ? {} : { title: input.title }),
             ...(input.fields === undefined ? {} : { fields: input.fields }),
           },

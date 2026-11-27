@@ -381,7 +381,7 @@ export function updateItem(ctx: Context, input: UpdateItemInput, now = systemClo
     const preset = presetOf(ctx, getCollection(db, item.collection));
     const type: ItemType = typeOf(preset, item.type);
     const at = now();
-    if (input.overLease !== true) assertMayWriteItem(ctx, item, input.actor, at);
+    assertMayWriteItem(ctx, item, input.actor, at, input.overLease === true);
     if (turnOf(type.workflow, item.state) === 'none') {
       throw new OteaError(
         'item_closed',

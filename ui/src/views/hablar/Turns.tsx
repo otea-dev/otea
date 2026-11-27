@@ -532,7 +532,13 @@ function Entry({
             recommended={message.recommended ?? undefined}
             {...(message.action === null
               ? {}
-              : { action: { item: message.action.item, note: message.action.note } })}
+              : {
+                  action: {
+                    item: message.action.item,
+                    note: message.action.note,
+                    to: message.action.to,
+                  },
+                })}
             send={(given) => onAnswer(message, given)}
           />
         ) : null}

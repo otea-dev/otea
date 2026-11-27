@@ -95,6 +95,7 @@ import { type Waiver, waiversFrom } from '../core/board/waivers.ts';
 import { OteaError } from '../core/errors.ts';
 import type { Actor } from '../core/item.ts';
 import { activeLease, type Lease } from '../core/lease.ts';
+import type { Surface } from '../core/surface.ts';
 import { closesOf, turnOf } from '../core/workflow.ts';
 import { findBoardOfCollection, findVersion, listBoards } from '../store/boards.ts';
 import { joinTransaction, transaction } from '../store/database.ts';
@@ -1582,6 +1583,8 @@ export type BoardMoveInput = {
   reason?: string;
   // The note of the handoff ("Nota de la entrega"), kept with the round.
   note?: string;
+  // Where the person made it (core/surface.ts), kept on the move's event.
+  surface?: Surface;
   // On a handoff, the commit and tree of the protected branch as git has it where the agent hands
   // it off: kept with a handoff into a review, it is what the person approves (app/gates.ts).
   // `pushed: false`: never pushed though the repo has a remote, for the approval to warn (P7-8).
@@ -1759,6 +1762,7 @@ function land(
   const data = {
     ...(input.reason ? { reason: input.reason } : {}),
     ...(input.note?.trim() ? { note: input.note } : {}),
+    ...(input.surface === undefined ? {} : { surface: input.surface }),
     ...(input.tip && reviewed ? { tip: input.tip } : {}),
     ...(input.tip && reviewed && input.merge ? { merge: input.merge } : {}),
     ...(input.tip && reviewed && input.overlaps ? { overlaps: input.overlaps } : {}),

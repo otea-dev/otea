@@ -4,7 +4,7 @@ import { insertEvidence, selectEvents } from '../store/queries.ts';
 import { postPersonMessage } from './conversation.ts';
 import { answerSecretaryTap, sayWithSendBack } from './conversation-act.ts';
 import { createItem, getItem } from './items.ts';
-import { approveItem, handoffItem } from './next.ts';
+import { approveItem, handoffItem, sendBackItem } from './next.ts';
 import type { Project } from './project.ts';
 import { declareSecretary, secretaryWake, startSecretaryWait } from './secretary.ts';
 import { memoryContext, projectOf, publishAs } from './testing.ts';
@@ -77,10 +77,13 @@ describe('the secretary asks the person to send an item back, and their tap does
     const card = ask();
 
     expect(card.options).toEqual([`Send ${id} back`, 'No']);
+    // Bound to the round of the review it was asked in.
     expect(card.action).toEqual({
       kind: 'send_back',
       item: id,
       note: 'Make it 404, only the message changes.',
+      round: 1,
+      to: 'Concepto',
     });
     expect(where().state).toBe(before);
   });
@@ -143,6 +146,42 @@ describe('the secretary asks the person to send an item back, and their tap does
     );
     // Nothing was recorded: the person's own words still answer it.
     expect(answerSecretaryTap(project, card.id, { text: 'never mind' }, now).replyTo).toBe(card.id);
+  });
+
+  // A card binds to the round it was asked in, not only to the item: sent back and handed in again
+  // meanwhile, the old card's tap would send back a delivery its note was never about.
+  it('refuses a tap once the item was sent back and handed in again since the card was asked', () => {
+    const card = ask();
+    sendBackItem(project, { id, actor: you, channel: 'ui', reason: 'from the desk' }, now);
+    insertEvidence(project.db, {
+      itemId: id,
+      role: 'after',
+      module: 'eart',
+      kind: 'image',
+      filename: 'b.png',
+      contentType: 'image/png',
+      size: 1,
+      sha256: 'b'.repeat(64),
+      caption: null,
+      createdAt: now(),
+      actor: quill,
+      channel: 'cli',
+    });
+    handoffItem(project, { id, actor: quill, channel: 'cli', note: 'again' }, now);
+    expect(where().state).toMatch(/review/);
+
+    expect(() => answerSecretaryTap(project, card.id, { option: 1 }, now)).toThrow(
+      /handed in again|changed since/,
+    );
+    expect(where().state).toMatch(/review/);
+  });
+
+  it('records where the person tapped, as the desk’s own send-back does', () => {
+    const card = ask();
+
+    answerSecretaryTap(project, card.id, { option: 1 }, now, 'human', 'phone');
+
+    expect(sentBack().at(-1)?.data).toMatchObject({ surface: 'phone' });
   });
 
   it('is answered once: a second tap neither sends it back twice nor answers twice', () => {

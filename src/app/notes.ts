@@ -229,6 +229,19 @@ export function leaveNote(ctx: Context, input: LeaveNoteInput, now = systemClock
   });
 }
 
+// The board and the step an agent does on the item now: where a note to its worker can be left.
+// None for an item on no board, in a review or in a step of the person's own.
+export function agentStepOf(
+  ctx: Context,
+  item: ItemRecord,
+): { board: LiveBoard; step: NonNullable<ReturnType<typeof stepById>> } | undefined {
+  const board = liveBoardOf(ctx, item.collection);
+  const at = positionOf(item.state);
+  const step =
+    board && !isClosed(at) && at.phase === 'doing' ? stepById(board.def, at.step) : undefined;
+  return board && step && step.doer !== 'you' ? { board, step } : undefined;
+}
+
 // The secretary tells the agent doing a step what the person changed, as a note it must answer
 // before it hands off (the person's own words, relayed: the change reached the item first). Only
 // while an agent does the step; undefined for an item nobody is working on, which a worker reads
@@ -247,11 +260,9 @@ export function relayChange(
       `Worker not told on ${input.id}: say what changed`,
     );
   const item = requireWritableItem(ctx.db, input.id);
-  const board = liveBoardOf(ctx, item.collection);
-  const at = positionOf(item.state);
-  const step =
-    board && !isClosed(at) && at.phase === 'doing' ? stepById(board.def, at.step) : undefined;
-  if (!board || !step || step.doer === 'you') return undefined;
+  const found = agentStepOf(ctx, item);
+  if (!found) return undefined;
+  const { board, step } = found;
   const when = now();
   const on = itemOnBoard(ctx, item, board.def);
   const note = Math.max(0, ...leftNumbers(ctx, item.id)) + 1;

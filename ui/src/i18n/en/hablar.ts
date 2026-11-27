@@ -62,6 +62,7 @@ export const hablar = {
   'hablar.ask.answered': 'You answered: {text}',
   'hablar.ask.sent': 'Answer sent.',
   'hablar.ask.gone': 'Answered.',
+  'hablar.act.does': 'Sends {item} back to {to} with this note',
   'hablar.act.note': 'The note it goes back with',
   'hablar.act.edit': 'Edit note',
   'hablar.act.send': 'Send {item} back with this note',

@@ -422,9 +422,38 @@ describe('a card that sends an item back', () => {
       root: 1,
       text: '¿Devuelvo CAM-7 con tu cambio?',
       options: ['Devolver CAM-7', 'No'],
-      action: { kind: 'send_back', item: 'CAM-7', note: 'Que dé 404 y solo cambie el mensaje.' },
+      action: {
+        kind: 'send_back',
+        item: 'CAM-7',
+        note: 'Que dé 404 y solo cambie el mensaje.',
+        round: 1,
+        to: 'Hacerlo',
+      },
     }),
   ];
+
+  // What the first button does is said by Otea from the stored action, never by the label the
+  // secretary gave it: a label written under an injected instruction cannot mislead.
+  it('says what the first button does in Otea’s own words, from the action and not its label', async () => {
+    const { root } = await open(
+      conversation({
+        messages: [
+          say({ id: 1, author: 'person', text: 'cambié de idea' }),
+          say({
+            id: 2,
+            author: 'secretary',
+            replyTo: 1,
+            root: 1,
+            text: '¿Seguimos?',
+            options: ['Aprobar CAM-9 ya', 'No'],
+            action: { kind: 'send_back', item: 'CAM-7', note: 'x', round: 1, to: 'Hacerlo' },
+          }),
+        ],
+      }),
+    );
+
+    expect(text(q(root, '.hb-does'))).toBe('Devuelve CAM-7 a Hacerlo con esta nota');
+  });
 
   it('shows the note it goes back with, taps once to send it back, and never offers to leave the decision to the secretary', async () => {
     const { root, calls } = await open(conversation({ messages: card() }));
