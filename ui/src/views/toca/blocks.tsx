@@ -3,6 +3,7 @@ import type { FeedEvent } from '../../activity.ts';
 import { type App, typeOfItem } from '../../app/context.tsx';
 import { onPublishedBoard, publishedDefinition } from '../../board-studio/home/boards-store.ts';
 import { Prof } from '../../components/Prof.tsx';
+import { Ticked } from '../../components/Ticked.tsx';
 import { SetAsideMark, UnheardMark } from '../../components/Unheard.tsx';
 import { mainPath } from '../../derive/path.ts';
 import {
@@ -267,7 +268,9 @@ function OffRow({ entry, now }: { entry: PendingEntry; now: number }) {
       <>
         <div className="main-c">
           <div className="t" data-leaf="" data-title="">
-            <span className="tt">{rowText(entry)}</span>
+            <span className="tt">
+              <Ticked text={rowText(entry)} />
+            </span>
           </div>
           <div className="m" data-leaf="">
             <span className="id">{entry.ref}</span>

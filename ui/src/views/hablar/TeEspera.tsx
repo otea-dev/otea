@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { fetchRolePrompt, postEscalationDismiss } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { useCopy } from '../../components/AgentPrompt.tsx';
+import { Ticked } from '../../components/Ticked.tsx';
 import { splitQuestion } from '../../conversation.ts';
 import { waitedText } from '../../derive/when.ts';
 import { momentLabel } from '../../format.ts';
@@ -140,7 +141,9 @@ function TeRows({ pending, onJump }: { pending: Pending; onJump: (entry: Pending
             <span className="hb-te-ref">
               {entry.kind === 'secretary' || entry.kind === 'worker' ? '' : entry.ref}
             </span>
-            <span className="hb-te-t">{rowText(entry)}</span>
+            <span className="hb-te-t">
+              <Ticked text={rowText(entry)} />
+            </span>
             <span className="hb-te-k">
               {t(`hablar.te.k.${entry.kind}`, { agent: entry.by ?? '' })}
             </span>

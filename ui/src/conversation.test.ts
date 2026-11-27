@@ -16,6 +16,7 @@ import {
   mergeMessages,
   otherKind,
   piecesOf,
+  quotedSnippet,
   rowsOf,
   type SecretaryStatus,
   splitQuestion,
@@ -487,6 +488,15 @@ describe('plain words with ids and links', () => {
 
 // R2 (field study 4, V2 and V4): a «(CAM-1)» broke at the line's end and left a lone «)» or «(»,
 // and the secretary's `commands` showed their backticks as written.
+describe('a quoted snippet', () => {
+  it('leaves the backticks out, so a cut in a code span never shows one with no mate', () => {
+    const said = 'Resúmeme qué me espera hoy y corre `otea pending` si hace falta, por favor.';
+    const snippet = quotedSnippet(said, 40);
+    expect(snippet).not.toContain('`');
+    expect(snippet).toContain('corre otea');
+  });
+});
+
 describe('plain words: punctuation that holds to a link, and code spans', () => {
   it('holds the opening and closing marks to the id or address they surround', () => {
     const known = new Set(['CAM-1', 'CAM-2']);

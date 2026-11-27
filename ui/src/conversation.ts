@@ -18,6 +18,12 @@ import type { Item } from './types.ts';
 export type { FromMessage, Message, MessageFile, MessageKind, SecretaryStatus };
 export { messageSnippet };
 
+// A snippet of a message to quote in one line («sobre «…»», a title): the code marks of its backticks
+// go, as a cut in the middle of a span would leave a backtick with no mate.
+export function quotedSnippet(text: string, max: number): string {
+  return messageSnippet(text.replaceAll('`', ''), max);
+}
+
 // What GET /api/conversation answers: the messages in order, the secretary as M1 tells it, and how
 // many of the person's messages wait for it.
 export type ConversationView = {

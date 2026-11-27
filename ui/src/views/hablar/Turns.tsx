@@ -21,8 +21,8 @@ import {
   fencesOf,
   type Message,
   type MessageKind,
-  messageSnippet,
   otherKind,
+  quotedSnippet,
   type Row as RowOf,
   splitReply,
   type TextBlock,
@@ -251,7 +251,7 @@ function KindLabel({
       data-kind={kind}
       aria-label={t('hablar.kind.fix', {
         kind: word(kind),
-        snippet: messageSnippet(turn.person[0]?.text ?? turn.messages[0]?.text ?? '', 50),
+        snippet: quotedSnippet(turn.person[0]?.text ?? turn.messages[0]?.text ?? '', 50),
         other: word(other),
       })}
       onClick={() => onKind(turn, other)}
@@ -316,11 +316,11 @@ function Chose({ message, now, asked }: { message: Message; now: number; asked: 
         {choice.about === null ? null : (
           <span className="hb-on">
             {t('hablar.chose.on', { about: choice.about })}
-            {choice.asked ? ` · «${messageSnippet(choice.asked, 60)}»` : ''}
+            {choice.asked ? ` · «${quotedSnippet(choice.asked, 60)}»` : ''}
           </span>
         )}
         {choice.about === null && asked?.text ? (
-          <span className="hb-on">«{messageSnippet(asked.text, 60)}»</span>
+          <span className="hb-on">«{quotedSnippet(asked.text, 60)}»</span>
         ) : null}
       </div>
     </>
@@ -374,7 +374,7 @@ function Reply({
       {why ? <p className="hb-unverified-why">{t('hablar.unverified.why')}</p> : null}
       {answers === null ? null : (
         <button type="button" className="hb-re" onClick={() => onGo(answers.root)}>
-          {t('hablar.re', { snippet: messageSnippet(answers.text, 60) })}
+          {t('hablar.re', { snippet: quotedSnippet(answers.text, 60) })}
         </button>
       )}
       {reply.lead === '' ? null : (
