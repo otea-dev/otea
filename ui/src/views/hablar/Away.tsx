@@ -49,9 +49,11 @@ export function AwayCopy({ name }: { name: string }) {
 
 // Where it restarts, and the commands for the person who would rather run them.
 export function AwayHow({ name }: { name: string }) {
+  const app = useApp();
   return (
     <>
-      <p className="hb-back">{t('hablar.away.back')}</p>
+      {/* On the computer, «no desde aquí» says nothing: the person is where it restarts. */}
+      <p className="hb-back">{t(app.phone ? 'hablar.away.back' : 'hablar.away.back.desk')}</p>
       <details className="hb-cmds">
         <summary>{t('hablar.away.cmds')}</summary>
         <p>{t('hablar.away.cmdWait')}</p>

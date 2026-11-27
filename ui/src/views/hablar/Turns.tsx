@@ -348,6 +348,8 @@ function Reply({
   const parts = useMemo(() => blocksOf(message.text), [message.text]);
   const reply = useMemo(() => splitReply(parts.rest), [parts.rest]);
   const [open, setOpen] = useState(false);
+  // Why it is not verified, said in words on a tap (a tooltip cannot be opened on a phone).
+  const [why, setWhy] = useState(false);
   const id = `hb-more-${message.id}`;
   return (
     <>
@@ -358,12 +360,18 @@ function Reply({
         </span>
         <time dateTime={message.at}>{noteTime(message.at, now)}</time>
         {message.author === 'secretary' && message.unverified ? (
-          <span className="hb-unverified" title={t('hablar.unverified.why')}>
+          <button
+            type="button"
+            className="hb-unverified"
+            aria-expanded={why}
+            onClick={() => setWhy(!why)}
+          >
             {t('hablar.unverified')}
-          </span>
+          </button>
         ) : null}
         {head}
       </div>
+      {why ? <p className="hb-unverified-why">{t('hablar.unverified.why')}</p> : null}
       {answers === null ? null : (
         <button type="button" className="hb-re" onClick={() => onGo(answers.root)}>
           {t('hablar.re', { snippet: messageSnippet(answers.text, 60) })}

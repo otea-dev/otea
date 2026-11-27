@@ -591,6 +591,36 @@ describe('a question that needs your words, a question that is over, a secretary
     expect(marks).toHaveLength(1);
     expect(text(marks[0])).toBe('sin verificar');
   });
+
+  // R2 (field study 4, V7): the why was a tooltip, which a phone cannot open. A tap on the mark
+  // says it in words, under the message's head, and a second tap puts it away.
+  it('says why in words when the mark is tapped, which a tooltip never did on a phone', async () => {
+    const { root } = await open(
+      conversation({
+        messages: [
+          say({ id: 1, author: 'person', text: 'hola' }),
+          say({
+            id: 2,
+            author: 'secretary',
+            replyTo: 1,
+            root: 1,
+            text: 'Aprobé todo.',
+            unverified: true,
+          }),
+        ],
+      }),
+    );
+    const mark = q(root, '.hb-unverified') as HTMLElement;
+    expect(q(root, '.hb-unverified-why')).toBeNull();
+    expect(mark.getAttribute('aria-expanded')).toBe('false');
+
+    await press(mark);
+
+    expect(text(q(root, '.hb-unverified-why'))).toContain('no pudo atar este mensaje');
+    expect(mark.getAttribute('aria-expanded')).toBe('true');
+    await press(mark);
+    expect(q(root, '.hb-unverified-why')).toBeNull();
+  });
 });
 
 describe('a one-paragraph reply', () => {
@@ -963,6 +993,30 @@ describe('the secretary thinking', () => {
       expect(text(away)).toContain('Modo oscuro');
       page?.unmount();
     }
+  });
+
+  // R2 (field study 4, V4): the desk told a person already at the computer that the secretary
+  // «se reinicia en tu equipo, no desde aquí». That is for the phone; the desk says where to paste.
+  it('says where the secretary restarts in words that fit where you are', async () => {
+    const view = conversation({
+      messages: read,
+      secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 2 },
+      waiting: { count: 2, since: ago(120) },
+    });
+    const how = async (phone: boolean) => {
+      const { root } = await open(view, { phone, pending: yours });
+      await press(q(root, '.hb-away-toggle') as HTMLElement);
+      const words = text(q(root, '.hb-back'));
+      page?.unmount();
+      return words;
+    };
+    expect(await how(true)).toContain('no desde aquí');
+    const desk = await how(false);
+    // Still the computer's, since that is where it restarts; never «not from here», which is where
+    // the person already is.
+    expect(desk).not.toContain('no desde aquí');
+    expect(desk).toContain('en tu equipo');
+    expect(desk).toContain('pégale este texto');
   });
 
   it('is the line «Te espera» alone while the secretary is there', async () => {

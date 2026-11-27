@@ -596,6 +596,18 @@
   font: 500 0.92em / inherit var(--mono);
   white-space: nowrap;
 }
+/* «(CAM-1),» is one unit: a line never ends on its «(» nor starts with its «)» */
+.hb-glue {
+  white-space: nowrap;
+}
+.hb-plain code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--well);
+  font: 400 0.9em / inherit var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 /* what you said */
 .hb-mine {
@@ -743,6 +755,12 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--warn);
+  cursor: pointer;
+}
+.hb-unverified-why {
+  margin: 4px 0 2px;
+  font: 400 italic 13.5px / 1.4 var(--serif);
+  color: var(--ink-2);
 }
 @keyframes hb-sweep {
   0% {

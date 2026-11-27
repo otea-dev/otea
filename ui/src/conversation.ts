@@ -351,6 +351,51 @@ export function piecesOf(text: string, known: ReadonlySet<string>): Piece[] {
   return out;
 }
 
+// A link piece with the marks that hold to it: «(CAM-1),» is one unbreakable unit, so a line never
+// ends on a lone «(» nor starts with a lone «)».
+export type Glued =
+  | { kind: 'text'; text: string }
+  | { kind: 'item'; id: string; open?: string; close?: string }
+  | { kind: 'url'; url: string };
+
+const OPENING = /[([«“"¿¡]+$/;
+const CLOSING = /^[)\]»”",.;:!?…]+/;
+
+export function gluePunctuation(pieces: readonly Piece[]): Glued[] {
+  const out: Glued[] = pieces.map((piece) => ({ ...piece }));
+  const text = (at: number) => {
+    const piece = out[at];
+    return piece?.kind === 'text' ? piece : undefined;
+  };
+  out.forEach((piece, at) => {
+    // An address is long and breaks where it must: only an id holds its marks.
+    if (piece.kind !== 'item') return;
+    const before = text(at - 1);
+    const open = before ? OPENING.exec(before.text)?.[0] : undefined;
+    const after = text(at + 1);
+    const close = after ? CLOSING.exec(after.text)?.[0] : undefined;
+    if (before && open) before.text = before.text.slice(0, -open.length);
+    if (after && close) after.text = after.text.slice(close.length);
+    if (open) piece.open = open;
+    if (close) piece.close = close;
+  });
+  return out.filter((piece) => piece.kind !== 'text' || piece.text !== '');
+}
+
+// The words of a message and, between backticks, the code the secretary wrote: `otea pending` is
+// drawn as code, not with its marks. A backtick with no mate stays a backtick.
+export function codeSpans(text: string): { code: boolean; text: string }[] {
+  const parts: { code: boolean; text: string }[] = [];
+  let from = 0;
+  for (const match of text.matchAll(/`([^`\n]+)`/g)) {
+    if (match.index > from) parts.push({ code: false, text: text.slice(from, match.index) });
+    parts.push({ code: true, text: match[1] ?? '' });
+    from = match.index + match[0].length;
+  }
+  if (from < text.length) parts.push({ code: false, text: text.slice(from) });
+  return parts;
+}
+
 // Whether a file shows as a thumbnail that opens large: only the formats an image is served in.
 export function isPicture(file: Pick<MessageFile, 'kind' | 'contentType'>): boolean {
   return file.kind === 'image' && /^image\/(png|jpe?g|gif|webp)$/.test(file.contentType);

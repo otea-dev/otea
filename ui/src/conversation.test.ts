@@ -7,9 +7,11 @@ import {
   cardCounts,
   cardsOf,
   chipOf,
+  codeSpans,
   FOLD_CHARS,
   FOLD_LINES,
   fencesOf,
+  gluePunctuation,
   type Message,
   mergeMessages,
   otherKind,
@@ -479,6 +481,42 @@ describe('plain words with ids and links', () => {
     // An address that ends in a word keeps all of it.
     expect(piecesOf('https://otea.dev/a-b_c/', new Set())).toEqual([
       { kind: 'url', url: 'https://otea.dev/a-b_c/' },
+    ]);
+  });
+});
+
+// R2 (field study 4, V2 and V4): a «(CAM-1)» broke at the line's end and left a lone «)» or «(»,
+// and the secretary's `commands` showed their backticks as written.
+describe('plain words: punctuation that holds to a link, and code spans', () => {
+  it('holds the opening and closing marks to the id or address they surround', () => {
+    const known = new Set(['CAM-1', 'CAM-2']);
+    expect(gluePunctuation(piecesOf('Listo (CAM-1), y también «CAM-2». Fin', known))).toEqual([
+      { kind: 'text', text: 'Listo ' },
+      { kind: 'item', id: 'CAM-1', open: '(', close: '),' },
+      { kind: 'text', text: ' y también ' },
+      { kind: 'item', id: 'CAM-2', open: '«', close: '».' },
+      { kind: 'text', text: ' Fin' },
+    ]);
+    // A mark that stands alone, away from a link, stays where it was.
+    expect(gluePunctuation(piecesOf('Sin enlaces (ni uno).', known))).toEqual([
+      { kind: 'text', text: 'Sin enlaces (ni uno).' },
+    ]);
+  });
+
+  it('sets a `command` between backticks as code, leaves a lone backtick, and keeps ids in code as code', () => {
+    expect(codeSpans('Corre `npm test` y luego `otea pending`.')).toEqual([
+      { code: false, text: 'Corre ' },
+      { code: true, text: 'npm test' },
+      { code: false, text: ' y luego ' },
+      { code: true, text: 'otea pending' },
+      { code: false, text: '.' },
+    ]);
+    expect(codeSpans('Un ` suelto y nada más')).toEqual([
+      { code: false, text: 'Un ` suelto y nada más' },
+    ]);
+    expect(codeSpans('Mira `CAM-1`')).toEqual([
+      { code: false, text: 'Mira ' },
+      { code: true, text: 'CAM-1' },
     ]);
   });
 });

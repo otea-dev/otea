@@ -18,6 +18,8 @@ export const hablar = {
     'Tu secretario está desconectado. Tus mensajes se guardan hasta que vuelva.',
   'hablar.away.back':
     'Se reinicia en tu equipo, no desde aquí: abre una sesión de tu agente y pégale este texto.',
+  'hablar.away.back.desk':
+    'Se reinicia en tu equipo: abre una sesión de tu agente y pégale este texto.',
   'hablar.away.short': {
     one: 'Tu secretario está desconectado · {count} mensaje espera',
     other: 'Tu secretario está desconectado · {count} mensajes esperan',

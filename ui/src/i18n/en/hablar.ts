@@ -15,6 +15,8 @@ export const hablar = {
   'hablar.awayUnknown': 'Your secretary is offline. Your messages are kept until it is back.',
   'hablar.away.back':
     'It restarts on your computer, not from here: open a session of your agent and paste this text into it.',
+  'hablar.away.back.desk':
+    'It restarts on your computer: open a session of your agent and paste this text into it.',
   'hablar.away.short': {
     one: 'Your secretary is offline · {count} message waiting',
     other: 'Your secretary is offline · {count} messages waiting',
