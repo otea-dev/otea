@@ -147,6 +147,69 @@ describe('an agent name is bound to the harness session noted for it', () => {
     expect(spoken()).toEqual([['secretary', 'Hola.']]);
   }, 120_000);
 
+  // Field study 4, T1c: `otea pending --as <secretary>` from any session refreshed its last_seen, so a
+  // dead secretary kept reading connected and nobody could take its role while something polled.
+  it('answers a read from another session without keeping the secretary alive', async () => {
+    const lastSeen = () => {
+      const project = openProject(repo.dir);
+      try {
+        const row = project.db
+          .prepare('SELECT last_seen AS at FROM agents WHERE name = :name')
+          .get({ name: sol }) as { at: string } | undefined;
+        return row?.at;
+      } finally {
+        project.db.close();
+      }
+    };
+    // Its last sign is long past: a read that counted would show.
+    const longAgo = new Date(Date.now() - 20 * 60_000).toISOString();
+    const age = () => {
+      const project = openProject(repo.dir);
+      try {
+        project.db
+          .prepare('UPDATE agents SET last_seen = :longAgo WHERE name = :name')
+          .run({ longAgo, name: sol });
+      } finally {
+        project.db.close();
+      }
+    };
+    harness('real', 'whoami', '--as', sol).boundTo(sol);
+    age();
+
+    const read = await harness('stranger', 'pending', '--as', sol).result();
+
+    expect(read.code, read.err).toBe(0);
+    expect(read.out).toContain('Nothing');
+    expect(lastSeen()).toBe(longAgo);
+  }, 120_000);
+
+  it('lets the bound session read as the secretary and be seen', async () => {
+    const real = harness('real', 'pending', '--as', sol);
+    real.boundTo(sol);
+    const longAgo = new Date(Date.now() - 20 * 60_000).toISOString();
+    const project = openProject(repo.dir);
+    try {
+      project.db
+        .prepare('UPDATE agents SET last_seen = :longAgo WHERE name = :name')
+        .run({ longAgo, name: sol });
+    } finally {
+      project.db.close();
+    }
+
+    const read = await real.result();
+
+    expect(read.code, read.err).toBe(0);
+    const after = openProject(repo.dir);
+    try {
+      const row = after.db
+        .prepare('SELECT last_seen AS at FROM agents WHERE name = :name')
+        .get({ name: sol }) as { at: string };
+      expect(row.at > longAgo).toBe(true);
+    } finally {
+      after.db.close();
+    }
+  }, 120_000);
+
   it('lets a new session take over once the bound one is gone', async () => {
     const old = harness('old', 'whoami', '--as', sol);
     old.boundTo(sol);
