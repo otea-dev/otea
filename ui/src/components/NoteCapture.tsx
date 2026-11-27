@@ -12,6 +12,7 @@ import {
 } from '../intake-files.ts';
 import { Icon } from '../kit/index.ts';
 import { clearNoteDraft, keepNoteDraft, readNoteDraft } from '../note-draft.ts';
+import { keepNoteFiles, readNoteFiles } from '../note-draft-files.ts';
 import { QUEUE_MAX_MB } from '../offline/capture-queue.ts';
 import { enqueue, type Queued, queueAvailable } from '../offline/queue-store.ts';
 import { Thumb } from './IntakeFiles.tsx';
@@ -70,6 +71,35 @@ export function NoteCapture({
     if (autoFocus) field.current?.focus({ preventScroll: true });
   }, [autoFocus]);
 
+  // The note is kept as it is written, words and files, so the page reloading under it (the
+  // installed app updating itself while the camera, another app, has the front) loses nothing: it
+  // comes back as it was. A send that lands, or Descartar, empties it.
+  useEffect(() => {
+    if (text.trim() === '') clearNoteDraft(project);
+    else keepNoteDraft(project, text);
+  }, [text, project]);
+  // Files are put back once, before any is kept: until then an empty box must not wipe them.
+  const filesRead = useRef(false);
+  useEffect(() => {
+    let current = true;
+    void readNoteFiles(project).then((files) => {
+      if (!current) return;
+      filesRead.current = true;
+      if (files.length > 0)
+        setDrafts((was) => (was.length > 0 ? was : withFiles([], files, 'single', draftKey)));
+    });
+    return () => {
+      current = false;
+    };
+  }, [project]);
+  useEffect(() => {
+    if (filesRead.current)
+      void keepNoteFiles(
+        project,
+        drafts.map(({ file }) => file),
+      );
+  }, [drafts, project]);
+
   // Online as the session allows; while the computer does not answer the session reads read-only,
   // and a note still goes to the queue (app.canCapture).
   const canWrite = app.canCapture;
@@ -98,6 +128,7 @@ export function NoteCapture({
     const done = (how: 'sent' | 'queued', ref?: string) => {
       attempt.current = null;
       clearNoteDraft(project);
+      void keepNoteFiles(project, []);
       if (!alive.current) return;
       setText('');
       setKept(false);
@@ -162,6 +193,7 @@ export function NoteCapture({
   const discard = () => {
     attempt.current = null;
     clearNoteDraft(project);
+    void keepNoteFiles(project, []);
     setText('');
     setKept(false);
     setDrafts([]);

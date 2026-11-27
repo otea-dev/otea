@@ -1,7 +1,8 @@
-// The words of a quick note that was not sent (the PC did not answer, or refused it): kept on the
-// phone per project, so closing the sheet or reloading the page brings them back instead of losing
-// them. Files cannot be kept here (a picked file lives only in the open page); a note that waits
-// for the PC with its files goes to the offline queue instead (offline/capture-queue.ts).
+// The words of a quick note that was not sent (written and not yet sent, or the PC did not answer,
+// or refused it): kept on the phone per project, so closing the sheet or reloading the page (the
+// app updating itself under the camera) brings them back instead of losing them. Its files are
+// kept beside them (note-draft-files.ts); a note that waits for the PC with its files goes to the
+// offline queue instead (offline/capture-queue.ts).
 
 const KEY = 'otea.capture.note';
 const keyOf = (project: string | undefined) => (project ? `${KEY}:${project}` : KEY);
