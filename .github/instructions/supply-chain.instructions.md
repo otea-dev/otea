@@ -20,5 +20,5 @@ The published package `@otea/cli` has six runtime dependencies on purpose (`@hon
 - **Permissions:** the default is `contents: read`. Flag a widened `permissions`, a job-level grant that is broader than the job needs, `id-token: write` or `secrets: inherit` outside the release workflows, and new use of secrets in jobs that run on pull requests.
 - **Pinning:** third-party actions are pinned to a full commit SHA with a version comment, as they are now. Flag a tag or branch ref (`@v4`, `@main`).
 - **Release path** (`release-please.yml`, `npm-publish.yml`, `desktop.yml`): npm publishing is trusted publishing that only stages; the workflow file name is what npm matches. Flag a token, a plain `npm publish`, a renamed workflow, or a change to what runs on tags.
-- **Required checks:** `check (ubuntu-latest)`, `check (windows-latest)` and `cla`; renaming a job or matrix entry silently removes them. Do not weaken or skip tests in `ci.yml`.
+- **Required checks:** `check (ubuntu-latest)`, `check (windows-latest)` and `cla`; renaming a job or matrix entry silently removes them. `check (windows-latest)` is the gate job of the two Windows halves (`check (windows-latest, part 1 of 2)` and `part 2 of 2`); keep its name. Do not weaken or skip tests in `ci.yml`.
 - **`dependabot.yml`:** grouped updates and the `chore(deps)` prefix stay.
