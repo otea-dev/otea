@@ -1,7 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { noteVersion, offlineCapable, VERSION_KEY } from './register.ts';
 import { FROM_CACHE, SAVED_AT } from './sw-routes.ts';
-import { afterRead, readOf, type SyncState } from './sync-state.ts';
+import {
+  afterRead,
+  noteRead,
+  readOf,
+  resetSync,
+  STARTUP_MS,
+  type SyncState,
+  settleStartup,
+  syncNow,
+} from './sync-state.ts';
 
 const start: SyncState = { offline: false, syncedAt: null };
 
@@ -37,6 +46,43 @@ describe('afterRead', () => {
   it('back online with the next read from the PC', () => {
     const off = afterRead(start, { kind: 'failed' }, 50);
     expect(afterRead(off, { kind: 'fresh' }, 60)).toEqual({ offline: false, syncedAt: 60 });
+  });
+});
+
+// Opened from a notification on a cold phone, the first answer takes seconds: the service worker
+// gives up on it after four and serves what it kept, while the PC answers a moment later. The app
+// said "No llego a tu equipo" for those seconds. Offline is said only for a PC that did not
+// answer after start-up.
+describe('the first seconds after the app opens', () => {
+  beforeEach(() => resetSync(1_000));
+
+  it('does not say offline for a read the cache answered while the PC is still waking', () => {
+    noteRead({ kind: 'cached', savedAt: 40 }, 5_000);
+    noteRead({ kind: 'failed' }, 6_000);
+    expect(syncNow().offline).toBe(false);
+    noteRead({ kind: 'fresh' }, 7_000);
+    expect(syncNow()).toEqual({ offline: false, syncedAt: 7_000 });
+    // Nothing held is left to turn up once the grace is over.
+    settleStartup(1_000 + STARTUP_MS + 1);
+    expect(syncNow().offline).toBe(false);
+  });
+
+  it('says it once the grace is over and the PC never answered', () => {
+    noteRead({ kind: 'cached', savedAt: 40 }, 5_000);
+    expect(syncNow().offline).toBe(false);
+    settleStartup(1_000 + STARTUP_MS + 1);
+    expect(syncNow()).toEqual({ offline: true, syncedAt: 40 });
+  });
+
+  it('says it at once for a read that fails after the grace', () => {
+    noteRead({ kind: 'failed' }, 1_000 + STARTUP_MS + 50);
+    expect(syncNow().offline).toBe(true);
+  });
+
+  it('says it at once for a PC that answered before and then went quiet', () => {
+    noteRead({ kind: 'fresh' }, 2_000);
+    noteRead({ kind: 'failed' }, 3_000);
+    expect(syncNow().offline).toBe(true);
   });
 });
 
