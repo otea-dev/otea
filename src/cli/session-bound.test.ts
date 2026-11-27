@@ -32,7 +32,7 @@ const MAIN = fileURLToPath(new URL('./main.ts', import.meta.url));
 // 7 was expected). Every session these tests start waits for its listing up to the guard's own
 // ceiling instead, so the refusal rests on the listing completing, not on the machine's speed. The
 // guard only lets the wait be raised (cli/session-guard.ts readMsOf), never shortened: that clamp
-// is checked on its own in session-judge.test.ts.
+// is checked in session-judge.test.ts and, end to end against a stub listing, in session-wait.test.ts.
 const SLOW_LISTING_OK = { OTEA_SESSION_READ_MS: '60000' };
 
 // U8 (field study 4): `otea say "..." --as claude-sec` from any other process posted in Hablar
