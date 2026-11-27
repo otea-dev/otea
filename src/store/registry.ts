@@ -75,8 +75,19 @@ type PathRow = {
   root_commit: string | null;
 };
 
+const givenHomes = new WeakMap<DatabaseSync, string>();
+
+// The home as the caller named it. SQLite reports the file of a database by its real path (macOS
+// keeps /var behind /private/var), and a path read back from the registry has to stay the one the
+// person's home was given by.
+export function rememberHome(db: DatabaseSync, home: string): void {
+  givenHomes.set(db, home);
+}
+
 // The Otea home the registry lives in (its folder), '' for a registry kept in memory.
 export function homeOf(db: DatabaseSync): string {
+  const given = givenHomes.get(db);
+  if (given !== undefined) return given;
   const databases = db.prepare('PRAGMA database_list').all() as { name: string; file: string }[];
   const file = databases.find((each) => each.name === 'main')?.file ?? '';
   return file === '' ? '' : dirname(file);

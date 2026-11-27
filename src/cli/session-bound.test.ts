@@ -88,14 +88,16 @@ describe('an agent name is bound to the harness session noted for it', () => {
       script,
       [
         "const { spawn } = require('node:child_process');",
-        "const { existsSync, writeFileSync } = require('node:fs');",
+        "const { existsSync, renameSync, writeFileSync } = require('node:fs');",
         'const [out, goFile, main, ...argv] = process.argv.slice(2);',
+        // Written whole, then put in place: the test reads the file as soon as it exists.
+        "const publish = (text) => { writeFileSync(out + '.part', text); renameSync(out + '.part', out); };",
         'const run = () => {',
         "  const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', main, ...argv], { stdio: ['ignore', 'pipe', 'pipe'] });",
         "  let text = ''; let err = '';",
         "  child.stdout.on('data', (d) => { text += d; });",
         "  child.stderr.on('data', (d) => { err += d; });",
-        "  child.on('close', (code) => writeFileSync(out, JSON.stringify({ code, out: text, err })));",
+        "  child.on('close', (code) => publish(JSON.stringify({ code, out: text, err })));",
         '};',
         'const poll = setInterval(() => { if (existsSync(goFile)) { clearInterval(poll); run(); } }, 50);',
         'setTimeout(() => {}, 120_000);',
@@ -646,13 +648,15 @@ describe('the secretary’s declaration notes its harness', () => {
       script,
       [
         "const { spawn } = require('node:child_process');",
-        "const { writeFileSync } = require('node:fs');",
+        "const { renameSync, writeFileSync } = require('node:fs');",
         'const [out, main, ...argv] = process.argv.slice(2);',
+        // Written whole, then put in place: the test reads the file as soon as it exists.
+        "const publish = (text) => { writeFileSync(out + '.part', text); renameSync(out + '.part', out); };",
         "const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', main, ...argv], { stdio: ['ignore', 'pipe', 'pipe'] });",
         "let text = ''; let err = '';",
         "child.stdout.on('data', (d) => { text += d; });",
         "child.stderr.on('data', (d) => { err += d; });",
-        "child.on('close', (code) => writeFileSync(out, JSON.stringify({ code, out: text, err })));",
+        "child.on('close', (code) => publish(JSON.stringify({ code, out: text, err })));",
         'setTimeout(() => {}, 120_000);',
       ].join('\n'),
     );

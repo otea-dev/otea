@@ -16,6 +16,7 @@ import {
   type PathKind,
   type ProjectPath,
   type RegisteredProject,
+  rememberHome,
   selectProjectPaths,
   selectRegisteredProject,
   selectRegisteredProjects,
@@ -39,6 +40,7 @@ function registryPath(env: Env): string {
 export function openRegistry(env: Env = process.env): DatabaseSync {
   mkdirSync(oteaHome(env), { recursive: true });
   return openWithSetup(registryPath(env), (db) => {
+    rememberHome(db, oteaHome(env));
     migrateRegistry(db);
     anchorDataDirs(db, oteaHome(env));
     return db;

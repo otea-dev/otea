@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -88,6 +88,25 @@ describe('a copied or moved Otea home', () => {
     const opened = track(openProject(repo, { OTEA_HOME: copy }));
 
     expect(opened.dataDir).toBe(join(copy, 'data', id));
+  });
+
+  // macOS keeps its temp folder behind a link (/var -> /private/var), and SQLite reports the file of
+  // the registry by its real path: the data folder stays under the home as the person gave it.
+  it('names the data folder under the home as given when that is reached through a link', () => {
+    const real = tempDir();
+    const link = join(tempDir(), 'home-link');
+    symlinkSync(real, link, 'junction');
+    cleanups.push(() => rmSync(link, { force: true }));
+    const { repo, project } = projectIn(link);
+    const { id } = project.identity;
+    project.db.close();
+
+    const opened = track(openProject(repo, { OTEA_HOME: link }));
+
+    expect(opened.dataDir).toBe(join(link, 'data', id));
+    const registry = openRegistry({ OTEA_HOME: link });
+    expect(registry.prepare('SELECT data_dir FROM projects').get()?.data_dir).toBe(`data/${id}`);
+    registry.close();
   });
 
   it('never touches a row that points outside the home', () => {
