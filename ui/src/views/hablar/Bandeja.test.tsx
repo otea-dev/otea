@@ -179,6 +179,27 @@ describe('the quick note', () => {
     expect(calls[1]?.headers['idempotency-key']).toBe(calls[0]?.headers['idempotency-key']);
   });
 
+  // G3: the words a failed send kept came back every time, with no way to be rid of them.
+  it('lets you throw away what a failed send kept, and it does not come back', async () => {
+    server([], { failures: 1 });
+    let root = await show(<NoteCapture onSent={vi.fn()} />);
+    await typeInto(q(root, '.bn-text'), 'una idea');
+    await press(q(root, '.bn-save'));
+    expect(q(root, '.bn-err')).not.toBeNull();
+
+    // Closed and opened again: the words are back, and so is the way to discard them.
+    page?.unmount();
+    root = await show(<NoteCapture onSent={vi.fn()} />);
+    expect(q<HTMLTextAreaElement>(root, '.bn-text')?.value).toBe('una idea');
+    await press(q(root, '.bn-discard'));
+
+    expect(q<HTMLTextAreaElement>(root, '.bn-text')?.value).toBe('');
+    expect(q(root, '.bn-discard')).toBeNull();
+    page?.unmount();
+    root = await show(<NoteCapture onSent={vi.fn()} />);
+    expect(q<HTMLTextAreaElement>(root, '.bn-text')?.value).toBe('');
+  });
+
   it('still finishes a send under StrictMode, which mounts, unmounts and mounts it again', async () => {
     const calls = server([]);
     const sent = vi.fn();

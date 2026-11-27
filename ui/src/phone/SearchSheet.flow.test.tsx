@@ -108,4 +108,43 @@ describe('the phone search sheet', () => {
     vi.unstubAllGlobals();
     view.unmount();
   });
+
+  // G3: the line a screen reader hears when the results change counted the items alone.
+  it('counts what it found in Hablar in the line it reads out, with the items', async () => {
+    vi.stubGlobal('fetch', async () => {
+      const said = {
+        id: 7,
+        root: 7,
+        author: 'person',
+        by: 'tú',
+        kind: 'consultation',
+        text: '¿Y si el login falla?',
+        at: ago(30),
+        attachments: [],
+        links: [],
+      };
+      return new Response(JSON.stringify({ messages: [said], more: false, secretary: null }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+    const view = mount(
+      <AppTestProvider value={app}>
+        <SearchSheet />
+      </AppTestProvider>,
+    );
+    await settle();
+    openSearch();
+    await settle();
+    await typeInto(field(), 'login');
+    await vi.waitFor(() => expect(document.querySelector('.srow.talk')).not.toBeNull());
+
+    expect(document.querySelector('.srch-count')?.textContent).toBe('1 item · 1 in Talk');
+
+    // Only a hit in Hablar: the line is there too, naming it.
+    await typeInto(field(), 'falla');
+    await vi.waitFor(() => expect(document.querySelector('.srow.talk')).not.toBeNull());
+    expect(document.querySelector('.srch-count')?.textContent).toBe('1 in Talk');
+    vi.unstubAllGlobals();
+    view.unmount();
+  });
 });

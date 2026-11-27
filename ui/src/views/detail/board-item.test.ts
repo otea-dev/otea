@@ -1260,9 +1260,15 @@ describe('branchSaid', () => {
     } as const;
     setLanguage('es');
     expect(localBehindSaid(behind)).toBe(
-      'Subido a origin/main, pero tu main local va 2 commits atrasado: en D:\\work\\app ejecuta git pull --ff-only',
+      'Subido a origin/main, pero en tu main local van 2 commits atrasados: en D:\\work\\app ejecuta git pull --ff-only',
     );
     expect(localBehindSaid({ ...behind, behind: 1 })).toContain('va 1 commit atrasado');
+    expect(localBehindSaid({ ...behind, behind: 3, state: 'changes' })).toContain(
+      'van 3 commits atrasados',
+    );
+    expect(localBehindSaid({ ...behind, behind: 3, state: 'elsewhere', on: 'x' })).toContain(
+      'van 3 commits atrasados',
+    );
     expect(localBehindSaid({ ...behind, state: 'changes' })).toContain('tiene cambios tuyos');
     expect(localBehindSaid({ ...behind, state: 'elsewhere', on: 'feat/x' })).toContain(
       'está en feat/x',

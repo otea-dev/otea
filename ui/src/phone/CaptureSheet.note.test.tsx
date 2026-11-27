@@ -137,9 +137,34 @@ describe('the phone’s quick note', () => {
     const modes = [...document.querySelectorAll<HTMLButtonElement>('.bn-mode button')];
     expect(modes.map((button) => button.textContent)).toEqual(['Quick note', 'With a board']);
     await press(modes[1]);
-    expect(document.querySelector('.bn-text')).toBeNull();
+    // The note is put aside (its words are kept: see below), the board's form is what shows.
+    expect(document.querySelector('.bn-text')?.closest('[hidden]')).not.toBeNull();
+    expect(document.querySelector('input.ftitle')).not.toBeNull();
     await press(document.querySelectorAll<HTMLButtonElement>('.bn-mode button')[0]);
-    expect(document.querySelector('.bn-text')).not.toBeNull();
+    expect(document.querySelector('.bn-text')?.closest('[hidden]')).toBeNull();
+    expect(document.querySelector('input.ftitle')).toBeNull();
+    view.unmount();
+  });
+
+  // G3: looking at the board's form unmounted the note, and what was typed went with it.
+  it('keeps the note while the board’s form is looked at', async () => {
+    const view = mount(
+      <AppTestProvider value={app}>
+        <CaptureSheet />
+      </AppTestProvider>,
+    );
+    await settle();
+    openCapture();
+    await settle();
+    await typeInto(document.querySelector<HTMLTextAreaElement>('.bn-text'), 'una idea a medias');
+
+    const modes = () => [...document.querySelectorAll<HTMLButtonElement>('.bn-mode button')];
+    await press(modes()[1]);
+    await press(modes()[0]);
+
+    expect(document.querySelector<HTMLTextAreaElement>('.bn-text')?.value).toBe(
+      'una idea a medias',
+    );
     view.unmount();
   });
 });

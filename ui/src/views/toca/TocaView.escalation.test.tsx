@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Pending, PendingEntry } from '../../../../src/core/pending.ts';
 import { type App, AppTestProvider } from '../../app/context.tsx';
 import { ago, item, NOW } from '../../derive/fixtures.ts';
@@ -15,6 +15,7 @@ let page: Mounted | undefined;
 afterEach(() => {
   page?.unmount();
   page = undefined;
+  vi.unstubAllGlobals();
   setLanguage('en');
 });
 
@@ -45,6 +46,10 @@ describe('Te toca, a report about an item that is also yours to review', () => {
       openItem: (id: string) => void opened.push(id),
       go: (route) => void went.push(route),
     });
+    vi.stubGlobal(
+      'fetch',
+      async () => new Response('{}', { status: 404, headers: { 'content-type': 'application/json' } }),
+    );
     page = mount(
       <AppTestProvider value={app}>
         <TocaView />
