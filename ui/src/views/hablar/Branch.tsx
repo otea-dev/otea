@@ -3,6 +3,7 @@ import { optionsNeedingWords } from '../../../../src/core/own-words.ts';
 import type { AnswerWords } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { ShortText } from '../../components/ShortText.tsx';
+import { Ticked } from '../../components/Ticked.tsx';
 import { type Chip, splitQuestion } from '../../conversation.ts';
 import { t } from '../../i18n/i18n.ts';
 import { AgentMark, Button, Swap, toast } from '../../kit/index.ts';
@@ -220,7 +221,9 @@ export function AskBody({
         </>
       )}
       {said !== null || gone ? (
-        <p className="hb-said">{said ?? t('hablar.ask.gone')}</p>
+        <p className="hb-said">
+          <Ticked text={said ?? t('hablar.ask.gone')} />
+        </p>
       ) : (
         <>
           {action ? (
@@ -258,7 +261,9 @@ export function AskBody({
                     answer({ option: index + 1 }, t('hablar.ask.answered', { text }));
                   }}
                 >
-                  <span>{text}</span>
+                  <span>
+                    <Ticked text={text} />
+                  </span>
                   {recommended === index + 1 ? (
                     <span className="hb-rec">{t('pick.recommended')}</span>
                   ) : null}

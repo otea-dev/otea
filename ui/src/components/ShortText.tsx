@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { FOLD_CHARS, FOLD_LINES, splitQuestion, splitReply } from '../conversation.ts';
 import { t } from '../i18n/i18n.ts';
 import { NoteText } from './NoteText.tsx';
+import { Ticked } from './Ticked.tsx';
 
 // What an agent wrote for the person (a question, a handoff note) set as the secretary's replies
 // are: the conclusion in one sentence, the rest in body text, and a rest that runs long folded
@@ -51,7 +52,9 @@ export function ShortText({
           {markdown ? (
             <NoteText text={text} className={leadClass} />
           ) : (
-            <p className={`${leadClass} st-lines`}>{text}</p>
+            <p className={`${leadClass} st-lines`}>
+              <Ticked text={text} />
+            </p>
           )}
         </div>
         {long ? toggle(open, true) : null}
@@ -63,7 +66,9 @@ export function ShortText({
     markdown ? (
       <NoteText text={words} className={className} />
     ) : (
-      <p className={className}>{words}</p>
+      <p className={className}>
+        <Ticked text={words} />
+      </p>
     );
   const showRest = reply.rest !== '' && (!reply.folds || open);
   return (

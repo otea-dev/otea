@@ -600,7 +600,8 @@
 .hb-glue {
   white-space: nowrap;
 }
-.hb-plain code {
+.hb-plain code,
+.hb-ask code {
   padding: 1px 5px;
   border-radius: 5px;
   background: var(--well);
