@@ -1,10 +1,10 @@
-import { bandejaIdOf, isBandejaRef } from '../core/bandeja.ts';
+import { bandejaIdOf } from '../core/bandeja.ts';
 import { OteaError } from '../core/errors.ts';
 import { plainLine } from '../core/quote.ts';
 import type { SecretaryState } from '../core/secretary.ts';
 import { transaction } from '../store/database.ts';
 import { dismissEscalation, escalationExists, selectOpenEscalations } from '../store/secretary.ts';
-import { requireEntry } from './bandeja.ts';
+import { isBandejaTarget, requireEntry } from './bandeja.ts';
 import type { Context } from './context.ts';
 import { type Clock, requireItem, systemClock } from './items.ts';
 import {
@@ -70,7 +70,7 @@ export function parseEscalation(kept: string): { by: string; text: string } {
 // The item or Bandeja note it is about, checked, as its id.
 function aboutOf(ctx: Context, given: string): string {
   const about = given.trim();
-  if (isBandejaRef(about)) {
+  if (isBandejaTarget(ctx, about)) {
     const entry = requireEntry(ctx, bandejaIdOf(about));
     return entry.ref;
   }

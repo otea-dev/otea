@@ -25,6 +25,7 @@ import {
 } from '../app/agents.ts';
 import {
   askOnBandeja,
+  isBandejaTarget,
   bandejaOfItem,
   bandejaPaths,
   closeBandeja,
@@ -242,7 +243,7 @@ import {
   rolePrompt,
   roleTakesBoard,
 } from '../core/agent-prompts.ts';
-import { bandejaIdOf, isBandejaRef } from '../core/bandeja.ts';
+import { bandejaIdOf } from '../core/bandeja.ts';
 import { isClosed, isLandStep, positionOf, waysOf } from '../core/board/engine.ts';
 import {
   type BoardDefinition,
@@ -3507,7 +3508,7 @@ const ask: Command = {
       throw new UsageError('--recommend is the number of an option, from 1');
     return withAgent(input, (project) => {
       // A question on a Bandeja entry the refiner holds (B-3), not on an item.
-      if (isBandejaRef(id)) {
+      if (isBandejaTarget(project, id)) {
         const { entry, question: asked } = askOnBandeja(project, {
           id: bandejaIdOf(id),
           agent: actor.name,

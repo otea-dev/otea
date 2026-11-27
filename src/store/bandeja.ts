@@ -294,11 +294,19 @@ export function fileEntry(
   return Number(db.prepare(sql).run({ id, agent, item, at }).changes) === 1;
 }
 
-// The entry an item was filed from.
+// The entry an item was filed from. An item's id is kept in capitals (a board's prefix is), so the
+// id is made one and compared as it is: the `bandeja_item` index serves it, which a NOCASE
+// comparison cannot use.
 export function selectEntryOfItem(db: DatabaseSync, item: string): EntryRow | undefined {
   return db
-    .prepare(`SELECT ${COLUMNS} FROM bandeja_entries WHERE item_id = ? COLLATE NOCASE`)
-    .get(item) as EntryRow | undefined;
+    .prepare(`SELECT ${COLUMNS} FROM bandeja_entries WHERE item_id = ?`)
+    .get(item.toUpperCase()) as EntryRow | undefined;
+}
+
+// A deleted item is no one's origin: the entries filed under it stay filed, with no item, so the id
+// can be taken again (by a board of the same prefix) without a note claiming to be its source.
+export function forgetEntriesOfItem(db: DatabaseSync, item: string): void {
+  db.prepare('UPDATE bandeja_entries SET item_id = NULL WHERE item_id = ?').run(item.toUpperCase());
 }
 
 // Whether any entry file has this hash (a board's deletion keeps what the Bandeja holds).

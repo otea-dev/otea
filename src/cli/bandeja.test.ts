@@ -197,6 +197,38 @@ describe('the Bandeja from the refiner', () => {
     });
   });
 
+  // A 0.7 board named "B" has items B-1: the id is that item's first, and a note only when no item
+  // has it (cold review G2).
+  describe('an id both a note and an item could be', () => {
+    const boardNamedB = async () => {
+      inProject((project) => {
+        project.db.prepare("UPDATE collections SET prefix = 'B' WHERE name = 'tasks'").run();
+      });
+      const made = await refined('The B board item', '--as', 'lia', '--json');
+      expect(JSON.parse(made.out).id).toBe('B-1');
+    };
+
+    it('asks on the item when an item has the id, and on the note otherwise', async () => {
+      capture('a note');
+      await otea('bandeja', 'take', 'B-1', '--as', 'lia');
+      await boardNamedB();
+      await otea('claim', 'B-1', '--as', 'lia');
+
+      const asked = await otea('ask', 'B-1', 'Which one?', '--option', 'A', '--option', 'B', '--as', 'lia');
+
+      expect(asked.err).toBe('');
+      expect(asked.code).toBe(0);
+      expect(asked.out).not.toContain('Bandeja');
+      expect(entries()[0]).toMatchObject({ state: 'refining', asking: null });
+      expect((await otea('show', 'B-1', '--as', 'lia')).out).toContain('Which one?');
+
+      // The note is still reached by its own id where no item has it.
+      const noteAsked = await otea('ask', 'B-2', 'Better how?', '--option', 'A', '--option', 'B', '--as', 'lia');
+      expect(noteAsked.code).toBe(3);
+      expect(noteAsked.err).toContain('B-2 is not in the Bandeja');
+    });
+  });
+
   describe('asking the person on an entry', () => {
     it('shows options on the entry, waits for the answer, and wakes the secretary with it', async () => {
       capture('make it better');

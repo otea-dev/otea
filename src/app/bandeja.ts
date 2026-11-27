@@ -8,6 +8,7 @@ import {
   type BandejaState,
   bandejaRef,
   type FromBandeja,
+  isBandejaRef,
 } from '../core/bandeja.ts';
 import { checkOptions, DELEGATED } from '../core/board/questions.ts';
 import { MAX_MESSAGE_CHARS, MAX_MESSAGE_FILES, messageSnippet } from '../core/conversation.ts';
@@ -37,6 +38,7 @@ import {
   selectEntryRows,
 } from '../store/bandeja.ts';
 import { transaction } from '../store/database.ts';
+import { findItem } from '../store/queries.ts';
 import { saveRole, selectRoles } from '../store/secretary.ts';
 import type { Context } from './context.ts';
 import { type MessageFileInput, traceAnswer } from './conversation.ts';
@@ -562,6 +564,13 @@ export function fileBandeja(
     }
     return requireEntry(project, input.id, () => at);
   });
+}
+
+// Whether a name given to a command (ask, escalate) is a Bandeja note. B is reserved for notes from
+// 0.8, but a 0.7 board named B has items B-1 already: a real item comes first, and only a name no
+// item has is a note.
+export function isBandejaTarget(ctx: Context, text: string): boolean {
+  return isBandejaRef(text) && findItem(ctx.db, text.trim().toUpperCase()) === undefined;
 }
 
 // The entry an item came from, for the item's page and `otea show`.

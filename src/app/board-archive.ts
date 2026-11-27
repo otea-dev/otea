@@ -6,7 +6,7 @@ import { readDefinition } from '../core/board/schema.ts';
 import { OteaError } from '../core/errors.ts';
 import type { Actor } from '../core/item.ts';
 import { activeLease } from '../core/lease.ts';
-import { entryFileKept } from '../store/bandeja.ts';
+import { entryFileKept, forgetEntriesOfItem } from '../store/bandeja.ts';
 import {
   type BoardRow,
   deleteBoard,
@@ -305,6 +305,7 @@ export function deleteBoardForever(
         forgetTopicItem(project, item, at);
         // The turn that produced it stays in the conversation; it just no longer lists the item.
         db.prepare('DELETE FROM conversation_links WHERE item_id = ?').run(item);
+        forgetEntriesOfItem(db, item);
         db.prepare('DELETE FROM items WHERE id = ?').run(item);
       }
       deleteDraft(db, board.id);

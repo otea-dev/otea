@@ -14,6 +14,13 @@ import {
   unarchiveBoard,
 } from './board-archive.ts';
 import {
+  bandejaOfItem,
+  captureToBandeja,
+  fileBandeja,
+  requireEntry,
+  takeBandeja,
+} from './bandeja.ts';
+import {
   createBoard,
   createBoardSet,
   ensureRequestsBoard,
@@ -353,6 +360,22 @@ describe('deleteBoardForever', () => {
     const turn = listConversation(project).messages;
     expect(turn.map(({ links }) => links)).toEqual([[], []]);
     expect(turnsOfItem(project, id)).toEqual([]);
+  });
+
+  it('leaves no Bandeja note pointing to an item that is gone: the note stays, filed, with no item', () => {
+    const board = criaturas();
+    const id = add('Ciervo');
+    const { entry } = captureToBandeja(project, { text: 'a deer, please' }, now);
+    takeBandeja(project, { id: entry.id, agent: 'kiln' }, now);
+    fileBandeja(project, { id: entry.id, agent: 'kiln', item: id }, now);
+    expect(requireEntry(project, entry.id, now).item).toBe(id);
+    archiveBoard(project, board, { by: you }, now);
+
+    deleteBoardForever(project, board, { confirm: 'Criaturas' });
+
+    // Its id could be taken again (a board named like this one): the note must not claim it.
+    expect(requireEntry(project, entry.id, now)).toMatchObject({ state: 'filed', item: null });
+    expect(bandejaOfItem(project, id)).toBeUndefined();
   });
 
   it('deletes items topics point to: their topics lose the link, a converted one opens again', () => {
