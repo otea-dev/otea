@@ -367,7 +367,7 @@ import { harnessOf, isKnownHarness, listProcesses, watchOwner } from './owner.ts
 import { PHONE_COMMANDS } from './phone.ts';
 import { portFrom, portToOpen, portToStart, projectPage } from './ports.ts';
 import { probeSignIn } from './probe.ts';
-import { unreachedWhere } from './reach.ts';
+import { saysWhereItLives, unreachedWhere } from './reach.ts';
 import { readServeFile, removeServeFile, serverVersionNote, writeServeFile } from './serve-file.ts';
 import { isFromAnotherSession, sessionBound, sessionVerdictOf } from './session-guard.ts';
 import {
@@ -2118,7 +2118,7 @@ function refuseUnreachedFile(project: Project, move: BoardMoveInput): void {
     return;
   for (const hand of stepById(board.def, position.step)?.hand ?? []) {
     const part = board.def.parts[hand.ref];
-    const value = part?.kind === 'url' ? item.fields[part.id] : undefined;
+    const value = part && saysWhereItLives(part) ? item.fields[part.id] : undefined;
     if (!part || hand.req === 'no' || typeof value !== 'string' || value.trim() === '') continue;
     const why = unreachedWhere(project.root, value);
     if (why)

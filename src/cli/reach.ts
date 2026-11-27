@@ -1,6 +1,17 @@
 import { existsSync, statSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
+// Whether a field of a board says where the work lives: a web address field, or a text field the
+// board named for a file or a path («Archivo», «Ruta», «File path»). A board has no field type for a
+// path, so its name is what says so.
+const PLACE_NAME = /\b(archivos?|ficheros?|rutas?|carpetas?|files?|paths?|folders?)\b/i;
+export function saysWhereItLives(part: { kind: string; name: string }): boolean {
+  return (
+    part.kind === 'url' ||
+    ((part.kind === 'text' || part.kind === 'long') && PLACE_NAME.test(part.name))
+  );
+}
+
 // Where a piece of work says it lives (a content board's «Publicado en»), checked against what the
 // person can read (field study 4, U3: six of six pieces closed as Done while their text sat on a side
 // branch in a worktree, and one even wrote «todavía no está en tu carpeta»). A web address is where
