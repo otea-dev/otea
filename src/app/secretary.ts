@@ -234,8 +234,11 @@ export function ackSecretaryReturns(
   db: DatabaseSync,
   agent: string,
   now: Clock = systemClock,
+  // The items and notes the act names (say --links, ask <id>, bandeja take <B-n>): an escalation
+  // is acked only by an act about its own.
+  refs: readonly string[] = [],
 ): void {
-  if (secretaryName(db) === agent) ackReturned(db, now());
+  if (secretaryName(db) === agent) ackReturned(db, now(), refs);
 }
 
 // How often a wait looks at the boards for work nobody hears (a scan reads every item), however

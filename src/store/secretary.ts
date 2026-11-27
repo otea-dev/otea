@@ -86,6 +86,12 @@ export function dismissEscalation(db: DatabaseSync, id: number, at: string): boo
   return Number(db.prepare(sql).run({ id, at }).changes) === 1;
 }
 
+// Whether a signal of that number is an escalation, open or done with.
+export function escalationExists(db: DatabaseSync, id: number): boolean {
+  const sql = "SELECT 1 AS found FROM secretary_signals WHERE id = :id AND kind = 'escalation'";
+  return db.prepare(sql).get({ id }) !== undefined;
+}
+
 // What was acked before `before` is no record anyone reads: it goes.
 export function pruneSecretary(db: DatabaseSync, before: string): void {
   db.prepare('DELETE FROM secretary_signals WHERE acked_at IS NOT NULL AND acked_at < :before').run(
@@ -116,11 +122,16 @@ export function dropSignal(db: DatabaseSync, id: number, at: string): void {
   db.prepare('UPDATE secretary_signals SET acked_at = :at WHERE id = :id').run({ id, at });
 }
 
-// The secretary acted: everything returned to it so far is acked.
-export function ackReturned(db: DatabaseSync, at: string): void {
+// The secretary acted: every nudge returned to it so far is acked, and of the escalations only
+// those the act is about (`refs`, the items or notes it names): an escalation whose wait output sat
+// unread survives an act on something else.
+export function ackReturned(db: DatabaseSync, at: string, refs: readonly string[] = []): void {
   db.prepare(
-    'UPDATE secretary_signals SET acked_at = :at WHERE taken_at IS NOT NULL AND acked_at IS NULL',
-  ).run({ at });
+    `UPDATE secretary_signals SET acked_at = :at
+      WHERE taken_at IS NOT NULL AND acked_at IS NULL
+        AND (kind <> 'escalation'
+          OR lower(ref) IN (SELECT lower(value) FROM json_each(:refs)))`,
+  ).run({ at, refs: JSON.stringify(refs) });
   db.prepare(
     'UPDATE unheard_stretches SET acked_at = :at WHERE told_at IS NOT NULL AND acked_at IS NULL',
   ).run({ at });

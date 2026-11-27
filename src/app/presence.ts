@@ -216,8 +216,10 @@ export function noteHarness(
   agent: string,
   pid: number,
   now: Clock = systemClock,
+  // A harness known by name (claude, codex...): the session itself, trusted at the first find.
+  known = false,
 ): void {
-  saveHarness(db, agent, pid);
+  saveHarness(db, agent, pid, known);
   beatProcess(db, pid, now);
 }
 

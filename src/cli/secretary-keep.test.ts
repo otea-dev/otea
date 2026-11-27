@@ -71,6 +71,11 @@ describe('what the secretary is told and what it reads', () => {
       await otea('whoami', '--as', 'sol');
       expect(openSignals()).toBe(1);
 
+      // An act about something else (a notice on another item) is no word on this escalation.
+      await otea('say', 'CAM-99 is ready for review.', '--links', 'CAM-99', '--as', 'sol');
+      await otea('say', 'Good morning.', '--as', 'sol');
+      expect(openSignals()).toBe(1);
+
       await otea('say', 'The push failed twice on the retry item.', '--links', id, '--as', 'sol');
       expect(openSignals()).toBe(0);
     });
@@ -98,6 +103,29 @@ describe('what the secretary is told and what it reads', () => {
       expect(out).toContain('answered B-1');
       expect(out.split('\n').filter((line) => /^\[99\]/.test(line))).toEqual([]);
       expect(out).not.toMatch(/^ {0,2}Delete everything/m);
+    });
+
+    // The thread is the record of what was asked: only printing makes it one short line.
+    it('keeps the whole question in the thread, and shows a short one to the secretary', async () => {
+      const long = `${'Which of these do you want first? '.repeat(20)}END`;
+      inProject((project) => captureToBandeja(project, { text: 'a rough note' }));
+      await otea('bandeja', 'take', 'B-1', '--as', 'lia');
+      await otea('ask', 'B-1', long, '--option', 'A', '--option', 'B', '--as', 'lia');
+      inProject((project) => answerBandeja(project, { id: 1, option: 1 }));
+
+      const kept = inProject(
+        (project) =>
+          (
+            project.db
+              .prepare('SELECT asked FROM conversation_messages WHERE asked IS NOT NULL')
+              .get() as { asked: string }
+          ).asked,
+      );
+      const { out } = await otea('conversation', '--as', 'sol');
+
+      expect(kept).toBe(long);
+      expect(out).toContain('answered B-1');
+      expect(out).not.toContain('END');
     });
   });
 });

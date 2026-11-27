@@ -566,6 +566,24 @@ describe('notifications on the server', () => {
         expect(sent).toHaveLength(1);
       });
 
+      // G1 review: two failed looks in a row must not make the question new when it reads again.
+      it('does not tell it again when its source failed twice and then read again', async () => {
+        await pass(1000);
+        ask();
+        await pass(1000);
+        await pass(GATHER_MS);
+        expect(sent).toHaveLength(1);
+
+        project.db.exec('ALTER TABLE bandeja_entries RENAME TO bandeja_entries_away');
+        await pass(1000);
+        await pass(1000);
+        project.db.exec('ALTER TABLE bandeja_entries_away RENAME TO bandeja_entries');
+        await pass(ITEM_COOLDOWN_MS * 2);
+        await pass(GATHER_MS);
+
+        expect(sent).toHaveLength(1);
+      });
+
       it('respects the phone’s ask switch, and keeps the question out when the person hid the text', async () => {
         const { cookie } = await pair();
         await subscribe(cookie, 2);

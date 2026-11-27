@@ -46,6 +46,10 @@ describe('the secretary seen offline once its process is gone', () => {
     lookAt((project) => {
       const noted = selectListenerProcesses(project.db).get('sol')?.harness ?? null;
       if (noted !== null) forgetHarness(project.db, 'sol', noted);
+      // What an earlier test wrote to it is read: a wait must not return at once for it.
+      project.db
+        .prepare('UPDATE conversation_messages SET read_at = ? WHERE read_at IS NULL')
+        .run(new Date().toISOString());
     });
   });
 
@@ -113,66 +117,75 @@ describe('the secretary seen offline once its process is gone', () => {
   // The harness session is the secretary's real process: it runs `otea wait --secretary` in the
   // background, answers when it returns, and waits again. Killed between two waits, nothing of
   // Otea's runs, and it stayed «conectado» for the whole 30-minute hold.
-  it('reads offline within seconds of its harness being killed between two waits', async () => {
-    // The harness runs two waits one after the other (a wait returns, it answers, it waits again):
-    // the second finding the same process above it makes that process the session (G1: one wait
-    // alone only names a candidate, which may be an intermediary that ends with its command).
-    const starter = [
-      "const { spawn } = require('node:child_process');",
-      'const args = process.argv.slice(1);',
-      "const run = (n) => { const c = spawn(process.execPath, args, { detached: true, stdio: 'ignore' }); console.log(c.pid); if (n > 1) c.on('exit', () => run(n - 1)); };",
-      'run(2);',
-      'setTimeout(() => {}, 120_000);',
-    ].join(' ');
-    const harness = spawn(
-      process.execPath,
-      [
-        '-e',
-        starter,
-        '--disable-warning=ExperimentalWarning',
-        MAIN,
-        'wait',
-        '--secretary',
-        '--as',
-        'sol',
-        '--timeout',
-        '10m',
-      ],
-      { cwd: repo.dir, env: { ...process.env }, stdio: ['ignore', 'pipe', 'ignore'] },
-    );
-    children.push(harness);
-    const pids: number[] = [];
-    harness.stdout.setEncoding('utf8').on('data', (text: string) => {
-      for (const line of text.split('\n')) if (line.trim() !== '') pids.push(Number(line));
-    });
-    await until(() => pids.length >= 1, 30_000);
-    const wait = pids[0] as number;
-    try {
-      await until(() => stateNow() === 'listening', 30_000);
-      // The person writes at once, before the wait has read the processes above it: it returns and
-      // its process ends, the harness lives on, answering.
-      const project = openProject(repo.dir);
+  // A harness known by name (claude, codex...) is trusted at its first find (G1 review): `named`
+  // puts «claude» in its command line, as the real one has; a process Otea does not know by name
+  // (an intermediary may look like it) is the session only once two waits found it above them.
+  it.each([
+    { named: true, waits: 1 },
+    { named: false, waits: 2 },
+  ])(
+    'reads offline within seconds of its harness being killed between two waits (named: $named)',
+    async ({ named, waits }) => {
+      const starter = [
+        ...(named ? ["const harnessName = 'claude';"] : []),
+        "const { spawn } = require('node:child_process');",
+        'const args = process.argv.slice(1);',
+        "const run = (n) => { const c = spawn(process.execPath, args, { detached: true, stdio: 'ignore' }); console.log(c.pid); if (n > 1) c.on('exit', () => run(n - 1)); };",
+        `run(${waits});`,
+        'setTimeout(() => {}, 120_000);',
+      ].join(' ');
+      const harness = spawn(
+        process.execPath,
+        [
+          '-e',
+          starter,
+          '--disable-warning=ExperimentalWarning',
+          MAIN,
+          'wait',
+          '--secretary',
+          '--as',
+          'sol',
+          '--timeout',
+          '10m',
+        ],
+        { cwd: repo.dir, env: { ...process.env }, stdio: ['ignore', 'pipe', 'ignore'] },
+      );
+      children.push(harness);
+      const pids: number[] = [];
+      harness.stdout.setEncoding('utf8').on('data', (text: string) => {
+        for (const line of text.split('\n')) if (line.trim() !== '') pids.push(Number(line));
+      });
+      await until(() => pids.length >= 1, 30_000);
+      const wait = pids[0] as number;
       try {
-        postPersonMessage(project, { text: 'is the PC on?' });
+        await until(() => stateNow() === 'listening', 30_000);
+        // The person writes at once, before the wait has read the processes above it: it returns and
+        // its process ends, the harness lives on, answering.
+        const project = openProject(repo.dir);
+        try {
+          postPersonMessage(project, { text: 'is the PC on?' });
+        } finally {
+          project.db.close();
+        }
+        await until(() => !processAlive(wait), 30_000);
+        if (waits > 1) {
+          // The second wait starts at once and returns for the same unread message.
+          await until(() => pids.length >= waits, 30_000);
+          await until(() => !processAlive(pids[waits - 1] as number), 30_000);
+        }
+        // The harness is the session now.
+        await until(() => harnessNoted() === harness.pid, 30_000);
+        expect(stateNow()).toBe('connected');
+
+        const killedAt = Date.now();
+        process.kill(harness.pid as number);
+        await until(() => stateNow() === 'offline', 8_000);
+
+        expect(Date.now() - killedAt).toBeLessThan(8_000);
       } finally {
-        project.db.close();
+        for (const pid of pids) if (processAlive(pid)) process.kill(pid);
       }
-      await until(() => !processAlive(wait), 30_000);
-      // The second wait starts at once and returns for the same unread message.
-      await until(() => pids.length >= 2, 30_000);
-      const second = pids[1] as number;
-      await until(() => !processAlive(second), 30_000);
-      // Both found the harness above them: it is the session now.
-      await until(() => harnessNoted() === harness.pid, 30_000);
-      expect(stateNow()).toBe('connected');
-
-      const killedAt = Date.now();
-      process.kill(harness.pid as number);
-      await until(() => stateNow() === 'offline', 8_000);
-
-      expect(Date.now() - killedAt).toBeLessThan(8_000);
-    } finally {
-      for (const pid of pids) if (processAlive(pid)) process.kill(pid);
-    }
-  }, 120_000);
+    },
+    120_000,
+  );
 });

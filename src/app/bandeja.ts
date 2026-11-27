@@ -690,7 +690,7 @@ function stateLine(entry: BandejaEntry): string {
     return `${STATE_WORD.refining} by ${entry.claimedBy ?? '?'} until ${timeText(entry.claimUntil ?? entry.at)}`;
   if (entry.state === 'filed') return `${STATE_WORD.filed} as ${entry.item ?? 'an item'}`;
   if (entry.state === 'closed')
-    return `${STATE_WORD.closed} by ${plainLine(entry.closedBy ?? '?', 60)}: ${quoteAgent(entry.closeReason ?? 'no reason given')}`;
+    return `${STATE_WORD.closed} by ${plainLine(entry.closedBy ?? '?', 60)}: ${plainLine(entry.closeReason ?? 'no reason given', MAX_REASON_CHARS)}`;
   if (entry.state === 'asking')
     return `${STATE_WORD.asking}: ${quoteAgent(entry.asking?.text ?? '')}`;
   return STATE_WORD.waiting;

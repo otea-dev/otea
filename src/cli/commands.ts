@@ -465,6 +465,16 @@ async function withProjectWhile<T>(cwd: string, use: (project: Project) => Promi
   }
 }
 
+// The items and notes an act of the secretary is about, by the ids it names: what an escalation
+// on them is answered by (say --links, ask/update <id>, bandeja take/close <B-n>).
+function actRefs(input: Input): string[] {
+  const named = [
+    ...(input.option('links') ?? '').split(','),
+    ...(input.command === 'say' || input.command === 'create' ? [] : input.args.slice(0, 1)),
+  ];
+  return named.map((ref) => ref.trim()).filter((ref) => ref !== '');
+}
+
 // Notes that the agent running the command was seen, so the UI can show who is at work.
 function seen(project: Project, input: Input, actor: Actor = input.actor): void {
   const { channel, harness, newSession } = input;
@@ -486,7 +496,9 @@ function seen(project: Project, input: Input, actor: Actor = input.actor): void 
   keepHeldEntries(project, actor.name);
   // The secretary acting on what its wait returned: a command that acts (say, create...), not one
   // that only looks, which would lose what a wait running in the background returned unread.
-  if (isSecretaryAct(input.command)) ackSecretaryReturns(project.db, actor.name);
+  if (isSecretaryAct(input.command)) {
+    ackSecretaryReturns(project.db, actor.name, systemClock, actRefs(input));
+  }
 }
 
 // Runs a command seen as `actor`: noted first, so the command finds it, and forgotten again when it
@@ -2775,10 +2787,12 @@ async function waitForSecretary(input: Input): Promise<Output> {
   };
   const result = await withAgentWhile(input, async (project) => {
     requireSecretary(project.db, me);
-    const noted = owner.harness.then((pid) => {
+    const noted = Promise.all([owner.harness, owner.harnessKnown]).then(([pid, known]) => {
       if (pid === undefined || pid === process.pid) return;
       try {
-        noteHarness(project.db, me, pid);
+        // A harness known by name is the session at once; any other process is a candidate until
+        // a second wait finds it too (it may be an intermediary that ends with its command).
+        noteHarness(project.db, me, pid, systemClock, known);
       } catch {
         // The wait ended and closed the project first: nothing left to note it for.
       }

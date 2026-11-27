@@ -462,7 +462,8 @@ export function traceAnswer(
       mode: trace.mode,
       option: trace.option,
       about: trace.about,
-      asked: plainLine(trace.asked),
+      // Kept whole (the thread is the record): it is made one short quoted line only when printed.
+      asked: trace.asked,
     },
   });
 }

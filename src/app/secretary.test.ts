@@ -151,6 +151,12 @@ describe('the secretary', () => {
           expect(secretaryStatus(ctx.db, stamp(T0 + 3000), only(4242))?.state).toBe('connected');
         });
 
+        it('is the session at once when it is a harness known by name, so a killed session reads offline fast', () => {
+          noteHarness(ctx.db, 'sol', 4242, stamp(T0), true);
+
+          expect(secretaryStatus(ctx.db, stamp(T0 + 3000), gone)?.state).toBe('offline');
+        });
+
         it('stays unproven while every wait finds another process', () => {
           noteHarness(ctx.db, 'sol', 4242, stamp(T0));
           noteHarness(ctx.db, 'sol', 4243, stamp(T0 + 1000));

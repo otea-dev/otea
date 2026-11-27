@@ -104,6 +104,21 @@ export function harnessOf(rows: readonly ProcessRow[], start: number): number | 
   return undefined;
 }
 
+// The agent harnesses Otea knows by name: a process that is one (or node running one) is the
+// session itself, never an intermediary that ends with its command (bwrap, docker exec, ssh,
+// wsl.exe, script). Its first find is trusted at once; an unknown process needs two waits.
+const KNOWN_HARNESS = /^(claude|opencode|codex|agy|gemini|antigravity)(-[a-z]+)?$/;
+const KNOWN_HARNESS_COMMAND =
+  /(?:^|[\\/\s"'])(?:claude|opencode|codex|agy|gemini|antigravity)(?:-[a-z]+)?(?:\.c?js|\.mjs|\.exe)?(?:["'\s]|$)/i;
+
+export function isKnownHarness(rows: readonly ProcessRow[], pid: number): boolean {
+  const row = rows.find((each) => each.pid === pid);
+  if (!row) return false;
+  const program = programOf(row.name);
+  if (KNOWN_HARNESS.test(program)) return true;
+  return program === 'node' && row.command !== undefined && KNOWN_HARNESS_COMMAND.test(row.command);
+}
+
 // Lines of "pid parent name", as both listings below print them; on Windows a tab and the program's
 // file follow, when Windows says it.
 export function readProcessTable(text: string): ProcessRow[] {
@@ -258,6 +273,8 @@ export type OwnerWatch = {
   // The harness session it runs under (harnessOf), once the processes were listed; undefined when
   // they could not be, or the watch stopped first.
   harness: Promise<number | undefined>;
+  // Whether that process is a harness known by name (isKnownHarness); false while unknown.
+  harnessKnown: Promise<boolean>;
   // Ends an early listing still running (a watch started with `early` leaves it to its caller).
   release: () => void;
 };
@@ -293,12 +310,15 @@ export function watchOwner(
   const onAbort = () => controller.abort();
   parent.addEventListener('abort', onAbort, { once: true });
   const harness = Promise.withResolvers<number | undefined>();
+  const known = Promise.withResolvers<boolean>();
   const look = () => {
     if (listed) return;
     listed = true;
     void list(listing.signal).then((table) => {
       if (table) chain = ownerChain(table.rows, start, table.complete);
-      harness.resolve(table ? harnessOf(table.rows, start) : undefined);
+      const pid = table ? harnessOf(table.rows, start) : undefined;
+      harness.resolve(pid);
+      known.resolve(table !== undefined && pid !== undefined && isKnownHarness(table.rows, pid));
     });
   };
   const timer = setInterval(() => {
@@ -314,6 +334,7 @@ export function watchOwner(
   const release = () => {
     listing.abort();
     harness.resolve(undefined);
+    known.resolve(false);
   };
   const stop = () => {
     clearInterval(timer);
@@ -330,6 +351,7 @@ export function watchOwner(
     stop,
     started: start,
     harness: harness.promise,
+    harnessKnown: known.promise,
     release,
   };
 }

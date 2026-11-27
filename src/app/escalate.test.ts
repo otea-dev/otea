@@ -14,7 +14,9 @@ import { createItem } from './items.ts';
 import { pendingOf, pendingText } from './pending.ts';
 import type { Project } from './project.ts';
 import {
+  ackSecretaryReturns,
   declareSecretary,
+  emitSecretarySignal,
   secretaryStatus,
   secretaryWake,
   startSecretaryWait,
@@ -128,6 +130,21 @@ describe('escalating to the secretary', () => {
       expect(escalations(11 * MIN)).toHaveLength(1);
     });
 
+    it('is acked only by an act about it, while any act acks the nudges', () => {
+      say('a problem');
+      emitSecretarySignal(project.db, { kind: 'bandeja_item', ref: 'B-1' }, clock(2500));
+      for (const at of [3000, 3100]) {
+        secretaryWake(project, startSecretaryWait(clock(at)), clock(at));
+      }
+
+      ackSecretaryReturns(project.db, 'sol', clock(4000), ['OTHER-1']);
+      expect(selectOpenEscalations(project.db)).toHaveLength(1);
+      expect(secretaryWaiting(project.db).count).toBe(1);
+
+      ackSecretaryReturns(project.db, 'sol', clock(5000), [id.toLowerCase()]);
+      expect(selectOpenEscalations(project.db)).toEqual([]);
+    });
+
     it('can be dismissed by the person, which ends it for the secretary too', () => {
       say('a problem');
       for (const at of [3000, 4000]) {
@@ -139,9 +156,19 @@ describe('escalating to the secretary', () => {
 
       expect(escalations(7000)).toEqual([]);
       expect(secretaryWaiting(project.db).count).toBe(0);
-      expect(() => dismissOpenEscalation(project, shown?.signal ?? -1, clock(8000))).toThrow(
-        /not open/,
-      );
+      // A second tap, or a race with the secretary's ack, is no error: it is done with.
+      expect(() => dismissOpenEscalation(project, shown?.signal ?? -1, clock(8000))).not.toThrow();
+      // One that never existed is.
+      expect(() => dismissOpenEscalation(project, 9999, clock(8000))).toThrow(/no escalation/i);
+    });
+
+    it('can be dismissed after the secretary acked it, with no error', () => {
+      say('a problem');
+      secretaryWake(project, startSecretaryWait(clock(3000)), clock(3000));
+      const [open] = selectOpenEscalations(project.db);
+      ackSecretaryReturns(project.db, 'sol', clock(4000), [id]);
+
+      expect(() => dismissOpenEscalation(project, open?.id ?? -1, clock(5000))).not.toThrow();
     });
   });
 

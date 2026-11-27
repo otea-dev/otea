@@ -182,14 +182,20 @@ export function createNotifier(
       ...(secretary === undefined ? (kept.get('secretary') ?? []) : []),
       ...(bandeja === undefined ? (kept.get('Bandeja') ?? []) : []),
     ];
-    kept.set(
-      'secretary',
-      (secretary ?? []).map(({ key }) => key),
-    );
-    kept.set(
-      'Bandeja',
-      (bandeja ?? []).map(({ key }) => key),
-    );
+    // Only a good look replaces what a source showed: after two failed looks in a row its keys
+    // are still the last good ones.
+    if (secretary !== undefined) {
+      kept.set(
+        'secretary',
+        secretary.map(({ key }) => key),
+      );
+    }
+    if (bandeja !== undefined) {
+      kept.set(
+        'Bandeja',
+        bandeja.map(({ key }) => key),
+      );
+    }
     const fresh = freshSignals(seen, signals);
     seen = new Set([...signals.map(({ key }) => key), ...carried]);
     const targets = listeners();

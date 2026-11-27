@@ -180,9 +180,11 @@ describe('the Bandeja over the API', () => {
 
     expect(dismissed.status).toBe(200);
     expect((await read()).entries).toEqual([]);
+    // A second tap (or a race with the secretary's ack) is done with, not an error.
     expect((await call(`/escalations/${shown?.signal}/dismiss`, { method: 'POST' })).status).toBe(
-      404,
+      200,
     );
+    expect((await call('/escalations/9999/dismiss', { method: 'POST' })).status).toBe(404);
   });
 
   it('keeps the images and files sent with it, and serves them back as what they are', async () => {

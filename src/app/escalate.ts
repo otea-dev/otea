@@ -3,7 +3,7 @@ import { OteaError } from '../core/errors.ts';
 import { plainLine } from '../core/quote.ts';
 import type { SecretaryState } from '../core/secretary.ts';
 import { transaction } from '../store/database.ts';
-import { dismissEscalation, selectOpenEscalations } from '../store/secretary.ts';
+import { dismissEscalation, escalationExists, selectOpenEscalations } from '../store/secretary.ts';
 import { requireEntry } from './bandeja.ts';
 import type { Context } from './context.ts';
 import { type Clock, requireItem, systemClock } from './items.ts';
@@ -52,9 +52,10 @@ export function escalationShown(
 
 // The person sets an escalation aside (the row in Te toca): it is done with.
 export function dismissOpenEscalation(ctx: Context, id: number, now: Clock = systemClock): void {
-  if (!dismissEscalation(ctx.db, id, now())) {
-    throw new OteaError('not_found', `Escalation ${id} is not open (it was acted on or dismissed)`);
-  }
+  // Done with already (a second tap, the secretary's ack, a prune that came first): no error, the
+  // person's tap has what it asked for. Only a number that was never an escalation is refused.
+  if (dismissEscalation(ctx.db, id, now()) || escalationExists(ctx.db, id)) return;
+  throw new OteaError('not_found', `There is no escalation ${id}`);
 }
 
 // How an escalation is kept: who said it and what, the words quoted as data.

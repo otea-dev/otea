@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   harnessOf,
+  isKnownHarness,
   ownerChain,
   readListing,
   readPosixTable,
@@ -128,6 +129,35 @@ describe('the processes that own a command', () => {
       { pid: 500, parent: 600, name: 'sh.exe', path: 'C:\\Program Files\\Git\\usr\\bin\\sh.exe' },
       { pid: 4, parent: 0, name: 'System' },
     ]);
+  });
+
+  // G1 review: a harness known by name is the session itself; an intermediary is not.
+  it('knows the harnesses by name, node running one, and never an intermediary', () => {
+    const rows = [
+      { pid: 1, parent: 0, name: 'claude.exe' },
+      { pid: 2, parent: 0, name: 'codex' },
+      {
+        pid: 3,
+        parent: 0,
+        name: 'node.exe',
+        command: 'node C:\\x\\opencode\\bin\\opencode.js run',
+      },
+      { pid: 4, parent: 0, name: 'node.exe', command: 'node server.js' },
+      { pid: 5, parent: 0, name: 'bwrap' },
+      { pid: 6, parent: 0, name: 'ssh' },
+      { pid: 7, parent: 0, name: 'gemini' },
+    ];
+
+    expect(rows.map(({ pid }) => isKnownHarness(rows, pid))).toEqual([
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+    ]);
+    expect(isKnownHarness(rows, 99)).toBe(false);
   });
 
   // G1: a busy Windows machine lists far more than execFile's default 1 MB; the listing then failed

@@ -854,13 +854,15 @@ export function selectListening(db: DatabaseSync): Map<string, string> {
 // A process found above one wait only is a candidate, stored negated (-pid): the first wait of a
 // session may pick an intermediary that lives one command (bwrap, docker exec, ssh, wsl.exe), whose
 // end says nothing of the session. Found above the next wait too (the same id), it is the harness
-// (+pid) and may say «ended». Another id restarts the candidate. No column: a negative id is read
-// as «not trusted yet» (selectListenerProcesses).
-export function saveHarness(db: DatabaseSync, agent: string, pid: number): void {
+// (+pid) and may say «ended». Another id restarts the candidate. A process that is a harness known
+// by name (`known`: claude, codex...) is no intermediary and is trusted at the first find, so a
+// killed session still reads offline within seconds. No column: a negative id is read as «not
+// trusted yet» (selectListenerProcesses).
+export function saveHarness(db: DatabaseSync, agent: string, pid: number, known = false): void {
   const row = db
     .prepare('SELECT listening_harness AS harness FROM agents WHERE name = :agent')
     .get({ agent }) as { harness: number | null } | undefined;
-  const next = row?.harness === pid || row?.harness === -pid ? pid : -pid;
+  const next = known || row?.harness === pid || row?.harness === -pid ? pid : -pid;
   db.prepare(
     'UPDATE agents SET listening_harness = :next WHERE name = :agent AND listening_session IS NULL',
   ).run({ agent, next });
