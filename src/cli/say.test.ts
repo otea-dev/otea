@@ -173,6 +173,24 @@ describe('the conversation from the secretary', () => {
       ]);
     });
 
+    // Git Bash writes the drive D: as /d/...: its own commands print paths that way, and with
+    // MSYS_NO_PATHCONV=1 (which Otea's agent text tells an agent to set) they reach otea as typed,
+    // where a plain resolve makes them D:\d\... (field study 4, T1c).
+    const onWindows = it.skipIf(process.platform !== 'win32');
+    onWindows('takes a /d/... path of Git Bash as the file on D:', async () => {
+      repo.write('plan.txt', '1. fix it');
+      const drive = repo.dir[0] as string;
+      const msys = `/${drive.toLowerCase()}${repo.dir.slice(2).replaceAll('\\', '/')}/plan.txt`;
+
+      const said = await otea('say', 'The plan.', '--file', msys, '--as', 'sol');
+
+      expect(said.err).toBe('');
+      expect(said.out).toContain('with 1 file(s)');
+      expect(conversation()[0]?.attachments).toEqual([
+        expect.objectContaining({ name: 'plan.txt' }),
+      ]);
+    });
+
     it('is refused for a file that is not there', async () => {
       const { code, err } = await otea('say', 'x', '--file', 'missing.txt', '--as', 'sol');
 
