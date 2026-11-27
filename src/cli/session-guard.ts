@@ -55,6 +55,13 @@ export function sessionVerdictOf(input: Input): SessionVerdict {
   return verdicts.get(input) ?? 'unverified';
 }
 
+// The commands that read under the secretary's name from a session that is not the bound one: they
+// are answered, but are no sign of life of the secretary (field study 4, T1c: `otea pending --as
+// <secretary>` from any process kept a dead secretary «connected» and its role taken).
+const strangers = new WeakSet<Input>();
+
+export const isFromAnotherSession = (input: Input): boolean => strangers.has(input);
+
 type Caller = { pid: number; started: number | undefined; known: boolean; rows: ProcessRow[] };
 
 // The harness this command runs under, from the processes; undefined when they cannot be read (or
@@ -131,17 +138,26 @@ export async function guardSession(input: Input): Promise<(() => Promise<void>) 
   if (agent === undefined) return undefined;
   let bound: Bound | undefined;
   let declares = false;
+  let reading: Noted | undefined;
   try {
     const project = openProject(input.cwd);
     try {
       bound = boundOf(project, input, agent);
       declares = input.command === 'profile' && input.option('role') === 'secretary';
+      // A read under the secretary's name: not refused, but not taken for its sign of life unless it
+      // comes from its session.
+      if (bound === undefined && !declares && secretaryName(project.db) === agent) {
+        reading = notedSession(project.db, agent);
+      }
     } finally {
       project.db.close();
     }
   } catch {
     // No project here: the command says so itself.
     return undefined;
+  }
+  if (reading !== undefined && (await judge(reading, input)).verdict === 'other') {
+    strangers.add(input);
   }
   if (bound !== undefined) {
     const { verdict, harness } = await judge(bound.noted, input);

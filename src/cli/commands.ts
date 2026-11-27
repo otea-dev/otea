@@ -366,7 +366,7 @@ import { PHONE_COMMANDS } from './phone.ts';
 import { portFrom, portToOpen, portToStart, projectPage } from './ports.ts';
 import { probeSignIn } from './probe.ts';
 import { readServeFile, removeServeFile, serverVersionNote, writeServeFile } from './serve-file.ts';
-import { sessionBound, sessionVerdictOf } from './session-guard.ts';
+import { isFromAnotherSession, sessionBound, sessionVerdictOf } from './session-guard.ts';
 import {
   boardHintLines,
   cancelled,
@@ -491,6 +491,8 @@ function actRefs(input: Input): string[] {
 function seen(project: Project, input: Input, actor: Actor = input.actor): void {
   const { channel, harness, newSession } = input;
   if (actor.kind !== 'agent') return;
+  // A read under the secretary's name from another session is answered, never a sign of its life.
+  if (isFromAnotherSession(input)) return;
   // Through an MCP server the agent is connected: the open server is listening for it.
   const note = channel === 'mcp' ? hearAgent : seeAgent;
   note(project.db, {
