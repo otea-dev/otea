@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { authorizeMove, type Channel, type Move, type Performer } from '../core/authority.ts';
+import { isClosed, positionOf } from '../core/board/engine.ts';
 import { guardedBranch } from '../core/board/model.ts';
 import { openQuestion } from '../core/board/questions.ts';
 import { type RequestChanged, requestChangedAfterHandoff } from '../core/board/request-changed.ts';
@@ -38,6 +39,7 @@ import {
   updateItemContent,
   updateItemState,
 } from '../store/queries.ts';
+import { selectRoles } from '../store/secretary.ts';
 import { approvalData } from './approval-wait.ts';
 import { type Asks, askingItems, withAsks } from './asking.ts';
 import { assertPicked, type ChoiceInput, recordChoice } from './choices.ts';
@@ -440,6 +442,36 @@ export type UpdateItemInput = {
   overLease?: true;
 };
 
+// While an item waits for the person's review no agent changes its request or the fields handed in
+// (final red-team run, R8: `otea update <id> --field ... --as <any name>` rewrote them, and the desk
+// only warned afterwards): the delivery answers the request the person reads. The person edits it on
+// the desk, or sends it back, and the worker changes it then. An agent's own review (a step another
+// agent checks) is not the person's, and closes nothing here. The fields a board lets be filled at
+// any time (its estimates, `anytime`) are neither the request nor a handed field: an agent still
+// estimates them, as the person corrects them.
+function assertNotInPersonsReview(
+  ctx: Context,
+  item: ItemRecord,
+  type: ItemType,
+  actor: Actor,
+  changed: readonly string[],
+): void {
+  if (actor.kind !== 'agent' || turnOf(type.workflow, item.state) !== 'human') return;
+  const board = liveBoardOf(ctx, item.collection);
+  if (!board) return;
+  const position = positionOf(item.state);
+  if (isClosed(position) || position.phase !== 'review') return;
+  if (changed.every((key) => board.def.anytime.includes(key))) return;
+  const secretary = selectRoles(ctx.db).get(actor.name) === 'secretary';
+  const way = secretary
+    ? `Ask them in one tap, with a card: otea say "<question>" --send-back ${item.id} --note "<their change, in their words>" --option "<send it back>" --option "<leave it>"`
+    : 'Ask them, or let them send it back: the worker changes it then';
+  throw new OteaError(
+    'forbidden',
+    `${item.id} waits for the person's review: it does not change under them. ${way}`,
+  );
+}
+
 export function updateItem(ctx: Context, input: UpdateItemInput, now = systemClock): Item {
   const { db } = ctx;
   return joinTransaction(db, () => {
@@ -464,6 +496,7 @@ export function updateItem(ctx: Context, input: UpdateItemInput, now = systemClo
     };
     const revision = revise(type, item, changes);
     if (Object.keys(revision.changes).length === 0) return present(item, type.workflow, at);
+    assertNotInPersonsReview(ctx, item, type, input.actor, Object.keys(revision.changes));
     const content = {
       title: revision.title,
       fields: revision.fields,

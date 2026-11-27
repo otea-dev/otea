@@ -9,7 +9,6 @@ import { memoryContext, projectOf, publishAs } from './testing.ts';
 
 const you = { kind: 'human' as const, name: 'human' };
 const quill = { kind: 'agent' as const, name: 'quill' };
-const sol = { kind: 'agent' as const, name: 'sol' };
 const T0 = Date.parse('2026-11-26T10:00:00.000Z');
 
 // U5 (field study 4): the request was rewritten while its delivery waited for review, and the review
@@ -38,7 +37,9 @@ describe('a request that changed after its delivery was handed in', () => {
     });
     handoffItem(project, { id, actor: quill, channel: 'cli', ...(note ? { note } : {}) }, now);
   };
-  const rewrite = (title: string, desc: string, actor = sol) =>
+  // Once the delivery waits for the person's review only they change the request, on the desk
+  // (S2: an agent's update is refused, review-hold.test.ts); before it, the secretary may.
+  const rewrite = (title: string, desc: string, actor = you) =>
     updateItem(project, { id, actor, title, fields: { fdesc: desc } }, now);
   const shown = () => showItem(project, id, { actor: you, channel: 'ui' }, now);
 
@@ -63,7 +64,7 @@ describe('a request that changed after its delivery was handed in', () => {
     rewrite('Sapo', 'Rápido');
 
     expect(shown().requestChanged).toMatchObject({
-      by: 'sol',
+      by: 'human',
       changes: expect.arrayContaining([
         { field: 'title', from: 'Rana', to: 'Sapo' },
         { field: expect.stringMatching(/desc/i), from: 'Lenta', to: 'Rápido' },
@@ -84,22 +85,25 @@ describe('a request that changed after its delivery was handed in', () => {
     expect(shown().requestChanged).toBeUndefined();
   });
 
-  // Review of H2: only what the person asked for counts. A field the board keeps for bookkeeping
-  // (here its checklist), or an edit by a subagent of the agent that handed it in, says nothing.
-  it('flags the request’s own words, not bookkeeping fields nor the handing agent’s subagents', () => {
+  // Review of H2: only what the person asked for counts. An edit by a subagent of the agent that
+  // handed it in is no longer made at all (S2: the review is the person's, review-hold.test.ts), so
+  // nothing is flagged for it; the person's own edit is.
+  it('flags the person’s own change of the request, and no subagent of the handing agent can make one', () => {
     deliver();
 
-    updateItem(
-      project,
-      { id, actor: { kind: 'agent', name: 'quill-haiku' }, title: 'Rana 2' },
-      now,
-    );
+    expect(() =>
+      updateItem(
+        project,
+        { id, actor: { kind: 'agent', name: 'quill-haiku' }, title: 'Rana 2' },
+        now,
+      ),
+    ).toThrow(/waits for the person's review/);
     expect(shown().requestChanged).toBeUndefined();
 
     updateItem(project, { id, actor: you, title: 'Sapo' }, now);
     expect(shown().requestChanged).toMatchObject({
       by: 'human',
-      changes: [{ field: 'title', from: 'Rana 2', to: 'Sapo' }],
+      changes: [{ field: 'title', from: 'Rana', to: 'Sapo' }],
     });
   });
 
