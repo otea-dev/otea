@@ -1,7 +1,26 @@
 import { DatabaseSync } from 'node:sqlite';
+import { OteaError } from '../core/errors.ts';
+
+// SQLite's bare «unable to open database file» says nothing a person or an agent can act on: the
+// path, the usual cause and what to do are said instead (field study 4, U3: an agent in a sandbox
+// that cannot write Otea's folder, which cannot even escalate, as that needs the same database).
+function unopenable(path: string, error: unknown): Error {
+  if (!/unable to open database file/i.test(String((error as Error)?.message))) {
+    return error as Error;
+  }
+  return new OteaError(
+    'forbidden',
+    `Otea cannot open its database at ${path}: this session most likely has no permission to write there (a sandbox, a read-only folder or drive, or the folder is missing). Stop and tell the person; do not change Otea or its files.`,
+  );
+}
 
 export function openDatabase(path: string): DatabaseSync {
-  const db = new DatabaseSync(path);
+  let db: DatabaseSync;
+  try {
+    db = new DatabaseSync(path);
+  } catch (error) {
+    throw unopenable(path, error);
+  }
   // The timeout goes first: switching to WAL needs a lock, and another process may hold it.
   db.exec('PRAGMA busy_timeout = 5000');
   db.exec('PRAGMA journal_mode = WAL');
