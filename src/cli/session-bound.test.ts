@@ -12,6 +12,7 @@ import { openProject } from '../app/project.ts';
 import { createMcpServer } from '../mcp/server.ts';
 import { selectListenerProcesses } from '../store/queries.ts';
 import { COMMANDS } from './commands.ts';
+import { missedLately } from './harness-miss.ts';
 import { listProcesses } from './owner.ts';
 import {
   cliAt,
@@ -348,11 +349,19 @@ describe('an agent name is bound to the harness session noted for it', () => {
   it('refuses a worker name acting on an item its live session leased', async () => {
     const claim = await cliAt(repo.dir, { OTEA_AGENT: quill })('claim', 'TASKS-1');
     expect(claim.code, claim.err).toBe(0);
-    // The claim notes its own harness in the background; this session's note comes after it.
+    // The claim notes its own harness in the background; this session's note comes after it. The
+    // lookup is done once it noted a harness (a negative id when the process is not known by name
+    // as a harness, which the list of live ones leaves out: what a test run outside an agent's
+    // session finds, and waiting for a listed one took the whole 15 s), or noted that it found
+    // none (a miss).
     await until(() => {
+      if (missedLately(repo.dir, quill)) return true;
       const project = openProject(repo.dir);
       try {
-        return selectListenerProcesses(project.db).get(quill)?.harness != null;
+        const row = project.db
+          .prepare('SELECT listening_harness AS harness FROM agents WHERE name = :agent')
+          .get({ agent: quill }) as { harness: number | null } | undefined;
+        return row?.harness != null;
       } finally {
         project.db.close();
       }

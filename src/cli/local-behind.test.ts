@@ -1,20 +1,28 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { liveBoardOf } from '../app/next.ts';
 import { openProject } from '../app/project.ts';
 import { stateOf } from '../core/board/engine.ts';
 import { updateItemState } from '../store/queries.ts';
-import { type Cli, cliAt, declareProfiles, tempGitRepo } from './testing.ts';
+import {
+  type Cli,
+  cliAt,
+  declareProfiles,
+  SEED_TIMEOUT_MS,
+  type SeededRepo,
+  seededLocalRepo,
+  type TempRepo,
+} from './testing.ts';
 
 // Field study 3: an agent landed with `git push origin HEAD:main` from a worktree, the item went
 // Done, and the person's local main never moved, with nothing to say so ("npm start in my checkout
 // would not have the fixes"). Landing says plainly where the work is and that the local main is
 // behind.
 describe('an item that landed while the local main stayed behind', () => {
-  let repo: ReturnType<typeof tempGitRepo>;
+  let repo: TempRepo;
   let origin: string;
   let otea: Cli;
   let tree: string;
@@ -68,23 +76,40 @@ describe('an item that landed while the local main stayed behind', () => {
     return git(tree, 'rev-parse', '--short', 'HEAD');
   };
 
-  beforeEach(async () => {
+  // The checkout and its bare origin are made once (a local project with the board, the profile, a
+  // first commit pushed: a dozen spawns); each test gets a copy of both, origin pointing at its own,
+  // and its own worktree (a worktree records absolute paths, so it cannot be copied).
+  let seeded: SeededRepo;
+  let originTemplate: string;
+  beforeAll(async () => {
+    originTemplate = mkdtempSync(join(tmpdir(), 'otea-origin-'));
+    execFileSync('git', ['init', '--quiet', '--bare', originTemplate], { stdio: 'ignore' });
+    seeded = await seededLocalRepo(async (dir) => {
+      const person = cliAt(dir);
+      await person('init', '--local', '--template', 'none');
+      expect((await person('board', 'add', 'Código', '--template', 'mainline')).code).toBe(0);
+      declareProfiles(dir, 'lu');
+      writeFileSync(join(dir, 'bot.py'), 'print(1)\n');
+      git(dir, 'add', 'bot.py');
+      git(dir, 'commit', '-q', '-m', 'first');
+      git(dir, 'branch', '-M', 'main');
+      git(dir, 'remote', 'add', 'origin', originTemplate);
+      git(dir, 'push', '-q', '-u', 'origin', 'main');
+    });
+  }, SEED_TIMEOUT_MS);
+  afterAll(() => {
+    seeded?.remove();
+    rmSync(originTemplate, { recursive: true, force: true, maxRetries: 10 });
+  });
+
+  beforeEach(() => {
     remote = 'origin';
-    repo = tempGitRepo();
+    repo = seeded.fresh();
     origin = mkdtempSync(join(tmpdir(), 'otea-origin-'));
+    cpSync(originTemplate, origin, { recursive: true });
+    git(repo.dir, 'remote', 'set-url', 'origin', origin);
     tree = mkdtempSync(join(tmpdir(), 'otea-tree-'));
-    execFileSync('git', ['init', '--quiet', '--bare', origin], { stdio: 'ignore' });
     otea = cliAt(repo.dir, { OTEA_AGENT: 'lu' });
-    const person = cliAt(repo.dir);
-    await person('init', '--template', 'none');
-    expect((await person('board', 'add', 'Código', '--template', 'mainline')).code).toBe(0);
-    declareProfiles(repo.dir, 'lu');
-    writeFileSync(join(repo.dir, 'bot.py'), 'print(1)\n');
-    git(repo.dir, 'add', 'bot.py');
-    git(repo.dir, 'commit', '-q', '-m', 'first');
-    git(repo.dir, 'branch', '-M', 'main');
-    git(repo.dir, 'remote', 'add', 'origin', origin);
-    git(repo.dir, 'push', '-q', '-u', 'origin', 'main');
     rmSync(tree, { recursive: true, force: true });
     git(repo.dir, 'worktree', 'add', '-q', '--detach', tree);
   });
@@ -289,7 +314,7 @@ describe('an item that landed while the local main stayed behind', () => {
 // land sync` brings it up to date with the same checks as with a remote, and says plainly when it
 // cannot, so no worker ever asks the person whether to update their folder.
 describe('otea land sync in a repo with no remote', () => {
-  let repo: ReturnType<typeof tempGitRepo>;
+  let repo: TempRepo;
   let tree: string;
   let otea: Cli;
 
@@ -329,18 +354,27 @@ describe('otea land sync in a repo with no remote', () => {
     return id;
   };
 
-  beforeEach(async () => {
-    repo = tempGitRepo();
+  // The checkout is made once (a local project with the board, the profile, a first commit); each
+  // test gets a copy and its own worktree (a worktree records absolute paths, so it is not copied).
+  let seeded: SeededRepo;
+  beforeAll(async () => {
+    seeded = await seededLocalRepo(async (dir) => {
+      const person = cliAt(dir);
+      await person('init', '--local', '--template', 'none');
+      expect((await person('board', 'add', 'Código', '--template', 'mainline')).code).toBe(0);
+      declareProfiles(dir, 'lu');
+      writeFileSync(join(dir, 'bot.py'), 'print(1)\n');
+      git(dir, 'add', 'bot.py');
+      git(dir, 'commit', '-q', '-m', 'first');
+      git(dir, 'branch', '-M', 'main');
+    });
+  }, SEED_TIMEOUT_MS);
+  afterAll(() => seeded?.remove());
+
+  beforeEach(() => {
+    repo = seeded.fresh();
     tree = mkdtempSync(join(tmpdir(), 'otea-tree-'));
     otea = cliAt(repo.dir, { OTEA_AGENT: 'lu' });
-    const person = cliAt(repo.dir);
-    await person('init', '--template', 'none');
-    expect((await person('board', 'add', 'Código', '--template', 'mainline')).code).toBe(0);
-    declareProfiles(repo.dir, 'lu');
-    writeFileSync(join(repo.dir, 'bot.py'), 'print(1)\n');
-    git(repo.dir, 'add', 'bot.py');
-    git(repo.dir, 'commit', '-q', '-m', 'first');
-    git(repo.dir, 'branch', '-M', 'main');
     rmSync(tree, { recursive: true, force: true });
     git(repo.dir, 'worktree', 'add', '-q', '--detach', tree);
   });

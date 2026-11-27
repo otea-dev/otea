@@ -2,6 +2,8 @@ import { execFileSync } from 'node:child_process';
 import {
   appendFileSync,
   chmodSync,
+  cpSync,
+  existsSync,
   mkdtempSync,
   realpathSync,
   rmSync,
@@ -9,7 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { baseTipsOf, landedCommitRefusal, type Ownership } from './landed-commit.ts';
 
 // P8-F1, P9-F5: «Commit pushed» took «banana», and the hash of a push the hook had refused. The
@@ -31,17 +33,74 @@ describe('the commit a board says it landed', () => {
     git(dir, 'commit', '-q', '-m', file);
     return git(dir, 'rev-parse', '--short', 'HEAD');
   };
+  const write = (file: string, content: string, message = file) => {
+    writeFileSync(join(dir, file), content);
+    git(dir, 'add', file);
+    git(dir, 'commit', '-q', '-m', message);
+  };
+  const append = (file: string, line: string) => {
+    appendFileSync(join(dir, file), `${line}\n`);
+    git(dir, 'add', file);
+    git(dir, 'commit', '-q', '-m', line);
+  };
   const refusal = (value: string) => landedCommitRefusal(dir, 'Commit pushed', value, 'main');
 
-  beforeEach(() => {
-    root = realpathSync.native(mkdtempSync(join(tmpdir(), 'otea-landed-')));
+  // The repos the tests start from are made once, by the commands a test used to run before its
+  // own (a dozen git spawns, or twenty with the approved branch: seconds each on a Windows runner),
+  // and each test gets a copy of the folder, with origin pointing at its own bare repo.
+  const BRANCH = 'feat';
+  const starts = { plain: '', pushed: '', branched: '' };
+  let approvedTip = '';
+  const tempRoot = () => realpathSync.native(mkdtempSync(join(tmpdir(), 'otea-landed-')));
+  const layout = (folder: string) => {
+    root = folder;
     dir = join(root, 'checkout');
     origin = join(root, 'origin.git');
+  };
+  const snapshot = (from: string) => {
+    const copy = tempRoot();
+    cpSync(from, copy, { recursive: true });
+    return copy;
+  };
+  const startFrom = (template: string) => {
+    layout(snapshot(template));
+    if (existsSync(origin)) git(dir, 'remote', 'set-url', 'origin', origin);
+  };
+
+  beforeAll(() => {
+    layout(tempRoot());
     execFileSync('git', ['init', '--quiet', '-b', 'main', dir], { stdio: 'ignore' });
+    starts.plain = snapshot(root);
+    execFileSync('git', ['init', '--quiet', '--bare', '-b', 'main', origin], { stdio: 'ignore' });
+    commit('root.txt');
+    git(dir, 'remote', 'add', 'origin', origin);
+    git(dir, 'push', '-q', 'origin', 'main');
+    starts.pushed = snapshot(root);
+    // The item's branch: two commits, one of them on a file another item will touch. Handed off
+    // and approved at its tip, which is what the review read (pushed).
+    write('shared.txt', 'one\ntwo\n', 'shared');
+    git(dir, 'push', '-q', 'origin', 'main');
+    git(dir, 'switch', '-q', '-c', BRANCH);
+    write('feature.txt', 'feature\n');
+    append('shared.txt', 'item line');
+    git(dir, 'push', '-q', 'origin', BRANCH);
+    approvedTip = git(dir, 'rev-parse', 'HEAD');
+    // Another item landed on main meanwhile.
+    git(dir, 'switch', '-q', 'main');
+    starts.branched = snapshot(root);
+    rmSync(root, { recursive: true, force: true, maxRetries: 10 });
+  }, 90_000);
+  afterAll(() => {
+    for (const template of Object.values(starts)) {
+      rmSync(template, { recursive: true, force: true, maxRetries: 10 });
+    }
   });
+
   afterEach(() => rmSync(root, { recursive: true, force: true, maxRetries: 10 }));
 
   describe('in a repo with no remote', () => {
+    beforeEach(() => startFrom(starts.plain));
+
     it('takes a commit of the local main and nothing else', () => {
       const landed = commit('a.txt');
       expect(refusal(landed)).toBeUndefined();
@@ -73,12 +132,8 @@ describe('the commit a board says it landed', () => {
   });
 
   describe('in a repo with a remote', () => {
-    beforeEach(() => {
-      execFileSync('git', ['init', '--quiet', '--bare', '-b', 'main', origin], { stdio: 'ignore' });
-      commit('root.txt');
-      git(dir, 'remote', 'add', 'origin', origin);
-      git(dir, 'push', '-q', 'origin', 'main');
-    });
+    // A bare origin, and a checkout with a root commit pushed to it.
+    beforeEach(() => startFrom(starts.pushed));
 
     it('takes a commit that is on origin/main', () => {
       const pushed = commit('a.txt');
@@ -218,33 +273,15 @@ describe('the commit a board says it landed', () => {
     // agent rebased it (a multi-commit branch, or a rebase that had a conflict to resolve), and
     // the refusal called main's own tip «an older commit of main».
     describe('landing the approved branch after main moved on', () => {
-      const BRANCH = 'feat';
-      const write = (file: string, content: string, message = file) => {
-        writeFileSync(join(dir, file), content);
-        git(dir, 'add', file);
-        git(dir, 'commit', '-q', '-m', message);
-      };
-      const append = (file: string, line: string) => {
-        appendFileSync(join(dir, file), `${line}\n`);
-        git(dir, 'add', file);
-        git(dir, 'commit', '-q', '-m', line);
-      };
       const head = () => git(dir, 'rev-parse', '--short', 'HEAD');
       const ask = (value: string, tip: string) =>
         landedCommitRefusal(dir, 'Commit on main', value, 'main', { commit: tip });
-      // The item's branch: two commits, one of them on a file another item will touch. Handed off
-      // and approved at its tip, which is what the review read (pushed).
+      // The item's branch (made once, in beforeAll): two commits, one of them on a file another
+      // item will touch, pushed and handed off at its tip, which is what the review read.
       let approved: string;
       beforeEach(() => {
-        write('shared.txt', 'one\ntwo\n', 'shared');
-        git(dir, 'push', '-q', 'origin', 'main');
-        git(dir, 'switch', '-q', '-c', BRANCH);
-        write('feature.txt', 'feature\n');
-        append('shared.txt', 'item line');
-        git(dir, 'push', '-q', 'origin', BRANCH);
-        approved = git(dir, 'rev-parse', 'HEAD');
-        // Another item landed on main meanwhile.
-        git(dir, 'switch', '-q', 'main');
+        startFrom(starts.branched);
+        approved = approvedTip;
       });
       const mainMovesOnAnotherFile = () => {
         write('other.txt', 'other\n');
@@ -455,6 +492,7 @@ describe('the commit a board says it landed', () => {
   // commit. The commit must be this item's: not one another item landed with, and not one made
   // before the item was taken.
   describe('the commit must be this item’s own', () => {
+    beforeEach(() => startFrom(starts.plain));
     const ask = (value: string, own: Ownership, approved?: { commit: string }) =>
       landedCommitRefusal(dir, 'Commit pushed', value, 'main', approved, own);
     const head = () => git(dir, 'rev-parse', 'HEAD');
@@ -585,6 +623,7 @@ describe('the commit a board says it landed', () => {
     }
   })();
   it.skipIf(!sha256Works)('takes a 64-digit id of a SHA-256 repository', () => {
+    layout(tempRoot());
     const sha256 = join(root, 'sha256');
     execFileSync('git', ['init', '--quiet', '-b', 'main', '--object-format=sha256', sha256], {
       stdio: 'ignore',
