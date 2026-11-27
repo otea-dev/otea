@@ -34,6 +34,7 @@ import {
   saveProcessStart,
   saveProfile,
   selectAgents,
+  selectEvents,
   selectLastReleases,
   selectLatestStartBesides,
   selectLeases,
@@ -578,7 +579,7 @@ export function waitBeat(
 }
 
 // A lease within this of running out (or already out) of a holder that is there is extended.
-const LEASE_RENEW_AHEAD_MS = 3 * 60_000;
+export const LEASE_RENEW_AHEAD_MS = 3 * 60_000;
 
 // What the last look at the leases found per project: the holders it left alone, and when, so a
 // really stuck item does not make every read list the agents again.
@@ -629,7 +630,7 @@ function renewLapsingLeases(
   let left = 0;
   for (const { id, lease } of due) {
     const silentSince = there.get(lease.holder);
-    if (silentSince === undefined) {
+    if (silentSince === undefined || grantedFor(db, id, lease.holder) < LEASE_RENEW_AHEAD_MS) {
       left += 1;
       continue;
     }
@@ -646,6 +647,17 @@ function renewLapsingLeases(
 }
 
 const LOOK_AGAIN_MS = 5_000;
+
+// How long the holder's claim granted the lease for (its `claimed` event: when, and until when).
+// Unknown (no such event) counts as the default lease, so an older record is still renewed.
+function grantedFor(db: DatabaseSync, id: string, holder: string): number {
+  const claimed = selectEvents(db, id).findLast(
+    (event) => event.type === 'claimed' && event.data.holder === holder,
+  );
+  const until = Date.parse(String(claimed?.data.expiresAt ?? ''));
+  const from = Date.parse(claimed?.at ?? '');
+  return Number.isNaN(until) || Number.isNaN(from) ? DEFAULT_LEASE_TTL_MS : until - from;
+}
 
 // A waiting agent is alive: a parent waiting on its children, or on the person's answer, keeps
 // what it holds, each live lease extended to a default lease from now, never shortened. A lease

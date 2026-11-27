@@ -10,7 +10,13 @@ import type { Context } from './context.ts';
 import { createItem, listItems } from './items.ts';
 import { claimItem } from './leases.ts';
 import { pendingOf } from './pending.ts';
-import { keepLeasesOfAgentsThere, listAgents, noteHarness, seeAgent } from './presence.ts';
+import {
+  keepLeasesOfAgentsThere,
+  listAgents,
+  noteHarness,
+  seeAgent,
+  sessionRuns,
+} from './presence.ts';
 import { memoryContext, publishAs } from './testing.ts';
 
 const T0 = Date.parse('2026-11-26T10:00:00.000Z');
@@ -105,6 +111,28 @@ describe('a worker whose harness runs is not stuck', () => {
     expect(Date.parse(item?.lease?.expiresAt ?? '')).toBeLessThanOrEqual(T0 + 35 * MIN);
     // Past it, the lease runs out and the item is stuck.
     expect(stuck(36 * MIN)).toEqual([expect.objectContaining({ ref: id })]);
+  });
+
+  // A worker that asked for a short lease (claim --ttl 1s) asked for it to run out: the renewal is
+  // for the default lease of a long step, never for a lease granted for less than it looks ahead.
+  it('leaves a lease granted for a short time to run out', () => {
+    noteHarness(ctx.db, ana.name, process.pid, at(0), true);
+    // Freed and claimed anew for a minute: the claim event says how long it was granted for.
+    clearLease(ctx.db, id);
+    claimItem(ctx, { id, actor: ana, ttlMs: 60_000 }, at(0));
+
+    expect(stuck(20 * MIN)).toEqual([expect.objectContaining({ ref: id })]);
+    const [item] = listItems(ctx, {}, at(20 * MIN));
+    expect(item?.lease).toBeNull();
+  });
+
+  // A harness found above one command only is a candidate (it may be an intermediary that ends with
+  // its command): it says nothing of the session, so it never makes a lapsed lease its holder's
+  // to keep (CI: wait.test.ts hung on an expired lease nobody could take).
+  it('does not read a session as running from a harness candidate alone', () => {
+    noteHarness(ctx.db, ana.name, process.pid, at(0), false);
+
+    expect(sessionRuns(ctx.db, ana.name, at(20 * MIN))).toBe(false);
   });
 
   it('skips quietly on a database it cannot write', () => {

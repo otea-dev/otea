@@ -904,7 +904,7 @@ export function selectListenerProcesses(db: DatabaseSync): Map<string, ListenerP
     .prepare(
       `SELECT name, listening_session, listening_waiter, listening_harness FROM agents
         WHERE listening_session IS NOT NULL OR listening_waiter IS NOT NULL
-          OR listening_harness IS NOT NULL`,
+          OR listening_harness > 0`,
     )
     .all() as {
     name: string;

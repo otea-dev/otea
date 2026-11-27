@@ -143,6 +143,7 @@ import {
   type Harness,
   harnessKey,
   hearAgent,
+  LEASE_RENEW_AHEAD_MS,
   LISTEN_BEAT_MS,
   listAgents,
   mcpLoaded,
@@ -3151,7 +3152,9 @@ const claim: Command = {
         text,
       };
     });
-    noteWorkerHarnessAfter(input);
+    // A worker that asks for a short lease asks for it to run out: its session is not noted as the
+    // sign it is there, which would keep the item its own past the lease (lease-take.ts).
+    if (ttl === undefined || ttl >= LEASE_RENEW_AHEAD_MS) noteWorkerHarnessAfter(input);
     return claimed;
   },
 };
