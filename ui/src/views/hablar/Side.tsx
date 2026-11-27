@@ -1,5 +1,11 @@
 import { useApp } from '../../app/context.tsx';
-import type { Card, Chip, Filter } from '../../conversation.ts';
+import {
+  type Card,
+  type Chip,
+  type Filter,
+  type MessageKind,
+  messageSnippet,
+} from '../../conversation.ts';
 import { useConversationHits } from '../../conversation-search.ts';
 import { t } from '../../i18n/i18n.ts';
 import { AgentMark, Seg } from '../../kit/index.ts';
@@ -41,13 +47,29 @@ function Kid({ chip }: { chip: Chip }) {
   );
 }
 
-function CardView({ card, now, onGo }: { card: Card; now: number; onGo: (root: number) => void }) {
+function CardView({
+  card,
+  now,
+  onGo,
+  onKind,
+}: {
+  card: Card;
+  now: number;
+  onGo: (root: number) => void;
+  onKind: (root: number, kind: MessageKind) => void;
+}) {
   return (
-    <article className="hb-card" data-kind={card.kind} data-asks={card.asks || undefined}>
+    <article className="hb-card" data-kind={card.kind ?? 'none'} data-asks={card.asks || undefined}>
       <div className="hb-meta">
-        <span className="hb-kind static" data-kind={card.kind}>
-          {t(`hablar.kind.${card.kind}`)}
-        </span>
+        {card.kind ? (
+          <span className="hb-kind static" data-kind={card.kind}>
+            {t(`hablar.kind.${card.kind}`)}
+          </span>
+        ) : (
+          <span className="hb-kind static" data-kind="none">
+            {t('hablar.kind.none')}
+          </span>
+        )}
         <time dateTime={card.at}>{noteTime(card.at, now)}</time>
       </div>
       <button
@@ -61,6 +83,25 @@ function CardView({ card, now, onGo }: { card: Card; now: number; onGo: (root: n
       {card.answer ? <p className="hb-ans">{card.answer}</p> : null}
       {card.taking ? <p className="hb-taking">{t('hablar.out.taking')}</p> : null}
       {card.leftover ? <p className="hb-taking">{t('hablar.out.leftover')}</p> : null}
+      {card.kind === null ? (
+        <div className="hb-sort">
+          {(['request', 'consultation'] as const).map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              className="hb-kind"
+              data-kind={kind}
+              aria-label={t('hablar.kind.make', {
+                kind: t(`hablar.kind.${kind}`),
+                snippet: messageSnippet(card.title, 50),
+              })}
+              onClick={() => onKind(card.root, kind)}
+            >
+              <span>{t(`hablar.kind.${kind}`)}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
       {card.chips.length > 0 ? (
         <div className="hb-kids">
           {card.chips.map((chip) => (
@@ -79,6 +120,7 @@ export function Side({
   onFilter,
   onGo,
   onHit,
+  onKind,
   now,
   bandeja,
   search,
@@ -91,6 +133,8 @@ export function Side({
   onGo: (root: number) => void;
   // Opens a turn the search found: it may be on an earlier page than the one read.
   onHit: (root: number) => void;
+  // One tap on a card nobody classified: it is a request or a consultation.
+  onKind: (root: number, kind: MessageKind) => void;
   now: number;
   // The Bandeja's notes as the page read them, and the one lit by a link.
   bandeja: BandejaProps;
@@ -167,7 +211,7 @@ export function Side({
           ) : (
             <div className="hb-cards">
               {cards.map((card) => (
-                <CardView key={card.root} card={card} now={now} onGo={onGo} />
+                <CardView key={card.root} card={card} now={now} onGo={onGo} onKind={onKind} />
               ))}
             </div>
           )}

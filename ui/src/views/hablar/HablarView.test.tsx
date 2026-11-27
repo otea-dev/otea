@@ -1120,6 +1120,35 @@ describe('correcting what a turn is', () => {
   });
 });
 
+// R2 (field study 4, U3): a turn the secretary answered without classifying it stayed out of «Lo que
+// salió»; it shows there as «sin clasificar», titled by what the person said, and one tap says what it is.
+describe('a turn nobody classified', () => {
+  const unsorted = () => [
+    say({ id: 1, author: 'person', text: 'Dime cuánto tarda el envío a Mendoza' }),
+    say({ id: 2, author: 'secretary', replyTo: 1, root: 1, text: 'Dos días hábiles.' }),
+  ];
+
+  it('is in «Lo que salió» with its words, and a tap on «pedido» marks it', async () => {
+    const { root, calls } = await open(conversation({ messages: unsorted() }));
+    const card = q(root, '.hb-card') as HTMLElement;
+    expect(text(q(card, '.hb-kind.static'))).toBe('sin clasificar');
+    expect(text(q(card, '.hb-ct'))).toBe('Dime cuánto tarda el envío a Mendoza');
+
+    await press(q(card, '.hb-sort .hb-kind[data-kind="request"]'));
+
+    expect(calls).toEqual([
+      expect.objectContaining({
+        method: 'POST',
+        url: '/api/conversation/messages/1/kind',
+        body: { kind: 'request' },
+      }),
+    ]);
+    // It shows as the person set it at once: the sort buttons are gone, the label says request.
+    expect(q(root, '.hb-card .hb-sort')).toBeNull();
+    expect(text(q(root, '.hb-card .hb-kind.static'))).toBe('pedido');
+  });
+});
+
 describe('the secretary away, or never there', () => {
   it('says that it is away, how many messages wait, and since when', async () => {
     const { root } = await open(

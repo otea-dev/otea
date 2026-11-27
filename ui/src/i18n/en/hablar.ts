@@ -62,6 +62,8 @@ export const hablar = {
   'hablar.less': 'see less',
   'hablar.kind.request': 'request',
   'hablar.kind.consultation': 'consultation',
+  'hablar.kind.none': 'unsorted',
+  'hablar.kind.make': 'Mark as a {kind} · “{snippet}”',
   'hablar.kind.fix': 'Marked as a {kind} · “{snippet}”. Tap to make it a {other}.',
   'hablar.kind.done': 'Now a {kind}. Your secretary will see it and act.',
   'hablar.kind.failed': 'Could not change it ({message}). Try again.',

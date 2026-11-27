@@ -533,6 +533,10 @@ export function HablarView({
           onFilter={setFilter}
           onGo={goTo}
           onHit={openHit}
+          onKind={(root, kind) => {
+            const turn = turns.find((each) => each.root === root);
+            if (turn) onKind(turn, kind);
+          }}
           now={app.now}
           bandeja={{ ...notes, lit: litNote, answerBelow: threadShows }}
           search={search}

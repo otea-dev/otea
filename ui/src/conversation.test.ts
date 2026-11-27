@@ -706,6 +706,33 @@ describe('what came out, in cards', () => {
     ]);
   });
 
+  // R2 (field study 4, U3): a turn the secretary answered without ever classifying it vanished from
+  // «Lo que salió». It stays in sight with no kind, titled by the person's own words, so one tap can
+  // make it a request or a consultation; only «Todo» holds it.
+  it('keeps an answered turn nobody classified, titled by the person, and counts it in all', () => {
+    const open = turnsOf([
+      say({ id: 1, author: 'person', text: '¿Cuánto tarda el envío a Mendoza?' }),
+      say({ id: 2, author: 'secretary', replyTo: 1, root: 1, text: 'Dos días.' }),
+      // Still unanswered, read a moment ago: the secretary holds it, it is not unclassified.
+      say({ id: 3, author: 'person', text: 'Y a Salta?' }),
+      // A side topic's record has its own place.
+      say({ id: 4, author: 'person', text: 'Guarda esto' }),
+      say({ id: 5, author: 'agent', replyTo: 4, root: 4, topic: 'TEM-3' }),
+    ]);
+
+    expect(cardsOf(open, items, NOW)).toEqual([
+      expect.objectContaining({
+        root: 1,
+        kind: null,
+        title: '¿Cuánto tarda el envío a Mendoza?',
+        answer: 'Dos días.',
+      }),
+    ]);
+    expect(cardsOf(open, items, NOW, 'request')).toEqual([]);
+    expect(cardsOf(open, items, NOW, 'consultation')).toEqual([]);
+    expect(cardCounts(open, items, NOW)).toEqual({ all: 1, request: 0, consultation: 0 });
+  });
+
   it('filters by kind and counts each', () => {
     expect(cardsOf(turns, items, NOW, 'request').map((card) => card.root)).toEqual([1]);
     expect(cardsOf(turns, items, NOW, 'consultation').map((card) => card.root)).toEqual([3]);

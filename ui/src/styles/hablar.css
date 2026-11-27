@@ -1549,6 +1549,18 @@ button.hb-chip:hover {
   font: 400 italic 12.5px / 1.45 var(--serif);
   color: var(--ink-2);
 }
+/* a card nobody classified: its label is quiet, and two taps say what it is */
+.hb-kind[data-kind="none"] {
+  background: var(--well);
+  color: var(--ink-3);
+}
+.hb-sort {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 16px;
+  padding-top: 2px;
+}
 .hb-kids {
   position: relative;
   z-index: 1;

@@ -440,7 +440,8 @@ export type Filter = 'all' | 'request' | 'consultation';
 // A card of «Lo que salió»: a request with its items, or a consultation with its answer.
 export type Card = {
   root: number;
-  kind: MessageKind;
+  // Null: the secretary answered the turn and never said what it is; one tap on the card sets it.
+  kind: MessageKind | null;
   title: string;
   at: string;
   // A consultation's one-line answer.
@@ -468,6 +469,36 @@ export function titleOf(turn: Turn): string {
   return first ? messageSnippet(first.text, 90) : '';
 }
 
+// A turn the person began and the secretary answered, and never classified: ordinary talk it did
+// not mark, or a request it forgot to. A turn still on its way (unanswered), a trace of a tap, one
+// a secretary's question began and a side topic's record are not this.
+function isUnclassified(turn: Turn): boolean {
+  const root = turn.messages[0];
+  return (
+    turn.kind === null &&
+    turn.waits === null &&
+    turn.topic === null &&
+    root?.author === 'person' &&
+    root.choice === null &&
+    turn.replies.length > 0
+  );
+}
+
+function unclassifiedCard(turn: Turn, items: ReadonlyMap<string, Item>, now: number): Card {
+  const reply = turn.replies[0];
+  return {
+    root: turn.root,
+    kind: null,
+    title: titleOf(turn),
+    at: turn.at,
+    answer: reply ? messageSnippet(reply.text, 140) : null,
+    chips: branchOf(turn, items, now),
+    asks: false,
+    taking: false,
+    leftover: false,
+  };
+}
+
 // The cards, newest first: every turn that is a request or a consultation and, for a request, has
 // produced something (a request with nothing linked yet is still being worked out), unless it is
 // one the person made themselves by correcting a consultation: that one stays in sight, saying the
@@ -481,7 +512,11 @@ export function cardsOf(
   const cards: Card[] = [];
   for (const turn of turns) {
     const { kind } = turn;
-    if (kind === null || (filter !== 'all' && kind !== filter)) continue;
+    if (kind === null) {
+      if (filter === 'all' && isUnclassified(turn)) cards.push(unclassifiedCard(turn, items, now));
+      continue;
+    }
+    if (filter !== 'all' && kind !== filter) continue;
     const taking = kind === 'request' && turn.links.length === 0 && turn.kindBy === 'person';
     if (kind === 'request' && turn.links.length === 0 && !taking) continue;
     // What came out of a turn stays with it when the person corrects a request to a consultation:

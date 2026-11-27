@@ -65,6 +65,8 @@ export const hablar = {
   'hablar.less': 'ver menos',
   'hablar.kind.request': 'pedido',
   'hablar.kind.consultation': 'consulta',
+  'hablar.kind.none': 'sin clasificar',
+  'hablar.kind.make': 'Marcar como {kind} · «{snippet}»',
   'hablar.kind.fix': 'Marcado como {kind} · «{snippet}». Pulsa para cambiarlo a {other}.',
   'hablar.kind.done': 'Ahora es {kind}. Tu secretario lo verá y actuará.',
   'hablar.kind.failed': 'No se pudo cambiar ({message}). Inténtalo de nuevo.',
