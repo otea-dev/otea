@@ -684,9 +684,13 @@ export function applyMigrations(
     );
   }
   for (const [offset, sql] of migrations.slice(current, target).entries()) {
+    const done = current + offset + 1;
     transaction(db, () => {
+      // The version was read before the lock: another process (the desk, an agent's command) may have
+      // run this one since, and running it twice fails on the table or column it made.
+      if (userVersion(db) >= done) return;
       db.exec(sql);
-      db.exec(`PRAGMA user_version = ${current + offset + 1}`);
+      db.exec(`PRAGMA user_version = ${done}`);
     });
   }
 }
