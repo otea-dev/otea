@@ -441,6 +441,12 @@ export type Card = {
 const isOpenLook = (look: Look): boolean => look !== 'done' && look !== 'dropped';
 
 export function titleOf(turn: Turn): string {
+  // A turn the secretary began with a question: it is titled by that question, not by the person's
+  // tap on one of its options («Sí, encárgalo»).
+  const root = turn.messages[0];
+  if (root && root.author !== 'person' && root.options.length > 0) {
+    return messageSnippet(splitQuestion(root.text).lead, 90);
+  }
   const first = turn.person[0] ?? turn.messages[0];
   return first ? messageSnippet(first.text, 90) : '';
 }

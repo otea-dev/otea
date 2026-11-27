@@ -594,6 +594,30 @@ describe('what came out, in cards', () => {
     expect(cards[0]).toMatchObject({ answer: 'Sí, si cada cliente revisa distinto.' });
   });
 
+  // U3 (field study 4): a request that came out of the person's tap on the secretary's question was
+  // titled by the tap («Sí, encárgalo»); it is titled by the question it answers.
+  it('titles a turn that began with the secretary’s question by that question, not by the tap', () => {
+    const asked = turnsOf([
+      say({
+        id: 20,
+        author: 'secretary',
+        text: 'Hay dos formas de recuperar la columna.\n¿Lo encargo a un agente?',
+        options: ['Sí, encárgalo', 'No'],
+      }),
+      say({ id: 21, author: 'person', replyTo: 20, root: 20, text: 'Sí, encárgalo' }),
+      say({
+        id: 22,
+        author: 'secretary',
+        replyTo: 21,
+        root: 20,
+        kind: 'request',
+        links: ['CAM-12'],
+      }),
+    ]);
+    const [card] = cardsOf(asked, items, NOW);
+    expect(card?.title).toBe('¿Lo encargo a un agente?');
+  });
+
   // The person's own tap on «consulta ⇄» makes the turn a request nothing has taken yet: it stays
   // in sight, saying the secretary is taking it, instead of vanishing from the list.
   it('keeps a request the person corrected, with no items yet, saying the secretary takes it', () => {
