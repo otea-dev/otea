@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
 import {
   type AgentStatus,
@@ -292,13 +294,75 @@ export function endListening(
 
 // Whether a process still runs on this computer, where every MCP server of the project runs, as
 // the system tells it by its id alone.
-export function processAlive(pid: number): boolean {
+// A zombie (ended, its parent not yet told) still answers a signal: a Linux container without an
+// init never reaps its children, so `otea serve stop` said «did not end» of a server that was down
+// (field study 7). The process state says it: Z is gone.
+export type ProcessProbe = {
+  platform: NodeJS.Platform;
+  // The text of /proc/<pid>/stat (Linux), or undefined.
+  stat: (pid: number) => string | undefined;
+  // What `ps -o stat= -p <pid>` prints (macOS and the BSDs), or undefined.
+  ps: (pid: number) => string | undefined;
+};
+
+// Where the state of a process is: the letter after the command's closing parenthesis, which the
+// command itself may contain.
+function procState(stat: string): string | undefined {
+  const at = stat.lastIndexOf(')');
+  return at < 0 ? undefined : stat.slice(at + 1).trim()[0];
+}
+
+// How long a `ps` answer is kept: the desk looks at every process of every agent on a timer, and a
+// `ps` per look would be a process spawned per agent.
+const PS_KEPT_MS = 1000;
+const psKept = new Map<number, { at: number; state: string | undefined }>();
+
+const SYSTEM_PROBE: ProcessProbe = {
+  platform: process.platform,
+  stat: (pid) => {
+    try {
+      return readFileSync(`/proc/${pid}/stat`, 'utf8');
+    } catch {
+      return undefined;
+    }
+  },
+  ps: (pid) => {
+    const at = Date.now();
+    const kept = psKept.get(pid);
+    if (kept && at - kept.at < PS_KEPT_MS) return kept.state;
+    let state: string | undefined;
+    try {
+      state = execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], {
+        encoding: 'utf8',
+        timeout: 2000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+    } catch {
+      state = undefined;
+    }
+    psKept.set(pid, { at, state });
+    return state;
+  },
+};
+
+function isZombie(pid: number, probe: ProcessProbe): boolean {
+  if (probe.platform === 'linux') {
+    const stat = probe.stat(pid);
+    return stat !== undefined && procState(stat) === 'Z';
+  }
+  if (probe.platform === 'darwin' || probe.platform.endsWith('bsd')) {
+    return probe.ps(pid)?.trim().startsWith('Z') === true;
+  }
+  return false;
+}
+
+export function processAlive(pid: number, probe: ProcessProbe = SYSTEM_PROBE): boolean {
   try {
     process.kill(pid, 0);
-    return true;
   } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
+    if ((error as NodeJS.ErrnoException).code !== 'EPERM') return false;
   }
+  return !isZombie(pid, probe);
 }
 
 // Long past any listening window: the rows of processes killed before they could say they ended.

@@ -156,6 +156,7 @@ import {
   noteCall,
   noteHarness,
   offerName,
+  processAlive,
   quietVoices,
   renewLeases,
   seeAgent,
@@ -886,15 +887,6 @@ const projectsForget: Command = {
     return { data: forgotten, text: `Forgot ${link.path}\n${left}` };
   },
 };
-
-function processAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
-  }
-}
 
 function migrationText(report: MigrationReport): string {
   const { status, id, root, to, from, backup, tables, files, undo } = report;
