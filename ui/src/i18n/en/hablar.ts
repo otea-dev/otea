@@ -14,6 +14,11 @@ export const hablar = {
   'hablar.awayUnknown': 'Your secretary is offline. Your messages wait for it.',
   'hablar.away.back':
     'It restarts on your computer, not from here: open a session of your agent and paste it this text. Your messages wait and it reads them when it is back.',
+  'hablar.away.short': {
+    one: 'Your secretary is offline · {count} message waiting',
+    other: 'Your secretary is offline · {count} messages waiting',
+  },
+  'hablar.away.shortNone': 'Your secretary is offline',
   'hablar.away.cmds': 'Or with commands, in the terminal',
   'hablar.away.cmdWait': 'If its session is still open, ask your agent to run:',
   'hablar.away.cmdPrompt': 'If you closed it, open a new one and paste what this prints:',

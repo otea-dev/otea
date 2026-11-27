@@ -16,6 +16,11 @@ export const hablar = {
   'hablar.awayUnknown': 'Tu secretario está desconectado. Tus mensajes lo esperan.',
   'hablar.away.back':
     'Se reinicia en tu computadora, no desde aquí: abre una sesión de tu agente y pégale este texto. Tus mensajes esperan y los lee al volver.',
+  'hablar.away.short': {
+    one: 'Tu secretario está desconectado · {count} mensaje espera',
+    other: 'Tu secretario está desconectado · {count} mensajes esperan',
+  },
+  'hablar.away.shortNone': 'Tu secretario está desconectado',
   'hablar.away.cmds': 'O con comandos, en la terminal',
   'hablar.away.cmdWait': 'Si su sesión sigue abierta, pídele a tu agente que ejecute:',
   'hablar.away.cmdPrompt': 'Si la cerraste, abre una nueva y pega lo que imprime:',

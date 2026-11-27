@@ -881,6 +881,46 @@ describe('the secretary thinking', () => {
     expect(q(away, 'details')?.hasAttribute('open')).toBe(false);
   });
 
+  // P (phone, field study 4): the block took a third of a 390 px screen. On the phone it is one
+  // line that opens to the full block, open by default only the first time in a session.
+  it('folds the away block to one line on the phone, open only the first time in a session', async () => {
+    try {
+      sessionStorage.clear();
+    } catch {}
+    const view = conversation({
+      messages: read,
+      secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 2 },
+      waiting: { count: 2, since: ago(120) },
+    });
+    const first = await open(view, { phone: true });
+    let away = q(first.root, '.hb-away') as HTMLElement;
+    const head = q<HTMLButtonElement>(away, '.hb-away-head') as HTMLButtonElement;
+    expect(text(head)).toBe('Tu secretario está desconectado · 2 mensajes esperan');
+    expect(head.getAttribute('aria-expanded')).toBe('true');
+    expect(buttonNamed(away, 'Copiar el texto del secretario')).toBeDefined();
+    page?.unmount();
+
+    // A later visit in the same session: one line, until it is tapped.
+    await open(view, { phone: true });
+    away = q(page?.root as HTMLElement, '.hb-away') as HTMLElement;
+    expect(q(away, '.hb-away-head')?.getAttribute('aria-expanded')).toBe('false');
+    expect(buttonNamed(away, 'Copiar el texto del secretario')).toBeUndefined();
+    await press(q(away, '.hb-away-head'));
+    expect(buttonNamed(away, 'Copiar el texto del secretario')).toBeDefined();
+  });
+
+  it('keeps the whole away block on the desk, with no fold', async () => {
+    const { root } = await open(
+      conversation({
+        messages: read,
+        secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 1 },
+      }),
+      { phone: false },
+    );
+    expect(q(root, '.hb-away-head')).toBeNull();
+    expect(buttonNamed(root, 'Copiar el texto del secretario')).toBeDefined();
+  });
+
   it('marks a message it has not read yet as waiting', async () => {
     const { root } = await open(
       conversation({ messages: [say({ id: 1, author: 'person', delivery: 'pending' })] }),

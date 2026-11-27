@@ -26,6 +26,7 @@ import {
 import { momentLabel } from '../../format.ts';
 import { useRemote } from '../../hooks.ts';
 import { t } from '../../i18n/i18n.ts';
+import { Icon } from '../../kit/Icon.tsx';
 import { Button, toast } from '../../kit/index.ts';
 import { F, lerp } from '../../motion/curves.ts';
 import { drive } from '../../motion/drive.ts';
@@ -127,6 +128,73 @@ function AwayHow({ name }: { name: string }) {
         <CopyCommand command={`otea prompt --role secretary --as ${name}`} />
       </details>
     </>
+  );
+}
+
+// On the phone the notice is one line that opens to the whole block; it opens by itself only the
+// first time in a session (then the person knows what it says). The desk keeps the whole block.
+const AWAY_SEEN = 'otea.away-seen';
+
+function firstAwayThisSession(): boolean {
+  try {
+    if (sessionStorage.getItem(AWAY_SEEN) !== null) return false;
+    sessionStorage.setItem(AWAY_SEEN, '1');
+  } catch {
+    // no storage: it opens, as the first time does
+  }
+  return true;
+}
+
+function AwayNotice({
+  since,
+  now,
+  phone,
+  waiting,
+  name,
+}: {
+  since: string | null | undefined;
+  now: number;
+  phone: boolean;
+  waiting: number;
+  name: string | undefined;
+}) {
+  const [first] = useState(() => (phone ? firstAwayThisSession() : false));
+  const [chosen, setChosen] = useState<boolean | undefined>();
+  const open = chosen ?? first;
+  const sentence = since
+    ? t('hablar.away', { since: momentLabel(since, now) })
+    : t('hablar.awayUnknown');
+  if (!phone) {
+    return (
+      <div className="hb-away" role="status" data-enter="fade">
+        <i aria-hidden="true" />
+        <span>{sentence}</span>
+        {waiting > 0 ? <b className="hb-wait">{t('hablar.waiting', { count: waiting })}</b> : null}
+        {name ? <AwayHow name={name} /> : null}
+      </div>
+    );
+  }
+  return (
+    <div className="hb-away" data-phone="" role="status" data-enter="fade">
+      <button
+        type="button"
+        className="hb-away-head"
+        aria-expanded={open}
+        onClick={() => setChosen(!open)}
+      >
+        <i aria-hidden="true" />
+        <span>
+          {waiting > 0 ? t('hablar.away.short', { count: waiting }) : t('hablar.away.shortNone')}
+        </span>
+        <Icon name="chevron" />
+      </button>
+      {open ? (
+        <>
+          <span className="hb-away-sentence">{sentence}</span>
+          {name ? <AwayHow name={name} /> : null}
+        </>
+      ) : null}
+    </div>
   );
 }
 
@@ -478,18 +546,13 @@ export function HablarView({
         </div>
         {none ? <NoSecretary /> : null}
         {away ? (
-          <div className="hb-away" role="status" data-enter="fade">
-            <i aria-hidden="true" />
-            <span>
-              {away.since
-                ? t('hablar.away', { since: momentLabel(away.since, app.now) })
-                : t('hablar.awayUnknown')}
-            </span>
-            {convo.status === 'ready' && convo.waiting.count > 0 ? (
-              <b className="hb-wait">{t('hablar.waiting', { count: convo.waiting.count })}</b>
-            ) : null}
-            {secretary ? <AwayHow name={secretary.name} /> : null}
-          </div>
+          <AwayNotice
+            since={away.since}
+            now={app.now}
+            phone={app.phone}
+            waiting={convo.status === 'ready' ? convo.waiting.count : 0}
+            name={secretary?.name}
+          />
         ) : null}
         <TeEspera pending={app.pending} onJump={jump} />
         <div className="hb-chat" id="hb-panel-chat" ref={scroller}>

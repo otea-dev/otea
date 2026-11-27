@@ -149,6 +149,48 @@
   flex: none;
   margin-top: 2px;
 }
+/* on the phone the notice is one line (the head) that opens to the whole block */
+.hb-away[data-phone] {
+  padding: 0 13px;
+}
+.hb-away-head {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  margin: 0 -13px;
+  padding: 0 13px;
+  width: calc(100% + 26px);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hb-away-head span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hb-away-head .ic {
+  flex: none;
+  color: var(--ink-3);
+  transition: transform 240ms var(--o-settle);
+}
+.hb-away-head[aria-expanded="true"] .ic {
+  transform: rotate(180deg);
+}
+.hb-away .hb-away-sentence {
+  flex: 1 1 100%;
+  padding-top: 2px;
+}
+.hb-away[data-phone]:has(.hb-away-sentence) {
+  padding-bottom: 9px;
+}
 /* the commands are the second way to bring it back: folded, in the page's own words */
 .hb-cmds {
   flex: 1 1 100%;
