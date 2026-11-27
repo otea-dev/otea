@@ -109,6 +109,14 @@ export type Message = {
   recommended: number | null;
   // What the first option does when the person taps it, when the question carries an action.
   action: MessageAction | null;
+  // The secretary's message that Otea could not tie to the session noted for it (the desk marks it).
+  unverified: boolean;
+  // The numbers (from 1) of the options that need the person's own words: tapping one opens the
+  // text box instead of answering at once.
+  optionText: number[];
+  // A question that stopped being asked: withdrawn by the secretary, or settled by what the person
+  // did (it sent the item back, the turn became an item). It no longer waits for them.
+  closed: { at: string; why: string } | null;
   choice: MessageChoice | null;
   // The person's messages only: when the secretary's wait returned it, before it read it.
   heardAt: string | null;

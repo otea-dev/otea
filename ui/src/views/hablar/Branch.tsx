@@ -132,6 +132,8 @@ export function AskBody({
   gone = false,
   bare = false,
   action,
+  optionText = [],
+  retract,
   send,
 }: {
   by: string;
@@ -146,17 +148,41 @@ export function AskBody({
   // The question sends an item back for you when you tap its first option, with this note: the card
   // shows the note, lets you edit it, and never leaves the decision to the secretary.
   action?: { kind: 'send_back' | 'drop'; item: string; note: string; to: string };
+  // The numbers (from 1) of the options that need your own words: tapping one opens the text box
+  // instead of answering at once.
+  optionText?: readonly number[];
+  // Takes the answer back (Deshacer), while the secretary has not heard it: the question asks again.
+  retract?: () => Promise<void>;
   send: (given: AnswerWords) => Promise<void>;
 }) {
   const app = useApp();
   const [free, setFree] = useState<string | null>(null);
+  // The option picked that needs words: the text box is its explanation.
+  const [picked, setPicked] = useState<number | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const blocked = busy || gone || app.sync.offline || !app.session.canWrite;
   const answer = (given: AnswerWords, shown: string) => {
     setBusy(true);
     send(given).then(
-      () => setSaid(shown),
+      () => {
+        setSaid(shown);
+        if (retract === undefined || action) return;
+        toast({
+          msg: shown,
+          undo: () =>
+            void retract().then(
+              () => {
+                setSaid(null);
+                setBusy(false);
+                setFree(null);
+                setPicked(null);
+              },
+              (error: unknown) =>
+                toast({ msg: error instanceof Error ? error.message : String(error) }),
+            ),
+        });
+      },
       (error: unknown) => {
         setBusy(false);
         toast({ msg: error instanceof Error ? error.message : String(error) });
@@ -202,7 +228,7 @@ export function AskBody({
               {action.note}
             </blockquote>
           ) : null}
-          {options.length > 0 && !(action && free !== null) ? (
+          {options.length > 0 && !(action && free !== null) && picked === null ? (
             <div className="hb-opts">
               {options.map((text, index) => (
                 <button
@@ -210,8 +236,17 @@ export function AskBody({
                   type="button"
                   className="hb-opt"
                   data-rec={recommended === index + 1 ? '' : undefined}
+                  data-words={optionText.includes(index + 1) ? '' : undefined}
                   disabled={blocked}
-                  onClick={() => answer({ option: index + 1 }, t('hablar.ask.answered', { text }))}
+                  onClick={() => {
+                    // An option that needs your words opens the box: nothing is sent yet.
+                    if (optionText.includes(index + 1)) {
+                      setPicked(index + 1);
+                      setFree('');
+                      return;
+                    }
+                    answer({ option: index + 1 }, t('hablar.ask.answered', { text }));
+                  }}
                 >
                   <span>{text}</span>
                   {recommended === index + 1 ? (
@@ -244,6 +279,11 @@ export function AskBody({
             </div>
           ) : (
             <div className="hb-own">
+              {picked === null ? null : (
+                <p className="hb-does">
+                  {t('hablar.ask.explain', { text: options[picked - 1] ?? '' })}
+                </p>
+              )}
               <textarea
                 rows={2}
                 value={free}
@@ -257,15 +297,22 @@ export function AskBody({
                   size="sm"
                   disabled={blocked || free.trim() === ''}
                   onClick={() =>
-                    action
+                    picked !== null
                       ? answer(
-                          { option: 1, note: free.trim() },
-                          t('hablar.ask.answered', { text: options[0] ?? '' }),
+                          { option: picked, explain: free.trim() },
+                          t('hablar.ask.answered', {
+                            text: `${options[picked - 1] ?? ''} — ${free.trim()}`,
+                          }),
                         )
-                      : answer(
-                          { text: free.trim() },
-                          t('hablar.ask.answered', { text: free.trim() }),
-                        )
+                      : action
+                        ? answer(
+                            { option: 1, note: free.trim() },
+                            t('hablar.ask.answered', { text: options[0] ?? '' }),
+                          )
+                        : answer(
+                            { text: free.trim() },
+                            t('hablar.ask.answered', { text: free.trim() }),
+                          )
                   }
                 >
                   {action
@@ -274,7 +321,13 @@ export function AskBody({
                       })
                     : t('sheet.qa.send')}
                 </Button>
-                <button type="button" onClick={() => setFree(null)}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFree(null);
+                    setPicked(null);
+                  }}
+                >
                   {t('topics.convert.cancel')}
                 </button>
               </div>

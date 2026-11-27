@@ -566,6 +566,8 @@ const SecretaryAnswerBody = z.union([
       option: z.number().int().positive(),
       // The person's edit of the note a card sends back with.
       note: z.string().max(MAX_MESSAGE_CHARS).optional(),
+      // What the person adds to an option that needs their own words.
+      explain: z.string().max(MAX_MESSAGE_CHARS).optional(),
     })
     .strict(),
   z.object({ delegate: z.literal(true) }).strict(),

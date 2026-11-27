@@ -596,6 +596,27 @@
   background-size: 200% 100%;
   animation: hb-sweep 1.8s ease-in-out infinite;
 }
+/* the secretary held a message for minutes: no sweeping bar, what it means and what to do */
+.hb-thinking.hb-silent {
+  display: block;
+  font-style: normal;
+}
+.hb-thinking.hb-silent p {
+  margin: 0;
+}
+.hb-silent-do {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-3, var(--ink-2));
+}
+/* a message of the secretary's that Otea could not tie to its session */
+.hb-unverified {
+  padding: 0 6px;
+  border: 1px solid var(--line, currentColor);
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--ink-2);
+}
 @keyframes hb-sweep {
   0% {
     background-position: 100% 0;

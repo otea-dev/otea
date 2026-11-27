@@ -444,7 +444,8 @@ export type Row =
       // The older message it answers, when it is not the one right above it.
       answers: Message | null;
       // A question with options to tap: open until the person has replied to it.
-      question: 'open' | 'answered' | null;
+      // `closed`: the secretary withdrew it, or what it asked was settled some other way.
+      question: 'open' | 'answered' | 'closed' | null;
     }
   // What the person chose or answered: their own row.
   | { type: 'choice'; message: Message; turn: Turn; asked: Message | null };
@@ -481,7 +482,14 @@ export function rowsOf(messages: readonly Message[], turns: readonly Turn[]): Ro
         turn,
         head: turn.replies[0]?.id === message.id,
         answers,
-        question: message.options.length === 0 ? null : spoke ? 'answered' : 'open',
+        question:
+          message.options.length === 0
+            ? null
+            : spoke
+              ? 'answered'
+              : message.closed !== null
+                ? 'closed'
+                : 'open',
       },
     ];
   });

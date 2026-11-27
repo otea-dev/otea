@@ -23,6 +23,7 @@ import {
   listConversation,
   messageIdOf,
   postPersonMessage,
+  retractAnswer,
   turnsOfItem,
 } from '../app/conversation.ts';
 import { answerSecretaryTap } from '../app/conversation-act.ts';
@@ -1080,6 +1081,13 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
           return c.json(message, 201);
         },
       )
+      // The person takes back the answer they just gave (Deshacer), before the secretary heard it.
+      .post('/conversation/messages/:id/unanswer', (c) => {
+        assertWritable(c, auth);
+        const question = retractAnswer(project, messageIdOf(c.req.param('id')));
+        feed.notify();
+        return c.json(question);
+      })
       // The Bandeja (app/bandeja.ts): the person's rough captures. The person captures and answers
       // only here, signed in, from the UI's own origin: no command or tool of an agent makes an
       // entry or answers for the person.

@@ -60,6 +60,7 @@ import {
   readAsSecretary,
   requireLinkableMessage,
   turnsOfItem,
+  withdrawQuestion,
 } from '../app/conversation.ts';
 import { sayWithSendBack } from '../app/conversation-act.ts';
 import { cropNote } from '../app/crop.ts';
@@ -363,6 +364,7 @@ import { PHONE_COMMANDS } from './phone.ts';
 import { portFrom, portToOpen, portToStart, projectPage } from './ports.ts';
 import { probeSignIn } from './probe.ts';
 import { readServeFile, removeServeFile, serverVersionNote, writeServeFile } from './serve-file.ts';
+import { sessionBound, sessionVerdictOf } from './session-guard.ts';
 import {
   boardHintLines,
   cancelled,
@@ -5302,7 +5304,7 @@ const say: Command = {
   name: 'say',
   summary:
     'For the secretary: tell the person something, short, the conclusion first (- reads stdin). To answer a message: --reply-to <id>, with --request --links <item ids made> or --consultation to classify that turn. Your own news (a review ready, a problem): no --reply-to. A question: 2 to 4 --option answers they tap; with --send-back <id> --note "<note>" the first one sends that item of their review back for them, with the note, when they tap it',
-  args: ['text'],
+  args: ['text?'],
   options: {
     file: { multiple: true, placeholder: 'path' },
     'reply-to': { placeholder: 'id' },
@@ -5310,6 +5312,12 @@ const say: Command = {
     consultation: { flag: true },
     links: { placeholder: 'ids', about: 'item ids, comma separated' },
     option: { multiple: true, placeholder: 'text', about: '2 to 4 answers they tap' },
+    'option-text': {
+      multiple: true,
+      placeholder: 'n',
+      about: 'number of an option that needs their own words: tapping it opens the text box',
+    },
+    withdraw: { placeholder: 'id', about: 'take back your open question (no text)' },
     recommend: { placeholder: 'n', about: 'number (from 1) of the one you pick' },
     'send-back': {
       placeholder: 'id',
@@ -5330,8 +5338,30 @@ const say: Command = {
   execute: async (input) => {
     const [given = ''] = input.args;
     const { actor, cwd } = input;
+    const withdraw = input.option('withdraw');
+    if (withdraw !== undefined) {
+      if (given !== '') throw new UsageError('--withdraw takes no text: it takes back a question');
+      return withAgent(input, (project) => {
+        const closed = withdrawQuestion(project, {
+          agent: actor.name,
+          id: messageIdOf(withdraw),
+        });
+        return {
+          data: closed,
+          text: `Withdrew message ${closed.id}: it no longer waits for the person.`,
+        };
+      });
+    }
+    if (given === '' && input.options('file').length === 0)
+      throw new UsageError('say needs the text to say (or --withdraw <id>)');
     const replyTo = input.option('reply-to');
     const options = input.options('option');
+    const optionText = input.options('option-text').map((n) => {
+      const number = Number(n.replace(/^#/, ''));
+      if (!Number.isInteger(number))
+        throw new UsageError('--option-text is the number of an option');
+      return number;
+    });
     const sendBackGiven = input.option('send-back');
     const dropGiven = input.option('drop');
     const noteGiven = input.option('note');
@@ -5374,7 +5404,10 @@ const say: Command = {
         ...(kind === undefined ? {} : { kind }),
         links,
         ...(options.length === 0 ? {} : { options }),
+        ...(optionText.length === 0 ? {} : { optionText }),
         ...(recommended === undefined ? {} : { recommended }),
+        // Said under a name Otea could not tie to the secretary's session: the desk marks it.
+        unverified: sessionVerdictOf(input) !== 'bound',
         ...(sendBack === undefined || noteGiven === undefined
           ? {}
           : {
@@ -5394,9 +5427,10 @@ const say: Command = {
       const kept = said.kept ? ` The person set this turn as ${message.kind}: that stays.` : '';
       const files =
         message.attachments.length === 0 ? '' : ` with ${message.attachments.length} file(s)`;
+      const warned = said.warnings.map((warning) => `\nWarning: ${warning}`).join('');
       return {
         data: said,
-        text: `Said as message ${message.id}${message.replyTo === null ? '' : `, answering ${message.replyTo}`}${files}${turn}.${kept}`,
+        text: `Said as message ${message.id}${message.replyTo === null ? '' : `, answering ${message.replyTo}`}${files}${turn}.${kept}${warned}`,
       };
     });
   },
@@ -5593,7 +5627,7 @@ const bandejaClose: Command = {
   },
 };
 
-export const COMMANDS: readonly Command[] = [
+const OWN_COMMANDS: readonly Command[] = [
   init,
   projectsList,
   projectsCurrent,
@@ -5676,6 +5710,9 @@ export const COMMANDS: readonly Command[] = [
   ...PHONE_COMMANDS,
   mcp,
 ];
+
+// Each command checks first that the name it acts under is not another session's (session-guard.ts).
+export const COMMANDS: readonly Command[] = OWN_COMMANDS.map(sessionBound);
 
 export function findCommand(tokens: readonly string[]): Command | undefined {
   return COMMANDS.find((command) =>

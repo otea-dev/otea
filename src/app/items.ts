@@ -14,6 +14,7 @@ import type { Surface } from '../core/surface.ts';
 import { itemMoves } from '../core/views.ts';
 import { type Closing, closesOf, type Turn, turnOf, type Workflow } from '../core/workflow.ts';
 import { findBoardOfCollection } from '../store/boards.ts';
+import { closeQuestions } from '../store/conversation.ts';
 import { joinTransaction, transaction } from '../store/database.ts';
 import {
   appendEvent,
@@ -507,6 +508,9 @@ export function landMove(
   // The person's review is news for the secretary, unless the person made the move themselves.
   if (actor.kind === 'agent')
     signalReview(ctx, item, { to, turn: turnOf(workflow, to), board }, at);
+  // What the person settled by moving the item is no longer asked: the secretary's questions about
+  // it stop waiting for them (they kept counting in Te espera after the item was sent back).
+  else closeQuestions(db, { item: item.id }, at, 'settled');
   const moved = { ...item, state: to, updatedAt: at, lease: handoff ? null : item.lease };
   return present(moved, workflow, at);
 }

@@ -4,6 +4,7 @@ import {
   answerSecretaryQuestion,
   correctTurn,
   fetchRolePrompt,
+  unanswerSecretaryQuestion,
 } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { askingCount } from '../../bandeja.ts';
@@ -375,6 +376,11 @@ export function HablarView({
       near.current = true;
       if (convo.status === 'ready') convo.reload();
     });
+  // Deshacer: the answer goes, and the question asks again.
+  const onRetract = (message: Message) =>
+    unanswerSecretaryQuestion(message.id).then(() => {
+      if (convo.status === 'ready') convo.reload();
+    });
 
   const name = app.project?.name ?? '';
   const none = convo.status === 'ready' && secretary === null;
@@ -497,6 +503,7 @@ export function HablarView({
                     onKind={onKind}
                     onGo={goTo}
                     onAnswer={onAnswer}
+                    onRetract={onRetract}
                     noteAsks={noteAsks}
                     onNoteAnswered={notes.reload}
                     litAsk={litAsk}

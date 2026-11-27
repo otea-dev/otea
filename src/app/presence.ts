@@ -874,7 +874,10 @@ export function listAgents(
       live,
       status: agentStatus({
         live,
-        holding: held.length,
+        // The secretary talks and keeps others at work: whatever it holds (a note of the Bandeja it
+        // refines itself, an item it made) is never the work the person counts as «trabajando»
+        // (field study 4, U7: with it dead, the top bar still said «1 trabajando»).
+        holding: role === 'secretary' ? 0 : held.length,
         waiting,
         asking: askers.has(name),
         sessionEnded: sessionEnded || ended,

@@ -388,7 +388,10 @@ export async function postOpened(id: string, evidence: number): Promise<void> {
 // the decision left to the agent, and the number of the question you were shown: an answer to one
 // that has since changed is refused.
 // `note`: with the first option of a card that sends an item back, the person's edit of its note.
-export type AnswerWords = { text: string } | { option: number; note?: string } | { delegate: true };
+export type AnswerWords =
+  | { text: string }
+  | { option: number; note?: string; explain?: string }
+  | { delegate: true };
 export type AnswerGiven = { question: number } & AnswerWords;
 
 // Your answer to an agent's question (otea ask): the turn goes back to the agent, in the same round.
@@ -708,6 +711,11 @@ export function correctTurn(message: number, kind: MessageKind): Promise<Message
 // message in reply to it, which the secretary hears.
 export function answerSecretaryQuestion(message: number, given: AnswerWords): Promise<Message> {
   return post<Message>(`/api/conversation/messages/${message}/answer`, given);
+}
+
+// Deshacer after such a tap, while the secretary has not heard it: the question waits again.
+export function unanswerSecretaryQuestion(message: number): Promise<Message> {
+  return post<Message>(`/api/conversation/messages/${message}/unanswer`, {});
 }
 
 // The Bandeja: the entries not filed yet, and the latest filed ones.

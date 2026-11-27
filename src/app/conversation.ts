@@ -23,7 +23,9 @@ import { clockText, timeText } from '../core/time.ts';
 import { selectEntryOfItem } from '../store/bandeja.ts';
 import {
   clearKindNews,
+  closeQuestions,
   countPending,
+  deleteMessage,
   insertAttachment,
   insertLink,
   insertMessage,
@@ -33,6 +35,7 @@ import {
   messageOfClientKey,
   type NewFile,
   type Page,
+  selectAnswerOf,
   selectDefaultTurn,
   selectKindNews,
   selectMessage,
@@ -230,6 +233,11 @@ export type SayInput = {
   // their review, with a note the secretary drafted from their words). It needs the options: the
   // first does it, the others only answer. Only the person's tap performs it (conversation-act.ts).
   action?: MessageAction;
+  // The numbers (from 1) of the options that need the person's own words ("I'll explain when I
+  // answer"): tapping one opens the text box instead of answering at once.
+  optionText?: readonly number[];
+  // Otea could not tie this to the session noted for the secretary: the desk marks it.
+  unverified?: boolean;
 };
 
 export type Said = {
@@ -238,6 +246,10 @@ export type Said = {
   // asked for.
   kind: MessageKind | null;
   kept: boolean;
+  // What was said but not done: a link that cannot hang from the message it answers. A `say` posts
+  // whatever it can and warns, never failing for it (the person waited ten minutes on «pensando…»
+  // for an answer a refused link kept from posting).
+  warnings: string[];
 };
 
 // Gives the turn a kind, unless the person set it (their correction stands). True when it did. A
@@ -296,6 +308,17 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
   const checked = checkOptions(input.options, input.recommended);
   if ('problem' in checked) invalid(`Not said: ${checked.problem}`);
   const action = checkedAction(input.action, checked.options);
+  const optionText = [...new Set(input.optionText ?? [])].sort((a, b) => a - b);
+  for (const number of optionText) {
+    if (!Number.isInteger(number) || number < 1 || number > checked.options.length) {
+      invalid(
+        `Not said: --option-text ${number} names no option (${checked.options.length} given, numbered from 1)`,
+      );
+    }
+    if (action !== undefined && number === 1) {
+      invalid('Not said: the first option performs the card for the person, it takes no words');
+    }
+  }
   // Classifying is about a turn of the person's. Without --reply-to it is the latest message
   // already read, and only when that is no guess: another message not read yet, or another read
   // turn not classified, and the secretary says which (a reply to the wrong turn would tie the
@@ -318,15 +341,18 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
     replyTo = latest;
   }
   if (replyTo !== undefined) requireMessage(project, replyTo);
+  const warnings: string[] = [];
+  const hung: string[] = [];
   for (const id of links) {
     const item = requireItem(project.db, id);
     // An item that came from a Bandeja note hangs from that note: never from a turn of the person's.
+    // The answer is posted all the same, without that link, and the warning says so.
     const note = replyTo === undefined ? undefined : selectEntryOfItem(project.db, item.id);
     if (note !== undefined) {
-      invalid(
-        `${item.id} came from the Bandeja note B-${note.id}: it does not hang from a message. Mention it in a notice instead: otea say "<text>" --links ${item.id} with no --reply-to`,
+      warnings.push(
+        `${item.id} came from the Bandeja note B-${note.id}: it does not hang from a message, so this was said without that link. Mention it in a notice if the person must see it: otea say "<text>" --links ${item.id} with no --reply-to`,
       );
-    }
+    } else hung.push(item.id);
   }
   const at = now();
   return transaction(project.db, () => {
@@ -340,6 +366,8 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
       options: checked.options,
       recommended: checked.recommended,
       action,
+      unverified: input.unverified,
+      optionText,
     });
     keepFiles(project, id, files);
     // What it answers is read: it answered from what the wake showed, without `otea conversation`,
@@ -350,12 +378,56 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
     if (replyTo !== undefined) clearKindNews(project.db, [root]);
     // Items linked to a turn make it a request unless it is classified; a notice's links are its own.
     const wanted =
-      input.kind ?? (replyTo !== undefined && links.length > 0 ? ('request' as const) : undefined);
+      input.kind ?? (replyTo !== undefined && hung.length > 0 ? ('request' as const) : undefined);
     const kept = wanted === undefined ? false : !classify(project, root, wanted);
-    linkItems(project, root, links, at);
+    // A notice mentions every item it names; an answer hangs only the ones that can hang from it.
+    linkItems(project, root, replyTo === undefined ? links : hung, at);
     const message = requireMessage(project, id);
-    return { message, kind: message.kind, kept };
+    return { message, kind: message.kind, kept, warnings };
   });
+}
+
+// How long the person may take back a tap on a question, while the secretary has not read it.
+export const RETRACT_ANSWER_MS = 30_000;
+
+// The person takes back the answer they just gave to a question (Deshacer): the question waits for
+// them again. Only while the secretary has not heard it, within a few seconds, and never a card's
+// tap, which already did what it said.
+export function retractAnswer(project: Project, id: number, now: Clock = systemClock): Message {
+  return joinTransaction(project.db, () => {
+    const question = requireMessage(project, id);
+    const answer = selectAnswerOf(project.db, id);
+    const refuse = (why: string): never => {
+      throw new OteaError('not_undoable', `Message ${id}: ${why}`);
+    };
+    if (answer === undefined) return refuse('there is no answer to take back');
+    if (question.action !== null) return refuse('its tap already did what the card says');
+    if (answer.readAt !== null || answer.heardAt !== null)
+      return refuse('the secretary already has your answer');
+    if (Date.parse(now()) - Date.parse(answer.at) > RETRACT_ANSWER_MS)
+      return refuse('the answer is too old to take back');
+    deleteMessage(project.db, answer.id);
+    return requireMessage(project, id);
+  });
+}
+
+// The secretary takes back a question of its own that nobody needs to answer any more (what it
+// asked was settled some other way): it stops waiting for the person, who sees it was withdrawn.
+export function withdrawQuestion(
+  project: Project,
+  input: { agent: string; id: number },
+  now: Clock = systemClock,
+): Message {
+  requireSecretary(project.db, input.agent, 'withdraws its own question (say --withdraw)');
+  const question = requireMessage(project, input.id);
+  if (question.author !== 'secretary' || question.options.length === 0) {
+    invalid(`Message ${input.id} is not a question of yours with options to tap`);
+  }
+  if (question.closed !== null)
+    invalid(`Message ${input.id} is already closed (${question.closed.why})`);
+  if (isAnswered(project.db, input.id)) invalid(`Message ${input.id} was already answered`);
+  closeQuestions(project.db, { id: input.id }, now(), 'withdrawn');
+  return requireMessage(project, input.id);
 }
 
 // Links the turn a message belongs to with an item the secretary made out of it (otea create
@@ -373,6 +445,8 @@ export function linkMessageToItem(
     linkItems(project, message.root, [item], now());
     if (selectRootKind(project.db, message.root).kind === null)
       classify(project, message.root, 'request');
+    // The turn became an item: what the secretary asked about it is settled.
+    closeQuestions(project.db, { root: message.root }, now(), 'settled');
     // Making an item out of a turn is acting on it, whether or not it was read.
     clearKindNews(project.db, [message.root]);
     return requireMessage(project, messageId);
@@ -407,6 +481,9 @@ export function correctKind(project: Project, id: number, kind: MessageKind): Me
   }
   const changed = selectRootKind(project.db, message.root).kind !== kind;
   setKind(project.db, message.root, kind, 'person', changed);
+  // Taking the turn as the person means it is settled: what the secretary asked about it (is it
+  // worth noting?) no longer waits for them.
+  if (changed) closeQuestions(project.db, { root: message.root }, systemClock(), 'settled');
   return requireMessage(project, id);
 }
 
@@ -414,10 +491,17 @@ export function correctKind(project: Project, id: number, kind: MessageKind): Me
 // their own words, or the decision left to the secretary. Exactly one.
 // `note`: with the first option of a question that carries an action, the person's own edit of the
 // note it performs with.
+// `explain`: with an option that needs the person's own words (say --option-text), what they added.
 export type GivenAnswer =
-  | { option: number; note?: string | undefined; text?: never; delegate?: never }
-  | { text: string; option?: never; delegate?: never; note?: never }
-  | { delegate: true; text?: never; option?: never; note?: never };
+  | {
+      option: number;
+      note?: string | undefined;
+      explain?: string | undefined;
+      text?: never;
+      delegate?: never;
+    }
+  | { text: string; option?: never; delegate?: never; note?: never; explain?: never }
+  | { delegate: true; text?: never; option?: never; note?: never; explain?: never };
 
 // The person's answer to a question of the secretary's (say --option): their own message, in reply
 // to it, that wakes the secretary like any message. Answered once: by a reply to that question;
@@ -433,6 +517,14 @@ export function answerSecretaryQuestion(
   const question = requireMessage(project, id);
   if (question.author !== 'secretary' || question.options.length === 0) {
     throw new OteaError('invalid_fields', `Message ${id} is not a question with options to tap`);
+  }
+  // A question the secretary took back is not answered. One that was settled some other way may
+  // still be: the person's words reach the secretary all the same.
+  if (question.closed?.why === 'withdrawn') {
+    throw new OteaError(
+      'invalid_transition',
+      `Message ${id} was withdrawn by the secretary: it no longer waits for an answer`,
+    );
   }
   let words: string;
   let mode: AnswerMode;
@@ -451,7 +543,16 @@ export function answerSecretaryQuestion(
   } else if (given.option !== undefined) {
     const chosen = question.options[given.option - 1];
     if (chosen === undefined) invalid(`Message ${id} has no option ${given.option}`);
-    words = chosen;
+    const explained = (given.explain ?? '').trim();
+    if (question.optionText.includes(given.option) && explained === '') {
+      invalid(`Option ${given.option} of message ${id} needs your own words: say them`);
+    }
+    if (explained !== '' && !question.optionText.includes(given.option)) {
+      invalid(`Option ${given.option} of message ${id} takes no words of your own`);
+    }
+    words = explained === '' ? chosen : `${chosen} — ${explained}`;
+    if (words.length > MAX_MESSAGE_CHARS)
+      invalid(`An answer takes at most ${MAX_MESSAGE_CHARS} characters`);
     mode = 'option';
     option = given.option;
   } else {

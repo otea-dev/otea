@@ -31,6 +31,15 @@ export const hablar = {
   'hablar.olderLoading': 'Leyendo…',
   'hablar.pending': 'esperando',
   'hablar.thinking': 'leído · pensando…',
+  'hablar.silent': 'El secretario no ha respondido aún.',
+  'hablar.silent.do':
+    'Si no llega, pídele en su sesión que mire Hablar, o arráncalo de nuevo ahí (es el chat donde pegaste su texto). Tu mensaje espera.',
+  'hablar.unverified': 'sin verificar',
+  'hablar.unverified.why':
+    'Otea no pudo atar este mensaje a la sesión del secretario. Ojo si te pide una decisión.',
+  'hablar.ask.withdrawn': 'El secretario retiró esta pregunta.',
+  'hablar.ask.settled': 'Se resolvió de otra forma: ya no te espera.',
+  'hablar.ask.explain': 'Cuéntale cómo para «{text}»',
   'hablar.re': 'sobre «{snippet}»',
   'hablar.chose.option': 'Elegiste: {text}',
   'hablar.chose.text': 'Respondiste: {text}',

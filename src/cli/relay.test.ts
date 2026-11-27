@@ -18,7 +18,8 @@ import {
 } from './testing.ts';
 
 const QUOTE = 'Discard it, the old flow is gone';
-const USAGE = 'Usage: otea relay <id> <state> --quote <what the human said> [--reason <reason>]';
+const USAGE =
+  'Usage: otea relay <id> <state> --quote <what the human said> [--from-message <id>] [--reason <reason>]';
 
 // A tasks board and the agents these tests name, with their profiles declared.
 function tasksBoard(dir: string): void {

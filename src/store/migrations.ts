@@ -648,6 +648,17 @@ export const MIGRATIONS = [
   `
   ALTER TABLE conversation_messages ADD COLUMN action TEXT;
   `,
+  // Security and trust (field study 4, U8): a secretary message whose session Otea could not tie to
+  // the one noted for the secretary (unverified, which the desk marks), the options of a question
+  // that need the person's own words (option_text, a JSON list of option numbers), and a question
+  // that stopped being asked, by the secretary withdrawing it or because what it asked was settled
+  // elsewhere (closed_at, closed_why).
+  `
+  ALTER TABLE conversation_messages ADD COLUMN unverified INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE conversation_messages ADD COLUMN option_text TEXT;
+  ALTER TABLE conversation_messages ADD COLUMN closed_at TEXT;
+  ALTER TABLE conversation_messages ADD COLUMN closed_why TEXT;
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {

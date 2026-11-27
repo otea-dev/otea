@@ -356,6 +356,11 @@ function Reply({
           {message.author === 'secretary' ? t('hablar.secretary') : message.by}
         </span>
         <time dateTime={message.at}>{noteTime(message.at, now)}</time>
+        {message.author === 'secretary' && message.unverified ? (
+          <span className="hb-unverified" title={t('hablar.unverified.why')}>
+            {t('hablar.unverified')}
+          </span>
+        ) : null}
         {head}
       </div>
       {answers === null ? null : (
@@ -442,17 +447,36 @@ function PasteBlock({ block }: { block: TextBlock }) {
   );
 }
 
-function Thinking() {
+// How long the secretary may hold a message it read before the desk says it has not answered: a
+// session that is stuck, or that ended the way a closed laptop does, would otherwise read «pensando…»
+// for as long as the person watched (field study 4: ten minutes).
+export const SILENT_AFTER_MS = 4 * 60_000;
+
+// When the secretary took the turn's last message of the person's: heard, else read, else said.
+function thinkingSince(turns: readonly Turn[], root: number): string {
+  const last = turns.find((turn) => turn.root === root)?.messages.at(-1);
+  return last?.heardAt ?? last?.readAt ?? last?.at ?? new Date(0).toISOString();
+}
+
+function Thinking({ since, now }: { since: string; now: number }) {
+  const silent = now - Date.parse(since) >= SILENT_AFTER_MS;
   return (
     <>
       <div className="hb-who">
         <SecretaryMark />
         <span className="hb-name">{t('hablar.secretary')}</span>
       </div>
-      <div className="hb-thinking" role="status">
-        <span className="bar" aria-hidden="true" />
-        {t('hablar.thinking')}
-      </div>
+      {silent ? (
+        <div className="hb-thinking hb-silent" role="status">
+          <p>{t('hablar.silent')}</p>
+          <p className="hb-silent-do">{t('hablar.silent.do')}</p>
+        </div>
+      ) : (
+        <div className="hb-thinking" role="status">
+          <span className="bar" aria-hidden="true" />
+          {t('hablar.thinking')}
+        </div>
+      )}
     </>
   );
 }
@@ -468,13 +492,25 @@ type EntryProps = {
   onKind: (turn: Turn, kind: MessageKind) => void;
   onGo: (root: number) => void;
   onAnswer: (message: Message, given: AnswerWords) => Promise<void>;
+  onRetract: (message: Message) => Promise<void>;
 };
 
 // One message of the thread, where it was said. The turn it belongs to only lends it what it
 // shares: the kind label (always on the person's own first message: it is what they said that the
 // kind sorts, never what the secretary answered) and the branch of items that came out of it
 // (under that first reply).
-function Entry({ row, items, now, fresh, found, begins, onKind, onGo, onAnswer }: EntryProps) {
+function Entry({
+  row,
+  items,
+  now,
+  fresh,
+  found,
+  begins,
+  onKind,
+  onGo,
+  onAnswer,
+  onRetract,
+}: EntryProps) {
   const { message, turn } = row;
   const label = <KindLabel turn={turn} onKind={onKind} />;
   let body: ReactNode;
@@ -519,8 +555,14 @@ function Entry({ row, items, now, fresh, found, begins, onKind, onGo, onAnswer }
                     to: message.action.to,
                   },
                 })}
+            optionText={message.optionText}
+            retract={() => onRetract(message)}
             send={(given) => onAnswer(message, given)}
           />
+        ) : row.question === 'closed' ? (
+          <p className="hb-said hb-closed">
+            {t(message.closed?.why === 'withdrawn' ? 'hablar.ask.withdrawn' : 'hablar.ask.settled')}
+          </p>
         ) : null}
         {row.head ? <Branch chips={chips} fresh={(id) => fresh(`c${turn.root}:${id}`)} /> : null}
       </Row>
@@ -645,6 +687,8 @@ export type TurnsProps = {
   onGo: (root: number) => void;
   // The person's tap on a question of the secretary's.
   onAnswer: (message: Message, given: AnswerWords) => Promise<void>;
+  // Deshacer after such a tap, while the secretary has not heard it.
+  onRetract: (message: Message) => Promise<void>;
   // The notes of the Bandeja a refiner asked you about: their questions stand at the foot as an
   // agent's question on an item does, and are answered there. Read again once one is.
   noteAsks?: readonly BandejaEntry[];
@@ -667,6 +711,7 @@ export function Turns({
   onKind,
   onGo,
   onAnswer,
+  onRetract,
   noteAsks = [],
   onNoteAnswered,
   litAsk,
@@ -733,13 +778,14 @@ export function Turns({
             onKind={onKind}
             onGo={onGo}
             onAnswer={onAnswer}
+            onRetract={onRetract}
           />
         );
       })}
       {thinking === undefined ? null : (
         <section className="hb-turn" data-k="thinking">
           <Row lane="secretary" bodyKey={`t${thinking}`} fresh={fresh(`t${thinking}`)} busy>
-            <Thinking />
+            <Thinking since={thinkingSince(turns, thinking)} now={app.now} />
           </Row>
         </section>
       )}

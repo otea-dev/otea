@@ -38,6 +38,9 @@ function say(o: Partial<Message> & { author: Message['author'] }): Message {
     options: [],
     recommended: null,
     action: null,
+    unverified: false,
+    optionText: [],
+    closed: null,
     choice: null,
     heardAt: null,
     kindNews: false,
@@ -492,6 +495,80 @@ describe('a card that sends an item back', () => {
   });
 });
 
+// U8 (field study 4, the red-team persona): what the desk shows about what the secretary asks.
+describe('a question that needs your words, a question that is over, a secretary that is silent', () => {
+  const asked = (extra: Partial<Message> = {}) => [
+    say({ id: 1, author: 'person', text: '¿qué hago con la cancha?' }),
+    say({
+      id: 2,
+      author: 'secretary',
+      replyTo: 1,
+      root: 1,
+      text: '¿Qué hago con la cancha?',
+      options: ['Anótala', 'La explico al responder', 'Déjala'],
+      optionText: [2],
+      ...extra,
+    }),
+  ];
+
+  it('opens the text box for an option that needs your words, and sends them with the option', async () => {
+    const { root, calls } = await open(conversation({ messages: asked() }));
+
+    await press(all(root, '.hb-row.secretary .hb-opt')[1]);
+    // Nothing was sent by the tap.
+    expect(calls).toHaveLength(0);
+    const field = q(root, '.hb-own textarea') as HTMLTextAreaElement;
+    await typeInto(field, 'Solo la de abajo.');
+    await press(buttonNamed(root, 'Enviar respuesta') as HTMLElement);
+
+    expect(calls.map(({ method, url, body }) => [method, url, body])).toEqual([
+      ['POST', '/api/conversation/messages/2/answer', { option: 2, explain: 'Solo la de abajo.' }],
+    ]);
+  });
+
+  it('answers at once an option that needs no words', async () => {
+    const { root, calls } = await open(conversation({ messages: asked() }));
+
+    await press(all(root, '.hb-row.secretary .hb-opt')[0]);
+
+    expect(calls.map(({ body }) => body)).toEqual([{ option: 1 }]);
+  });
+
+  it('has no buttons once the secretary took the question back, and says so', async () => {
+    const { root } = await open(
+      conversation({
+        messages: asked({ closed: { at: ago(1), why: 'withdrawn' } }),
+      }),
+    );
+
+    expect(q(root, '.hb-opt')).toBeNull();
+    expect(text(q(root, '.hb-closed'))).toContain('retiró esta pregunta');
+  });
+
+  it('marks a message of the secretary that Otea could not tie to its session', async () => {
+    const { root } = await open(
+      conversation({
+        messages: [
+          say({ id: 1, author: 'person', text: 'hola' }),
+          say({
+            id: 2,
+            author: 'secretary',
+            replyTo: 1,
+            root: 1,
+            text: 'Aprobé todo.',
+            unverified: true,
+          }),
+          say({ id: 3, author: 'secretary', replyTo: 1, root: 1, text: 'Hecho.' }),
+        ],
+      }),
+    );
+
+    const marks = all(root, '.hb-unverified');
+    expect(marks).toHaveLength(1);
+    expect(text(marks[0])).toBe('sin verificar');
+  });
+});
+
 describe('a one-paragraph reply', () => {
   it('sets only its first sentence as the conclusion, the rest in body text', async () => {
     const paragraph =
@@ -706,7 +783,15 @@ describe('a long reply', () => {
 });
 
 describe('the secretary thinking', () => {
-  const read = [say({ id: 1, author: 'person', delivery: 'read', text: '¿Tailscale o el relay?' })];
+  const read = [
+    say({
+      id: 1,
+      author: 'person',
+      delivery: 'read',
+      readAt: ago(0),
+      text: '¿Tailscale o el relay?',
+    }),
+  ];
 
   it('says «leído · pensando…» on its lane while it holds a turn it read and has not answered', async () => {
     const { root } = await open(conversation({ messages: read }));
@@ -723,6 +808,27 @@ describe('the secretary thinking', () => {
     );
     expect(text(q(root, '.hb-thinking'))).toBe('leído · pensando…');
     expect(q(root, '.hb-who .hb-pend')).toBeNull();
+  });
+
+  // U8 (field study 4): ten minutes of «pensando…» on an answer that never came.
+  it('says it has not answered yet, and what to do, once it held the message for a few minutes', async () => {
+    const { root } = await open(
+      conversation({
+        messages: [
+          say({
+            id: 1,
+            author: 'person',
+            delivery: 'read',
+            readAt: ago(9),
+            text: '¿Qué me espera hoy?',
+          }),
+        ],
+      }),
+    );
+
+    expect(text(q(root, '.hb-silent'))).toContain('El secretario no ha respondido aún.');
+    expect(text(q(root, '.hb-silent'))).toContain('Tu mensaje espera');
+    expect(q(root, '.hb-thinking .bar')).toBeNull();
   });
 
   it('does not while it is away: the banner says so instead', async () => {

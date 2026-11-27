@@ -32,10 +32,14 @@ type MessageRow = {
   asked: string | null;
   heard_at: string | null;
   action: string | null;
+  unverified: number;
+  option_text: string | null;
+  closed_at: string | null;
+  closed_why: string | null;
 };
 
 const COLUMNS =
-  'm.id, m.author, m.author_name, m.text, m.at, m.reply_to, m.root, m.read_at, m.topic, m.options, m.recommended, m.choice, m.choice_option, m.about, m.asked, m.heard_at, m.action';
+  'm.id, m.author, m.author_name, m.text, m.at, m.reply_to, m.root, m.read_at, m.topic, m.options, m.recommended, m.choice, m.choice_option, m.about, m.asked, m.heard_at, m.action, m.unverified, m.option_text, m.closed_at, m.closed_why';
 
 export type NewMessage = {
   author: MessageAuthor;
@@ -53,6 +57,10 @@ export type NewMessage = {
   recommended?: number | undefined;
   // What the first option does when the person taps it.
   action?: MessageAction | undefined;
+  // The secretary's message that Otea could not tie to the session noted for it.
+  unverified?: boolean | undefined;
+  // The numbers (from 1) of the options that need the person's own words.
+  optionText?: readonly number[] | undefined;
   // The person's answer to a question: how, and what it records when it is only a trace.
   choice?: { mode: AnswerMode; option?: number | undefined; about?: string; asked?: string };
 };
@@ -70,9 +78,9 @@ export function insertMessage(db: DatabaseSync, message: NewMessage): number {
         )?.root;
   const sql = `INSERT INTO conversation_messages
     (author, author_name, text, at, reply_to, root, read_at, topic, client_scope, client_key, client_digest,
-     options, recommended, choice, choice_option, about, asked, action)
+     options, recommended, choice, choice_option, about, asked, action, unverified, option_text)
     VALUES (:author, :name, :text, :at, :replyTo, :root, :readAt, :topic, :scope, :key, :digest,
-     :options, :recommended, :choice, :choiceOption, :about, :asked, :action)`;
+     :options, :recommended, :choice, :choiceOption, :about, :asked, :action, :unverified, :optionText)`;
   const result = db.prepare(sql).run({
     author: message.author,
     name: message.name,
@@ -91,6 +99,11 @@ export function insertMessage(db: DatabaseSync, message: NewMessage): number {
         : JSON.stringify(message.options),
     recommended: message.recommended ?? null,
     action: message.action === undefined ? null : JSON.stringify(message.action),
+    unverified: message.unverified ? 1 : 0,
+    optionText:
+      message.optionText === undefined || message.optionText.length === 0
+        ? null
+        : JSON.stringify(message.optionText),
     choice: message.choice?.mode ?? null,
     choiceOption: message.choice?.option ?? null,
     about: message.choice?.about ?? null,
@@ -206,7 +219,7 @@ export function selectOpenQuestions(db: DatabaseSync): Message[] {
   const rows = db
     .prepare(
       `SELECT ${COLUMNS} FROM conversation_messages m
-       WHERE m.author = 'secretary' AND m.options IS NOT NULL
+       WHERE m.author = 'secretary' AND m.options IS NOT NULL AND m.closed_at IS NULL
          AND NOT EXISTS (
            SELECT 1 FROM conversation_messages p
            WHERE p.author = 'person' AND p.reply_to = m.id)
@@ -214,6 +227,61 @@ export function selectOpenQuestions(db: DatabaseSync): Message[] {
     )
     .all() as MessageRow[];
   return hydrate(db, rows);
+}
+
+// The person's message that answers a question of the secretary's, if there is one.
+export function selectAnswerOf(db: DatabaseSync, id: number): Message | undefined {
+  const row = db
+    .prepare(
+      `SELECT ${COLUMNS} FROM conversation_messages m
+       WHERE m.author = 'person' AND m.reply_to = ? ORDER BY m.id LIMIT 1`,
+    )
+    .get(id) as MessageRow | undefined;
+  return row ? hydrate(db, [row])[0] : undefined;
+}
+
+export function deleteMessage(db: DatabaseSync, id: number): void {
+  db.prepare('DELETE FROM conversation_messages WHERE id = ?').run(id);
+}
+
+// Closes the secretary's open questions that what the person did settled (it sent the item back,
+// the turn became an item), or that the secretary withdrew: they stop counting as waiting for the
+// person and the desk says why. Returns how many closed. `item`: the questions about that item (the
+// one their card acts on, or one their turn is linked to); `root`: the questions of that turn; `id`:
+// that question alone.
+export function closeQuestions(
+  db: DatabaseSync,
+  where: { item?: string; root?: number; id?: number },
+  at: string,
+  why: string,
+): number {
+  const open = `m.author = 'secretary' AND m.options IS NOT NULL AND m.closed_at IS NULL
+     AND NOT EXISTS (SELECT 1 FROM conversation_messages p WHERE p.author = 'person' AND p.reply_to = m.id)`;
+  const picks: string[] = [];
+  const params: Record<string, string | number> = { at, why };
+  if (where.item !== undefined) {
+    picks.push(
+      `json_extract(m.action, '$.item') = :item
+       OR m.root IN (SELECT message_id FROM conversation_links WHERE item_id = :item)`,
+    );
+    params.item = where.item;
+  }
+  if (where.root !== undefined) {
+    picks.push('m.root = :root');
+    params.root = where.root;
+  }
+  if (where.id !== undefined) {
+    picks.push('m.id = :id');
+    params.id = where.id;
+  }
+  if (picks.length === 0) return 0;
+  const result = db
+    .prepare(
+      `UPDATE conversation_messages AS m SET closed_at = :at, closed_why = :why
+       WHERE ${open} AND (${picks.map((pick) => `(${pick})`).join(' OR ')})`,
+    )
+    .run(params);
+  return Number(result.changes);
 }
 
 // Every message of a turn, in order.
@@ -304,6 +372,10 @@ function hydrate(db: DatabaseSync, rows: readonly MessageRow[]): Message[] {
       options: row.options === null ? [] : (JSON.parse(row.options) as string[]),
       recommended: row.recommended,
       action: row.action === null ? null : (JSON.parse(row.action) as MessageAction),
+      unverified: row.unverified === 1,
+      optionText: row.option_text === null ? [] : (JSON.parse(row.option_text) as number[]),
+      closed:
+        row.closed_at === null ? null : { at: row.closed_at, why: row.closed_why ?? 'closed' },
       choice: choiceOf(row),
       heardAt: row.heard_at,
       kindNews: (head?.kind_news ?? 0) > 0,

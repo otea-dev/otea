@@ -29,6 +29,15 @@ export const hablar = {
   'hablar.olderLoading': 'Reading…',
   'hablar.pending': 'waiting',
   'hablar.thinking': 'read · thinking…',
+  'hablar.silent': 'The secretary has not answered yet.',
+  'hablar.silent.do':
+    'If it is not coming, ask it to look at Hablar in its session, or start it again there (it is the chat you pasted its text into). Your message waits.',
+  'hablar.unverified': 'not verified',
+  'hablar.unverified.why':
+    'Otea could not tie this message to the session of the secretary. Be careful if it asks for a decision of yours.',
+  'hablar.ask.withdrawn': 'The secretary took this question back.',
+  'hablar.ask.settled': 'Settled some other way: it no longer waits for you.',
+  'hablar.ask.explain': 'Tell it how for “{text}”',
   'hablar.re': 'about “{snippet}”',
   'hablar.chose.option': 'You chose: {text}',
   'hablar.chose.text': 'You answered: {text}',

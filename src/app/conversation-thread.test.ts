@@ -116,13 +116,15 @@ describe('the conversation as a thread', () => {
       fileBandeja(project, { id: 1, agent: 'lia', item: fromNote }, clock(1800));
       const made = item('Another thing');
 
-      expect(() =>
-        sayAsSecretary(
-          project,
-          { agent: 'sol', text: 'Made both.', replyTo: asked.id, links: [made, fromNote] },
-          clock(2000),
-        ),
-      ).toThrow(new RegExp(`${fromNote}.*Bandeja`, 's'));
+      // The answer is posted all the same (field study 4, U8: a refused say left the person on
+      // «pensando…» for ten minutes), without that link, and the warning says why.
+      const answered = sayAsSecretary(
+        project,
+        { agent: 'sol', text: 'Made both.', replyTo: asked.id, links: [made, fromNote] },
+        clock(2000),
+      );
+      expect(answered.message.links).toEqual([made]);
+      expect(answered.warnings.join(' ')).toMatch(new RegExp(`${fromNote}.*Bandeja`, 's'));
       expect(turnsOfItem(project, fromNote)).toEqual([]);
       // A notice may mention it all the same.
       const notice = sayAsSecretary(
