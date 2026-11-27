@@ -93,15 +93,42 @@ const programOf = (name: string) =>
     .replace(/\.(exe|cmd|bat)$/, '')
     .split(/\s+/)[0] as string;
 
+// The words of a command line, a double-quoted one whole (a folder with a space in its name).
+function commandWords(command: string): string[] {
+  return [...command.matchAll(/"([^"]*)"|(\S+)/g)].map((match) => match[1] ?? (match[2] as string));
+}
+
+// The options of node that take the next word as their value.
+const NODE_VALUE_OPTIONS = new Set(['-r', '--require', '--import', '--loader', '--env-file']);
+
+// The script a node command line runs: its first word that is no option; undefined for an inline
+// script (-e, -p) or none. Its other words are the harness's own arguments, the person's prompt
+// among them, which may name npm without being it.
+function scriptOf(command: string): string | undefined {
+  const words = commandWords(command).slice(1);
+  for (let at = 0; at < words.length; at++) {
+    const word = words[at] as string;
+    if (/^(-e|-p|-c|--eval|--print)$/.test(word)) return undefined;
+    if (NODE_VALUE_OPTIONS.has(word)) at++;
+    else if (!word.startsWith('-')) return word;
+  }
+  return undefined;
+}
+
 // npm, npx, pnpm and yarn are node programs: node running their script is a wrapper too, however
 // the system names the process.
 const PACKAGE_RUNNER =
-  /(?:^|[\\/\s"'])(?:npm-cli|npx-cli|npm|npx|pnpm|pnpm\.cjs|yarn)(?:\.c?js)?(?:["'\s]|$)/i;
+  /(?:^|[\\/])(?:npm-cli|npx-cli|npm|npx|pnpm|pnpm\.cjs|yarn(?:-[\d.]+)?)(?:\.c?js)?$/i;
 
 function isWrapper(row: ProcessRow): boolean {
   const program = programOf(row.name);
   if (WRAPPERS.has(program)) return true;
-  return program === 'node' && row.command !== undefined && PACKAGE_RUNNER.test(row.command);
+  if (program !== 'node' || row.command === undefined) return false;
+  // npm retitles its process `npm exec otea`: the program is then the first word.
+  const title = commandWords(row.command)[0];
+  if (title !== undefined && PACKAGE_RUNNER.test(title)) return true;
+  const script = scriptOf(row.command);
+  return script !== undefined && PACKAGE_RUNNER.test(script);
 }
 
 // The harness session a command started by `start` runs under: the first process above it that is
@@ -135,21 +162,8 @@ const harnessWord = (token: string) =>
 // it runs (node .../claude-code/cli.js), never a word further on (`ssh host claude` is ssh). Some
 // systems name a process by its thread, whatever it runs, so the name alone cannot say it.
 function commandRunsHarness(command: string): boolean {
-  const text = command.trim();
-  const quoted = text.startsWith('"') ? text.indexOf('"', 1) : -1;
-  const split = quoted > 0 ? quoted + 1 : text.search(/\s/);
-  const program = (
-    quoted > 0 ? text.slice(1, quoted) : text.slice(0, split < 0 ? undefined : split)
-  ).trim();
-  const args = split < 0 ? [] : text.slice(split).trim().split(/\s+/);
-  let script: string | undefined;
-  for (const arg of args) {
-    // An inline script is no file to name a harness by.
-    if (/^(-e|-p|-c|--eval|--print)$/.test(arg)) break;
-    if (arg.startsWith('-')) continue;
-    script = arg.replace(/^["']|["']$/g, '');
-    break;
-  }
+  const program = commandWords(command)[0] ?? '';
+  const script = scriptOf(command)?.replace(/^["']|["']$/g, '');
   return harnessWord(program) || (script?.split(/[\\/]/).some(harnessWord) ?? false);
 }
 
