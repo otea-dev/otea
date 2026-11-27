@@ -108,6 +108,11 @@ export const hablar = {
   'hablar.send': 'Enviar',
   'hablar.sending': 'Enviando…',
   'hablar.remove': 'Quitar {name}',
+  // A phone camera's number as a name (intake-files.ts shownFileName).
+  'file.photo': 'Foto {time}',
+  'file.photoBare': 'Foto',
+  'file.other': 'Archivo {time}',
+  'file.otherBare': 'Archivo',
   'hablar.tooBig': 'Pasa el límite de {mb} MB',
   'hablar.failed': 'No se envió ({message}). Inténtalo de nuevo.',
   'hablar.offline': 'Sin conexión con tu equipo: podrás escribir cuando vuelva.',

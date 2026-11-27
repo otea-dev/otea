@@ -6,6 +6,7 @@ import {
   type FileDraft,
   MAX_FILE_MB,
   MAX_FILES,
+  shownFileName,
   sizeLabel,
   tooLarge,
   withFiles,
@@ -228,7 +229,7 @@ export function NoteCapture({
             <li key={key} data-error={tooLarge(file) || undefined}>
               <Thumb file={file} />
               <span className="hb-dname">
-                <span>{file.name}</span>
+                <span>{shownFileName(file.name, file.lastModified)}</span>
                 <small>
                   {tooLarge(file) ? t('hablar.tooBig', { mb: MAX_FILE_MB }) : sizeLabel(file.size)}
                 </small>
@@ -236,7 +237,9 @@ export function NoteCapture({
               <button
                 type="button"
                 className="hb-dx"
-                aria-label={t('hablar.remove', { name: file.name })}
+                aria-label={t('hablar.remove', {
+                  name: shownFileName(file.name, file.lastModified),
+                })}
                 onClick={() => setDrafts((was) => was.filter((each) => each.key !== key))}
               >
                 <Icon name="x" />

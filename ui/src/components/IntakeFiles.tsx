@@ -6,6 +6,7 @@ import {
   isImage,
   MAX_FILE_MB,
   MAX_FILES,
+  shownFileName,
   sizeLabel,
   tooLarge,
 } from '../intake-files.ts';
@@ -116,7 +117,7 @@ export function IntakeFiles({
                 <li key={key} className="intake-file" data-error={large || undefined}>
                   <Thumb file={file} />
                   <span className="intake-file-name">
-                    <span className="mono">{file.name}</span>
+                    <span className="mono">{shownFileName(file.name, file.lastModified)}</span>
                     <span className="t-cap">
                       {large ? t('intake.tooLarge', { mb: MAX_FILE_MB }) : sizeLabel(file.size)}
                     </span>

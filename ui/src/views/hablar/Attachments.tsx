@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { attachmentUrl } from '../../api.ts';
 import { isPicture, type MessageFile } from '../../conversation.ts';
 import { t } from '../../i18n/i18n.ts';
-import { extensionOf, sizeLabel } from '../../intake-files.ts';
+import { extensionOf, shownFileName, sizeLabel } from '../../intake-files.ts';
 import { Dialog } from '../../kit/pop/Dialog.tsx';
 
 // The files a message came with: an image shows as a thumbnail that opens large, anything else as
@@ -40,7 +40,7 @@ export function Attachments({ files }: { files: readonly MessageFile[] }) {
             <span className="hb-ext" aria-hidden="true">
               {extensionOf(file.name) || '·'}
             </span>
-            <span className="hb-nm">{file.name}</span>
+            <span className="hb-nm">{shownFileName(file.name)}</span>
             <span className="hb-sz">{sizeLabel(file.size)}</span>
           </a>
         ),
