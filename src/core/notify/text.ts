@@ -81,10 +81,10 @@ const WORDS = {
     unheard: () => 'Nobody is listening',
     secretary_reply: (by: string) => `${by || 'Your secretary'} replied`,
     secretary_offline: () => 'Your secretary is offline',
-    replyBody: 'Open Hablar to read it',
+    replyBody: 'Open Talk to read it',
     offlineBody: (n: number) =>
       n === 1 ? '1 message waits for you' : `${n} messages wait for you`,
-    hablar: 'Hablar',
+    hablar: 'Talk',
     group: {
       turn: (n: number) => `${n} things are yours`,
       ask: (n: number) => `${n} questions wait for you`,

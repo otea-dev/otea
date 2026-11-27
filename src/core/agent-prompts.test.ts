@@ -358,7 +358,7 @@ describe('the role prompts', () => {
       expect(rule).toContain('otea bandeja take <B-n> --as ana');
       expect(rule).toContain('otea bandeja close <B-n> --reason');
       expect(rule).toMatch(
-        lang === 'es' ? /un refinador para toda la Bandeja/ : /one refiner for the whole Bandeja/,
+        lang === 'es' ? /un refinador para toda la Bandeja/ : /one refiner for the whole Inbox/,
       );
       expect(rule).toMatch(lang === 'es' ? /por nota ni por respuesta/ : /per note or per answer/);
       expect(rule).toMatch(lang === 'es' ? /la nota es tuya/ : /the note is yours/);
@@ -437,7 +437,7 @@ describe('the role prompts', () => {
       expect(text).toMatch(
         lang === 'es'
           ? /nunca te detengas porque la Bandeja esté vacía/
-          : /never stop because the Bandeja is empty/,
+          : /never stop because the Inbox is empty/,
       );
       expect(text).toContain('otea bandeja close <B-n> --reason');
       expect(text).toContain('--from-bandeja <B-n> --as ana-ref');
@@ -546,6 +546,18 @@ describe('the role prompts', () => {
       expect(text).toContain('MSYS_NO_PATHCONV=1');
     });
 
+    // Field study 4 (U6): «summarize what was done» was wrong twice, and an opencode secretary gave
+    // the session texts as .md downloads.
+    it(`has the secretary answer a summary from otea pending and give session texts as blocks, never files (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, { name: 'ana' });
+      expect(text).toContain(
+        lang === 'es' ? 'Hecho en las últimas 24 horas' : 'Done in the last 24 hours',
+      );
+      expect(text).toContain(
+        lang === 'es' ? 'nunca como archivo ni descarga' : 'never as a file or a download',
+      );
+    });
+
     // Field study 3 (F4): «what waits for me today» left a review out because the secretary told it
     // from memory, and its «ready to review» notices came late or never.
     it(`has the secretary read what waits for the person from otea pending, never from memory (${lang})`, () => {
@@ -565,7 +577,7 @@ describe('the role prompts', () => {
       const text = rolePrompt('secretary', lang, { name: 'ana' });
       const rule = text.split('\n').find((line) => /^10\. /.test(line)) ?? '';
       expect(rule).toContain('`escalation`');
-      expect(rule).toContain('Hablar');
+      expect(rule).toContain(lang === 'es' ? 'Hablar' : 'Talk');
       expect(rule).toContain('otea say "<');
       expect(rule).toContain('--links');
       // A question the person already sees (it is in otea pending) is pointed to, never asked again:

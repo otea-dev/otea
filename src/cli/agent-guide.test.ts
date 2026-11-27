@@ -71,7 +71,7 @@ describe("Otea's agent guide", () => {
       'When the person says to leave an item for later: otea release <id> --later sets it aside for every agent; then keep waiting.',
       'Never write a polling loop of your own: otea wait is how you wait.',
       // 0.8: who the secretary is, and that nobody else talks to the person in its chat.
-      "The project's secretary (otea profile --role secretary) alone talks with the person in the Hablar chat",
+      "The project's secretary (otea profile --role secretary) alone talks with the person in the Talk chat",
       'You are not it unless told so: ask on the item (rule 10).',
     ]) {
       expect(AGENT_GUIDE).toContain(line);

@@ -3654,7 +3654,7 @@ const ask: Command = {
         });
         return {
           data: { entry, question: asked },
-          text: `Asked the person on ${entry.ref}: it waits for their answer, and your hold on it ends. They tap or write it on the desk (Hablar, the Bandeja). Once they answer, ${entry.ref} waits again: the refiner that takes the notes in turn gets it with otea bandeja take --next --wait --as ${actor.name} (or take it yourself: otea bandeja take ${entry.ref} --as ${actor.name}) and reads the answer: otea bandeja ${entry.ref} --as ${actor.name}.`,
+          text: `Asked the person on ${entry.ref}: it waits for their answer, and your hold on it ends. They tap or write it on the desk (Talk, the Inbox). Once they answer, ${entry.ref} waits again: the refiner that takes the notes in turn gets it with otea bandeja take --next --wait --as ${actor.name} (or take it yourself: otea bandeja take ${entry.ref} --as ${actor.name}) and reads the answer: otea bandeja ${entry.ref} --as ${actor.name}.`,
         };
       }
       const asked = askQuestion(project, {
