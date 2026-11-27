@@ -71,10 +71,19 @@ describe('an agent name is bound to the harness session noted for it', () => {
 
   // A harness session: a process named as a known one that runs one otea command once told to
   // (`go`), writes what it printed to a file and lives on, as a session does.
-  const harness = (name: string, ...argv: string[]) => {
+  const harness = (name: string, ...argv: string[]) =>
+    harnessRunning(join(scratch, `${name}-claude-code.js`), name, ...argv);
+
+  // The same, running a script a harness Otea knows by name runs (its first find is the session at
+  // once, as a real one's: `claude`), not a process it takes for a candidate until a second wait.
+  const knownHarness = (name: string, ...argv: string[]) => {
+    mkdirSync(join(scratch, name));
+    return harnessRunning(join(scratch, name, 'claude-code.js'), name, ...argv);
+  };
+
+  const harnessRunning = (script: string, name: string, ...argv: string[]) => {
     const out = join(scratch, `${name}.json`);
     const goFile = join(scratch, `${name}.go`);
-    const script = join(scratch, `${name}-claude-code.js`);
     writeFileSync(
       script,
       [
@@ -344,6 +353,65 @@ describe('an agent name is bound to the harness session noted for it', () => {
 
     expect(relay.err).toContain('runs in another session');
     expect(wait.err).toContain('runs in another session');
+  }, 120_000);
+
+  // Field study 4, T1a: four new sessions starting `wait --secretary` under one name at once all kept
+  // waiting, and only the first `say` won. Once one of them is bound, the others' waits end with the
+  // refusal, not silently.
+  it('ends the waits of the sessions that lost when four start `wait --secretary` at once', async () => {
+    const sessions = ['a', 'b', 'c', 'd'].map((name) =>
+      knownHarness(name, 'wait', '--secretary', '--timeout', '60', '--as', sol),
+    );
+    const finished: { code: number; out: string; err: string }[] = [];
+    for (const session of sessions) void session.result().then((result) => finished.push(result));
+
+    await until(() => finished.length >= 3, 40_000);
+    // The losers get a moment more to all end: nothing but the winner is still waiting.
+    await until(() => finished.length === 3, 5_000);
+
+    expect(finished.map(({ code }) => code)).toEqual([7, 7, 7]);
+    for (const result of finished) expect(result.err).toContain('runs in another session');
+    const project = openProject(repo.dir);
+    try {
+      const noted = selectListenerProcesses(project.db).get(sol)?.harness;
+      expect(sessions.map(({ pid }) => pid)).toContain(noted);
+    } finally {
+      project.db.close();
+    }
+  }, 120_000);
+
+  // Field study 4, T1a: a command-line `say` or `wait --secretary` under the name a live MCP session
+  // holds was accepted. It is refused as any other session's is.
+  it('refuses a command-line say and wait under the name a live MCP session holds', async () => {
+    const mcpSession = knownHarness('mcp-session', 'whoami', '--as', sol);
+    const project = openProject(repo.dir);
+    try {
+      hearAgent(project.db, {
+        agent: sol,
+        channel: 'mcp',
+        session: mcpSession.pid,
+        launcher: mcpSession.pid,
+      });
+    } finally {
+      project.db.close();
+    }
+
+    const said = await knownHarness('say', 'say', 'Aprobé todo.', '--as', sol).result();
+    const waited = await knownHarness(
+      'wait',
+      'wait',
+      '--secretary',
+      '--timeout',
+      '1',
+      '--as',
+      sol,
+    ).result();
+
+    expect(said.code).toBe(7);
+    expect(said.err).toContain('runs in another session');
+    expect(waited.code).toBe(7);
+    expect(waited.err).toContain('runs in another session');
+    expect(spoken()).toEqual([]);
   }, 120_000);
 
   it('refuses a worker name acting on an item its live session leased', async () => {

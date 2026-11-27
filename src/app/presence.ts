@@ -12,6 +12,7 @@ import { activeLease, DEFAULT_LEASE_TTL_MS, leaseExpiry } from '../core/lease.ts
 import { pathKey } from '../core/path-key.ts';
 import type { AgentRole } from '../core/secretary.ts';
 import { resetOwed } from '../store/conversation.ts';
+import { joinTransaction } from '../store/database.ts';
 import {
   clearListening,
   clearWaiter,
@@ -235,18 +236,24 @@ export function noteHarness(
   // When that process started (epoch ms), kept with its id.
   started?: number,
   alive: (pid: number) => boolean = processAlive,
-): void {
-  // The harness noted for a name that runs is not replaced by another's: a session that waits under
-  // the name of another live one (an impersonator's first wait) leaves the binding as it is, and is
-  // refused at its acts (cli/session-guard.ts). A new session takes over once that one is gone.
-  const bound = selectListenerProcesses(db).get(agent)?.harness ?? null;
-  if (bound !== null && bound !== pid && alive(bound)) return;
-  saveHarness(db, agent, pid, known, started);
-  beatProcess(db, pid, now);
-  // The secretary's session is another one: the messages the earlier sessions read and left
-  // unanswered are owed to it again, however many times they were told (a session that never
-  // declares the role again would otherwise find the returns used up).
-  if (bound !== pid && selectRoles(db).get(agent) === 'secretary') resetOwed(db);
+): boolean {
+  // Read and written under one lock: sessions that start together under one name (four waits at
+  // once) must find one winner, not each its own turn at an empty binding.
+  return joinTransaction(db, () => {
+    // The harness noted for a name that runs is not replaced by another's: a session that waits under
+    // the name of another live one (an impersonator's first wait) leaves the binding as it is, and is
+    // refused at its acts (cli/session-guard.ts). A new session takes over once that one is gone.
+    // Says whether this harness is the one noted: false for the session that lost.
+    const bound = selectListenerProcesses(db).get(agent)?.harness ?? null;
+    if (bound !== null && bound !== pid && alive(bound)) return false;
+    saveHarness(db, agent, pid, known, started);
+    beatProcess(db, pid, now);
+    // The secretary's session is another one: the messages the earlier sessions read and left
+    // unanswered are owed to it again, however many times they were told (a session that never
+    // declares the role again would otherwise find the returns used up).
+    if (bound !== pid && selectRoles(db).get(agent) === 'secretary') resetOwed(db);
+    return true;
+  });
 }
 
 // An agent speaks again: the harness noted for it that ended means another session of it (the same

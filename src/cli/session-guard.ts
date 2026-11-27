@@ -102,6 +102,11 @@ async function callerOf(): Promise<Caller | undefined> {
 
 type Bound = { noted: Noted; refusal: string };
 
+// What a command under the secretary's name is told when the session noted for it is another.
+export function secretaryElsewhere(agent: string): string {
+  return `${agent} is this project's secretary and runs in another session: this command is not from it. If you are the secretary, it is that session; if that one ended, take over from yours once its process is gone. Otherwise use your own name (otea whoami) and ask the secretary through otea escalate`;
+}
+
 // The session the command is bound to, if it acts as the secretary or on an item its own session
 // leased and that session runs.
 function boundOf(project: Project, input: Input, agent: string): Bound | undefined {
@@ -111,11 +116,7 @@ function boundOf(project: Project, input: Input, agent: string): Bound | undefin
     SECRETARY_ACTS.has(command) || declares || (command === 'wait' && input.flag('secretary'));
   if (secretaryAct && secretaryName(project.db) === agent) {
     const noted = notedSession(project.db, agent);
-    if (noted !== undefined)
-      return {
-        noted,
-        refusal: `${agent} is this project's secretary and runs in another session: this command is not from it. If you are the secretary, it is that session; if that one ended, take over from yours once its process is gone. Otherwise use your own name (otea whoami) and ask the secretary through otea escalate`,
-      };
+    if (noted !== undefined) return { noted, refusal: secretaryElsewhere(agent) };
   }
   if (!LEASE_ACTS.has(command)) return undefined;
   const id = input.args[0];

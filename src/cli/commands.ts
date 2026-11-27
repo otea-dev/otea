@@ -369,7 +369,12 @@ import { portFrom, portToOpen, portToStart, projectPage } from './ports.ts';
 import { probeSignIn } from './probe.ts';
 import { saysWhereItLives, unreachedWhere } from './reach.ts';
 import { readServeFile, removeServeFile, serverVersionNote, writeServeFile } from './serve-file.ts';
-import { isFromAnotherSession, sessionBound, sessionVerdictOf } from './session-guard.ts';
+import {
+  isFromAnotherSession,
+  secretaryElsewhere,
+  sessionBound,
+  sessionVerdictOf,
+} from './session-guard.ts';
 import {
   boardHintLines,
   cancelled,
@@ -2926,8 +2931,12 @@ async function waitForSecretary(input: Input): Promise<Output> {
   // before it is done waits for it a few seconds at most.
   const noting = input.channel === 'cli' && !harnessNoted(input.cwd, me);
   const owner = watchOwner(input.signal, { early: noting });
+  // Sessions that start together under one name: the first to note its harness is the secretary's,
+  // and the waits of the others end at once with the refusal any other act of theirs would get.
+  const lost = new AbortController();
+  let lostToAnother = false;
   const options = {
-    signal: owner.signal,
+    signal: AbortSignal.any([owner.signal, lost.signal]),
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
     recheckMs: SECRETARY_RECHECK_MS,
   };
@@ -2939,7 +2948,10 @@ async function waitForSecretary(input: Input): Promise<Output> {
         try {
           // A harness known by name is the session at once; any other process is a candidate until
           // a second wait finds it too (it may be an intermediary that ends with its command).
-          noteHarness(project.db, me, pid, systemClock, known, started);
+          if (!noteHarness(project.db, me, pid, systemClock, known, started)) {
+            lostToAnother = true;
+            lost.abort();
+          }
         } catch {
           // The wait ended and closed the project first: nothing left to note it for.
         }
@@ -2956,6 +2968,7 @@ async function waitForSecretary(input: Input): Promise<Output> {
     // the harness noted is what tells its session ended once this process is gone.
     if (noting && !owner.orphaned())
       await Promise.race([noted, delay(HARNESS_READ_MS, undefined, { ref: false })]);
+    if (lostToAnother) throw new OteaError('forbidden', secretaryElsewhere(me));
     if (!('found' in waited)) return waited;
     const wake = waited.found;
     // What waits for the person, counted now: the notice «ready for review» never rests on memory.
