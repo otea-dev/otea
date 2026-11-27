@@ -124,6 +124,19 @@ describe('noticeText', () => {
     );
   });
 
+  it('names Hablar once when a burst is the secretary talking, not once per message', () => {
+    const group: Notice = {
+      kind: 'group',
+      count: 2,
+      of: 'secretary_reply',
+      items: [
+        { item: 'hablar:1', title: '', kind: 'secretary_reply' },
+        { item: 'hablar:2', title: '', kind: 'secretary_reply' },
+      ],
+    };
+    expect(noticeText(group, 'es').body).toBe('Hablar');
+  });
+
   it('names the project a burst comes from, and keeps one burst per project on screen', () => {
     const web = { id: 'tienda-web-x1', name: 'tienda-web' };
     const group: Notice = {
