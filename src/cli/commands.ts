@@ -366,6 +366,7 @@ import { harnessOf, isKnownHarness, listProcesses, watchOwner } from './owner.ts
 import { PHONE_COMMANDS } from './phone.ts';
 import { portFrom, portToOpen, portToStart, projectPage } from './ports.ts';
 import { probeSignIn } from './probe.ts';
+import { unreachedWhere } from './reach.ts';
 import { readServeFile, removeServeFile, serverVersionNote, writeServeFile } from './serve-file.ts';
 import { isFromAnotherSession, sessionBound, sessionVerdictOf } from './session-guard.ts';
 import {
@@ -2101,6 +2102,31 @@ function refuseUnlandedCommit(project: Project, cwd: string, move: BoardMoveInpu
   if (refused) throw new OteaError('missing_fields', `${item.id} not handed off: ${refused}`);
 }
 
+// A board with no branch to protect (a text, a document: it lands nowhere) closes a piece only when
+// the place its step says the work lives, a «Publicado en»-like field of the handoff, is real: a web
+// address, or a file in the project's own folder where the person reads (U3, field study 4: six of
+// six pieces were Done on a side branch). The hash and branch checks above are for code boards.
+function refuseUnreachedFile(project: Project, move: BoardMoveInput): void {
+  if (move.actor.kind !== 'agent') return;
+  const item = getItem(project, move.id);
+  const board = liveBoardOf(project, item.collection);
+  const position = positionOf(item.state);
+  if (!board || isClosed(position) || position.phase !== 'doing') return;
+  if (guardedBranch(board.def) !== undefined || !movesOn(board.def, position.step, move.way))
+    return;
+  for (const hand of stepById(board.def, position.step)?.hand ?? []) {
+    const part = board.def.parts[hand.ref];
+    const value = part?.kind === 'url' ? item.fields[part.id] : undefined;
+    if (!part || hand.req === 'no' || typeof value !== 'string' || value.trim() === '') continue;
+    const why = unreachedWhere(project.root, value);
+    if (why)
+      throw new OteaError(
+        'missing_fields',
+        `${item.id} not handed off: ${part.name} says where the work lives, and ${why}. Put the file in the project's folder (the main checkout, never a branch, a worktree or .otea), then set ${part.name} to its path from that folder, or to the web address where it went live, and hand it off again; if you cannot, tell the person with otea ask.`,
+      );
+  }
+}
+
 // Whether a handoff of the step along `way` (none: the default one) takes the item on, to a later
 // step or to Done, not back to an earlier one for another round. What the handoff of a branch
 // checks (the branch has commits, the commit that landed is real) is checked for the forward moves,
@@ -2408,6 +2434,7 @@ const handoffCommand: Command = {
       const handed = handedBranch(project, input.cwd, move);
       // After the branch's own checks, which say first that it was never pushed.
       refuseUnlandedCommit(project, input.cwd, move);
+      refuseUnreachedFile(project, move);
       warning = handed.warning;
       said = handed.said;
       // A round that only merges main into the approved work: asked of the remote once, here.

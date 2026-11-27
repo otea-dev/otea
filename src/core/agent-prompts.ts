@@ -292,6 +292,15 @@ const SCRATCH =
 const SCRATCH_ES =
   'Guarda todo archivo que hagas dentro del proyecto, en `.otea/tmp/` (nunca en la carpeta temporal ni junto al repositorio), y lee un archivo en la ruta que Otea imprime para él, tal como se imprime; en Windows con Git Bash define `MSYS_NO_PATHCONV=1` y escribe `D:/carpeta`, nunca `/d/carpeta`.';
 
+// Where the work goes on a board that lands nowhere (a text, a page, notes): the person reads their
+// own folder, so a finished text is put there, not kept on a side branch (field study 4, U3: six of six
+// pieces were Done on branches the person never saw). Otea refuses a handoff whose «where it lives»
+// field names a file that is not in that folder.
+const FILES_HERE =
+  "The exception to that are the files the person is to read: put them in the project's own folder, the one they open, at the path the step names (else where the project already keeps such files), never on a side branch or under `.otea/`. A step that asks where the work ended up (a path or a link) is answered with the path from that folder, written only once the file is there; Otea refuses the handoff when what it names is not in their folder. If you cannot put it there, ask with `otea ask` instead of handing off.";
+const FILES_HERE_ES =
+  'La excepción son los archivos que la persona va a leer: ponlos en la carpeta del proyecto, la que ella abre, en la ruta que dice el paso (si no, donde el proyecto ya guarda archivos así), nunca en una rama aparte ni bajo `.otea/`. Un paso que pide dónde quedó el trabajo (una ruta o un enlace) se responde con la ruta desde esa carpeta, escrita solo cuando el archivo ya está ahí; Otea rechaza la entrega cuando lo que nombra no está en su carpeta. Si no puedes dejarlo ahí, pregunta con `otea ask` en vez de entregar.';
+
 // A board name as a command takes it: quoted when it has a space.
 const quoted = (board: string) => (/\s/.test(board) ? `"${board}"` : board);
 
@@ -323,7 +332,7 @@ const ROLE_WORDS = {
       const as = name ?? '<name>';
       const where = code
         ? `${WORKTREE} To land approved work: merge main into the branch (\`git merge origin/main\`), push normally, then push it to main as the step says. Never force push, never rebase a pushed branch. Once the item is Done, run \`otea land sync <item id> --as ${as}\`: it brings the person's main checkout up to date only when that is safe, and says why when it leaves it alone; never git pull, merge or switch branches in their checkout yourself. Pass on what it says.`
-        : SCRATCH;
+        : `${SCRATCH} ${FILES_HERE}`;
       return [
         name === undefined
           ? `You are a worker on the Otea board ${board}. First run \`otea whoami --harness <harness>\` and reuse the name it gives back, or pick one of your own (${NAME(exampleName())}); then use \`--as <name>\` on every otea call.`
@@ -382,7 +391,7 @@ const ROLE_WORDS = {
       const as = name ?? '<nombre>';
       const where = code
         ? `${WORKTREE_ES} Para integrar el trabajo aprobado: mezcla main en la rama (\`git merge origin/main\`), publícala normalmente y luego súbela a main como dice el paso. Nunca hagas force push, nunca rebases una rama ya publicada. Cuando el ítem esté Done, ejecuta \`otea land sync <id del ítem> --as ${as}\`: pone al día la copia principal de la persona solo cuando es seguro, y dice por qué cuando la deja como está; nunca hagas git pull, merge ni cambies de rama en su copia. Pasa lo que diga.`
-        : SCRATCH_ES;
+        : `${SCRATCH_ES} ${FILES_HERE_ES}`;
       return [
         name === undefined
           ? `Eres un trabajador del tablero ${board} de Otea. Primero ejecuta \`otea whoami --harness <harness>\` y reutiliza el nombre que te devuelve, o elige uno propio (${NAME_ES(exampleName())}); luego usa \`--as <nombre>\` en cada llamada de otea.`

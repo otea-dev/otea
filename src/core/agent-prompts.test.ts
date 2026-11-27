@@ -492,6 +492,10 @@ describe('the role prompts', () => {
       expect(text).not.toMatch(/worktree|land sync|git merge|force push/);
       expect(text).toContain('.otea/tmp/');
       expect(text).toContain('MSYS_NO_PATHCONV=1');
+      // What the person reads goes in their own folder, and Otea checks it is there (U3).
+      expect(text).toContain(
+        lang === 'es' ? 'Otea rechaza la entrega' : 'Otea refuses the handoff',
+      );
       // The rules keep their numbers: the others are the ones the code board has.
       const numbered = (code: boolean) =>
         rolePrompt('worker', lang, { board: 'Notas', name: 'ana', code })
