@@ -46,7 +46,7 @@
     "demo:gifs": "node scripts/demo/gifs.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.8",
+    "@biomejs/biome": "2.6.9",
     "@fontsource-variable/newsreader": "5.3.0",
     "@fontsource-variable/schibsted-grotesk": "5.3.0",
     "@fontsource/dm-mono": "5.3.0",
@@ -60,7 +60,7 @@
     "happy-dom": "21.0.4",
     "micromark": "4.0.3",
     "pdfjs-dist": "6.5.438",
-    "playwright-core": "1.61.0",
+    "playwright-core": "1.65.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "typescript": "7.0.2",
@@ -68,9 +68,9 @@
     "vitest": "5.1.1"
   },
   "dependencies": {
-    "@hono/node-server": "2.1.9",
+    "@hono/node-server": "2.1.11",
     "@modelcontextprotocol/server": "2.4.0",
-    "hono": "4.13.19",
+    "hono": "4.13.21",
     "uqr": "0.1.3",
     "yaml": "2.9.1",
     "zod": "4.6.7"
