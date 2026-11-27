@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { StrictMode } from 'react';
+import { act, StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type App, AppTestProvider } from '../../app/context.tsx';
 import type { BandejaEntry } from '../../bandeja.ts';
@@ -365,6 +365,130 @@ describe('Hablar with the Bandeja', () => {
     expect(q(root, '.hb')?.getAttribute('data-tab')).toBe('out');
     expect(q(root, '#bn-B-3')?.hasAttribute('data-lit')).toBe(true);
     expect(q(root, '#bn-B-1')?.hasAttribute('data-lit')).toBe(false);
+  });
+});
+
+// G3: a link to a note's question on a wide screen goes to the question at the foot of the thread,
+// whichever of the two reads (the notes, the conversation) comes first; the light always goes out.
+describe('a link to a question on a note, on a wide screen', () => {
+  const asking = entry({
+    id: 3,
+    state: 'asking',
+    text: 'make it better',
+    asking: { question: 1, by: 'lia', at: ago(3), text: '¿Mejor en qué?', options: ['a', 'b'] },
+  });
+
+  // The window's width as a test sets it: a media query holds while `wide` says so.
+  function widths(initial: boolean) {
+    const state = { wide: initial, listeners: new Set<() => void>() };
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('1240') && state.wide,
+      addEventListener: (_: string, listener: () => void) => state.listeners.add(listener),
+      removeEventListener: (_: string, listener: () => void) => state.listeners.delete(listener),
+    }));
+    return {
+      set(wide: boolean) {
+        state.wide = wide;
+        for (const listener of state.listeners) listener();
+      },
+    };
+  }
+
+  // The notes arrive at once; the conversation only when the test lets it.
+  function slowConversation(entries: BandejaEntry[]) {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const path = new URL(String(input instanceof Request ? input.url : input), 'http://x')
+        .pathname;
+      const json = (value: unknown, status = 200) =>
+        new Response(JSON.stringify(value), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        });
+      if (path.endsWith('/bandeja')) return json({ entries });
+      if (path.endsWith('/conversation')) {
+        await held;
+        return json({
+          messages: [],
+          more: false,
+          secretary: null,
+          waiting: { count: 0, since: null },
+        });
+      }
+      return json({ error: { code: 'not_found' } }, 404);
+    });
+    return release;
+  }
+
+  it('waits for the conversation, then goes to the question and lights it', async () => {
+    widths(true);
+    const release = slowConversation([asking]);
+    await show(<HablarView bandeja="B-3" />);
+    // The notes are there, the thread is not: the page does not settle for the note's row.
+    expect(page?.root.querySelector('#hb-ask-B-3')).toBeNull();
+
+    release();
+    await settle();
+
+    await vi.waitFor(() =>
+      expect(page?.root.querySelector('#hb-ask-B-3')?.hasAttribute('data-lit')).toBe(true),
+    );
+  });
+
+  it('puts the note’s light out after a moment, even when the window changes meanwhile', async () => {
+    const media = widths(false);
+    slowConversation([asking])();
+    const root = await show(<HablarView bandeja="B-3" />);
+    expect(q(root, '#bn-B-3')?.hasAttribute('data-lit')).toBe(true);
+
+    media.set(true);
+    await settle();
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 2600)));
+
+    expect(q(root, '#bn-B-3')?.hasAttribute('data-lit')).toBe(false);
+  });
+});
+
+// G3: a second tap on «Reabrir» while the first is on its way is the same tap.
+describe('reopening a closed note', () => {
+  it('sends once however many times it is tapped before the PC answers', async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let reopens = 0;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const path = new URL(String(input instanceof Request ? input.url : input), 'http://x')
+        .pathname;
+      const json = (value: unknown, status = 200) =>
+        new Response(JSON.stringify(value), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        });
+      if ((init.method ?? 'GET').toUpperCase() === 'POST') {
+        reopens += 1;
+        await held;
+        return json(entry({ id: 5 }), 201);
+      }
+      if (path.endsWith('/bandeja')) {
+        return json({
+          entries: [entry({ id: 5, state: 'closed', closedBy: 'sol', closeReason: 'duplicada' })],
+        });
+      }
+      return json({ error: { code: 'not_found' } }, 404);
+    });
+    const root = await show(<Live />);
+    const button = q(root, '.bn-reopen');
+
+    await press(button);
+    await press(button);
+    release();
+    await settle();
+
+    expect(reopens).toBe(1);
   });
 });
 

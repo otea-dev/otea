@@ -8,6 +8,8 @@ import { setLanguage } from '../../i18n/i18n.ts';
 import { seenAtMount } from '../../kit/pop/toast.tsx';
 import { testApp } from '../../shell/test-app.ts';
 import { buttonNamed, type Mounted, mount, press, settle, typeInto } from '../../test-dom.tsx';
+import type { Item } from '../../types.ts';
+import { AskCard } from './Branch.tsx';
 import { FromTurns } from './FromTurns.tsx';
 import { HablarView } from './HablarView.tsx';
 
@@ -1131,5 +1133,234 @@ describe('following the foot after a link to a turn', () => {
       room.mockRestore();
       window.localStorage.removeItem('otea.motion');
     }
+  });
+});
+
+// G3 (cold review of the desk): the conversation's page-by-page reads, the search, the composer's
+// suggestions, a question card that is asked twice, and the tabs.
+
+// A server whose conversation has earlier pages (`more`), a `before` read that can fail, and a
+// search that holds or fails: every GET of the conversation recorded with its query.
+function paged(
+  view: ConversationView,
+  o: {
+    before?: 'fail';
+    search?: (words: string) => Message[] | 'fail' | Promise<Message[]>;
+  } = {},
+) {
+  const reads: URLSearchParams[] = [];
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+    const url = new URL(String(input instanceof Request ? input.url : input), 'http://x');
+    const json = (value: unknown, status = 200) =>
+      new Response(JSON.stringify(value), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      });
+    if (!url.pathname.endsWith('/conversation')) return json({ error: { code: 'not_found' } }, 404);
+    reads.push(url.searchParams);
+    const words = url.searchParams.get('search');
+    if (words !== null) {
+      const found = await o.search?.(words);
+      if (found === 'fail') return json({ error: { code: 'down' } }, 500);
+      return json({ ...view, messages: found ?? [] });
+    }
+    if (url.searchParams.has('before') && o.before === 'fail') {
+      return json({ error: { code: 'down' } }, 500);
+    }
+    return json(view);
+  });
+  return reads;
+}
+
+describe('a link to a turn that is on an earlier page', () => {
+  it('reads the earlier page once, gives up when it fails, and leaves the button to try again', async () => {
+    const reads = paged(conversation({ messages: request(), more: true }), { before: 'fail' });
+    const ctl: Live = { bump: () => undefined, went: [] };
+    page = mount(<Live ctl={ctl} route={{ turn: 999 }} app={{}} />);
+    await settle();
+    await settle();
+
+    expect(reads.filter((read) => read.has('before'))).toHaveLength(1);
+    // The address is the conversation's again, and the person can ask for the page themselves.
+    expect(ctl.went).toEqual([{ view: 'hablar' }]);
+    expect(q(page.root, '.hb-earlier')?.hasAttribute('disabled')).toBe(false);
+  });
+});
+
+describe('searching what was said', () => {
+  const old = say({ id: 50, author: 'person', text: 'un backoff exponencial para los reintentos' });
+
+  it('opens a hit that is on an earlier page through the turn’s address, so the page is read', async () => {
+    paged(conversation({ messages: request(), more: true }), { search: () => [old] });
+    const ctl: Live = { bump: () => undefined, went: [] };
+    page = mount(<Live ctl={ctl} route={{}} app={{}} />);
+    await settle();
+
+    await typeInto(q(page.root, '.hb-search input'), 'backoff');
+    await vi.waitFor(() => expect(all(page?.root as HTMLElement, '.hb-hit')).toHaveLength(1));
+    await press(q(page.root, '.hb-hit button'));
+
+    expect(ctl.went).toEqual([{ view: 'hablar', turn: 50 }]);
+  });
+
+  it('says it is searching while the answer is on its way, never that nothing says it', async () => {
+    let release: (found: Message[]) => void = () => undefined;
+    paged(conversation({ messages: request() }), {
+      search: () =>
+        new Promise<Message[]>((resolve) => {
+          release = resolve;
+        }),
+    });
+    page = mount(
+      <AppTestProvider value={testApp({ now: NOW })}>
+        <HablarView />
+      </AppTestProvider>,
+    );
+    await settle();
+    await typeInto(q(page.root, '.hb-search input'), 'backoff');
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 400)));
+
+    expect(text(q(page.root, '.hb-none'))).toBe('Buscando…');
+
+    release([old]);
+    await vi.waitFor(() => expect(all(page?.root as HTMLElement, '.hb-hit')).toHaveLength(1));
+    expect(q(page.root, '.hb-none')).toBeNull();
+  });
+
+  it('says the search failed when the PC refuses it, and that nothing was said when it answers none', async () => {
+    paged(conversation({ messages: request() }), { search: () => 'fail' });
+    page = mount(
+      <AppTestProvider value={testApp({ now: NOW })}>
+        <HablarView />
+      </AppTestProvider>,
+    );
+    await settle();
+    await typeInto(q(page.root, '.hb-search input'), 'backoff');
+    await vi.waitFor(() =>
+      expect(text(q(page?.root as HTMLElement, '.hb-none'))).toContain('No se pudo buscar'),
+    );
+    expect(text(q(page.root, '.hb-none'))).not.toContain('Nada de lo dicho');
+    page.unmount();
+
+    paged(conversation({ messages: request() }), { search: () => [] });
+    page = mount(
+      <AppTestProvider value={testApp({ now: NOW })}>
+        <HablarView />
+      </AppTestProvider>,
+    );
+    await settle();
+    await typeInto(q(page.root, '.hb-search input'), 'backoff');
+    await vi.waitFor(() =>
+      expect(text(q(page?.root as HTMLElement, '.hb-none'))).toContain('Nada de lo dicho'),
+    );
+  });
+});
+
+describe('the composer’s suggestions', () => {
+  it('add to what you were writing instead of wiping it', async () => {
+    const { root } = await open(conversation());
+    const field = q<HTMLTextAreaElement>(root, '.hb-input textarea');
+    await typeInto(field, 'Mañana revisamos el tablero');
+
+    await press(all(root, '.hb-sugg')[1]);
+
+    expect(field?.value).toBe('Mañana revisamos el tablero Resúmeme lo que se hizo');
+  });
+});
+
+// An agent's question card whose item the test replaces: the feed brings a new question.
+function Asked({ first, ctl }: { first: Item; ctl: { next: (it: Item) => void } }) {
+  const [it, setIt] = useState(first);
+  ctl.next = setIt;
+  return <AskCard item={it} />;
+}
+
+describe('a question of an agent that is asked again', () => {
+  const ask = (question: number, text: string) =>
+    item({
+      id: 'CAM-14',
+      turn: 'human',
+      asks: { question, by: 'worker', text, at: ago(3), options: ['Sí', 'No'], recommended: 1 },
+    });
+
+  it('shows its buttons again for the new question, not what you answered before', async () => {
+    const ctl: { next: (it: Item) => void } = { next: () => undefined };
+    page = mount(
+      <AppTestProvider value={testApp({ now: NOW })}>
+        <Asked first={ask(2, '¿Lo pruebo en tablet?')} ctl={ctl} />
+      </AppTestProvider>,
+    );
+    await settle();
+    await press(q(page.root, '.hb-opt'));
+    expect(text(q(page.root, '.hb-said'))).toContain('Respondiste: Sí');
+
+    await act(async () => ctl.next(ask(3, '¿Y en un celular chico?')));
+
+    expect(q(page.root, '.hb-said')).toBeNull();
+    expect(all(page.root, '.hb-opt')).toHaveLength(2);
+  });
+});
+
+describe('the kind of a turn whose last message says none', () => {
+  it('stops overriding once the server says the same for the messages that carry a kind', async () => {
+    const view = conversation({
+      messages: [
+        ...request(),
+        // A follow-up the person wrote has no kind of its own: the turn's kind is the last one set.
+        say({ id: 3, author: 'person', root: 1, replyTo: 2, kind: null }),
+      ],
+    });
+    server(view);
+    const ctl = mountLive();
+    await settle();
+    await press(q(page?.root as HTMLElement, '.hb-kind'));
+    expect(text(q(page?.root as HTMLElement, '.hb-kind'))).toBe('consulta');
+
+    for (const message of view.messages) if (message.kind !== null) message.kind = 'consultation';
+    await change(ctl);
+    // Someone else puts it back: the old tap no longer hides that.
+    for (const message of view.messages) if (message.kind !== null) message.kind = 'request';
+    await change(ctl);
+    expect(text(q(page?.root as HTMLElement, '.hb-kind'))).toBe('pedido');
+  });
+});
+
+describe('the tabs of Hablar', () => {
+  it('move with the arrow keys, and each names the part it shows', async () => {
+    const { root } = await open(conversation());
+    const [chat, out] = all(root, '[role=tab]') as [HTMLElement, HTMLElement];
+    for (const tab of [chat, out]) {
+      const target = tab.getAttribute('aria-controls');
+      expect(target).not.toBeNull();
+      expect(document.getElementById(target ?? '')).not.toBeNull();
+    }
+    expect(chat.getAttribute('tabindex')).toBe('0');
+    expect(out.getAttribute('tabindex')).toBe('-1');
+
+    await act(async () => {
+      chat.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    });
+    expect(out.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(out);
+
+    await act(async () => {
+      out.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    });
+    expect(chat.getAttribute('aria-selected')).toBe('true');
+  });
+});
+
+describe('reading the conversation again', () => {
+  it('follows a burst of changes with one read, like the pending list', async () => {
+    const reads = paged(conversation({ messages: request() }));
+    const ctl: Live = { bump: () => undefined, went: [] };
+    page = mount(<Live ctl={ctl} route={{}} app={{}} />);
+    await settle();
+    const first = reads.length;
+
+    for (let i = 0; i < 5; i += 1) await change(ctl);
+
+    // The first change goes through at once; the rest wait for the window and land as one.
+    expect(reads.length - first).toBeLessThanOrEqual(1);
   });
 });
