@@ -1298,6 +1298,7 @@ const create: Command = {
       if (message !== undefined) requireLinkableMessage(project, actor.name, message);
       // The item, what it came from and the note filed under it are one step: a note that cannot be
       // filed (its hold ran out meanwhile) leaves no item behind for a retry to duplicate.
+      let carried: string[] = [];
       const { item, filed } = transaction(project.db, () => {
         const made = createItem(project, {
           collection,
@@ -1310,7 +1311,10 @@ const create: Command = {
           ...(input.unnamedTerminal ? { via: 'terminal' as const } : {}),
         });
         if (topic) linkTopic(project, { id: topic.id, item: made.id, via: 'from' });
-        if (message !== undefined) linkMessageToItem(project, actor.name, message, made.id);
+        // The files the person sent in that turn go with the item (their photo of the problem).
+        if (message !== undefined) {
+          carried = linkMessageToItem(project, actor.name, message, made.id).warnings;
+        }
         // The entry is filed under the item it became: its wait ends.
         return {
           item: made,
@@ -1333,7 +1337,7 @@ const create: Command = {
           : `\nYour question${open.length === 1 ? '' : 's'} ${open.join(', ')} in that turn still wait${open.length === 1 ? 's' : ''} for the person: if ${item.id} answers ${open.length === 1 ? 'it' : 'them'}, take ${open.length === 1 ? 'it' : 'them'} back with otea say --withdraw <id>.`;
       return {
         data: { ...itemData(project, item), ...(filed ? { bandeja: filed.ref } : {}) },
-        text: `${filed ? `${started}\nFiled ${filed.ref} under ${item.id}.` : started}${stays}`,
+        text: `${filed ? `${started}\nFiled ${filed.ref} under ${item.id}.` : started}${stays}${carried.map((warning) => `\nWarning: ${warning}`).join('')}`,
       };
     });
   },

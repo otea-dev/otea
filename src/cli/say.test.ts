@@ -224,6 +224,23 @@ describe('the conversation from the secretary', () => {
         ).out,
       ).id as string;
 
+    // Field study 7: the photo the person sent never reached the worker.
+    it('carry the photo the person sent to the item made from the message, and say where to open it', async () => {
+      const sent = person('the button looks wrong, see the photo', [
+        { filename: 'phone.png', bytes: Buffer.from('png-bytes') },
+      ]);
+      const fix = await item('Show the button', '--from-message', String(sent.id));
+
+      const shown = await otea('show', fix, '--as', 'worker');
+      expect(shown.out).toContain(
+        '1 file the person sent is attached to this item as evidence: open it from the paths listed under Evidence.',
+      );
+      const json = JSON.parse((await otea('show', fix, '--as', 'worker', '--json')).out);
+      const [file] = json.evidence;
+      expect(file).toMatchObject({ filename: 'phone.png', kind: 'image' });
+      expect(readFileSync(file.path, 'utf8')).toBe('png-bytes');
+    });
+
     it('link the items they produced, and the item says where it came from', async () => {
       const sent = person('the Aprobar button is hidden on the phone');
       const fix = await item('Show the button', '--from-message', String(sent.id));

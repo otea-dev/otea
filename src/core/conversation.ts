@@ -137,4 +137,7 @@ export type FromMessage = {
   author: MessageAuthor;
   kind: MessageKind | null;
   snippet: string;
+  // How many files the person sent in this turn (their photo of the problem), when any: they are
+  // attached to the item as evidence.
+  files?: number;
 };

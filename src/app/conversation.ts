@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
+import type { Performer } from '../core/authority.ts';
 import { checkOptions, DELEGATED } from '../core/board/questions.ts';
 import {
   type AnswerMode,
@@ -49,9 +50,17 @@ import {
   setKind,
 } from '../store/conversation.ts';
 import { joinTransaction, transaction } from '../store/database.ts';
+import { selectEvidence } from '../store/queries.ts';
 import type { Context } from './context.ts';
-import { evidenceFile, namedReadPath, readEvidence, storeFile } from './evidence.ts';
-import { type Clock, requireItem, systemClock } from './items.ts';
+import {
+  evidenceFile,
+  namedReadPath,
+  placeFile,
+  readEvidence,
+  recordEvidence,
+  storeFile,
+} from './evidence.ts';
+import { type Clock, requireItem, requireWritableItem, systemClock } from './items.ts';
 import type { Project } from './project.ts';
 import { addSecretarySource, requireSecretary, secretaryStatus } from './secretary.ts';
 
@@ -274,9 +283,60 @@ function classify(project: Project, root: number, kind: MessageKind): boolean {
   return true;
 }
 
-function linkItems(project: Project, root: number, items: readonly string[], at: string): void {
+function linkItems(project: Project, root: number, items: readonly string[], at: string): string[] {
   for (const id of items) insertLink(project.db, root, requireItem(project.db, id).id, at);
+  return carryFiles(project, root, items, at);
 }
+
+// What the person sent in a turn belongs to what the turn became: the files of their messages (a
+// photo of the problem) go with each item made from it, as the person's own evidence, so the worker
+// that opens the item sees them (field study 7). A file the item already holds is not added twice.
+// An item that cannot take them (closed, archived, the part that takes them is full) is still linked:
+// the reason comes back as a warning for the secretary to tell the person.
+function carryFiles(
+  project: Project,
+  root: number,
+  items: readonly string[],
+  at: string,
+): string[] {
+  const sent = selectTurn(project.db, root)
+    .filter(({ author }) => author === 'person')
+    .flatMap(({ attachments }) => attachments);
+  if (sent.length === 0) return [];
+  const warnings: string[] = [];
+  for (const id of items) {
+    const item = requireItem(project.db, id);
+    const held = new Set(selectEvidence(project.db, item.id).map(({ sha256 }) => sha256));
+    const fresh = [...new Map(sent.map((file) => [file.sha256, file])).values()].filter(
+      ({ sha256 }) => !held.has(sha256),
+    );
+    if (fresh.length === 0) continue;
+    try {
+      const placed = fresh.map((file) =>
+        placeFile(
+          project,
+          requireWritableItem(project.db, item.id),
+          {
+            filename: file.name,
+            bytes: readFileSync(evidenceFile(project.dataDir, file.sha256)),
+          },
+          PERSON.actor,
+          at,
+        ),
+      );
+      for (const file of placed) recordEvidence(project, item.id, file, PERSON, at);
+    } catch (error) {
+      const why = error instanceof Error ? error.message : String(error);
+      warnings.push(
+        `${item.id} did not take the file${fresh.length === 1 ? '' : 's'} the person sent (${fresh.map(({ name }) => name).join(', ')}): ${why}. Tell the person, or attach them yourself with otea attach.`,
+      );
+    }
+  }
+  return warnings;
+}
+
+// The files came from the person, through the desk: they are theirs on the item.
+const PERSON: Performer = { actor: { kind: 'human', name: 'human' }, channel: 'ui' };
 
 // The action a question carries: its note is the person's own change, in a few words, and the first
 // option is what performs it, so there must be options to tap.
@@ -411,7 +471,7 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
       input.kind ?? (replyTo !== undefined && hung.length > 0 ? ('request' as const) : undefined);
     const kept = wanted === undefined ? false : !classify(project, root, wanted);
     // A notice mentions every item it names; an answer hangs only the ones that can hang from it.
-    linkItems(project, root, replyTo === undefined ? links : hung, at);
+    warnings.push(...linkItems(project, root, replyTo === undefined ? links : hung, at));
     const message = requireMessage(project, id);
     return { message, kind: message.kind, kept, warnings };
   });
@@ -473,17 +533,17 @@ export function linkMessageToItem(
   messageId: number,
   item: string,
   now: Clock = systemClock,
-): Message {
+): Message & { warnings: string[] } {
   const message = requireLinkableMessage(project, agent, messageId);
   return joinTransaction(project.db, () => {
-    linkItems(project, message.root, [item], now());
+    const warnings = linkItems(project, message.root, [item], now());
     if (selectRootKind(project.db, message.root).kind === null)
       classify(project, message.root, 'request');
     // The questions of this turn stay open: whether the item answers them is for the secretary to
     // say (openQuestionsOfTurn tells it, and say --withdraw closes one), not for Otea to guess.
     // Making an item out of a turn is acting on it, whether or not it was read.
     clearKindNews(project.db, [message.root]);
-    return requireMessage(project, messageId);
+    return { ...requireMessage(project, messageId), warnings };
   });
 }
 
@@ -910,13 +970,24 @@ addSecretarySource((ctx) => {
 // The turns an item came from, newest last: what show, next and the item's page tell. An item made
 // with no message has none.
 export function turnsOfItem(ctx: Context, item: string): FromMessage[] {
-  return selectTurnsOfItem(ctx.db, item).map((message) => ({
-    id: message.id,
-    at: message.at,
-    author: message.author,
-    kind: message.kind,
-    snippet: messageSnippet(message.text),
-  }));
+  const held = new Set(selectEvidence(ctx.db, item).map(({ sha256 }) => sha256));
+  return selectTurnsOfItem(ctx.db, item).map((message) => {
+    // The files the person sent in the turn that the item holds as evidence.
+    const files = new Set(
+      selectTurn(ctx.db, message.root)
+        .filter(({ author }) => author === 'person')
+        .flatMap(({ attachments }) => attachments.map(({ sha256 }) => sha256))
+        .filter((sha256) => held.has(sha256)),
+    ).size;
+    return {
+      id: message.id,
+      at: message.at,
+      author: message.author,
+      kind: message.kind,
+      snippet: messageSnippet(message.text),
+      ...(files === 0 ? {} : { files }),
+    };
+  });
 }
 
 // What show and next say of where an item came from, or nothing.
@@ -925,7 +996,13 @@ export function fromMessageLine(turns: readonly FromMessage[]): string | undefin
   const said = turns.map(
     (turn) => `message ${turn.id}${turn.kind === null ? '' : ` (${turn.kind})`}: "${turn.snippet}"`,
   );
-  return `Asked in the conversation, ${said.join('; ')}. Read the turn with otea conversation --since ${Math.max(0, (turns[0]?.id ?? 1) - 1)}.`;
+  const files = turns.reduce((sum, { files: n }) => sum + (n ?? 0), 0);
+  // Where the worker finds them: the item's own evidence, with the path to open each.
+  const sent =
+    files === 0
+      ? ''
+      : ` ${files} file${files === 1 ? '' : 's'} the person sent ${files === 1 ? 'is' : 'are'} attached to this item as evidence: open ${files === 1 ? 'it' : 'them'} from the paths listed under Evidence.`;
+  return `Asked in the conversation, ${said.join('; ')}. Read the turn with otea conversation --since ${Math.max(0, (turns[0]?.id ?? 1) - 1)}.${sent}`;
 }
 
 // A topic's turn kept as a consultation: the question and the answer, in the conversation, so the

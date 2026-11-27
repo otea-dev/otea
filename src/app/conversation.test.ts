@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MAX_EVIDENCE_BYTES } from '../core/evidence.ts';
+import { selectEvidence } from '../store/queries.ts';
 import { addCollection } from './collections.ts';
 import {
   attachmentPaths,
@@ -18,7 +19,8 @@ import {
   sayAsSecretary,
   turnsOfItem,
 } from './conversation.ts';
-import { createItem } from './items.ts';
+import { createItem, moveItem } from './items.ts';
+import { claimItem } from './leases.ts';
 import type { Project } from './project.ts';
 import { declareSecretary, secretaryWake, startSecretaryWait } from './secretary.ts';
 import { memoryContext, projectOf } from './testing.ts';
@@ -491,6 +493,75 @@ describe('the conversation', () => {
       expect(() => linkMessageToItem(project, 'luna', sent.id, dark, clock(3000))).toThrow(
         /Only the secretary/,
       );
+    });
+
+    // Field study 7: a photo sent in Hablar did not reach the item made from the message, and the
+    // worker never saw it.
+    describe('the files the person sent', () => {
+      const shot = { filename: 'phone.png', bytes: PNG };
+      const evidenceOf = (id: string) => selectEvidence(project.db, id);
+
+      it('go with an item made from the message (create --from-message), as the person’s own evidence', () => {
+        const sent = post('the button looks wrong, see the photo', 1000, { files: [shot] });
+        const fix = item('Fix the button');
+
+        linkMessageToItem(project, 'sol', sent.id, fix, clock(2000));
+
+        expect(evidenceOf(fix)).toEqual([
+          expect.objectContaining({
+            filename: 'phone.png',
+            kind: 'image',
+            actor: { kind: 'human', name: 'human' },
+          }),
+        ]);
+        expect(turnsOfItem(project, fix)).toEqual([expect.objectContaining({ files: 1 })]);
+        expect(fromMessageLine(turnsOfItem(project, fix))).toMatch(
+          /1 file the person sent is attached to this item as evidence/,
+        );
+      });
+
+      it('go with the items an answer links (say --links), and only once', () => {
+        const sent = post('see this', 1000, { files: [shot] });
+        const first = item('One');
+        const second = item('Two');
+
+        sayAsSecretary(
+          project,
+          { agent: 'sol', text: 'Made both.', replyTo: sent.id, links: [first, second] },
+          clock(2000),
+        );
+        // Linked again by the other way: the same photo is not attached twice.
+        linkMessageToItem(project, 'sol', sent.id, first, clock(3000));
+
+        expect(evidenceOf(first).map(({ filename }) => filename)).toEqual(['phone.png']);
+        expect(evidenceOf(second).map(({ filename }) => filename)).toEqual(['phone.png']);
+      });
+
+      it('never stop an item from being linked when its files cannot be attached', () => {
+        const sent = post('see this', 1000, { files: [shot] });
+        const done = item('Already done');
+        const sol = { kind: 'agent' as const, name: 'sol' };
+        claimItem(project, { id: done, actor: sol }, clock(1100));
+        moveItem(project, { id: done, to: 'in_progress', actor: sol, channel: 'cli' }, clock(1200));
+        moveItem(project, { id: done, to: 'review', actor: sol, channel: 'cli' }, clock(1300));
+        moveItem(
+          project,
+          { id: done, to: 'done', actor: { kind: 'human', name: 'human' }, channel: 'ui' },
+          clock(1500),
+        );
+
+        const said = sayAsSecretary(
+          project,
+          { agent: 'sol', text: 'Made it.', replyTo: sent.id, links: [done] },
+          clock(2000),
+        );
+
+        expect(said.message.links).toEqual([done]);
+        expect(evidenceOf(done)).toEqual([]);
+        expect(said.warnings.join('\n')).toMatch(
+          new RegExp(`${done}.*phone.png|phone.png.*${done}`),
+        );
+      });
     });
 
     it('say nothing of a kind when it is plain talk', () => {
