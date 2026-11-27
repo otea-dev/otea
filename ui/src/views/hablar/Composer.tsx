@@ -66,6 +66,11 @@ export function Composer({ onSent }: { onSent: () => void }) {
     el.style.overflowY = el.scrollHeight > MAX_HEIGHT ? 'auto' : 'hidden';
   }, [text]);
 
+  // A phone, or a screen the finger is the pointer of (a tablet): the keyboard comes up on the field.
+  const touch = () =>
+    app.phone ||
+    (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches === true);
+
   const add = (files: File[]) => {
     if (files.length === 0) return;
     setDrafts((was) => withFiles(was, files, 'single', draftKey));
@@ -92,7 +97,11 @@ export function Composer({ onSent }: { onSent: () => void }) {
         setDrafts((now) => now.filter((draft) => !sentKeys.has(draft.key)));
         setBusy(false);
         onSent();
-        field.current?.focus();
+        // On the desk the next message is typed at once. On a touch device the keyboard that
+        // stayed up covered the nav and the composer: it goes away, and a tap on the field brings
+        // it back.
+        if (touch()) field.current?.blur();
+        else field.current?.focus();
       },
       (failure: unknown) => {
         setBusy(false);

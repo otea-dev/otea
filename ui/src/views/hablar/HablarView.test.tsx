@@ -1116,6 +1116,51 @@ describe('the composer', () => {
     expect(calls[2]?.headers['idempotency-key']).not.toBe(key);
   });
 
+  // Field study 7: on the phone the keyboard stayed up after Enviar and covered the nav and the
+  // composer. A send that landed puts the keyboard away on a touch device, and keeps the focus on
+  // the desk, where the next message is typed at once.
+  it.each([
+    [true, false],
+    [false, true],
+  ])('after a send that landed, phone %s: the field keeps the focus %s', async (phone, kept) => {
+    server(conversation());
+    page = mount(
+      <AppTestProvider value={testApp({ now: NOW, phone })}>
+        <HablarView />
+      </AppTestProvider>,
+    );
+    await settle();
+    const root = page.root;
+    const field = q<HTMLTextAreaElement>(root, '.hb-input textarea') as HTMLTextAreaElement;
+    await typeInto(field, 'Hola');
+    field.focus();
+    expect(document.activeElement).toBe(field);
+
+    await press(q(root, '.hb-send'));
+
+    expect(field.value).toBe('');
+    expect(document.activeElement === field).toBe(kept);
+  });
+
+  it('keeps the focus, and the keyboard, when the send failed: the words are still there', async () => {
+    server(conversation(), { failures: 1 });
+    page = mount(
+      <AppTestProvider value={testApp({ now: NOW, phone: true })}>
+        <HablarView />
+      </AppTestProvider>,
+    );
+    await settle();
+    const root = page.root;
+    const field = q<HTMLTextAreaElement>(root, '.hb-input textarea') as HTMLTextAreaElement;
+    await typeInto(field, 'Hola');
+    field.focus();
+
+    await press(q(root, '.hb-send'));
+
+    expect(field.value).toBe('Hola');
+    expect(document.activeElement).toBe(field);
+  });
+
   it('sends files with the words as a form, and shows each one before it goes', async () => {
     const calls = server(conversation());
     page = mount(
