@@ -627,10 +627,10 @@ describe('approvalRefusal: Aprobar refused in words when a wait no longer holds'
       },
     } as unknown as Parameters<typeof linksOf>[0];
     const links = linksOf(item, (r) => ({ board: r.collection }));
-    expect(links.blockers[0]).toMatchObject({ closed: false, step: 'Hecho, sin fusionar' });
+    expect(links.blockers[0]).toMatchObject({ closed: false, step: 'Hecho, falta integrar' });
     const rows = waitRows(errores(), 'sfix', links);
     expect(approvalRefusal('ENT-2', rows)).toBe(
-      'No se aprobó ENT-2: ENT-1 (en «Entregas») lo frena y aún no se fusionó: apruébalo cuando su rama esté en la base.',
+      'No se aprobó ENT-2: ENT-1 (en «Entregas») lo frena y aún no se integró: apruébalo cuando esté integrado.',
     );
     expect(waitBlock(rows)).toBe('espera a ENT-1, que lo frena');
     setLanguage('en');
@@ -648,7 +648,7 @@ describe('approvalRefusal: Aprobar refused in words when a wait no longer holds'
     } as unknown as Parameters<typeof linksOf>[0];
     const links = linksOf(item, (r) => ({ board: r.collection }));
     expect(approvalRefusal('TRA-1', waitRows(cambios(), 'sexec', links))).toBe(
-      'No se aprobó TRA-1: ENT-1 aún no se fusionó.',
+      'No se aprobó TRA-1: ENT-1 aún no se integró.',
     );
     setLanguage('en');
   });
@@ -1240,7 +1240,7 @@ describe('branchSaid', () => {
     const outside = { branch: 'feat/x', base: 'main', land: 'Integrar' };
     setLanguage('es');
     expect(branchSaid(landing, outside)).toBe(
-      'ya está en main, fusionada fuera de Otea: un agente cierra el paso Integrar',
+      'ya está en main, integrada fuera de Otea: un agente cierra el paso Integrar',
     );
     setLanguage('en');
     expect(branchSaid(landing, outside)).toBe(

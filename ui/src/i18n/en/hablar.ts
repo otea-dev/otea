@@ -10,10 +10,11 @@ export const hablar = {
   'hablar.status.listening': '{name} is listening',
   'hablar.status.connected': '{name} is connected',
   'hablar.status.offline': '{name} is offline',
-  'hablar.away': 'Your secretary has been offline since {since}. Your messages wait for it.',
-  'hablar.awayUnknown': 'Your secretary is offline. Your messages wait for it.',
+  'hablar.away':
+    'Your secretary has been offline since {since}. Your messages are kept until it is back.',
+  'hablar.awayUnknown': 'Your secretary is offline. Your messages are kept until it is back.',
   'hablar.away.back':
-    'It restarts on your computer, not from here: open a session of your agent and paste it this text. Your messages wait and it reads them when it is back.',
+    'It restarts on your computer, not from here: open a session of your agent and paste this text into it.',
   'hablar.away.short': {
     one: 'Your secretary is offline · {count} message waiting',
     other: 'Your secretary is offline · {count} messages waiting',
@@ -25,12 +26,12 @@ export const hablar = {
   'hablar.waiting': { one: '{count} message waiting', other: '{count} messages waiting' },
   'hablar.none.title': 'No secretary yet',
   'hablar.none.text':
-    'Open an agent session and paste it this text: from then on it is your secretary and answers you here.',
+    'Open an agent session and paste this text into it: from then on it is your secretary and answers you here.',
   'hablar.none.copy': 'Copy the secretary text',
   'hablar.none.copied': 'Copied',
-  'hablar.none.orRun': 'Or have it print the text in its terminal:',
+  'hablar.none.orRun': 'Or, from a terminal, print the text with this command:',
   'hablar.none.after':
-    'Meanwhile you can write: your messages are kept and it reads them when it arrives.',
+    'You can write now: your secretary reads your messages as soon as it starts listening (the first reply takes 1-2 minutes).',
   'hablar.empty': 'Nothing said yet. Ask for something, or ask a question.',
   'hablar.loading': 'Reading the conversation…',
   'hablar.older': 'Earlier messages',
@@ -39,7 +40,7 @@ export const hablar = {
   'hablar.thinking': 'read · thinking…',
   'hablar.silent': 'The secretary has not answered yet.',
   'hablar.silent.do':
-    'If it is not coming, ask it to look at Hablar in its session, or start it again there (it is the chat you pasted its text into). Your message waits.',
+    'If it does not come, go back to the session where you pasted its text and ask it to read your messages. Your message is kept.',
   'hablar.unverified': 'not verified',
   'hablar.unverified.why':
     'Otea could not tie this message to the session of the secretary. Be careful if it asks for a decision of yours.',
@@ -63,7 +64,7 @@ export const hablar = {
   'hablar.kind.consultation': 'consultation',
   'hablar.kind.fix': 'Marked as a {kind} · “{snippet}”. Tap to make it a {other}.',
   'hablar.kind.done': 'Now a {kind}. Your secretary will see it and act.',
-  'hablar.kind.failed': 'Could not change it: {message}',
+  'hablar.kind.failed': 'Could not change it ({message}). Try again.',
   'hablar.picture': 'Open {name}',
   'hablar.pictureClose': 'Close',
   'hablar.file': 'Download {name}',
@@ -99,9 +100,10 @@ export const hablar = {
   'hablar.sending': 'Sending…',
   'hablar.remove': 'Remove {name}',
   'hablar.tooBig': 'Over the {mb} MB limit',
-  'hablar.failed': 'Not sent: {message}',
+  'hablar.failed': 'Not sent ({message}). Try again.',
   'hablar.offline': 'No connection with your computer: you can write once it is back.',
-  'hablar.readOnly': 'This browser can read the conversation but not write in it.',
+  'hablar.readOnly':
+    'This browser can only read the conversation. To write, open Otea from your computer with otea open.',
   'hablar.suggestions': 'Suggestions',
   'hablar.sugg.today': 'What is waiting for me today?',
   'hablar.sugg.done': 'Summarize what got done',
@@ -125,8 +127,8 @@ export const hablar = {
   'hablar.from': 'came out of Talk · “{snippet}”',
   'hablar.from.file': 'came out of Talk · your attachment',
   'hablar.from.more': { one: '+ {count} more turn', other: '+ {count} more turns' },
-  // «Waiting for you»: what waits for you, pinned over the conversation, counted by Otea
-  'hablar.te.title': 'Waiting for you',
+  // «Your turn now»: the same list as the Your turn page, pinned over the conversation, counted by Otea
+  'hablar.te.title': 'Your turn now',
   'hablar.te.sum.q': { one: '{count} question', other: '{count} questions' },
   'hablar.te.sum.r': { one: '{count} review', other: '{count} reviews' },
   'hablar.te.sum.s': { one: '{count} step of yours', other: '{count} steps of yours' },
@@ -144,16 +146,16 @@ export const hablar = {
   'hablar.te.k.step': 'your step',
   'hablar.te.k.stuck': '{agent} has been quiet for a while',
   'hablar.te.sum.w': {
-    one: '{count} board with nobody on it',
-    other: '{count} boards with nobody on them',
+    one: '{count} board with no agent',
+    other: '{count} boards with no agent',
   },
   'hablar.te.k.worker': 'open a session',
   'hablar.te.worker': {
-    one: '{board}: {count} item waits and nobody works this board. Open a session with the worker text.',
+    one: '{board}: {count} item waits and no agent works this board. Open a session and paste the agent’s text into it.',
     other:
-      '{board}: {count} items wait and nobody works this board. Open a session with the worker text.',
+      '{board}: {count} items wait and no agent works this board. Open a session and paste the agent’s text into it.',
   },
-  'hablar.te.worker.copy': 'Copy the worker text',
+  'hablar.te.worker.copy': 'Copy the agent’s text',
   'hablar.te.worker.copied': 'Copied',
   'hablar.te.what.review': 'review',
   'hablar.te.what.answer': 'answer',
@@ -178,7 +180,7 @@ export const hablar = {
   'bandeja.queues':
     'Your computer is not answering: the note waits in the queue and goes when it is back.',
   'bandeja.lands': 'It lands in this project’s Inbox; your secretary turns it into an item.',
-  'bandeja.failed': 'Not saved: {message}',
+  'bandeja.failed': 'Not saved ({message}). Try again.',
   'bandeja.title': 'Inbox',
   'bandeja.dek': 'What you jotted down, and how it is going',
   'bandeja.onlyFiles': 'Files only',

@@ -112,3 +112,54 @@ describe('the computer, by one name', () => {
     expect(words(en).filter((text) => /\b(your|the) PC\b/.test(text))).toEqual([]);
   });
 });
+
+// Field study 4 (O): one name per thing for the person. The English desk never speaks Spanish
+// (Talk, Inbox, Your turn), the Spanish desk says «agente» for what works (not «trabajador»),
+// «integrar» for landing (not «fusionar»), «subítem» (not «hijo»), «refinando» (not «puliendo»),
+// and no lease or git word where a plain one does. «Te toca» is the page, and Hablar's panel is
+// that same list, named after it. These are the words the product settled on: a change of one is
+// a decision, made here.
+describe('one name per thing, for the person', () => {
+  const texts = (catalog: object) =>
+    Object.entries(catalog).map(
+      ([key, value]) =>
+        [
+          key,
+          typeof value === 'string' ? value : Object.values(value as object).join(' '),
+        ] as const,
+    );
+  const found = (catalog: object, pattern: RegExp) =>
+    texts(catalog)
+      .filter(([, text]) => pattern.test(text))
+      .map(([key]) => key);
+
+  it('never shows the English desk a Spanish name', () => {
+    expect(found(en, /Hablar|Bandeja|Te toca|Te espera|Te esperan/)).toEqual([]);
+  });
+
+  it('says agent, integrar, subítem and refinando in Spanish, and no lease or relay jargon', () => {
+    expect(found(es, /trabajador/i)).toEqual([]);
+    expect(found(es, /fusionad|sin fusionar|se fusion/i)).toEqual([]);
+    expect(found(es, /\bhijos?\b|\bpadre\b/i)).toEqual([]);
+    expect(found(es, /puliend|relayad|reserva venc|venció|sin nadie|nadie escucha/i)).toEqual([]);
+  });
+
+  it('calls the pinned panel of Hablar by the name of the Te toca page', () => {
+    setLanguage('es');
+    expect(t('hablar.te.title')).toBe('Te toca ahora');
+    expect(t('hablar.te.title').startsWith(t('toca.title'))).toBe(true);
+    setLanguage('en');
+    expect(t('hablar.te.title')).toBe('Your turn now');
+    expect(t('hablar.te.title').startsWith(t('toca.title'))).toBe(true);
+  });
+
+  it('says what to do next after an error, in both languages', () => {
+    for (const lang of ['es', 'en'] as const) {
+      setLanguage(lang);
+      for (const key of ['hablar.failed', 'hablar.kind.failed', 'bandeja.failed'] as const) {
+        expect(t(key, { message: 'x' }), `${lang} ${key}`).toMatch(/Inténtalo de nuevo|Try again/);
+      }
+      expect(t('hablar.readOnly')).toMatch(/otea open/);
+    }
+  });
+});

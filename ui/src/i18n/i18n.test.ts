@@ -148,7 +148,7 @@ describe('t', () => {
     expect(t('common.files', { count: 1 })).toBe('1 file');
     expect(t('common.files', { count: 3 })).toBe('3 files');
     setLanguage('es');
-    expect(t('list.childOf', { id: 'BUG-1' })).toBe('Hijo de BUG-1');
+    expect(t('list.childOf', { id: 'BUG-1' })).toBe('Subítem de BUG-1');
     expect(t('common.files', { count: 1 })).toBe('1 archivo');
     expect(t('common.files', { count: 0 })).toBe('0 archivos');
     // Spanish has a `many` category for millions; without its own form, `other` says it.
@@ -195,7 +195,7 @@ describe('times and lists in Spanish', () => {
     expect(agoLabel(ago(5 * 1440), now)).toBe('hace 5 d');
     const lease = { holder: 'claude', expiresAt: new Date(now + 12 * 60_000).toISOString() };
     expect(leaseLeft(lease, now)).toBe('quedan 12 min');
-    expect(leaseLeft({ ...lease, expiresAt: ago(1) }, now)).toBe('reserva vencida');
+    expect(leaseLeft({ ...lease, expiresAt: ago(1) }, now)).toBe('sin señales');
     expect(momentLabel('2026-10-28T12:31:00.000Z', now, 'UTC')).toBe('28 oct, 12:31');
     expect(momentLabel('2025-01-02T09:05:00.000Z', now, 'UTC')).toBe('2 ene 2025, 09:05');
     expect(listOf(['A', 'B', 'C'])).toBe('A, B y C');

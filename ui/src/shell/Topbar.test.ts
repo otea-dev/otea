@@ -459,13 +459,13 @@ describe('the agents menu', () => {
     const connected = agent('Kiln', { status: 'connected', waiting: false, profile: opus });
     const html = body(agentRows([connected], items, NOW));
     expect(html).toContain(
-      '<span class="verb">conectado · su reserva de CRE-44 venció</span><span class="tx">Tortuga musgosa</span>',
+      '<span class="verb">conectado · se acabó su tiempo en CRE-44</span><span class="tx">Tortuga musgosa</span>',
     );
     expect(html).not.toContain('libre');
     expect(html).not.toContain('sin señal');
     const listening = { ...connected, status: 'listening' as const, waiting: true };
     expect(body(agentRows([listening], items, NOW))).toContain(
-      '<span class="verb">escuchando · su reserva de CRE-44 venció</span>',
+      '<span class="verb">escuchando · se acabó su tiempo en CRE-44</span>',
     );
     setLanguage('en');
     expect(body(agentRows([connected], items, NOW))).toContain(

@@ -270,7 +270,7 @@ describe('the Bandeja beside what came out', () => {
       'filed',
     ]);
     expect(text(q(rows[1] as HTMLElement, '.bn-st'))).toBe('esperando al secretario');
-    expect(text(q(rows[2] as HTMLElement, '.bn-st'))).toBe('puliendo · lia');
+    expect(text(q(rows[2] as HTMLElement, '.bn-st'))).toBe('refinando · lia');
     expect(text(q(rows[0] as HTMLElement, '.bn-st'))).toBe('te pregunta');
     expect(text(q(rows[3] as HTMLElement, '.bn-st'))).toBe('archivado en CAM-12');
 

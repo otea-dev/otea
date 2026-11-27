@@ -119,7 +119,7 @@ describe('a refusal from the server', () => {
       ],
     });
     expect(serverMessage(unmerged, 409)).toBe(
-      'No se entregó ENT-2: ENT-1 («Entregas», Hecho, sin fusionar) lo frena y aún no se fusionó.',
+      'No se entregó ENT-2: ENT-1 («Entregas», Hecho, falta integrar) lo frena y aún no se integró.',
     );
     const unmergedParts = refused('children_open', 'x', {
       kind: 'handoff',
@@ -136,7 +136,7 @@ describe('a refusal from the server', () => {
       ],
     });
     expect(serverMessage(unmergedParts, 409)).toBe(
-      'No se entregó TRA-1: su parte ENT-1 (Hecho, sin fusionar) aún no se fusionó.',
+      'No se entregó TRA-1: su parte ENT-1 (Hecho, falta integrar) aún no se integró.',
     );
   });
 

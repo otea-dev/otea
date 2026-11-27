@@ -375,6 +375,7 @@ import {
   choiceFrom,
   choiceQuestion,
   defaultBoard,
+  firstRunLines,
 } from './start-choice.ts';
 import { STARTED_BY } from './started-by.ts';
 import { statsText } from './stats.ts';
@@ -4283,7 +4284,7 @@ const serveStatus: Command = {
 // otea start: the person's first minutes in one command (README, Getting started).
 const start: Command = {
   name: 'start',
-  summary: `For you, not for an agent, in the project's folder: set everything up for a first session in one command, and say what is ready. It creates the project when there is none (otea init), starts this computer's background server and opens the desk signed in (otea serve start; --no-open prints a single-use sign-in link instead, --port picks the port for a first start, and a later start keeps the port it last ran on), offers a first board from a template when the project has none of its own (--template <key> names one, none skips it; at a terminal, when not given, a short numbered choice asks (code changes, to-dos, or let your agent design them; Enter takes the default it shows, none or Ctrl+C makes no board); --yes takes the default that choice shows (changes in a git repo, to-dos in a plain folder) without asking; --no-board asks nothing and makes none; with --json or no terminal nothing is asked and no board is made, the report naming the command for each template instead); the board and the text are in ${LANGUAGE_RULE} or the one --lang gives (a project it makes is made in it), once, which is how to force one, and the report says which; it prints the text to paste into your agent's chat (otea prompt) with the MCP server it adds to its own config. It looks before it acts: run again, it changes nothing that exists and says what was already there. An agent never runs it: it connects with otea connect and never starts the desk`,
+  summary: `For you, not for an agent, in the project's folder: set everything up for a first session in one command, and say what is ready. It creates the project when there is none (otea init), starts this computer's background server and opens the desk signed in (otea serve start; --no-open prints a single-use sign-in link instead, --port picks the port for a first start, and a later start keeps the port it last ran on), offers a first board from a template when the project has none of its own (--template <key> names one, none skips it; at a terminal, when not given, a short numbered choice asks (code changes, to-dos, or let your agent design them; Enter takes the default it shows, none or Ctrl+C makes no board); --yes takes the default that choice shows (changes in a git repo, to-dos in a plain folder) without asking; --no-board asks nothing and makes none; with no terminal nothing is asked and it makes that same default board; --json asks nothing and makes none, the report naming the command for each template instead); the board and the text are in ${LANGUAGE_RULE} or the one --lang gives (a project it makes is made in it), once, which is how to force one, and the report says which; it prints the text to paste into your agent's chat (otea prompt) with the MCP server it adds to its own config. It looks before it acts: run again, it changes nothing that exists and says what was already there. An agent never runs it: it connects with otea connect and never starts the desk`,
   details: TEMPLATE_LIST,
   args: [],
   options: {
@@ -4325,8 +4326,10 @@ const start: Command = {
                 const answer = await input.ask(choiceQuestion(fallback)).catch((error: unknown) => {
                   throw cancelled(error) ?? error;
                 });
-                // Nobody to ask (no terminal): no board, as before.
-                return answer === undefined ? undefined : choiceFrom(answer, fallback);
+                // Nobody to ask (no terminal, a harness running it for the person): the board the
+                // question would have defaulted to, so the desk is not empty on a first run (--no-board
+                // opts out, --json is for scripts and makes none). Field study 4: no board by default.
+                return answer === undefined ? fallback.key : choiceFrom(answer, fallback);
               },
             }),
     });
@@ -4380,19 +4383,20 @@ const start: Command = {
     const [said, other, otherKey] =
       lang === 'es' ? ['Spanish', 'English', 'en'] : ['English', 'Spanish', 'es'];
     const langLine = `Language: ${said} for the boards and the text below (--lang ${otherKey} makes them ${other})`;
-    // The way to daily use, in the project's language: one session is the secretary, the person
-    // talks with it in Hablar on the desk, and it keeps the workers running. With boards already
-    // there it is the next step; with none, designing them comes first and this follows.
-    const secretaryLine =
-      lang === 'es'
-        ? 'Para hablar con tus agentes desde el escritorio (Hablar) y que trabajen por ti, pega en el chat de UNA sesión el texto del secretario: otea prompt --role secretary'
-        : "To talk with your agents from the desk (Hablar) and have them work for you, paste the secretary's text into ONE session's chat: otea prompt --role secretary";
+    // The way to daily use, first and short, in the project's language: one session is the
+    // secretary, the person talks with it in Talk on the desk, and it keeps the agents at work. It
+    // comes before the status and before the long text, so it is the first thing read (field
+    // study 4: it used to be an English line after forty lines of board design).
     const designed = boards.all.length > 0;
     const pasteText = [
-      "Next, paste this into your agent's chat (otea prompt prints it again):",
+      designed
+        ? 'Or, to connect one agent without a secretary, paste this into its chat (otea prompt prints it again):'
+        : 'Or, to have your agent design the boards with you, paste this into its chat (otea prompt prints it again):',
       ...prompt.split('\n').map((line) => `  ${line}`),
     ];
     const text = [
+      ...firstRunLines(lang, { url, signIn: noOpen }),
+      '',
       projectLine,
       boardsLine,
       langLine,
@@ -4400,7 +4404,7 @@ const start: Command = {
       ...notes,
       ...signIn,
       '',
-      ...(designed ? [secretaryLine, '', ...pasteText] : [...pasteText, '', secretaryLine]),
+      ...pasteText,
       '',
       `Your agent adds Otea's MCP server to its own config when it connects (the text above tells it; otea connect prints the details): ${JSON.stringify({ [MCP_SERVER]: entry })}`,
     ];

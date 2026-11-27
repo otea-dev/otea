@@ -662,7 +662,7 @@ describe('who did what on a board, in the history', () => {
       NOW,
       def,
     );
-    expect(line?.text).toBe('Registró que feat/x se fusionó');
+    expect(line?.text).toBe('Registró que feat/x se integró');
   });
 });
 

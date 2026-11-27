@@ -237,7 +237,7 @@ describe('the rounds of a board step', () => {
       />,
     );
     expect(html).toContain('data-relayed');
-    expect(html).toContain('<b>relayada por orch, citando &quot;dale&quot;</b>');
+    expect(html).toContain('<b>transmitida por orch, citando &quot;dale&quot;</b>');
     expect(html).not.toContain('<b>aprobada');
   });
 

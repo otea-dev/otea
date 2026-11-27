@@ -124,7 +124,7 @@ export const studioHome = {
   'bs.archive.deleteItem': 'Delete board…',
   'bs.archive.title': 'Archive {board}?',
   'bs.archive.lede':
-    'It leaves Te toca, Triage, the lists, the phone and what agents are offered. Its items stay to read and search in Studio’s Archived; restore it and everything is back as it was.',
+    'It leaves Your turn, Triage, the lists, the phone and what agents are offered. Its items stay to read and search in Studio’s Archived; restore it and everything is back as it was.',
   'bs.archive.with': '{child} goes with it: {board} divides into it.',
   'bs.archive.open': {
     one: '1 open item freezes where it stands: nobody moves, edits or claims it.',

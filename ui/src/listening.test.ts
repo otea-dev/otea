@@ -248,7 +248,7 @@ describe('hearing', () => {
     expect(connectedAgents([refiner])).toEqual([]);
     expect(hearing([refiner, secretary], [], NOW)).toEqual({ kind: 'nobody' });
     expect(noAgents([refiner, secretary])).toBe(true);
-    expect(unheardLead([], [refiner, secretary], 'TASK-1')).toBe('No worker is connected.');
+    expect(unheardLead([], [refiner, secretary], 'TASK-1')).toBe('No agent is connected.');
     // A worker beside them is the one named.
     const worker = agent('w', { status: 'connected' });
     expect(hearing([refiner, worker], [], NOW)).toEqual({ kind: 'connected', agents: ['w'] });

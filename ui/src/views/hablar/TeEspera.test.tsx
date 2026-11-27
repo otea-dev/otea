@@ -43,7 +43,7 @@ describe('the «Te espera» strip of Hablar', () => {
   it('lists everything that waits for you, one line each, with how many', () => {
     const html = render(pending([question, ...reviews]));
 
-    expect(html).toContain('Waiting for you');
+    expect(html).toContain('Your turn now');
     expect(html).toContain('>3<');
     for (const ref of ['B-1', 'CAM-6', 'CAM-7']) expect(html).toContain(ref);
     expect(html).toContain('Which screen?');
@@ -66,9 +66,9 @@ describe('the «Te espera» strip of Hablar', () => {
       ]),
     );
 
-    expect(html).toContain('Documentos: 3 items wait and nobody works this board');
-    expect(html).toContain('1 board with nobody on it');
-    expect(html).toContain('Copy the worker text');
+    expect(html).toContain('Documentos: 3 items wait and no agent works this board');
+    expect(html).toContain('1 board with no agent');
+    expect(html).toContain('Copy the agent’s text');
   });
 
   it('says which review holds the queue of a board, and what waits behind it', () => {

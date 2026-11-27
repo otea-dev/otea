@@ -20,7 +20,7 @@ fi
 for app in "$resources/../MacOS/Otea" "$resources/../otea-desktop" "$resources/../Otea.exe"; do
   if [ -f "$app" ]; then
     export ELECTRON_RUN_AS_NODE=1
-    exec "$app" "$main" "$@"
+    exec "$app" --disable-warning=ExperimentalWarning "$main" "$@"
   fi
 done
 echo "otea: no Otea app next to $resources" >&2

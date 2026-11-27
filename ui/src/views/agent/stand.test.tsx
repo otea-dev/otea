@@ -37,7 +37,7 @@ describe('what the agent sheet says of an agent whose lease ran out', () => {
     setLanguage('es');
     const html = stand(kiln({ status: 'connected' }));
     expect(html).toMatch(
-      /^Conectado: su reserva de <em>Tortuga musgosa<\/em> venció a las \d\d:\d\d, pero puede seguir en ello\.$/,
+      /^Conectado: se acabó su tiempo en <em>Tortuga musgosa<\/em> a las \d\d:\d\d, pero puede seguir en ello\.$/,
     );
     expect(html).not.toMatch(/libre|sin señal/i);
     setLanguage('en');

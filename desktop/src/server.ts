@@ -43,7 +43,10 @@ export function sourceCli(repoRoot: string): Cli {
 export function bundledCli(resourcesPath: string, execPath: string): Cli {
   return {
     command: execPath,
-    args: [join(resourcesPath, 'otea', 'src', 'cli', 'main.ts')],
+    args: [
+      '--disable-warning=ExperimentalWarning',
+      join(resourcesPath, 'otea', 'src', 'cli', 'main.ts'),
+    ],
     env: { ELECTRON_RUN_AS_NODE: '1' },
   };
 }

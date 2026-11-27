@@ -198,7 +198,7 @@ describe("Te toca's head on the phone", () => {
   it('says what waits in the dek and the day under it, the way the agents column did', () => {
     setLanguage('es');
     const html = render(fake(true));
-    expect(html).toContain('Una cosa espera por ti');
+    expect(html).toContain('Una cosa te espera');
     expect(html).not.toContain('Los agentes entregaron');
     expect(html).toContain('class="p-recap"');
     expect(html).toContain('Hoy entregaron 1, aprobaste 0 y devolviste 0 con notas.');

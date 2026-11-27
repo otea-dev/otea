@@ -22,6 +22,7 @@ const IS_WIN = process.platform === 'win32';
 
 const ECHO = [
   'const args = process.argv.slice(2);',
+  "console.log('flags:' + process.execArgv.join(' '));",
   'console.log(JSON.stringify({ args, asNode: process.env.ELECTRON_RUN_AS_NODE }));',
   "process.exit(args.includes('fail') ? 3 : 0);",
 ].join('\n');
@@ -53,8 +54,25 @@ function fakeApp(executable: string, resources: string): string {
 function run(command: string, args: string[]) {
   const result = spawnSync(command, args, { encoding: 'utf8', windowsHide: true });
   const out = result.stdout.trim().split('\n').at(-1) ?? '';
-  return { status: result.status, got: out ? JSON.parse(out) : undefined };
+  return {
+    status: result.status,
+    got: out ? JSON.parse(out) : undefined,
+    flags: /^flags:(.*)$/m.exec(result.stdout)?.[1]?.trim(),
+  };
 }
+
+// Node warns on every run that type stripping and node:sqlite are experimental; bin/otea.mjs filters
+// it, and the app's own commands must too (field study 4: a person saw it on `otea start`).
+describe('the app commands keep the experimental-feature notice out of the output', () => {
+  it('runs the CLI with Node told to leave it out', () => {
+    const res = fakeApp(IS_WIN ? 'Otea.exe' : 'otea-desktop', 'resources');
+    const shim = IS_WIN
+      ? run('cmd.exe', ['/d', '/c', join(res, 'bin', 'otea.cmd'), 'start'])
+      : run(join(res, 'bin', 'otea'), ['start']);
+    expect(shim.status).toBe(0);
+    expect(shim.flags).toBe('--disable-warning=ExperimentalWarning');
+  });
+});
 
 describe.runIf(IS_WIN)('otea.cmd', () => {
   it('runs the CLI on the app next to it, as Node, with the arguments as given', () => {

@@ -383,7 +383,7 @@ export const studioEditor = {
   'bs.editor.long.name': 'Nombre',
   'bs.editor.guard.switch': 'Otea protege esta rama.',
   'bs.editor.guard.sentence':
-    'Se sube solo mientras se hace {steps} y se fusiona cuando está Hecho. Es del repositorio que dice {repo}',
+    'Se sube solo mientras se hace {steps} y se integra cuando está Hecho. Es del repositorio que dice {repo}',
   'bs.editor.guard.no_step': 'ningún paso',
   'bs.editor.guard.no_field': 'ningún campo',
   'bs.editor.guard.no_field_title': 'Ningún campo',
@@ -400,9 +400,9 @@ export const studioEditor = {
   'bs.editor.guard.base_switch': 'También protege la rama base.',
   'bs.editor.guard.base_label': 'Rama base',
   'bs.editor.guard.base_on':
-    'Los agentes solo suben o fusionan a {base} la rama de cada {item} ya en Hecho. Tú sigues pudiendo: desde la web del repositorio, o con git push --no-verify.',
+    'Los agentes solo suben o integran a {base} la rama de cada {item} ya en Hecho. Tú sigues pudiendo: desde la web del repositorio, o con git push --no-verify.',
   'bs.editor.guard.base_off':
-    'La rama base no se revisa: un agente podría fusionar en local una rama en revisión y subirla.',
+    'La rama base no se revisa: un agente podría integrar en local una rama en revisión y subirla.',
   'bs.editor.drop.title': 'Descartar',
   'bs.editor.drop.gloss': 'la otra forma de terminar',
   'bs.editor.drop.by': 'Descartar lo haces tú, {by}',

@@ -15,18 +15,28 @@
 
 **Otea es el lugar donde tú y tus agentes de IA se pasan el trabajo.** Los agentes dejan lo que hicieron, con su evidencia; tú dejas decisiones y comentarios. En cada momento se ve en qué está cada cosa y a quién le toca. Tus datos se quedan en tu proyecto: sin nube y sin cuentas.
 
+Hablas con un solo agente, tu secretario: convierte lo que le pides en trabajo y mantiene ocupados a tus otros agentes.
+Tú solo revisas y decides, en el escritorio o en el teléfono.
+
 Esta es la guía corta en español: instalar y empezar a usar Otea. Todo lo demás está en el [README en inglés](README.md) y en [`docs/`](docs/) (ver [Más información](#más-información)).
 
 ## Empezar en un minuto
 
-En la carpeta que quieres seguir, normalmente un repositorio:
+1. **Instala** (necesita Node.js 22.18 o posterior):
 
-```sh
-npm i -g @otea/cli   # necesita Node.js 22.18 o posterior
-otea start
-```
+   ```sh
+   npm i -g @otea/cli
+   ```
 
-`otea start` crea el proyecto, abre el escritorio en tu navegador e imprime el texto que le pegas a tu agente (el [paso 2](#2-crear-el-proyecto) lo explica). Para trabajar cada día, pega después el texto del secretario (`otea prompt --role secretary`) en el chat de una sesión y habla con él en **Hablar**: el [paso 5](#5-hablar-con-tu-secretario) lo cuenta en tres pasos.
+2. **Empieza**, en la carpeta que quieres seguir, normalmente un repositorio:
+
+   ```sh
+   otea start
+   ```
+
+   Crea el proyecto y un primer tablero (**Cambios** en un repositorio de git, **Pendientes** en una carpeta sin git), deja el escritorio andando y lo abre en tu navegador. El [paso 2](#2-crear-el-proyecto) lo explica.
+
+3. **Conoce a tu secretario.** En el escritorio entra en **Hablar**, copia el texto del secretario y pégalo en una sesión nueva de tu agente (Claude Code, OpenCode, Codex o cualquier otro con terminal o MCP). En la terminal, `otea prompt --role secretary` imprime el mismo texto. La primera respuesta tarda 1-2 minutos; desde ahí pides las cosas en **Hablar** y decides en **Te toca**. El [paso 5](#5-hablar-con-tu-secretario) lo cuenta con más detalle.
 
 - **¿`npm i -g` dice permiso denegado?** Instala en una carpeta tuya, sin `sudo`: `npm i -g --prefix "$HOME/.otea-npm" @otea/cli`, y pon la subcarpeta `bin` de esa carpeta en tu `PATH` en macOS y Linux, o la carpeta misma en Windows ([detalles](#el-comando-otea-desde-npm)).
 - **¿Sin Node, o prefieres Otea en su propia ventana?** Instala la app de escritorio: la sección siguiente tiene las dos formas.
@@ -139,7 +149,7 @@ otea --version
 
 ## 2. Crear el proyecto
 
-Elige la carpeta que quieres seguir, normalmente un repositorio. Crear el proyecto no escribe nada en el repositorio, y empieza sin tableros. Cuando tu agente ejecuta `otea connect` (o tú `otea init --agents-md`), Otea añade a `AGENTS.md` un bloque marcado entre `<!-- otea:begin -->` y `<!-- otea:end -->`, que solo apunta a `otea board`; `otea hook install --git` escribe el hook de push. `otea uninstall` lo quita todo (`--dry-run` lista antes cada repo y archivo que tocaría) y no borra tus datos salvo con `--purge-data`.
+Elige la carpeta que quieres seguir, normalmente un repositorio. Crear el proyecto no escribe nada en el repositorio, y empieza sin tableros (`otea start` crea el primero). Cuando tu agente ejecuta `otea connect` (o tú `otea init --agents-md`), Otea añade a `AGENTS.md` un bloque marcado entre `<!-- otea:begin -->` y `<!-- otea:end -->`, que solo apunta a `otea board`; `otea hook install --git` escribe el hook de push. `otea uninstall` lo quita todo (`--dry-run` lista antes cada repo y archivo que tocaría) y no borra tus datos salvo con `--purge-data`.
 
 - **Si usas la app de escritorio:** ábrela. La primera vez te pide abrir un proyecto: **Abrir carpeta** (si la carpeta todavía no es un proyecto, la app te pregunta si lo creas ahí) o **Crear proyecto** (para una carpeta nueva). Si la carpeta está dentro de un repositorio de git, la app te ofrece crear el proyecto para todo el repositorio. No hace falta `otea init`: la app lo hace por ti. Las próximas veces, Otea reabre tu último proyecto; **Cambiar de proyecto…**, en el ícono de la bandeja o de la barra de menús, vuelve a mostrar la lista.
 - **Si usas la terminal (npm o código):** en la carpeta de tu proyecto, un solo comando hace los primeros minutos:
@@ -148,7 +158,7 @@ Elige la carpeta que quieres seguir, normalmente un repositorio. Crear el proyec
   otea start    # crea el proyecto, abre el escritorio y te da el texto para tu agente
   ```
 
-  Crea el proyecto si no existe, deja el escritorio andando en segundo plano y lo abre en tu navegador (`--no-open` imprime el enlace en su lugar), te ofrece un primer tablero a partir de una plantilla (`--template <clave>`; sin ella, tu agente los diseña contigo) e imprime el texto que le pegas a tu agente, con el servidor MCP que él agrega. Puedes correrlo otra vez cuando quieras: no cambia nada de lo que ya existe y te dice qué había. Es para ti: un agente nunca lo ejecuta.
+  Crea el proyecto si no existe, deja el escritorio andando en segundo plano y lo abre en tu navegador (`--no-open` imprime el enlace en su lugar) y crea un primer tablero para que el escritorio no quede vacío: te lo ofrece como una elección corta en una terminal (Enter toma el que propone: **Cambios** en un repositorio de git, **Pendientes** en una carpeta sin git) y, sin terminal, toma ese mismo sin preguntar (`--template <clave>` elige otro, `--no-board` no crea ninguno). Imprime primero los tres pasos hacia tu secretario (abrir **Hablar**, copiar su texto, pegarlo en una sesión nueva) y después el estado, el texto para conectar un agente suelto y el servidor MCP que él agrega. Puedes correrlo otra vez cuando quieras: no cambia nada de lo que ya existe y te dice qué había. Es para ti: un agente nunca lo ejecuta.
 
 ## 3. Abrir el escritorio
 
@@ -166,7 +176,7 @@ Es tu escritorio: ahí revisas, apruebas y devuelves el trabajo de tus agentes.
 
 ## 4. Pegarle el texto a tu agente
 
-`otea start` imprime el texto, y el escritorio vacío te lo ofrece con el botón **Copiar la instrucción** («Esto es para tu agente»; el texto completo está en **Detalles técnicos**). Con la app o con la terminal, es el mismo: cópialo y pégalo en el chat de tu agente (Claude Code, OpenCode, Codex o cualquier otro con terminal o MCP). Más tarde, el botón **Conectar un agente** vuelve a mostrarlo, y `otea prompt` imprime el mismo texto en la terminal.
+Para el día a día, el texto que pegas es el del secretario ([paso 5](#5-hablar-con-tu-secretario)). Este es el otro: el que conecta un agente suelto, sin secretario. `otea start` lo imprime, y el escritorio sin tableros te lo ofrece con el botón **Copiar la instrucción** («Esto es para tu agente»; el texto completo está en **Detalles técnicos**). Con la app o con la terminal, es el mismo: cópialo y pégalo en el chat de tu agente (Claude Code, OpenCode, Codex o cualquier otro con terminal o MCP). Más tarde, el botón **Conectar un agente** vuelve a mostrarlo, y `otea prompt` imprime el mismo texto en la terminal.
 
 Si usas la app, tu agente tiene que poder ejecutar `otea` en su terminal. Windows y el `.deb` de Linux lo dejan listo al instalar (abre una terminal nueva, o reinicia tu agente, después de instalar). En macOS, haz clic en el ícono de Otea en la barra de menús y elige **Instalar el comando otea**. El AppImage no lo deja: usa el `.deb` o npm.
 
@@ -185,8 +195,8 @@ Si trabajas directo en `main` y no quieres que nada se suba antes de verlo, píd
 
 Para el trabajo de cada día, Otea propone una forma de trabajar, en tres pasos:
 
-1. **Pega el texto del secretario en el chat de UNA sesión.** `otea prompt --role secretary` lo imprime (`otea start` también te dice dónde está, y la página vacía de **Hablar** en el escritorio tiene un botón **Copiar**). Esa sesión es tu secretario: mantiene el trabajo en marcha y nunca hace un ítem él mismo.
-2. **Habla con él en Hablar**, la primera fila del menú del escritorio y una pestaña del teléfono. Lo que le pides se vuelve ítems (un pedido) o una respuesta (una consulta), y te dice cuál de las dos hizo; lanza un trabajador por tablero y un refinador, cada uno con su texto (`otea prompt --role worker --board <nombre>`, `otea prompt --role refiner`). Si tu harness no puede lanzar subagentes en segundo plano, te dice cuántas sesiones más abrir y te da el texto de cada una.
+1. **Pega el texto del secretario en el chat de UNA sesión.** `otea prompt --role secretary` lo imprime (`otea start` lo dice en sus primeras líneas, y la página vacía de **Hablar** en el escritorio tiene un botón **Copiar**). Esa sesión es tu secretario: mantiene a los agentes trabajando y nunca hace un ítem él mismo. Su primera respuesta tarda 1-2 minutos.
+2. **Habla con él en Hablar**, la primera fila del menú del escritorio y una pestaña del teléfono. Lo que le pides se vuelve ítems (un pedido) o una respuesta (una consulta), y te dice cuál de las dos hizo; lanza un agente por tablero y un refinador, cada uno con su texto (`otea prompt --role worker --board <nombre>`, `otea prompt --role refiner`). Si tu harness no puede lanzar subagentes en segundo plano, te dice cuántas sesiones más abrir y te da el texto de cada una. El panel de arriba de Hablar, **Te toca ahora**, es la misma lista que la página **Te toca**.
 3. **Deja las ideas sueltas en la Bandeja** (**Nuevo › Nota rápida**, en el escritorio o el teléfono): el refinador convierte cada nota en un ítem y te pregunta con botones lo que falte. Tú decides: apruebas, devuelves con una nota o respondes. Si cambias de idea sobre algo que ya está en tu revisión, el secretario te ofrece en Hablar una tarjeta de un toque que lo devuelve con tu nota.
 
 `otea help` lista todos los comandos, y `otea <comando> --help` sus opciones. Los detalles están en [Trabajar con agentes](docs/working-with-agents.md#the-canonical-way-a-secretary-workers-and-a-refiner) (en inglés).

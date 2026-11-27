@@ -854,7 +854,7 @@ describe('the secretary thinking', () => {
     );
 
     expect(text(q(root, '.hb-silent'))).toContain('El secretario no ha respondido aún.');
-    expect(text(q(root, '.hb-silent'))).toContain('Tu mensaje espera');
+    expect(text(q(root, '.hb-silent'))).toContain('Tu mensaje se guarda');
     expect(q(root, '.hb-thinking .bar')).toBeNull();
   });
 
@@ -900,8 +900,8 @@ describe('the secretary thinking', () => {
     );
     const away = q(root, '.hb-away') as HTMLElement;
 
-    expect(text(away)).toContain('en tu computadora');
-    expect(text(away)).toContain('Tus mensajes esperan');
+    expect(text(away)).toContain('en tu equipo');
+    expect(text(away)).toContain('Tus mensajes se guardan');
     await press(buttonNamed(away, 'Copiar el texto del secretario'));
     expect(written).toEqual(['Eres el secretario de este proyecto.']);
     // The commands are a second way, folded: a person on a phone reads words first.
@@ -1107,7 +1107,9 @@ describe('the secretary away, or never there', () => {
       }),
     );
     const banner = text(q(root, '.hb-away')) ?? '';
-    expect(banner).toMatch(/^Tu secretario está desconectado desde .+\. Tus mensajes lo esperan\./);
+    expect(banner).toMatch(
+      /^Tu secretario está desconectado desde .+\. Tus mensajes se guardan hasta que vuelva\./,
+    );
     expect(banner).toContain('2 mensajes esperando');
   });
 

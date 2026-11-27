@@ -17,7 +17,13 @@ export function oteaLauncher(main: string, runtime: Runtime): Launcher {
   if (runtime.electron === undefined) {
     return { command: 'node', args: ['--disable-warning=ExperimentalWarning', main] };
   }
-  return { command: runtime.execPath, args: [main], env: { ELECTRON_RUN_AS_NODE: '1' } };
+  // The same flag as on Node: Node's notice that type stripping and node:sqlite are experimental
+  // stays out of what a person or an agent reads.
+  return {
+    command: runtime.execPath,
+    args: ['--disable-warning=ExperimentalWarning', main],
+    env: { ELECTRON_RUN_AS_NODE: '1' },
+  };
 }
 
 // Whether path is a file this computer can run: any file on Windows (PATHEXT picks the ending), an

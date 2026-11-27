@@ -17,11 +17,11 @@ describe('notifySummary', () => {
   it('names the kinds on, in the order Preferencias shows them', () => {
     setLanguage('es');
     expect(notifySummary(DEFAULT_PREFS)).toBe(
-      'Avisos: revisiones · preguntas · respuestas · atascos · nadie escucha · secretario responde · secretario desconectado',
+      'Avisos: revisiones · preguntas · respuestas · atascos · ningún agente conectado · secretario responde · secretario desconectado',
     );
     setLanguage('en');
     expect(notifySummary({ ...DEFAULT_PREFS, replied: false, aside: true })).toBe(
-      'Notifications: reviews · questions · stuck items · nobody listening · secretary replies · secretary offline · set aside',
+      'Notifications: reviews · questions · stuck items · no agent connected · secretary replies · secretary offline · set aside',
     );
   });
 

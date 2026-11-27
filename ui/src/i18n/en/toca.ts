@@ -80,7 +80,7 @@ export const toca = {
   'toca.off.inHablar': 'in Talk',
   'toca.off.report': 'Notice',
   'toca.act.report': 'Read',
-  'toca.off.worker': 'Board with nobody on it',
+  'toca.off.worker': 'Board with no agent',
   'toca.act.worker': 'Open a session',
   'toca.sub.reports': '{agent} reports',
 
@@ -106,7 +106,7 @@ export const toca = {
   'next.once': 'This will not show again on this device.',
 
   // No agent connected
-  'toca.noAgents.title': 'No worker connected',
+  'toca.noAgents.title': 'No agent connected',
   'toca.noAgents.waiting': {
     one: 'One item is on an agent’s turn, waiting for someone to take it. Connect an agent and it starts there.',
     other:

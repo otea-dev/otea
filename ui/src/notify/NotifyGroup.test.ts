@@ -58,7 +58,7 @@ describe('Preferencias › Avisos', () => {
     expect(html).toContain('Un agente te pregunta');
     expect(html).toContain('Un agente contestó tu nota');
     expect(html).toContain('Algo se atascó');
-    expect(html).toContain('Hay trabajo para un agente y nadie escucha');
+    expect(html).toContain('Hay trabajo esperando y ningún agente conectado');
     expect(html).toContain('Un agente dejó algo para después');
     expect(html).toContain('Horas de silencio');
     expect(html).toContain('Desactivar en este teléfono');

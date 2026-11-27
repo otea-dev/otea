@@ -313,6 +313,25 @@ describe('the role prompts', () => {
       expect(listen).toContain('otea conversation --as <');
     });
 
+    // O (field study 4): the person is told the first reply takes a minute or two, and the secretary
+    // speaks the desk's words to them: one name per thing across the desk, the texts and the README.
+    it(`has the secretary say its first reply takes 1-2 minutes, and speak the desk's words (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, {});
+      expect(text).toMatch(
+        lang === 'es'
+          ? /primera respuesta tarda de 1 a 2 minutos/
+          : /first reply takes 1 to 2 minutes/,
+      );
+      expect(text).toContain(
+        lang === 'es' ? '«agente» para un trabajador' : '"agent" for a worker',
+      );
+      expect(text).toContain(lang === 'es' ? '«Te toca ahora»' : '"Your turn now"');
+      if (lang === 'en') {
+        expect(text).not.toMatch(/\ba Inbox\b/);
+        expect(text).not.toMatch(/Hablar|Bandeja|Te toca|Waiting for you/);
+      }
+    });
+
     // Field study 3: a secretary told to always reply to a message put its news under old messages
     // and changed the kind of the person's turns. News is a message of its own.
     it(`says its own news as a message with no --reply-to, and acts at once on a kind the person changed (${lang})`, () => {

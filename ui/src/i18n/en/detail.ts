@@ -482,7 +482,7 @@ export const detail = {
   'sheet.says.unpushed': 'note: {branch} was never pushed to the remote',
   'sheet.says.unchanged': 'it brings no code change: there is nothing to push',
   'sheet.says.closesUnmerged':
-    'it is Done, but its branch is not merged yet: it still has to be merged and marked merged',
+    'it is Done, but it has not landed yet: it still has to land and be marked as landed',
   'sheet.says.resume': 'back in the queue of {state}, for any agent',
   'sheet.says.free':
     'drops {agent}’s lease: back in the queue of {state}, and {agent} claims it again before going on',
@@ -615,8 +615,8 @@ export const detail = {
   'sheet.h.agentClosed': 'Closed it: {state}',
   'sheet.h.agentDiscarded': 'Discarded it: {state}',
   'sheet.h.delivered': 'You handed it off: on to {state}',
-  'sheet.h.merged': 'Recorded that {branch} was merged',
-  'sheet.h.mergedYou': 'You recorded that {branch} was merged',
+  'sheet.h.merged': 'Recorded that {branch} landed',
+  'sheet.h.mergedYou': 'You recorded that {branch} landed',
   'sheet.h.claimed': 'Took the lease',
   'sheet.h.claimedOver': 'Took the lease from {previous}',
   'sheet.h.released': 'Let the lease go',
@@ -663,8 +663,8 @@ export const detail = {
 
   // An item on a Studio board: its parts, its links, its branch, its rounds, the discard dialog.
   'bi.refuse.partsUnmerged': {
-    one: 'Not approved {id}: {list} is not merged yet.',
-    other: 'Not approved {id}: {list} are not merged yet.',
+    one: 'Not approved {id}: {list} has not landed yet.',
+    other: 'Not approved {id}: {list} have not landed yet.',
   },
   'bi.refuse.parts': {
     one: 'Not approved {id}: {list} is still unfinished.',
@@ -709,7 +709,7 @@ export const detail = {
   'bi.refuse.blockersEnded':
     'Not approved {id}: {other} (in {board}) holds it back and is still unfinished.',
   'bi.refuse.blockersUnmerged':
-    'Not approved {id}: {other} (in {board}) holds it back and is not merged yet: approve it once its branch is in the base.',
+    'Not approved {id}: {other} (in {board}) holds it back and has not landed yet: approve it once it has landed.',
   'bi.partOf': 'Part of',
   'bi.parts.title': 'Parts',
   'bi.parts.gloss': '{ended} of {total} finished',

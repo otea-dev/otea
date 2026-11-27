@@ -29,10 +29,12 @@ describe('oteaLauncher', () => {
     const launcher = oteaLauncher(MAIN, { execPath: '/opt/Otea/otea-desktop', electron: '45.2.1' });
     expect(launcher).toEqual({
       command: '/opt/Otea/otea-desktop',
-      args: [MAIN],
+      args: ['--disable-warning=ExperimentalWarning', MAIN],
       env: { ELECTRON_RUN_AS_NODE: '1' },
     });
-    expect(shellLine(launcher)).toBe(`ELECTRON_RUN_AS_NODE=1 "/opt/Otea/otea-desktop" "${MAIN}"`);
+    expect(shellLine(launcher)).toBe(
+      `ELECTRON_RUN_AS_NODE=1 "/opt/Otea/otea-desktop" --disable-warning=ExperimentalWarning "${MAIN}"`,
+    );
   });
 
   it('gives the MCP server of the desktop app with its environment, pinned to the project', () => {
@@ -40,7 +42,7 @@ describe('oteaLauncher', () => {
 
     expect(mcpEntry(launcher, 'shop-k3x7qa')).toEqual({
       command: 'C:\\Otea\\Otea.exe',
-      args: [MAIN, 'mcp', '--project', 'shop-k3x7qa'],
+      args: ['--disable-warning=ExperimentalWarning', MAIN, 'mcp', '--project', 'shop-k3x7qa'],
       env: { ELECTRON_RUN_AS_NODE: '1' },
     });
   });

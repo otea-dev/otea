@@ -114,9 +114,9 @@ export const boardStudio = {
   'bs.change.doer_drop_on': 'En {name}, quien lo hace también puede descartarlo, diciendo por qué.',
   'bs.change.doer_drop_off': 'En {name}, quien lo hace ya no puede descartarlo.',
   'bs.change.guard_on':
-    'Otea protege la {part}: se sube solo mientras se hace {steps}, y se fusiona cuando está Hecho.',
+    'Otea protege la {part}: se sube solo mientras se hace {steps}, y se integra cuando está Hecho.',
   'bs.change.guard_off': 'Otea ya no protege la {part}.',
-  'bs.change.guard_base': 'Los agentes solo fusionan a {base} la rama de un ítem Hecho.',
+  'bs.change.guard_base': 'Los agentes solo integran a {base} la rama de un ítem Hecho.',
   'bs.change.initial_on': 'Cada ítem nuevo empieza con {part}: {value}.',
   'bs.change.initial_off': '{part} ya no tiene valor de inicio.',
   'bs.change.split_on': 'Cada ítem se divide en {board}.',

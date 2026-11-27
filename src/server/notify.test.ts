@@ -816,7 +816,7 @@ describe('notifications on the server', () => {
         expect(sent).toEqual([
           expect.objectContaining({
             payload: expect.objectContaining({
-              title: 'memory · Nadie escucha',
+              title: 'memory · Hay trabajo y ningún agente conectado',
               url: `/p/memory-aaaaaa/#/i/${id}`,
             }),
           }),

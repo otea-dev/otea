@@ -24,10 +24,10 @@ export const toca = {
   // El dek
   'toca.numbers': 'cero|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece',
   'toca.dek.waiting': {
-    one: '{n} cosa espera por ti {since}.',
-    other: '{n} cosas esperan por ti; la más antigua, {since}.',
+    one: '{n} cosa te espera {since}.',
+    other: '{n} cosas te esperan; la más antigua, {since}.',
   },
-  'toca.dek.none': 'Nada espera por ti.',
+  'toca.dek.none': 'Nada te espera.',
   'toca.dek.handed': 'Los agentes entregaron {n} hoy.',
   'toca.dek.handedNone': 'Los agentes no entregaron nada hoy.',
   'toca.since.now': 'desde hace un momento',
@@ -65,15 +65,15 @@ export const toca = {
   'toca.sub.silent': '{agent} lleva rato sin avisar',
   'toca.sub.waitsFor': 'espera a {agent}',
   'toca.sub.waitsAgent': 'espera a un agente',
-  'toca.sub.waitsKids': 'espera a sus hijos',
+  'toca.sub.waitsKids': 'espera a sus subítems',
   'toca.sub.landsAfter': 'se integra después de {agent}',
   'toca.sub.setAside': '{agent} lo dejó para más adelante',
   'toca.sub.bounced': 'volvió: chocó con otro cambio ya integrado',
   'toca.sub.didIt': 'lo hizo {agent}',
   'toca.sub.closedBy': 'lo cerró {agent}',
   'toca.sub.closedByYou': 'cerrado por ti',
-  'toca.sub.closedRelayed': 'cerrado, relayada por {agent}',
-  // La columna de la derecha ya dice «reserva vencida»: aquí, quién y desde cuándo, corto para
+  'toca.sub.closedRelayed': 'cerrado, transmitido por {agent}',
+  // La columna de la derecha ya dice «sin señales»: aquí, quién y desde cuándo, corto para
   // que la fila no corte el texto.
   'toca.quiet': '{agent} · hace {time}',
   'toca.replied': '{agent} contestó',
@@ -85,7 +85,7 @@ export const toca = {
   'toca.off.inHablar': 'en Hablar',
   'toca.off.report': 'Aviso',
   'toca.act.report': 'Leer',
-  'toca.off.worker': 'Tablero sin nadie',
+  'toca.off.worker': 'Tablero sin agente',
   'toca.act.worker': 'Abre una sesión',
   'toca.sub.reports': '{agent} avisa',
 
@@ -111,7 +111,7 @@ export const toca = {
   'next.once': 'No volverá a aparecer en este dispositivo.',
 
   // Sin agentes conectados
-  'toca.noAgents.title': 'Ningún trabajador conectado',
+  'toca.noAgents.title': 'Ningún agente conectado',
   'toca.noAgents.waiting': {
     one: 'Un ítem está en turno de un agente y espera a que alguien lo tome. Conecta un agente y empezará por él.',
     other:

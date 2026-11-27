@@ -80,10 +80,10 @@ export const common = {
   'agent.status.connected': 'connected',
   'agent.status.silent': 'no signal',
   'agent.status.away': 'away',
-  'listen.noAgents': 'no worker is connected',
-  'listen.noAgentsLead': 'No worker is connected.',
+  'listen.noAgents': 'no agent is connected',
+  'listen.noAgentsLead': 'No agent is connected.',
   'listen.noAgentsNotice':
-    'No worker is connected: this waits here until one connects and takes the next step.',
+    'No agent is connected: this waits here until one connects and takes the next step.',
   'listen.busy': { one: 'queued: {agent} is working', other: 'queued: {count} agents are working' },
   'listen.busyLead': {
     one: '{agent} is working on another item; it will see this when it waits again.',
@@ -159,8 +159,8 @@ export const common = {
   'refusal.why.note': 'a note',
   'refusal.why.part': 'its part {list} is not finished',
   'refusal.why.partsUnmerged': {
-    one: 'its part {list} is not merged yet',
-    other: 'its parts {list} are not merged yet',
+    one: 'its part {list} has not landed yet',
+    other: 'its parts {list} have not landed yet',
   },
   'refusal.why.allParts': {
     one: 'its {count} part is not finished: {list}',
@@ -175,10 +175,10 @@ export const common = {
     other: '{list} block it and are not finished',
   },
   'refusal.why.blockersUnmerged': {
-    one: '{list} blocks it and is not merged yet',
-    other: '{list} block it and are not merged yet',
+    one: '{list} blocks it and has not landed yet',
+    other: '{list} block it and have not landed yet',
   },
-  'link.unmerged': 'Done, not merged yet',
+  'link.unmerged': 'Done, not landed yet',
   'refusal.drop': 'Not discarded {item}: {why}.',
   'refusal.drop.notOpen': 'it has already ended',
   'refusal.drop.reason': 'say why',

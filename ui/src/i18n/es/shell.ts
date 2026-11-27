@@ -35,7 +35,7 @@ export const shell = {
   'shell.row.work': 'trabaja en',
   'shell.row.quiet': 'ausente desde {time} ·',
   // Conectado, y la reserva de un ítem suyo venció: puede seguir en ello (se dice con el estado)
-  'shell.row.lapsed': 'su reserva de {id} venció',
+  'shell.row.lapsed': 'se acabó su tiempo en {id}',
   'shell.row.wait': 'espera tu respuesta ·',
   'shell.row.idle': 'escuchando · libre desde {time}',
   'shell.row.connected': 'conectado · libre; verá lo nuevo cuando vuelva a esperar',
