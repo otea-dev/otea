@@ -55,6 +55,16 @@ export type QueueBlock = {
   waiting: string[];
 };
 
+// A board's queue for a worker: the items that wait for an agent that nobody holds, the agents
+// working it now, and how many the board takes at a time (two when it merges code, else one). The
+// secretary reads it to launch a second worker on its own when two or more wait and there is room.
+export type BoardQueue = {
+  board: string;
+  waiting: string[];
+  workers: string[];
+  limit: number;
+};
+
 export type PendingSecretary = {
   name: string;
   state: SecretaryState;
@@ -71,6 +81,8 @@ export type Pending = {
   // what they decide, oldest first.
   entries: PendingEntry[];
   blocks: QueueBlock[];
+  // Each board with items waiting for an agent (left out of the cheap count, like `blocks`).
+  queues: BoardQueue[];
   // The project's secretary, undefined (null) while it has none.
   secretary: PendingSecretary | null;
 };

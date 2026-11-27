@@ -32,6 +32,7 @@ const pending: Pending = {
   count: 1,
   entries: [report],
   blocks: [],
+  queues: [],
   secretary: null,
 };
 

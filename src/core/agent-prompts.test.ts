@@ -433,7 +433,7 @@ describe('the role prompts', () => {
       expect(text).toContain('otea bandeja --as ana-ref');
       // One refiner for the whole Bandeja: it takes the notes in turn, waiting for the next, and
       // goes on after it asks the person (field study 3, S5 P3).
-      expect(text).toContain('otea bandeja take --next --wait --as ana-ref');
+      expect(text).toContain('otea bandeja take --next --wait --timeout 90s --as ana-ref');
       expect(text).toMatch(
         lang === 'es'
           ? /nunca te detengas porque la Bandeja esté vacía/
@@ -548,6 +548,51 @@ describe('the role prompts', () => {
       expect(rule).toContain('`otea pending`');
       expect(rule).toMatch(
         lang === 'es' ? /no la repitas con opciones/ : /do not ask it again with options/,
+      );
+    });
+
+    // Field study 4 (H1): the secretary's behaviours that only its text can give. The commands in
+    // them are checked against the CLI by cli/prompt.test.ts.
+    it(`has the secretary hear a review, launch a second worker, change an item under a worker and ask a send-back with one tap, and never sound done (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, { name: 'ana' });
+      const rule = (n: number) =>
+        text.split('\n').find((line) => new RegExp(`^${n}\\. `).test(line)) ?? '';
+      // A delivery that reaches my review wakes the wait, and I am told in one line.
+      expect(rule(2)).toContain('`ready_for_review`');
+      expect(rule(9)).toContain('`ready_for_review`');
+      expect(rule(9)).toMatch(lang === 'es' ? /una línea/ : /one line/);
+      // A second worker on its own, from what otea pending says.
+      expect(rule(5)).toMatch(/otea pending/);
+      expect(rule(5)).toMatch(
+        lang === 'es'
+          ? /lanza tú el segundo, sin preguntarme/
+          : /launch the second one yourself, without asking me/,
+      );
+      // A reply to a new request never sounds done before the item is.
+      expect(rule(4)).toMatch(lang === 'es' ? /en cola como CAM-3/ : /queued as CAM-3/);
+      expect(rule(4)).toMatch(
+        lang === 'es' ? /antes que cualquier pedido nuevo/ : /before any new request/,
+      );
+      // A change of mind: update and tell the worker; in my review, a one-tap card, never the secretary.
+      expect(rule(12)).toContain('otea update <id>');
+      expect(rule(12)).toContain('--tell');
+      expect(rule(12)).toContain('--send-back <id> --note');
+      expect(rule(12)).toMatch(
+        lang === 'es' ? /tú nunca lo devuelves/ : /you never send it back yourself/,
+      );
+    });
+
+    // Field study 4 (U1): the first refiner ended its turn while its 9-minute wait ran in the
+    // background, and the note waited for the secretary. Its wait stays within a harness's foreground.
+    it(`keeps the refiner's wait short, and never lets it end its turn while it waits (${lang})`, () => {
+      const text = rolePrompt('refiner', lang, { name: 'ana-ref' });
+      const wait = /otea bandeja take --next --wait --timeout (\d+)s/.exec(text);
+      expect(wait).not.toBeNull();
+      expect(Number(wait?.[1])).toBeLessThanOrEqual(110);
+      expect(text).toMatch(
+        lang === 'es'
+          ? /Nunca termines tu turno mientras esperas/
+          : /Never end your turn while you wait/,
       );
     });
 

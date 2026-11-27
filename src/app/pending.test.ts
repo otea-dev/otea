@@ -14,6 +14,7 @@ import { createItem } from './items.ts';
 import { claimItem } from './leases.ts';
 import { landWaitOf } from './next.ts';
 import { pendingOf, pendingText } from './pending.ts';
+import { seeAgent } from './presence.ts';
 import type { Project } from './project.ts';
 import { askQuestion } from './questions.ts';
 import { declareSecretary } from './secretary.ts';
@@ -328,5 +329,57 @@ describe('what waits for the person', () => {
 
   it('says plainly that nothing waits', () => {
     expect(pendingText(pendingOf(project, clock(MIN)))).toContain('Nothing waits for the person');
+  });
+
+  // U4 (field study 4): with approved work waiting behind the only worker, the secretary started no
+  // second one until asked. Otea says how many wait for an agent on each board, who works it and how
+  // many the board takes, so the secretary reads it instead of guessing.
+  describe('the queue of each board for a worker', () => {
+    let tick = 0;
+    const now = () => new Date(Date.UTC(2026, 10, 19, 9, 0, tick++)).toISOString();
+    let board: string;
+    const waiting = (title: string) => {
+      const { id } = createItem(
+        project,
+        { collection: board, title, fields: { want: 'x' }, actor: you },
+        now,
+      );
+      updateItemState(project.db, id, 'doit', now());
+      return id;
+    };
+
+    beforeEach(() => {
+      const def = instantiate(requireTemplate('mainline'), 'es', {}, undefined, { keep: true });
+      publishAs(project, def, 'bmain', now);
+      board = def.name;
+    });
+
+    it('lists the items waiting for an agent, the workers on the board and the room for another', () => {
+      const first = waiting('first');
+      const second = waiting('second');
+      const third = waiting('third');
+      claimItem(project, { id: first, actor: agent('ana') }, now);
+      seeAgent(project.db, { agent: 'ana', channel: 'cli', call: true }, now);
+
+      const { queues } = pendingOf(project, now, { blocks: true });
+
+      expect(queues).toEqual([
+        { board, waiting: [second, third], workers: ['ana'], limit: expect.any(Number) },
+      ]);
+      const limit = queues[0]?.limit ?? 0;
+      const text = pendingText(pendingOf(project, now, { blocks: true }));
+      expect(text).toContain(`${board}: 2 waiting for an agent`);
+      expect(text).toContain('ana');
+      // The board takes a second worker only when it merges code: the text says to launch one then.
+      expect(text.includes('Launch a second worker')).toBe(limit > 1);
+    });
+
+    it('says nothing of a board nobody waits on, and leaves it out of the cheap count', () => {
+      const only = waiting('only');
+      claimItem(project, { id: only, actor: agent('ana') }, now);
+
+      expect(pendingOf(project, now).queues).toEqual([]);
+      expect(pendingOf(project, now, { blocks: false }).queues).toEqual([]);
+    });
   });
 });

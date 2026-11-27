@@ -4240,6 +4240,18 @@ const start: Command = {
     const [said, other, otherKey] =
       lang === 'es' ? ['Spanish', 'English', 'en'] : ['English', 'Spanish', 'es'];
     const langLine = `Language: ${said} for the boards and the text below (--lang ${otherKey} makes them ${other})`;
+    // The way to daily use, in the project's language: one session is the secretary, the person
+    // talks with it in Hablar on the desk, and it keeps the workers running. With boards already
+    // there it is the next step; with none, designing them comes first and this follows.
+    const secretaryLine =
+      lang === 'es'
+        ? 'Para hablar con tus agentes desde el escritorio (Hablar) y que trabajen por ti, pega en el chat de UNA sesión el texto del secretario: otea prompt --role secretary'
+        : "To talk with your agents from the desk (Hablar) and have them work for you, paste the secretary's text into ONE session's chat: otea prompt --role secretary";
+    const designed = boards.all.length > 0;
+    const pasteText = [
+      "Next, paste this into your agent's chat (otea prompt prints it again):",
+      ...prompt.split('\n').map((line) => `  ${line}`),
+    ];
     const text = [
       projectLine,
       boardsLine,
@@ -4248,10 +4260,7 @@ const start: Command = {
       ...notes,
       ...signIn,
       '',
-      "Next, paste this into your agent's chat (otea prompt prints it again):",
-      ...prompt.split('\n').map((line) => `  ${line}`),
-      '',
-      "To talk with your agents from the desk (Hablar) and have them work for you, paste this into one session's chat instead: otea prompt --role secretary",
+      ...(designed ? [secretaryLine, '', ...pasteText] : [...pasteText, '', secretaryLine]),
       '',
       `Your agent adds Otea's MCP server to its own config when it connects (the text above tells it; otea connect prints the details): ${JSON.stringify({ [MCP_SERVER]: entry })}`,
     ];
@@ -5217,7 +5226,7 @@ const conversation: Command = {
 const say: Command = {
   name: 'say',
   summary:
-    'For the secretary: tell the person something, short, the conclusion first (- reads stdin). To answer a message: --reply-to <id>, with --request --links <item ids made> or --consultation to classify that turn. Your own news (a review ready, a problem): no --reply-to. A question: 2 to 4 --option answers they tap',
+    'For the secretary: tell the person something, short, the conclusion first (- reads stdin). To answer a message: --reply-to <id>, with --request --links <item ids made> or --consultation to classify that turn. Your own news (a review ready, a problem): no --reply-to. A question: 2 to 4 --option answers they tap; with --send-back <id> --note "<note>" the first one sends that item of their review back for them, with the note, when they tap it',
   args: ['text'],
   options: {
     file: { multiple: true, placeholder: 'path' },

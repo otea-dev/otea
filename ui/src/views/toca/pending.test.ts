@@ -36,6 +36,7 @@ const waiting = (entries: PendingEntry[], over: Partial<Pending> = {}): Pending 
   count: entries.length,
   entries,
   blocks: [],
+  queues: [],
   secretary: null,
   ...over,
 });

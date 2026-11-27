@@ -8,6 +8,7 @@ const pending = (blocks: Pending['blocks']): Pending => ({
   count: 1,
   entries: [],
   blocks,
+  queues: [],
   secretary: null,
 });
 

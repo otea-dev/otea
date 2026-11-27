@@ -256,7 +256,13 @@ Then [give your agent the text](#give-your-agent-the-text).
 
 Both paths meet here. Paste the text into your agent's chat (Claude Code, OpenCode, Codex or any other with a shell or MCP); `otea prompt` prints the same text in a terminal. The agent connects itself, reads the project, asks you one question at a time how you work and drafts its boards. You try them and publish them in Studio. From then on each request goes through a board, and what waits for you shows in **Your turn**.
 
-For daily work there is a canonical setup: one chat, the secretary, talks with you in Hablar, turns your requests into items and keeps the work running without ever doing an item; a worker per board does them and a refiner turns your rough notes into items (`otea prompt --role secretary`, `otea prompt --role worker --board <name>`, `otea prompt --role refiner`). [The canonical way](docs/working-with-agents.md#the-canonical-way-a-secretary-workers-and-a-refiner) says how to launch them, with or without background subagents.
+For daily work there is a canonical setup, in three steps:
+
+1. **Paste the secretary's text into ONE session's chat**: `otea prompt --role secretary` prints it (`otea start` points to it, and the empty **Hablar** page on the desk has a Copy button). That session is your secretary: it keeps the workers running and never does an item itself.
+2. **Talk with it in Hablar**, the first row of the desk's menu and a tab of the phone. It turns what you ask into items (a request) or answers (a consultation), says which it made, and launches a worker per board and a refiner with their own texts (`otea prompt --role worker --board <name>`, `otea prompt --role refiner`). When your harness cannot run background subagents, it tells you how many other sessions to open and gives the text for each.
+3. **Capture rough ideas in the Bandeja** (**New › Quick note** on the desk or the phone): the refiner turns each note into an item and asks you what is missing with buttons. You decide: approve, send back with a note, answer. If you change your mind about something in review, the secretary offers a one-tap card in Hablar that sends it back with your note.
+
+[The canonical way](docs/working-with-agents.md#the-canonical-way-a-secretary-workers-and-a-refiner) says how to launch them, with or without background subagents.
 
 ### MCP config for your harness
 
@@ -350,7 +356,7 @@ On Windows write the paths with `/` or doubled `\\` inside JSON (and inside a TO
 | `otea start` | the first minutes in one command: the project, a first board, the desk in the background and the text for your agent; run again, it reports what exists |
 | `otea init` | makes the project for this folder |
 | `otea serve` | opens the desk in your browser |
-| `otea prompt` | prints the text to paste into an agent's chat |
+| `otea prompt` | prints the text to paste into an agent's chat; `otea prompt --role secretary` the one for the session you talk with in Hablar |
 | `otea board add <name> --template <key>` | adds a board from a template, published at once |
 | `otea topic on` | has agents keep the side questions you ask them, with their answers |
 | `otea devices list` | lists the paired phones; `otea devices revoke <id>` unpairs one |

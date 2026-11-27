@@ -26,7 +26,7 @@ npm i -g @otea/cli   # necesita Node.js 22.18 o posterior
 otea start
 ```
 
-`otea start` crea el proyecto, abre el escritorio en tu navegador e imprime el texto que le pegas a tu agente (el [paso 2](#2-crear-el-proyecto) lo explica).
+`otea start` crea el proyecto, abre el escritorio en tu navegador e imprime el texto que le pegas a tu agente (el [paso 2](#2-crear-el-proyecto) lo explica). Para trabajar cada día, pega después el texto del secretario (`otea prompt --role secretary`) en el chat de una sesión y habla con él en **Hablar**: el [paso 5](#5-hablar-con-tu-secretario) lo cuenta en tres pasos.
 
 - **¿`npm i -g` dice permiso denegado?** Instala en una carpeta tuya, sin `sudo`: `npm i -g --prefix "$HOME/.otea-npm" @otea/cli`, y pon la subcarpeta `bin` de esa carpeta en tu `PATH` en macOS y Linux, o la carpeta misma en Windows ([detalles](#el-comando-otea-desde-npm)).
 - **¿Sin Node, o prefieres Otea en su propia ventana?** Instala la app de escritorio: la sección siguiente tiene las dos formas.
@@ -180,6 +180,16 @@ Si trabajas directo en `main` y no quieres que nada se suba antes de verlo, píd
 </picture>
 
 **Responde a tus agentes desde el teléfono.** La pregunta de un agente te llega al teléfono; la respondes ahí y el escritorio muestra al agente siguiendo.
+
+## 5. Hablar con tu secretario
+
+Para el trabajo de cada día, Otea propone una forma de trabajar, en tres pasos:
+
+1. **Pega el texto del secretario en el chat de UNA sesión.** `otea prompt --role secretary` lo imprime (`otea start` también te dice dónde está, y la página vacía de **Hablar** en el escritorio tiene un botón **Copiar**). Esa sesión es tu secretario: mantiene el trabajo en marcha y nunca hace un ítem él mismo.
+2. **Habla con él en Hablar**, la primera fila del menú del escritorio y una pestaña del teléfono. Lo que le pides se vuelve ítems (un pedido) o una respuesta (una consulta), y te dice cuál de las dos hizo; lanza un trabajador por tablero y un refinador, cada uno con su texto (`otea prompt --role worker --board <nombre>`, `otea prompt --role refiner`). Si tu harness no puede lanzar subagentes en segundo plano, te dice cuántas sesiones más abrir y te da el texto de cada una.
+3. **Deja las ideas sueltas en la Bandeja** (**Nuevo › Nota rápida**, en el escritorio o el teléfono): el refinador convierte cada nota en un ítem y te pregunta con botones lo que falte. Tú decides: apruebas, devuelves con una nota o respondes. Si cambias de idea sobre algo que ya está en tu revisión, el secretario te ofrece en Hablar una tarjeta de un toque que lo devuelve con tu nota.
+
+`otea help` lista todos los comandos, y `otea <comando> --help` sus opciones. Los detalles están en [Trabajar con agentes](docs/working-with-agents.md#the-canonical-way-a-secretary-workers-and-a-refiner) (en inglés).
 
 ## En Windows, con Git Bash
 

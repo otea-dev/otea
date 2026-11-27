@@ -1,6 +1,8 @@
-import { positionOf } from '../core/board/engine.ts';
+import { isClosed, positionOf } from '../core/board/engine.ts';
 import { messageSnippet } from '../core/conversation.ts';
+import { activeLease } from '../core/lease.ts';
 import {
+  type BoardQueue,
   type Pending,
   type PendingEntry,
   type PendingKind,
@@ -13,11 +15,13 @@ import { selectOpenQuestions } from '../store/conversation.ts';
 import { selectStateEntries } from '../store/queries.ts';
 import { selectOpenEscalations } from '../store/secretary.ts';
 import { listBandeja } from './bandeja.ts';
+import { workerLimitOf, workersByBoard } from './board-workers.ts';
 import type { Context } from './context.ts';
 import { escalationShown, parseEscalation } from './escalate.ts';
 import { type Clock, type Item, listItems, systemClock, workflowOf } from './items.ts';
-import { landWaitOf, liveBoardOf } from './next.ts';
+import { landWaitOf, liveBoardOf, liveBoards } from './next.ts';
 import { scanned } from './overlap.ts';
+import { listAgents } from './presence.ts';
 import { secretaryStatus } from './secretary.ts';
 import { secretaryWaiting } from './secretary-waiting.ts';
 
@@ -227,6 +231,39 @@ function blocksOf(
   });
 }
 
+// Each board with items that wait for an agent nobody holds: who works it and how many it takes, so
+// the secretary launches a second worker by itself when two wait and the board has room.
+function queuesOf(ctx: Context, items: readonly Item[], now: Clock): BoardQueue[] {
+  const at = now();
+  const waiting = items.filter(
+    ({ turn, lease, state, collection }) =>
+      turn === 'agent' &&
+      activeLease(lease, at) === null &&
+      isDoing(state) &&
+      liveBoardOf(ctx, collection) !== undefined,
+  );
+  if (waiting.length === 0) return [];
+  const workers = workersByBoard(ctx.db, items, listAgents(ctx.db, now), at);
+  return liveBoards(ctx).flatMap(({ collection, def }) => {
+    const ids = waiting.filter((item) => item.collection === collection).map(({ id }) => id);
+    return ids.length === 0
+      ? []
+      : [
+          {
+            board: collection,
+            waiting: ids,
+            workers: (workers.get(collection) ?? []).map(({ name }) => name),
+            limit: workerLimitOf(def),
+          },
+        ];
+  });
+}
+
+const isDoing = (state: string): boolean => {
+  const at = positionOf(state);
+  return !isClosed(at) && at.phase === 'doing';
+};
+
 export function pendingOf(
   ctx: Context,
   now: Clock = systemClock,
@@ -242,6 +279,7 @@ export function pendingOf(
       options.blocks === false
         ? []
         : blocksOf(ctx, items, entries, now, options.landWait ?? landWaitOf),
+    queues: options.blocks === false ? [] : queuesOf(ctx, items, now),
     secretary: status
       ? {
           name: status.name,
@@ -289,6 +327,18 @@ function lineOf(entry: PendingEntry): string {
   }
 }
 
+// A board's queue for a worker, and what the secretary does about it: nobody works it, launch one;
+// one works it, two items wait and the board takes another, launch the second without asking.
+function queueLine({ board, waiting, workers, limit }: BoardQueue): string {
+  const who = workers.length === 0 ? 'no worker' : `worked by ${workers.join(', ')}`;
+  const head = `${board}: ${waiting.length} waiting for an agent (${waiting.join(', ')}), ${who}; the board takes ${limit === 1 ? 'one worker' : `${limit} workers`}.`;
+  if (workers.length === 0)
+    return `${head} Launch its worker: otea prompt --role worker --board ${board}.`;
+  if (workers.length < limit && waiting.length >= 2)
+    return `${head} Launch a second worker on your own, no need to ask: otea prompt --role worker --board ${board} (its own name).`;
+  return head;
+}
+
 const GROUPS: readonly { kinds: readonly PendingKind[]; head: string }[] = [
   { kinds: ['question', 'bandeja', 'secretary'], head: 'Questions' },
   { kinds: ['escalation'], head: 'Escalated by agents' },
@@ -300,9 +350,13 @@ const GROUPS: readonly { kinds: readonly PendingKind[]; head: string }[] = [
 // What `otea pending` prints, for the secretary: the count, each thing with what it waits for and
 // since when, what holds a board's queue, and what to do with it.
 export function pendingText(pending: Pending): string {
-  const { count, entries, blocks } = pending;
+  const { count, entries, blocks, queues } = pending;
+  const loads = queues.map(queueLine);
   if (count === 0) {
-    return 'Nothing waits for the person: no review, question or step of their own. Do not say otherwise from memory.';
+    return [
+      'Nothing waits for the person: no review, question or step of their own. Do not say otherwise from memory.',
+      ...loads,
+    ].join('\n');
   }
   const counts = pendingCounts(entries);
   const sum = [
@@ -325,6 +379,7 @@ export function pendingText(pending: Pending): string {
     `${count} ${count === 1 ? 'thing waits' : 'things wait'} for the person (${sum}).`,
     ...sections,
     ...holds,
+    ...loads,
     'This is the whole list, computed now: say it as it is, never add or drop one from memory. News they have not read goes as a notice (otea say "<text>" --links <ids>, no --reply-to).',
   ].join('\n');
 }

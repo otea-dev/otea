@@ -112,6 +112,7 @@ describe('the rail', () => {
             count: 2,
             entries: [ask('bandeja', 'B-1'), ask('secretary', '4')],
             blocks: [],
+            queues: [],
             secretary: null,
           },
         }),

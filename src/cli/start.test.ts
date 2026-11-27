@@ -153,6 +153,12 @@ describe('otea start', () => {
     );
     // With a board made, the agent's text is the one that joins it, in Spanish.
     expect(started.out).toContain('Empieza a trabajar en este proyecto');
+    // U1/U2 (field study 4): with boards there, the way to the secretary (Hablar) comes first and in
+    // the project's language, not as an English line after a long text.
+    const secretary = started.out.indexOf('pega en el chat de UNA sesión el texto del secretario');
+    expect(secretary).toBeGreaterThan(-1);
+    expect(secretary).toBeLessThan(started.out.indexOf('Empieza a trabajar en este proyecto'));
+    expect(started.out).toContain('otea prompt --role secretary');
   }, 120_000);
 
   // P8-F2: the second run, with the same arguments, said Spanish after the desk changed language. The
