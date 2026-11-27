@@ -59,14 +59,34 @@ describe('migrate', () => {
         'bandeja_questions',
       ]),
     );
-    expect(userVersion(db)).toBe(48);
+    expect(userVersion(db)).toBe(49);
+  });
+
+  // Cold review G2: what answers a message, and the notes and turns of an item by its id, were
+  // found by scanning (a NOCASE comparison cannot use a BINARY index).
+  it('looks up replies, an item’s notes and an item’s turns by index', () => {
+    migrate(db);
+    const plan = (sql: string) =>
+      db
+        .prepare(`EXPLAIN QUERY PLAN ${sql}`)
+        .all(1)
+        .map((row) => String(row.detail))
+        .join(' ');
+
+    expect(plan('SELECT id FROM conversation_messages WHERE reply_to = ?')).toContain(
+      'conversation_reply_to',
+    );
+    expect(plan('SELECT id FROM bandeja_entries WHERE item_id = ?')).toContain('bandeja_item');
+    expect(plan('SELECT message_id FROM conversation_links WHERE item_id = ?')).toMatch(
+      /conversation_links_item|PRIMARY KEY|autoindex/,
+    );
   });
 
   it('is idempotent', () => {
     migrate(db);
     migrate(db);
 
-    expect(userVersion(db)).toBe(48);
+    expect(userVersion(db)).toBe(49);
   });
 
   describe('from version 40, which kept a language on the project', () => {

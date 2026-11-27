@@ -564,6 +564,28 @@ describe('the conversation', () => {
       expect(found('100%')).toEqual([]);
     });
 
+    // Cold review G2: SQLite's LIKE folds ASCII only, so «ñandú» never matched «Ñandú», and a
+    // search of any length was run as typed.
+    it('finds a word whatever the case of its accented letters, and reads only a bounded search', () => {
+      const said = (text: string, at: number) =>
+        postPersonMessage(project, { text }, clock(at)).message.id;
+      const nandu = said('El Ñandú corre por el ÁRBOL', 6000);
+      const found = (search: string) =>
+        listConversation(project, { search }).messages.map(({ id }) => id);
+      expect(found('ñandú')).toEqual([nandu]);
+      expect(found('ÑANDÚ')).toEqual([nandu]);
+      expect(found('árbol')).toEqual([nandu]);
+      expect(found('Á')).toEqual([nandu]);
+      expect(found('é')).toEqual([]);
+
+      // Only the first 8 words count: a ninth that is nowhere is not read.
+      expect(found('el el el el el el el el zzzz')).toEqual([nandu]);
+      expect(found('el zzzz')).toEqual([]);
+      // Only the first 200 characters count.
+      expect(found(`ñandú${' '.repeat(250)}zzzz`)).toEqual([nandu]);
+      expect(found(`ñandú${' '.repeat(100)}zzzz`)).toEqual([]);
+    });
+
     it('are what a new topic is: the question and the answer of otea topic', () => {
       const agent = { kind: 'agent' as const, name: 'kiln' };
       const topic = addTopic(

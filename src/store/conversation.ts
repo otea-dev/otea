@@ -330,6 +330,28 @@ export type Page = {
   kind?: MessageKind | undefined;
 };
 
+const SEARCH_MAX_CHARS = 200;
+const SEARCH_MAX_WORDS = 8;
+
+// The words a search is read as: the first characters of what was typed, split on spaces, the first
+// few words of them. A longer search costs a scan of the whole conversation per word.
+export function searchWords(search: string): string[] {
+  return search
+    .slice(0, SEARCH_MAX_CHARS)
+    .split(/\s+/)
+    .filter((word) => word !== '')
+    .slice(0, SEARCH_MAX_WORDS);
+}
+
+// SQLite's lower() and LIKE fold ASCII letters only: a function that lowers any letter (Á, Ñ), kept
+// on the connection it is asked on.
+const folding = new WeakSet<DatabaseSync>();
+function foldCase(db: DatabaseSync): void {
+  if (folding.has(db)) return;
+  db.function('otea_lower', { deterministic: true }, (text) => String(text).toLowerCase());
+  folding.add(db);
+}
+
 // A page of messages in order (oldest first), and whether more lie beyond it: after `since` the next
 // ones, before `before` the earlier ones, else the newest. A kind or a search keeps the whole turns
 // that match.
@@ -351,17 +373,17 @@ export function selectMessages(
     where.push('m.root IN (SELECT id FROM conversation_messages WHERE kind = :kind)');
     params.kind = page.kind;
   }
-  // Every word of a search must be in the turn (in any of its messages), wherever it stands; a % or
-  // _ typed in one is only that character.
-  (page.search ?? '')
-    .split(/\s+/)
-    .filter((word) => word !== '')
-    .forEach((word, at) => {
-      where.push(
-        `m.root IN (SELECT root FROM conversation_messages WHERE text LIKE :w${at} ESCAPE '\\')`,
-      );
-      params[`w${at}`] = `%${word.replace(/[\\%_]/g, '\\$&')}%`;
-    });
+  // Every word of a search must be in the turn (in any of its messages), wherever it stands, in any
+  // case (accented letters too: SQLite's own LIKE folds ASCII only); a % or _ typed in one is only
+  // that character. A search is read up to SEARCH_MAX_CHARS characters and SEARCH_MAX_WORDS words.
+  const words = searchWords(page.search ?? '');
+  if (words.length > 0) foldCase(db);
+  words.forEach((word, at) => {
+    where.push(
+      `m.root IN (SELECT root FROM conversation_messages WHERE otea_lower(text) LIKE :w${at} ESCAPE '\\')`,
+    );
+    params[`w${at}`] = `%${word.toLowerCase().replace(/[\\%_]/g, '\\$&')}%`;
+  });
   const ascending = page.since !== undefined;
   const sql = `SELECT ${COLUMNS} FROM conversation_messages m
     ${where.length === 0 ? '' : `WHERE ${where.join(' AND ')}`}
@@ -425,9 +447,11 @@ export function selectTurnsOfItem(db: DatabaseSync, item: string): Message[] {
     .prepare(
       `SELECT ${COLUMNS} FROM conversation_messages m
        JOIN conversation_links l ON l.message_id = m.id
-       WHERE l.item_id = ? COLLATE NOCASE AND m.author <> 'secretary' ORDER BY m.id`,
+       WHERE l.item_id = ? AND m.author <> 'secretary' ORDER BY m.id`,
     )
-    .all(item) as MessageRow[];
+    // An item's id is kept in capitals, so the id is made one and compared as it is: the index on
+    // item_id serves it, which a NOCASE comparison cannot use.
+    .all(item.toUpperCase()) as MessageRow[];
   return hydrate(db, rows);
 }
 

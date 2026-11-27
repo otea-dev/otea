@@ -637,6 +637,11 @@ export const MIGRATIONS = [
   ALTER TABLE bandeja_entries ADD COLUMN closed_by TEXT;
   ALTER TABLE bandeja_entries ADD COLUMN close_reason TEXT;
   `,
+  // What answers a message: isAnswered and the open questions look for a person's message by the
+  // one it replies to, which scanned the whole conversation.
+  `
+  CREATE INDEX conversation_reply_to ON conversation_messages (reply_to);
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {
