@@ -274,6 +274,19 @@ function tried(cwd: string, ...args: string[]): { out: string } | { error: strin
   }
 }
 
+// Where to run git when it must read a remote: the repository's main checkout. A remote given by a
+// relative path (`../origin.git`) is read from the folder git runs in, so from a linked worktree
+// (.otea/worktrees/<item>) it names a folder that is no repository (field study 4, U6). The refs
+// git fetches are shared by every checkout, so it makes no difference which one asks.
+export function remoteCwd(cwd: string): string {
+  try {
+    const common = git(cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir');
+    return basename(common) === '.git' ? dirname(common) : cwd;
+  } catch {
+    return cwd;
+  }
+}
+
 // What a merge of the approved branch takes, as its remote has it right now (P3C-R3-1): a forge
 // merges the branch there, which a clone without Otea's hook may have pushed to since the person
 // approved it. The branch and the base it merges into are fetched from the remote the branch is
@@ -290,7 +303,7 @@ export function mergeTake(cwd: string, tip: Tip, base?: string, given?: string):
     let start: string | undefined;
     if (remotes.includes(remote)) {
       const heads = [branch, ...(base ? [base] : [])].map((name) => `refs/heads/${name}`);
-      const listed = tried(cwd, 'ls-remote', '--heads', remote, ...heads);
+      const listed = tried(remoteCwd(cwd), 'ls-remote', '--heads', remote, ...heads);
       if ('error' in listed) return { unknown: `git could not reach ${remote} (${listed.error})` };
       const there = new Map(
         listed.out
@@ -305,7 +318,7 @@ export function mergeTake(cwd: string, tip: Tip, base?: string, given?: string):
         .filter((name) => commitOf(cwd, there.get(name) ?? '') === undefined)
         .map((name) => `+refs/heads/${name}:refs/remotes/${remote}/${name}`);
       if (fetch.length > 0) {
-        const fetched = tried(cwd, 'fetch', '--quiet', '--no-tags', remote, ...fetch);
+        const fetched = tried(remoteCwd(cwd), 'fetch', '--quiet', '--no-tags', remote, ...fetch);
         if ('error' in fetched)
           return { unknown: `git could not fetch it from ${remote} (${fetched.error})` };
       }

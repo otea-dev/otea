@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { remoteCwd } from './gitrepo.ts';
 
 // What a board's «Commit pushed» (Commit en main) field claims: the commit it names holds the work
 // the person approved, and reached the base the board protects. The field took any text, «banana»
@@ -281,7 +282,7 @@ export function landedCommitRefusal(
   let noRemoteBase = false;
   if (remote !== undefined) {
     const fetched = run(
-      cwd,
+      remoteCwd(cwd),
       'fetch',
       '--quiet',
       '--no-tags',
