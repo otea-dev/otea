@@ -815,6 +815,7 @@ export const detail = {
     'The request changed after this was handed in ({by}, {time}). The diff and the branch answer the earlier request: sending it back is the safe move.',
   'bi.changed.line': '{field}: was {from} · now {to}',
   'bi.changed.empty': 'empty',
+  'bi.changed.title': 'Title',
   'bi.branch.mergeOnly':
     'Since the commit you approved ({since}) this round only merges main into {branch}. The merge itself changed {files}: everything in this diff is new and not reviewed yet, including files that did not conflict. The rest is what you approved, and what main brought in landed through its own review. Approving takes {tip} as it is.',
   'bi.branch.mergeOnlyClean':

@@ -479,7 +479,13 @@ export function RequestChangedLine({ changed }: { changed?: RequestChanged | und
       </span>
       <ul>
         {changed.changes.map(({ field, from, to }) => (
-          <li key={field}>{t('bi.changed.line', { field, from: shown(from), to: shown(to) })}</li>
+          <li key={field}>
+            {t('bi.changed.line', {
+              field: field === 'title' ? t('bi.changed.title') : field,
+              from: shown(from),
+              to: shown(to),
+            })}
+          </li>
         ))}
       </ul>
     </div>

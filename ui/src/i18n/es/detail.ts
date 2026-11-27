@@ -824,6 +824,7 @@ export const detail = {
     'El pedido cambió después de esta entrega ({by}, {time}). El diff y la rama responden al pedido anterior: devolverla es lo seguro.',
   'bi.changed.line': '{field}: antes {from} · ahora {to}',
   'bi.changed.empty': 'vacío',
+  'bi.changed.title': 'Título',
   'bi.branch.mergeOnly':
     'Desde el commit que aprobaste ({since}), esta ronda solo fusiona main en {branch}. La fusión misma cambió {files}: todo lo de este diff es nuevo y aún sin revisar, incluso los archivos que no chocaron. Lo demás es lo que aprobaste, y lo que trajo main aterrizó con su propia revisión. Aprobar toma {tip} tal como está.',
   'bi.branch.mergeOnlyClean':
