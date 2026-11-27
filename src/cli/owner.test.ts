@@ -103,6 +103,41 @@ describe('the processes that own a command', () => {
     expect(harnessOf(rows, 500)).toBe(700);
   });
 
+  // A harness that is a node program (codex, gemini, opencode on Windows) carries the person's
+  // prompt, or a word of its own arguments, on its command line: only the script node runs says
+  // whether it is npm.
+  it.each([
+    ['a prompt that names npm', '"C:\\node\\node.exe" "C:\\g\\gemini.js" -p "fix the npm install"'],
+    ['an argument that is npx', 'node C:\\harness\\agent.js npx'],
+    ['a flag value that is yarn', 'node C:\\harness\\agent.js --pkg yarn --model x'],
+    [
+      'a script folder with a space',
+      '"C:\\node\\node.exe" "C:\\Users\\Fede Ara\\agent\\agent.js" --use npm',
+    ],
+  ])('takes node for the harness when %s is only an argument', (_, command) => {
+    const rows = readProcessTable(
+      [
+        `700 1 node.exe\tC:\\node\\node.exe\t${command}`,
+        '600 700 cmd.exe\tC:\\Windows\\cmd.exe\tcmd /c otea say x',
+        '500 600 node.exe\tC:\\node\\node.exe\tnode C:\\otea\\otea.mjs say x',
+      ].join('\r\n'),
+    );
+
+    expect(harnessOf(rows, 600)).toBe(700);
+  });
+
+  it('still walks up past npm and npx whose script has a space in its folder', () => {
+    const rows = readProcessTable(
+      [
+        '700 1 claude.exe\tC:\\bin\\claude.exe\tclaude',
+        '600 700 bash.exe\tC:\\Git\\bin\\bash.exe\tbash -c otea',
+        '500 600 node.exe\tC:\\Program Files\\nodejs\\node.exe\t"C:\\Program Files\\nodejs\\node.exe" "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npx-cli.js" otea wait',
+      ].join('\r\n'),
+    );
+
+    expect(harnessOf(rows, 500)).toBe(700);
+  });
+
   it('reads the command line the listing says, and none when it says none', () => {
     expect(
       readProcessTable('500 600 node.exe\tC:\\n\\node.exe\tnode npm-cli.js exec x\r\n'),
