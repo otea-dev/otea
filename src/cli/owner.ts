@@ -356,7 +356,18 @@ export async function listProcesses(
 }
 
 // How often a long-running command checks that the processes that started it still run.
+// OTEA_OWNER_CHECK_MS may shorten it (a test that shows a server outliving its starter need not wait
+// several of these), never lengthen it: a check that comes sooner only finds a gone owner sooner.
 const OWNER_CHECK_MS = 5_000;
+const MIN_OWNER_CHECK_MS = 100;
+export function ownerCheckMsOf(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): number {
+  const given = env.OTEA_OWNER_CHECK_MS ? Number(env.OTEA_OWNER_CHECK_MS) : Number.NaN;
+  return Number.isFinite(given)
+    ? Math.min(OWNER_CHECK_MS, Math.max(MIN_OWNER_CHECK_MS, given))
+    : OWNER_CHECK_MS;
+}
 
 // `started`: the process that started this one, which the watch stops it with.
 export type OwnerWatch = {
@@ -384,7 +395,7 @@ export function watchOwner(
   {
     list = listProcesses,
     alive = processAlive,
-    everyMs = OWNER_CHECK_MS,
+    everyMs = ownerCheckMsOf(),
     early = false,
   }: {
     list?: (signal: AbortSignal) => Promise<ProcessTable | undefined>;
