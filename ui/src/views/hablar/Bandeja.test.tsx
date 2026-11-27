@@ -228,6 +228,9 @@ describe('the quick note', () => {
     const calls = server([]);
     const root = await show(<NoteCapture onSent={() => undefined} />, {
       session: { canWrite: false, canConfigure: false, canManageDevices: false },
+      // The field follows canCapture since a7a796d1 (a note goes to the queue while the computer
+      // does not answer): a browser that may only read can capture nothing either.
+      canCapture: false,
     });
 
     expect(q<HTMLTextAreaElement>(root, '.bn-text')?.disabled).toBe(true);
