@@ -232,6 +232,7 @@ describe('noticeText', () => {
     const ask: Notice = {
       kind: 'ask',
       item: 'B-3',
+      bandeja: true,
       title: 'El botón Aprobar queda tapado',
       by: 'lia',
       text: '¿Solo Aprobar o todas?',

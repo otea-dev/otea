@@ -56,6 +56,8 @@ export type ItemNotice = {
   // The turn of Hablar a secretary reply opens; how many messages wait for an offline secretary.
   turn?: number;
   count?: number;
+  // `item` is a Bandeja note (B-3), not an item.
+  bandeja?: true;
 };
 
 export type GroupNotice = {
@@ -113,8 +115,13 @@ function noticeOf(signal: Signal, prefs: NotifyPrefs): ItemNotice {
     ...(options === undefined ? {} : { options }),
     ...(signal.turn === undefined ? {} : { turn: signal.turn }),
     ...(signal.count === undefined ? {} : { count: signal.count }),
+    ...(signal.bandeja ? { bandeja: true as const } : {}),
   };
 }
+
+// What a signal is about: an item, or a Bandeja note that may have the same id as one.
+const aboutOf = ({ item, bandeja }: Pick<Signal, 'item' | 'bandeja'>): string =>
+  bandeja ? `bandeja:${item}` : item;
 
 export class Planner {
   private pending: Signal[] = [];
@@ -162,8 +169,8 @@ export class Planner {
     );
     const byItem = new Map<string, Signal>();
     for (const signal of this.pending) {
-      const held = byItem.get(signal.item);
-      if (!held || RANK[signal.kind] < RANK[held.kind]) byItem.set(signal.item, signal);
+      const held = byItem.get(aboutOf(signal));
+      if (!held || RANK[signal.kind] < RANK[held.kind]) byItem.set(aboutOf(signal), signal);
     }
     const ready: Signal[] = [];
     let wait: number | null = null;
@@ -172,11 +179,11 @@ export class Planner {
       if (free <= now) ready.push(signal);
       else wait = Math.min(wait ?? free, free);
     }
-    const out = new Set(ready.map(({ item }) => item));
-    this.pending = this.pending.filter(({ item }) => !out.has(item));
+    const out = new Set(ready.map(aboutOf));
+    this.pending = this.pending.filter((signal) => !out.has(aboutOf(signal)));
     this.due = wait;
     if (ready.length === 0 || inQuietHours(prefs.quiet, this.minuteOfDay(now))) return [];
-    for (const { item } of ready) this.told.set(item, now);
+    for (const signal of ready) this.told.set(aboutOf(signal), now);
     this.sentAt = now;
     const [only] = ready;
     if (ready.length === 1 && only) return [noticeOf(only, prefs)];

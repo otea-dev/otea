@@ -56,6 +56,9 @@ export type Signal = {
   // secretary_reply: the turn in Hablar the notice opens. secretary_offline: how many messages wait.
   turn?: number;
   count?: number;
+  // `item` is a Bandeja note (B-3), not an item: a 0.7 board named B has items B-1 too, so the id
+  // alone does not say which it is.
+  bandeja?: true;
 };
 
 // How long the person's messages must wait for an offline secretary before it is told.
@@ -144,6 +147,7 @@ export function bandejaSignalsOf(asks: readonly BandejaAskFacts[]): Signal[] {
     key: `bandeja:${ref}:q${question}`,
     kind: 'ask',
     item: ref,
+    bandeja: true,
     title: snippet,
     by,
     ...(text === '' ? {} : { text }),

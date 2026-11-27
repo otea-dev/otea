@@ -1,4 +1,3 @@
-import { isBandejaRef } from '../bandeja.ts';
 import type { Notice } from './planner.ts';
 import type { NotifyKind } from './signals.ts';
 
@@ -170,7 +169,7 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
   const question = notice.kind === 'ask' ? clean(notice.text) : undefined;
   const title = question ? `${said} · ${notice.item}` : said;
   // A question on a Bandeja note (B-3) is no item's: Hablar opens, at that note.
-  if (notice.kind === 'ask' && isBandejaRef(notice.item)) {
+  if (notice.kind === 'ask' && notice.bandeja === true) {
     return {
       title,
       body: question

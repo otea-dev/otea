@@ -249,6 +249,7 @@ describe('bandejaSignalsOf', () => {
         key: 'bandeja:B-3:q1',
         kind: 'ask',
         item: 'B-3',
+        bandeja: true,
         title: 'El botón Aprobar queda tapado',
         by: 'lia',
         text: '¿Solo Aprobar o todas?',
