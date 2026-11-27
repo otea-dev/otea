@@ -41,9 +41,10 @@ jobs:
           node scripts/try-package.mjs "$RUNNER_TEMP/pack"
 
   # The same check on Windows, in two parallel jobs: the suites that spawn processes (vitest's
-  # `processes` project, most of the run) are split in halves with --shard, and everything that
-  # runs once (lint, types, the unit project, the builds, the packed package) rides with the second
-  # half, which is the lighter one. Together they run exactly what `npm run check` runs.
+  # `processes` project, most of the run) are split in halves with --shard, and what runs once
+  # rides with one of them: the unit project with the first (it takes about as long as the half of
+  # the second that lint, types, the builds and the packed package leave), the rest with the
+  # second. Together they run exactly what `npm run check` runs.
   check-windows:
     name: check (windows-latest, part ${{ matrix.shard }} of 2)
     strategy:
@@ -71,7 +72,7 @@ jobs:
         run: npm run typecheck
       # The unit project first and on its own, as in vitest.config.ts: beside the suites that spawn
       # processes it would be starved.
-      - if: matrix.shard == 2
+      - if: matrix.shard == 1
         run: npx vitest run --project unit
       - run: npx vitest run --project processes --shard=${{ matrix.shard }}/2
       - if: matrix.shard == 2
