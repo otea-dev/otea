@@ -128,8 +128,8 @@ export const common = {
   },
   'move.closesAs': 'cierra el ítem como {as}',
   'move.closes': 'cierra el ítem',
-  'move.leaves': 'sale de Te esperan',
-  'move.comes': 'pasa a Te esperan',
+  'move.leaves': 'sale de Te toca',
+  'move.comes': 'pasa a Te toca',
   'move.asksReason': 'pide un motivo antes',
 
   // Cuándo, como lo dice una fila

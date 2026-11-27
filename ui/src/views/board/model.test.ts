@@ -380,7 +380,7 @@ describe('the groups of Lista and Tabla', () => {
 
   it('groups by turn and by who, closed work last', () => {
     expect(groupBoard(items, 'turn', ctx()).map((g) => g.title)).toEqual([
-      'Waiting for you',
+      'Your turn',
       'With agents',
       'Closed',
     ]);

@@ -218,7 +218,7 @@ describe('the project menu', () => {
   it('leads with Todos los proyectos and the total waiting', () => {
     const html = menu();
     expect(html).toContain('Todos los proyectos');
-    expect(html).toContain('lo que te espera, en todos lados');
+    expect(html).toContain('lo que te toca, en todos lados');
     expect(html).toMatch(/<span class="pw"><i class="dot"><\/i>5<\/span>/);
   });
 

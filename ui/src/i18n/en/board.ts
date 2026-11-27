@@ -1,7 +1,7 @@
 // The board area of the English catalog.
 export const board = {
   // Groups of the list and the grid
-  'section.human': 'Waiting for you',
+  'section.human': 'Your turn',
   'section.agent': 'With agents',
   'section.none': 'Closed',
   'section.noValue': '{group}: none',

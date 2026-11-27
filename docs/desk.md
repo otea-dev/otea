@@ -31,7 +31,7 @@ otea handoff PRE-1 --note "Answered with sources"
 
 You can also create items from the browser: when it is signed in, **New item** opens a form from the board's fields. Only the title is required; an item that lacks what the board's first step asks (Cómo lo valido on Cambios) starts there, in Aclarar, for an agent to complete (`otea update`, then `otea handoff <id>`), and one that has it starts at the next step. The timeline shows who created it as `human (ui)`.
 
-On a phone the selected item unfolds in place under its row, with its moves at the bottom of the screen. **Triage**, at the end of *Waiting for you*, shows what waits for you one card at a time: swipe right for the primary move, left to send it back to the agent (asking for the reason when the workflow requires one), or use the buttons.
+On a phone the selected item unfolds in place under its row, with its moves at the bottom of the screen. **Triage**, at the end of *Your turn*, shows what waits for you one card at a time: swipe right for the primary move, left to send it back to the agent (asking for the reason when the workflow requires one), or use the buttons.
 
 `#/modules` in the URL opens the catalog of field modules: what each one does and a live preview of how it looks in a row, in the detail and as a form control. `#/modules/<name>` links to one module. It lists the boards and the module each of their fields shows through (read from `GET /api/presets`); a board's fields are set in Studio, and the kind of each field picks its module.
 

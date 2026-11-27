@@ -3,7 +3,7 @@ import type { Catalog } from '../i18n.ts';
 // El área board del catálogo en español.
 export const board = {
   // Grupos de la lista y la tabla
-  'section.human': 'Te esperan',
+  'section.human': 'Te toca',
   'section.agent': 'Con agentes',
   'section.none': 'Cerrados',
   'section.noValue': '{group}: sin valor',

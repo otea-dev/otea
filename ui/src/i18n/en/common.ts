@@ -121,8 +121,8 @@ export const common = {
   },
   'move.closesAs': 'closes the item as {as}',
   'move.closes': 'closes the item',
-  'move.leaves': 'it leaves Waiting for you',
-  'move.comes': 'it comes to Waiting for you',
+  'move.leaves': 'it leaves Your turn',
+  'move.comes': 'it comes to Your turn',
   'move.asksReason': 'asks a reason first',
 
   // When, as a row says it (derive/when.ts): the lease left, or how long it has been where it is

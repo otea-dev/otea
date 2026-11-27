@@ -81,7 +81,7 @@ A 60 px topbar (project pill and menu, the centred mark, the agents pill into Ac
 - **Te toca**: Atasco, Preguntas para ti, Revisiones, Tus propios pasos, En camino, Cerrados (the closed work on the trunk), and the agents column with each agent's two-hour trace. **Atasco**: only what went quiet.
 - **Boards**: Pasos (columns by step), Lista (the lanes) and Tabla (sortable, resizable columns, ticks and the bulk tray), morphing into each other.
 - **The item**: the bar, the headline and its standfirst, the route (the two lanes laid flat, with a round dip for every send-back), the moves (Aprobar, Devolver…, answering a question in place, Deshacer), Detalles, the body and evidence, the structure and Historial; a pen-drawn line joins the row to the headline.
-- **Triaje**, **Actividad** (leases running down, the latest events), **Te espera** (every project), **Configuración** (the project's), **Preferencias** (yours: the page behind the rail's foot button, which keeps only theme, motion and language in its pop), **Emparejar**, **Encargo**, **Nuevo ítem**, and **Studio**, **Personalizar vista** and the module catalog in the same language.
+- **Triaje**, **Actividad** (leases running down, the latest events), **Te toca en todos lados** (every project), **Configuración** (the project's), **Preferencias** (yours: the page behind the rail's foot button, which keeps only theme, motion and language in its pop), **Emparejar**, **Encargo**, **Nuevo ítem**, and **Studio**, **Personalizar vista** and the module catalog in the same language.
 
 ## Words
 

@@ -7,7 +7,7 @@ export const shell = {
   'shell.projectSwitch': '{project}, switch project',
   'shell.projectOpen': 'open now',
   'shell.newProject': 'new project: {command} in a repo',
-  'shell.allProjectsLine': 'what waits for you, everywhere',
+  'shell.allProjectsLine': 'your turn, everywhere',
   'shell.unavailable': 'cannot be read now',
   'shell.waitingThere': { one: '{count} waits for you', other: '{count} wait for you' },
   'shell.nothingThere': 'nothing waits for you',
@@ -124,7 +124,7 @@ export const shell = {
 
   // Words other areas still read
   'rail.all': 'All work',
-  'rail.waiting': 'waiting for you',
+  'rail.waiting': 'your turn',
   'rail.official': 'official',
   'rail.projects': 'All projects',
 

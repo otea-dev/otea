@@ -381,11 +381,12 @@ describe('Te espera', () => {
     expect(html).not.toContain('p3 y p4 no tienen nada abierto');
   });
 
-  it('heads the page Te espera on the lanes', () => {
+  it('heads the all-projects page with the name of the Te toca list, on the lanes', () => {
     setLanguage('es');
     const html = render(createElement(ProjectsInbox, {}), fakeApp({ projects: [salinas] }));
     expect(html).toContain('Todos los proyectos');
-    expect(html).toContain('Te espera');
+    expect(html).toContain('Te toca en todos lados');
+    expect(html).not.toContain('Te espera');
     expect(html).toContain('data-list="projects"');
     expect(html).toContain('una fila de otro proyecto lo abre aquí');
     expect(html).not.toContain('pestaña');

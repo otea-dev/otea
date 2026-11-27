@@ -153,6 +153,32 @@ describe('one name per thing, for the person', () => {
     expect(t('hablar.te.title').startsWith(t('toca.title'))).toBe(true);
   });
 
+  // R2 (field study 4, design): the list of what is the person's to do had three names: the page
+  // and Hablar's panel said Te toca, the all-projects page and the board's section said Te espera
+  // / Waiting for you. It is one list; every name for it is in the family of «Te toca» / «Your
+  // turn», in the page, the board's section, the move's receipt and the rail.
+  it('names the list of what is yours the same on every surface, in both languages', () => {
+    const names = [
+      'projects.display',
+      'projects.waiting',
+      'section.human',
+      'move.leaves',
+      'move.comes',
+      'rail.waiting',
+      'shell.allProjectsLine',
+    ] as const;
+    for (const [lang, family] of [
+      ['es', /Te toca|te toca/],
+      ['en', /Your turn|your turn/],
+    ] as const) {
+      setLanguage(lang);
+      for (const key of names) {
+        expect(t(key), `${lang} ${key}`).toMatch(family);
+        expect(t(key), `${lang} ${key}`).not.toMatch(/te esperan?\b|waiting for you/i);
+      }
+    }
+  });
+
   it('says what to do next after an error, in both languages', () => {
     for (const lang of ['es', 'en'] as const) {
       setLanguage(lang);
