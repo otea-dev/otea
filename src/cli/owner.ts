@@ -109,7 +109,7 @@ export function harnessOf(rows: readonly ProcessRow[], start: number): number | 
 // wsl.exe, script). Its first find is trusted at once; an unknown process needs two waits.
 const KNOWN_HARNESS = /^(claude|opencode|codex|agy|gemini|antigravity)(-[a-z]+)?$/;
 const KNOWN_HARNESS_COMMAND =
-  /(?:^|[\\/\s"'])(?:claude|opencode|codex|agy|gemini|antigravity)(?:-[a-z]+)?(?:\.c?js|\.mjs|\.exe)?(?:["'\s]|$)/i;
+  /(?:^|[\\/\s"'])(?:claude|opencode|codex|agy|gemini|antigravity)(?:-[a-z]+)?(?:\.c?js|\.mjs|\.exe)?(?:["'\s\\/]|$)/i;
 
 export function isKnownHarness(rows: readonly ProcessRow[], pid: number): boolean {
   const row = rows.find((each) => each.pid === pid);
@@ -134,6 +134,19 @@ export function readProcessTable(text: string): ProcessRow[] {
         ...(command?.trim() ? { command: command.trim() } : {}),
       },
     ];
+  });
+}
+
+// The rows with the command line of each, from lines of "pid command line" (ps -o pid=,args=).
+export function withCommands(rows: readonly ProcessRow[], text: string): ProcessRow[] {
+  const commands = new Map<number, string>();
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^\s*(\d+)\s+(.+?)\s*$/.exec(line);
+    if (match) commands.set(Number(match[1]), match[2] as string);
+  }
+  return rows.map((row) => {
+    const command = commands.get(row.pid);
+    return command === undefined ? row : { ...row, command };
   });
 }
 
@@ -245,7 +258,12 @@ export async function listProcesses(
 ): Promise<ProcessTable | undefined> {
   if (process.platform !== 'win32') {
     const out = await run('ps', ['-A', '-o', 'pid=,ppid=,comm='], signal);
-    return out === undefined ? undefined : { rows: readProcessTable(out), complete: true };
+    if (out === undefined) return undefined;
+    // The program alone says `node` for Claude Code: its command line, from a second listing,
+    // tells it from any node (isKnownHarness). Without it the rows are still good.
+    const commands = await run('ps', ['-A', '-o', 'pid=,args='], signal, () => {});
+    const rows = readProcessTable(out);
+    return { rows: commands === undefined ? rows : withCommands(rows, commands), complete: true };
   }
   const out = await run(
     'powershell.exe',

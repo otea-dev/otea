@@ -1,7 +1,4 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { postPersonMessage } from '../app/conversation.ts';
@@ -137,17 +134,8 @@ describe('the secretary seen offline once its process is gone', () => {
         `run(${waits});`,
         'setTimeout(() => {}, 120_000);',
       ].join(' ');
-      // On Linux and macOS the system's listing names a process by its program, not its command
-      // line: the known harness is a program called claude (node under that name); on Windows the
-      // listing carries the command line, which names it (above).
-      const bin = mkdtempSync(join(tmpdir(), 'otea-claude-'));
-      let program = process.execPath;
-      if (named && process.platform !== 'win32') {
-        program = join(bin, 'claude');
-        symlinkSync(process.execPath, program);
-      }
       const harness = spawn(
-        program,
+        process.execPath,
         [
           '-e',
           starter,
@@ -196,7 +184,6 @@ describe('the secretary seen offline once its process is gone', () => {
         expect(Date.now() - killedAt).toBeLessThan(8_000);
       } finally {
         for (const pid of pids) if (processAlive(pid)) process.kill(pid);
-        rmSync(bin, { recursive: true, force: true });
       }
     },
     120_000,

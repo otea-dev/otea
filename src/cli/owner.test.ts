@@ -12,6 +12,7 @@ import {
   readPosixTable,
   readProcessTable,
   watchOwner,
+  withCommands,
   withPosixParents,
 } from './owner.ts';
 import { until } from './testing.ts';
@@ -129,6 +130,25 @@ describe('the processes that own a command', () => {
       { pid: 500, parent: 600, name: 'sh.exe', path: 'C:\\Program Files\\Git\\usr\\bin\\sh.exe' },
       { pid: 4, parent: 0, name: 'System' },
     ]);
+  });
+
+  // Linux and macOS list a process by its program only: Claude Code there is node running its
+  // script, told from any node by the command line, which a second listing gives.
+  it('adds the command line of each process to the rows of a system that lists the program only', () => {
+    const rows = [
+      { pid: 10, parent: 1, name: 'node' },
+      { pid: 11, parent: 1, name: 'node' },
+    ];
+    const text = [
+      '   10 node /usr/lib/node_modules/@anthropic-ai/claude-code/cli.js --resume',
+      '   11 node server.js',
+      '   12 ps -A -o pid=,args=',
+    ].join('\n');
+
+    const withCommand = withCommands(rows, text);
+
+    expect(withCommand[0]?.command).toContain('claude-code/cli.js');
+    expect(withCommand.map(({ pid }) => isKnownHarness(withCommand, pid))).toEqual([true, false]);
   });
 
   // G1 review: a harness known by name is the session itself; an intermediary is not.
