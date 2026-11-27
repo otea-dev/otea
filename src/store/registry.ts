@@ -1,3 +1,4 @@
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import type { RepoFingerprint } from '../core/repo.ts';
 import { applyMigrations } from './migrations.ts';
@@ -74,17 +75,42 @@ type PathRow = {
   root_commit: string | null;
 };
 
+// The Otea home the registry lives in (its folder), '' for a registry kept in memory.
+export function homeOf(db: DatabaseSync): string {
+  const databases = db.prepare('PRAGMA database_list').all() as { name: string; file: string }[];
+  const file = databases.find((each) => each.name === 'main')?.file ?? '';
+  return file === '' ? '' : dirname(file);
+}
+
+// A data folder inside the home is kept relative to it, so a home that is copied or moved uses its
+// own data; one anywhere else (a project's own .otea) is kept as it is.
+function storedDataDir(home: string, dataDir: string): string {
+  if (home === '' || !isAbsolute(dataDir)) return dataDir;
+  const inside = relative(home, dataDir);
+  if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) return dataDir;
+  return inside.split(sep).join('/');
+}
+
+function readDataDir(home: string, stored: string): string {
+  return home === '' || isAbsolute(stored) ? stored : resolve(home, stored);
+}
+
 export function insertRegisteredProject(db: DatabaseSync, project: RegisteredProject): void {
   db.prepare('INSERT INTO projects (id, name, storage, data_dir) VALUES (?, ?, ?, ?)').run(
     project.id,
     project.name,
     project.storage,
-    project.dataDir,
+    storedDataDir(homeOf(db), project.dataDir),
   );
 }
 
-function toProject(row: ProjectRow): RegisteredProject {
-  return { id: row.id, name: row.name, storage: row.storage, dataDir: row.data_dir };
+function toProject(row: ProjectRow, home: string): RegisteredProject {
+  return {
+    id: row.id,
+    name: row.name,
+    storage: row.storage,
+    dataDir: readDataDir(home, row.data_dir),
+  };
 }
 
 export function selectRegisteredProject(
@@ -92,12 +118,39 @@ export function selectRegisteredProject(
   id: string,
 ): RegisteredProject | undefined {
   const row = db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as ProjectRow | undefined;
-  return row && toProject(row);
+  return row && toProject(row, homeOf(db));
 }
 
 export function selectRegisteredProjects(db: DatabaseSync): RegisteredProject[] {
+  const home = homeOf(db);
   const rows = db.prepare('SELECT * FROM projects ORDER BY name, id').all() as ProjectRow[];
-  return rows.map(toProject);
+  return rows.map((row) => toProject(row, home));
+}
+
+// The data folders of the rows that still hold a whole path, for a home that was moved or copied
+// to take back (anchorDataDirs in app/home.ts): the project ids with the path each was given.
+export function wholeDataDirs(db: DatabaseSync): { id: string; dataDir: string }[] {
+  const rows = db.prepare('SELECT id, data_dir FROM projects').all() as {
+    id: string;
+    data_dir: string;
+  }[];
+  const homes = db.prepare('SELECT DISTINCT project_id AS id, data_dir FROM agent_homes').all() as {
+    id: string;
+    data_dir: string;
+  }[];
+  return [...rows, ...homes]
+    .filter((row) => isAbsolute(row.data_dir))
+    .map((row) => ({ id: row.id, dataDir: row.data_dir }));
+}
+
+// Keeps a data folder that lies inside the home relative to it, where the path was `from`.
+export function anchorDataDir(db: DatabaseSync, id: string, from: string, to: string): void {
+  db.prepare('UPDATE projects SET data_dir = ? WHERE id = ? AND data_dir = ?').run(to, id, from);
+  db.prepare('UPDATE agent_homes SET data_dir = ? WHERE project_id = ? AND data_dir = ?').run(
+    to,
+    id,
+    from,
+  );
 }
 
 export function insertProjectPath(db: DatabaseSync, path: ProjectPath): void {
@@ -137,6 +190,7 @@ export type AgentHome = {
 };
 
 export function selectAgentHome(db: DatabaseSync, name: string): AgentHome | undefined {
+  const home = homeOf(db);
   const row = db.prepare('SELECT * FROM agent_homes WHERE name = ?').get(name) as
     | {
         name: string;
@@ -152,7 +206,7 @@ export function selectAgentHome(db: DatabaseSync, name: string): AgentHome | und
       name: row.name,
       projectId: row.project_id,
       projectName: row.project_name,
-      dataDir: row.data_dir,
+      dataDir: readDataDir(home, row.data_dir),
       at: row.at,
       launcher: row.launcher,
     }
@@ -166,7 +220,7 @@ export function upsertAgentHome(db: DatabaseSync, home: AgentHome): void {
     ON CONFLICT (name) DO UPDATE SET project_id = excluded.project_id,
       project_name = excluded.project_name, data_dir = excluded.data_dir, at = excluded.at,
       launcher = excluded.launcher`,
-  ).run(home);
+  ).run({ ...home, dataDir: storedDataDir(homeOf(db), home.dataDir) });
 }
 
 export function selectProjectPaths(db: DatabaseSync): ProjectPath[] {

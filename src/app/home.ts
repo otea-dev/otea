@@ -8,6 +8,7 @@ import { longestContaining, pathKey } from '../core/path-key.ts';
 import { compareRepos, type RepoFingerprint, type RepoMatch } from '../core/repo.ts';
 import { openWithSetup, transaction } from '../store/database.ts';
 import {
+  anchorDataDir,
   deleteProjectPath,
   insertProjectPath,
   insertRegisteredProject,
@@ -19,6 +20,7 @@ import {
   selectRegisteredProject,
   selectRegisteredProjects,
   updateProjectPath,
+  wholeDataDirs,
 } from '../store/registry.ts';
 import type { Env } from './project.ts';
 
@@ -35,8 +37,24 @@ export function openRegistry(env: Env = process.env): DatabaseSync {
   mkdirSync(oteaHome(env), { recursive: true });
   return openWithSetup(registryPath(env), (db) => {
     migrateRegistry(db);
+    anchorDataDirs(db, oteaHome(env));
     return db;
   });
+}
+
+// A registry an older Otea wrote holds the whole path of each project's data, so a home that was
+// copied or moved went on using the folder it came from. A path that ends in data/<the project's id>
+// is read as that folder of this home, once it is there; whatever points elsewhere is left alone.
+function anchorDataDirs(db: DatabaseSync, home: string): void {
+  const whole = wholeDataDirs(db);
+  if (whole.length === 0) return;
+  for (const { id, dataDir } of whole) {
+    const tail = `/data/${id}`;
+    const same = (path: string) => path.replaceAll('\\', '/').toLowerCase();
+    if (!same(dataDir).endsWith(tail.toLowerCase())) continue;
+    if (!existsSync(join(home, 'data', id))) continue;
+    anchorDataDir(db, id, dataDir, `data/${id}`);
+  }
 }
 
 // Runs `use` on the registry, or returns undefined without creating it when there is none yet.
