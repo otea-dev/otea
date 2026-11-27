@@ -93,7 +93,12 @@ describe('the conversation', () => {
       const read = readAsSecretary(project, { agent: 'sol' }, clock(4000));
       expect(read.fresh).toEqual([sent.id]);
       expect(read.messages.map(({ id, delivery }) => [id, delivery])).toEqual([[sent.id, 'read']]);
-      expect(secretaryWake(project, startSecretaryWait(clock(5000)), clock(5000))).toBeUndefined();
+      // Read is not answered (app/owed.test.ts): a wait that begins after the read brings it back as
+      // already read, until the secretary replies; the wait running while it was read does not.
+      expect(secretaryWake(project, wait, clock(5000))).toBeUndefined();
+      expect(secretaryWake(project, startSecretaryWait(clock(5000)), clock(5000))).toMatchObject({
+        ref: String(sent.id),
+      });
 
       const said = sayAsSecretary(
         project,
@@ -125,9 +130,11 @@ describe('the conversation', () => {
       expect(second.fresh).toEqual([3]);
       // The talk before the first unread message comes along, so the answer has its context.
       expect(second.messages.map(({ id }) => id)).toEqual([1, 2, 3]);
-      expect(
-        secretaryWake(project, startSecretaryWait(clock(11000)), clock(11000)),
-      ).toBeUndefined();
+      // All three are read and none answered: a later wait brings the oldest back as already read.
+      expect(secretaryWake(project, startSecretaryWait(clock(11000)), clock(11000))).toMatchObject({
+        ref: '1',
+      });
+      expect(listConversation(project, {}, clock(11000)).waiting).toMatchObject({ count: 0 });
     });
 
     it('keeps a message sent again (a phone that never heard back) once', () => {

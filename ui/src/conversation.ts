@@ -106,10 +106,21 @@ export function turnsOf(messages: readonly Message[]): Turn[] {
 export function thinkingRoot(
   turns: readonly Turn[],
   secretary: SecretaryStatus | null,
+  now: number = Date.now(),
 ): number | undefined {
   if (!secretary || secretary.state === 'offline') return undefined;
-  return turns.findLast((turn) => turn.waits === 'reading')?.root;
+  const turn = turns.findLast((each) => each.waits === 'reading');
+  if (turn === undefined || secretary.state !== 'listening') return turn?.root;
+  // A secretary in its wait holds nothing: the wait brings back a message read and not answered
+  // within seconds (U6, field study 4). If it is still here after that, nobody holds it.
+  const last = turn.messages.at(-1);
+  const since = Date.parse(last?.heardAt ?? last?.readAt ?? last?.at ?? '');
+  return Number.isNaN(since) || now - since >= LISTENING_QUIET_MS ? turn.root : undefined;
 }
+
+// How long a message may stay read and unanswered while the secretary listens before the desk says
+// it has not answered (its wait brings the message back well within it).
+export const LISTENING_QUIET_MS = 20_000;
 
 // How much of a reply shows before «ver más»: the first line (the conclusion), then at most this
 // many short lines. It is the secretary's own rule (its text, `otea prompt --role secretary`: one

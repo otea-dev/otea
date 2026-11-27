@@ -665,6 +665,11 @@ export const MIGRATIONS = [
   `
   ALTER TABLE agents ADD COLUMN listening_harness_started INTEGER;
   `,
+  // Read is not answered (field study 4, U6): how many times a message the secretary read and did
+  // not answer was brought back to its waits. A restarted secretary starts the count again.
+  `
+  ALTER TABLE conversation_messages ADD COLUMN owed_returns INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {

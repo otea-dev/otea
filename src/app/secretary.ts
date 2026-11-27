@@ -9,7 +9,7 @@ import {
   type SecretaryStatus,
   type SecretaryWakeKind,
 } from '../core/secretary.ts';
-import { bumpKindNews, markHeard } from '../store/conversation.ts';
+import { bumpKindNews, bumpOwed, markHeard, resetOwed, selectOwed } from '../store/conversation.ts';
 import { joinTransaction } from '../store/database.ts';
 import { selectEvents } from '../store/queries.ts';
 import {
@@ -91,6 +91,8 @@ export function declareSecretary(
       replaced = current;
     }
     saveRole(db, agent, 'secretary', now());
+    // A session that begins is owed what the earlier one read and left unanswered, in full.
+    resetOwed(db);
     return { agent, role: 'secretary', replaced };
   });
 }
@@ -402,5 +404,20 @@ function wakeOf(
       return { kind, ...(ref === undefined ? {} : { ref }), text: wakeText(pending) };
     }
   }
-  return unheardWake(ctx, wait, now, processes);
+  return owedWake(ctx, wait, now) ?? unheardWake(ctx, wait, now, processes);
+}
+
+// Read is not answered: a message of the person's that an earlier look read and the secretary did
+// not answer (no reply to it, nothing made from it) is brought back to a wait that began after that
+// read, a few times at most. A reply refused, a session that died or a say that never ran leaves
+// the message owed; a restart (declareSecretary) starts the count again.
+function owedWake(ctx: Context, wait: SecretaryWait, now: Clock): SecretaryWake | undefined {
+  const [owed] = selectOwed(ctx.db, wait.startedAt);
+  if (owed === undefined) return undefined;
+  bumpOwed(ctx.db, owed.id, now());
+  return {
+    kind: 'person_message',
+    ref: String(owed.id),
+    text: `The person's message ${owed.id} ("${owed.text.replace(/\s+/g, ' ').slice(0, 120)}") was already read and has no answer. Answer it now: otea say "<your answer>" --reply-to ${owed.id}, or make what it asks for (otea create ... --from-message ${owed.id}). Read it again with otea conversation --since ${owed.id - 1}. Run say alone and read its result before you wait again.`,
+  };
 }

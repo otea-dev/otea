@@ -219,6 +219,17 @@ describe('the secretary thinking', () => {
     expect(thinkingRoot(turns, null)).toBeUndefined();
   });
 
+  it('is never thinking while it listens: a read message it left unanswered is not held', () => {
+    const turns = turnsOf([
+      say({ id: 1, author: 'person', delivery: 'read', readAt: ago(1), heardAt: ago(1) }),
+    ]);
+    const now = NOW - 50_000;
+    // Its wait brings the message back within seconds: nothing says «pensando…» meanwhile.
+    expect(thinkingRoot(turns, listening, now)).toBeUndefined();
+    // Still here a while later, nobody holds it: the desk says it has not answered.
+    expect(thinkingRoot(turns, listening, NOW)).toBe(1);
+  });
+
   it('is not thinking about a message it has not read, nor one it answered', () => {
     const pending = turnsOf([say({ id: 1, author: 'person', delivery: 'pending' })]);
     expect(pending[0]?.waits).toBe('pending');

@@ -458,8 +458,17 @@ function thinkingSince(turns: readonly Turn[], root: number): string {
   return last?.heardAt ?? last?.readAt ?? last?.at ?? new Date(0).toISOString();
 }
 
-function Thinking({ since, now }: { since: string; now: number }) {
-  const silent = now - Date.parse(since) >= SILENT_AFTER_MS;
+function Thinking({
+  since,
+  now,
+  listening,
+}: {
+  since: string;
+  now: number;
+  // The secretary is in its wait: it holds nothing, so it is never «pensando…».
+  listening: boolean;
+}) {
+  const silent = listening || now - Date.parse(since) >= SILENT_AFTER_MS;
   return (
     <>
       <div className="hb-who">
@@ -679,6 +688,8 @@ export type TurnsProps = {
   // The thread, message by message, in the order it was said.
   rows: readonly RowOf[];
   thinking: number | undefined;
+  // The secretary is in its wait: a message it read and did not answer is not being thought about.
+  secretaryListening?: boolean;
   items: ReadonlyMap<string, Item>;
   // The turn a link asked for, to find: it shows lit for a moment.
   found: number | undefined;
@@ -706,6 +717,7 @@ export function Turns({
   turns,
   rows,
   thinking,
+  secretaryListening = false,
   items,
   found,
   onKind,
@@ -785,7 +797,11 @@ export function Turns({
       {thinking === undefined ? null : (
         <section className="hb-turn" data-k="thinking">
           <Row lane="secretary" bodyKey={`t${thinking}`} fresh={fresh(`t${thinking}`)} busy>
-            <Thinking since={thinkingSince(turns, thinking)} now={app.now} />
+            <Thinking
+              since={thinkingSince(turns, thinking)}
+              now={app.now}
+              listening={secretaryListening}
+            />
           </Row>
         </section>
       )}

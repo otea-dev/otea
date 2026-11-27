@@ -190,6 +190,55 @@ export function markHeard(db: DatabaseSync, at: string): number {
   );
 }
 
+// How many times a message the secretary read and left unanswered is brought back to its waits.
+export const OWED_RETURNS = 2;
+// How long a message stays owed: an older one is no wait's business.
+const OWED_FOR_MS = 24 * 60 * 60_000;
+
+// The person's messages the secretary read before `readBefore` (an ISO time) and has not answered:
+// no message of the secretary's after it in its turn, nothing made from the turn, and not a record
+// (a tap on an agent's question, a topic) or a tap on a card that acts by itself. Oldest first.
+export function selectOwed(
+  db: DatabaseSync,
+  readBefore: string,
+): { id: number; text: string; readAt: string }[] {
+  const since = new Date(Date.parse(readBefore) - OWED_FOR_MS).toISOString();
+  const rows = db
+    .prepare(
+      `SELECT m.id, m.text, m.read_at FROM conversation_messages m
+       WHERE m.author = 'person' AND m.read_at IS NOT NULL AND m.read_at < :readBefore
+         AND m.at >= :since AND m.topic IS NULL AND m.about IS NULL AND m.owed_returns < :max
+         AND NOT EXISTS (
+           SELECT 1 FROM conversation_messages r
+           WHERE r.root = m.root AND r.id > m.id AND r.author <> 'person')
+         AND NOT EXISTS (SELECT 1 FROM conversation_links l WHERE l.message_id = m.root)
+         AND NOT EXISTS (
+           SELECT 1 FROM conversation_messages q
+           WHERE q.id = m.reply_to AND q.action IS NOT NULL)
+       ORDER BY m.id`,
+    )
+    .all({ readBefore, since, max: OWED_RETURNS }) as {
+    id: number;
+    text: string;
+    read_at: string;
+  }[];
+  return rows.map((row) => ({ id: row.id, text: row.text, readAt: row.read_at }));
+}
+
+// An owed message was brought back to a wait: one return counted, and the desk's «heard» is now.
+export function bumpOwed(db: DatabaseSync, id: number, at: string): void {
+  db.prepare(
+    'UPDATE conversation_messages SET owed_returns = owed_returns + 1, heard_at = ? WHERE id = ?',
+  ).run(at, id);
+}
+
+// A secretary session begins: what the earlier one left unanswered is owed to it again.
+export function resetOwed(db: DatabaseSync): void {
+  db.prepare(
+    "UPDATE conversation_messages SET owed_returns = 0 WHERE author = 'person' AND owed_returns > 0",
+  ).run();
+}
+
 // Whether the person has answered this question of the secretary's: a message of theirs that replies
 // to it. What else they say, or answer to other questions, leaves it open.
 export function isAnswered(db: DatabaseSync, id: number): boolean {

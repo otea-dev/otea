@@ -236,7 +236,7 @@ export function HablarView({
   );
   const turns = useMemo(() => turnsOf(messages ?? []), [messages]);
   const rows = useMemo(() => rowsOf(messages ?? [], turns), [messages, turns]);
-  const thinking = thinkingRoot(turns, secretary);
+  const thinking = thinkingRoot(turns, secretary, app.now);
   const cards = useMemo(
     () => cardsOf(turns, items, app.now, filter),
     [turns, items, app.now, filter],
@@ -577,6 +577,7 @@ export function HablarView({
                     turns={turns}
                     rows={rows}
                     thinking={thinking}
+                    secretaryListening={secretary?.state === 'listening'}
                     items={items}
                     found={found}
                     onKind={onKind}
