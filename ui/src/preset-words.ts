@@ -12,8 +12,18 @@ function wordsOf(type: TypeView | undefined) {
   return type?.labels?.[language()];
 }
 
+// A step's hidden id (core/board/ids.ts: a kind letter and seven base-36 characters, with
+// `__review` or `__yours` for its review): never a word for a person. A board the page does not
+// have yet leaves a state with no label, and the id showed («sgp22f0j__review»). A bare id is told
+// from a preset's own key (`starting`) by holding a digit, which nine ids in ten do.
+const HIDDEN_STATE = /^s[0-9a-z]{7}(__review|__yours)$|^s(?=[a-z]*[0-9])[0-9a-z]{7}$/;
+
+function unnamed(state: string): string {
+  return HIDDEN_STATE.test(state) ? '…' : state;
+}
+
 export function stateWord(type: TypeView | undefined, state: string): string {
-  return wordsOf(type)?.states[state] ?? state;
+  return wordsOf(type)?.states[state] ?? unnamed(state);
 }
 
 // The words of the board's language a kept state name is said in (the board's, the agent's, not the
@@ -48,7 +58,7 @@ export function keptStateWord(name: string, words: KeptWords = {}): string {
 
 // A state named across a collection's types (a group of the list by state): the first label for it.
 export function stateWordIn(types: readonly TypeView[], state: string): string {
-  return types.map((type) => wordsOf(type)?.states[state]).find(Boolean) ?? state;
+  return types.map((type) => wordsOf(type)?.states[state]).find(Boolean) ?? unnamed(state);
 }
 
 // The type's name as people read it: its label in the language on screen, or the preset's label.

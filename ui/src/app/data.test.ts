@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { boardsKey, canCaptureNow } from './data.ts';
+import type { CollectionView, Item } from '../types.ts';
+import { boardsKey, canCaptureNow, newlyUnknown, unknownBoards } from './data.ts';
 
 // P5-R3-9: a board published elsewhere (another window, the phone, an agent's change) left this
 // desk on the boards it first read, and an item's new field showed by its hidden key («DSI4K2MQ:
@@ -12,6 +13,36 @@ describe('when the desk reads the boards again', () => {
 
   it('keeps them while nothing changed', () => {
     expect(boardsKey(2, 5)).toBe(boardsKey(2, 5));
+  });
+});
+
+// E1: an item of a board the loaded boards did not know (made through the CLI while this page held
+// older answers, or served from the cache) showed its step by the hidden id («sgp22f0j__review»)
+// and its type as «item». An item of a board the desk does not have means the boards are old.
+describe('boards an item names that the desk does not have', () => {
+  const board = (name: string) => ({ name }) as CollectionView;
+  const item = (collection: string) => ({ collection }) as Item;
+
+  it('lists each once, in the order the items name them', () => {
+    expect(
+      unknownBoards(
+        [item('Tareas'), item('Cambios'), item('Tareas'), item('Otro')],
+        [board('Cambios')],
+      ),
+    ).toEqual(['Tareas', 'Otro']);
+  });
+
+  it('says none when every item is on a board it has', () => {
+    expect(unknownBoards([item('Cambios')], [board('Cambios')])).toEqual([]);
+  });
+
+  it('reads the boards again for a set of unknown boards it has not looked for, and only once', () => {
+    expect(boardsKey(0, 1, 1)).not.toBe(boardsKey(0, 1, 0));
+    expect(newlyUnknown(['Tareas'], '')).toBe('Tareas');
+    // Looked for already and still unknown (its board was archived): no loop.
+    expect(newlyUnknown(['Tareas'], 'Tareas')).toBeUndefined();
+    expect(newlyUnknown(['Tareas', 'Otro'], 'Tareas')).toBe('Tareas\nOtro');
+    expect(newlyUnknown([], 'Tareas')).toBeUndefined();
   });
 });
 

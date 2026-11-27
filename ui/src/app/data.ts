@@ -83,8 +83,28 @@ export function useFeed(version: number): FeedEvent[] {
 // When the boards are read again: on this window's Studio writes and on every change of the
 // project, so a board published elsewhere (another window, the phone) draws its new fields by their
 // names (P5-R3-9). Both counts only grow, so their sum changes whenever either does.
-export function boardsKey(studioWrites: number, version: number): number {
-  return studioWrites + version;
+// `rereads`: how many times the boards were read again because an item named one the desk did not
+// have (newlyUnknown). All three counts only grow.
+export function boardsKey(studioWrites: number, version: number, rereads = 0): number {
+  return studioWrites + version + rereads;
+}
+
+// The boards the items are on that the loaded boards do not include, each once.
+export function unknownBoards(
+  items: readonly Pick<Item, 'collection'>[],
+  collections: readonly Pick<CollectionView, 'name'>[],
+): string[] {
+  const known = new Set(collections.map((board) => board.name));
+  return [...new Set(items.map((item) => item.collection))].filter((name) => !known.has(name));
+}
+
+// A board made elsewhere while this page held older answers (or served them from the cache) left
+// its items with a hidden step id and no type words. The boards are read again for a set of
+// unknown ones the desk has not looked for yet, once: a board that stays unknown (an item whose
+// board was archived) does not read them in a loop.
+export function newlyUnknown(unknown: readonly string[], looked: string): string | undefined {
+  const names = unknown.join('\n');
+  return names !== '' && names !== looked ? names : undefined;
 }
 
 // Nuevo: online as the session allows; offline into the queue, where there is one, unless the
@@ -117,8 +137,22 @@ export function useAppData(): LoadedData {
   const items = useRemote(fetchItems, version, connection);
   const session = useRemote(fetchSession, 0, connection);
   const [studioWrites, setStudioWrites] = useState(0);
-  const boards = boardsKey(studioWrites, version);
+  const [rereads, setRereads] = useState(0);
+  const looked = useRef('');
+  const boards = boardsKey(studioWrites, version, rereads);
   const collections = useRemote(fetchCollections, boards, connection);
+  const boardsRead = ready(collections);
+  const itemsRead = ready(items);
+  const unknown =
+    boardsRead && itemsRead ? unknownBoards(itemsRead, boardsRead).join('\n') : undefined;
+  useEffect(() => {
+    if (unknown === undefined) return;
+    if (unknown === '') looked.current = '';
+    else if (newlyUnknown(unknown.split('\n'), looked.current) !== undefined) {
+      looked.current = unknown;
+      setRereads((n) => n + 1);
+    }
+  }, [unknown]);
   const presets = useRemote(fetchPresets, boards, connection);
   const project = useRemote(fetchProject, 0, connection);
   // Other projects are not on this server's stream: read again as this one changes, and on the beat.
