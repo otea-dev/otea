@@ -188,12 +188,7 @@ function AwayNotice({
         </span>
         <Icon name="chevron" />
       </button>
-      {open ? (
-        <>
-          <span className="hb-away-sentence">{sentence}</span>
-          {name ? <AwayHow name={name} /> : null}
-        </>
-      ) : null}
+      {open && name ? <AwayHow name={name} /> : null}
     </div>
   );
 }
