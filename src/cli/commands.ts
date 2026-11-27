@@ -2860,6 +2860,27 @@ function noteWorkerHarnessAfter(input: Input): void {
   void lookUpWorkerHarness(input, me).catch(() => noteMiss(input.cwd, me));
 }
 
+// A wait notes its agent's harness session (a worker's, a refiner's) once the owner watch has read
+// the processes, unless it is noted already (H2).
+function noteHarnessOfOwner(
+  project: Project,
+  input: Input,
+  owner: ReturnType<typeof watchOwner>,
+): void {
+  if (!workerHarnessUnknown(project, input)) return;
+  const me = input.actor.name;
+  void Promise.all([owner.harness, owner.harnessKnown, owner.harnessStarted]).then(
+    ([pid, known, started]) => {
+      if (pid === undefined || pid === process.pid) return;
+      try {
+        noteHarness(project.db, me, pid, systemClock, known, started);
+      } catch {
+        // The wait ended and closed the project first: nothing left to note it for.
+      }
+    },
+  );
+}
+
 async function lookUpWorkerHarness(input: Input, me: string): Promise<void> {
   const table = await listProcesses(AbortSignal.timeout(WORKER_HARNESS_READ_MS));
   const pid = table && harnessOf(table.rows, STARTED_BY);
@@ -2984,18 +3005,7 @@ const wait: Command = {
       // does the person's answer to its question.
       const me = input.actor.name;
       // A worker's harness session is noted once the owner watch has read the processes (H2).
-      if (workerHarnessUnknown(project, input)) {
-        void Promise.all([owner.harness, owner.harnessKnown, owner.harnessStarted]).then(
-          ([pid, known, started]) => {
-            if (pid === undefined || pid === process.pid) return;
-            try {
-              noteHarness(project.db, me, pid, systemClock, known, started);
-            } catch {
-              // The wait ended and closed the project first: nothing left to note it for.
-            }
-          },
-        );
-      }
+      noteHarnessOfOwner(project, input, owner);
       // An agent waiting for unclaimed agent work wakes only for an item next would offer it: one left for
       // or just offered to another agent would wake it to "nothing to do" again and again.
       const forMe =
@@ -5602,15 +5612,19 @@ const bandejaTake: Command = {
         text: `${head}\n${entryText(entry, paths, problems, actor.name)}`,
       };
     };
+    // The refiner's harness session is noted, as a worker's is, so a refiner killed with its
+    // session gives its note back at once, not when the hold runs out.
     if (!next) {
-      return withAgent(input, (project) => {
+      const taken = await withAgent(input, (project) => {
         const held = takeBandeja(project, { id: bandejaIdOf(id ?? ''), agent: actor.name });
         return show(project, held);
       });
+      noteWorkerHarnessAfter(input);
+      return taken;
     }
     const again = bandejaTakeNextCommand(actor.name);
     if (!waits) {
-      return withAgent(input, (project) => {
+      const taken = await withAgent(input, (project) => {
         noteRefiner(project, actor.name);
         const held = takeNextBandeja(project, { agent: actor.name });
         if (held === undefined) {
@@ -5621,6 +5635,8 @@ const bandejaTake: Command = {
         }
         return show(project, held);
       });
+      noteWorkerHarnessAfter(input);
+      return taken;
     }
     // The wait of the project's one refiner: it hears the agent, but is no listener on the boards.
     const timeout = input.option('timeout');
@@ -5628,6 +5644,7 @@ const bandejaTake: Command = {
     const owner = watchOwner(input.signal);
     const result = await withAgentWhile(input, async (project) => {
       noteRefiner(project, actor.name);
+      noteHarnessOfOwner(project, input, owner);
       const waited = await listenWhile(
         project,
         input,

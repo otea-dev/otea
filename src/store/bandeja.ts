@@ -228,16 +228,30 @@ export function holdEntry(
 export function countWaitingEntries(
   db: DatabaseSync,
   at: string,
+  // Refiners whose session ended: what they hold is held by nobody.
+  gone: readonly string[] = [],
 ): { count: number; since: string | null } {
   const row = db
     .prepare(
       `SELECT COUNT(*) AS n, MIN(e.at) AS since FROM bandeja_entries e
        WHERE e.filed_at IS NULL AND e.closed_at IS NULL
-         AND (e.claimed_by IS NULL OR e.claim_until <= :at)
+         AND (e.claimed_by IS NULL OR e.claim_until <= :at
+              OR e.claimed_by IN (SELECT value FROM json_each(:gone)))
          AND NOT EXISTS (SELECT 1 FROM bandeja_questions q WHERE q.entry_id = e.id AND q.answered_at IS NULL)`,
     )
-    .get({ at }) as { n: number; since: string | null };
+    .get({ at, gone: JSON.stringify(gone) }) as { n: number; since: string | null };
   return { count: Number(row.n), since: row.since };
+}
+
+// The agents holding an entry at `at` (held, not run out, not filed or closed).
+export function selectHolders(db: DatabaseSync, at: string): string[] {
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT claimed_by FROM bandeja_entries
+       WHERE claimed_by IS NOT NULL AND claim_until > :at AND filed_at IS NULL AND closed_at IS NULL`,
+    )
+    .all({ at }) as { claimed_by: string }[];
+  return rows.map((row) => row.claimed_by);
 }
 
 // Any call of a refiner keeps the entries it holds (as it keeps its items' leases): their lease

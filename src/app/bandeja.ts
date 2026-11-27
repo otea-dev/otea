@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { basename } from 'node:path';
+import type { DatabaseSync } from 'node:sqlite';
 import {
   BANDEJA_LEASE_MS,
   type BandejaEntry,
@@ -36,6 +37,7 @@ import {
   selectEntryOfItem,
   selectEntryRow,
   selectEntryRows,
+  selectHolders,
 } from '../store/bandeja.ts';
 import { joinTransaction, transaction } from '../store/database.ts';
 import { findItem } from '../store/queries.ts';
@@ -44,7 +46,7 @@ import type { Context } from './context.ts';
 import { type MessageFileInput, traceAnswer } from './conversation.ts';
 import { evidenceFile, namedReadPath, storeFile } from './evidence.ts';
 import { type Clock, requireItem, systemClock } from './items.ts';
-import { listAgents } from './presence.ts';
+import { listAgents, sessionEnded } from './presence.ts';
 import type { Project } from './project.ts';
 import { addSecretarySource, secretaryName } from './secretary.ts';
 import { addWaitingSource } from './secretary-waiting.ts';
@@ -155,23 +157,41 @@ export function captureToBandeja(
   return { entry: requireEntry(project, id, now), replayed: false };
 }
 
-function stateOf(row: EntryRow, questions: readonly BandejaQuestion[], at: string): BandejaState {
+function stateOf(
+  row: EntryRow,
+  questions: readonly BandejaQuestion[],
+  at: string,
+  gone: ReadonlySet<string>,
+): BandejaState {
   if (row.filed_at !== null) return 'filed';
   if (row.closed_at !== null) return 'closed';
   const last = questions.at(-1);
   if (last !== undefined && last.answer === undefined) return 'asking';
-  if (row.claimed_by !== null && row.claim_until !== null && row.claim_until > at)
+  if (
+    row.claimed_by !== null &&
+    row.claim_until !== null &&
+    row.claim_until > at &&
+    !gone.has(row.claimed_by)
+  )
     return 'refining';
   return 'waiting';
+}
+
+// The refiners holding a note whose session ended (their harness is gone, noted by their take or
+// wait): what they hold is held by nobody, not for the rest of the lease. Never for one heard
+// through no process Otea can watch.
+function goneHolders(db: DatabaseSync, at: string): string[] {
+  return selectHolders(db, at).filter((name) => sessionEnded(db, name, () => at));
 }
 
 function hydrate(ctx: Context, rows: readonly EntryRow[], at: string): BandejaEntry[] {
   const ids = rows.map(({ id }) => id);
   const files = filesOfEntries(ctx.db, ids);
   const asked = questionsOfEntries(ctx.db, ids);
+  const gone = new Set(goneHolders(ctx.db, at));
   return rows.map((row) => {
     const questions = asked.get(row.id) ?? [];
-    const state = stateOf(row, questions, at);
+    const state = stateOf(row, questions, at, gone);
     const last = questions.at(-1);
     const holding = state === 'refining';
     return {
@@ -269,6 +289,8 @@ export function takeBandeja(
         `${was.ref} is closed (${quoteAgent(was.closeReason ?? 'no reason given')}): the person may reopen it`,
       );
     }
+    // Held by a refiner whose session ended: let go of it first, then it is taken as any free note.
+    if (was.state === 'waiting') releaseEntry(project.db, id);
     const until = new Date(Date.parse(at) + BANDEJA_LEASE_MS).toISOString();
     if (!holdEntry(project.db, id, agent, at, until)) {
       throw new OteaError(
@@ -588,7 +610,10 @@ export function bandejaOfItem(ctx: Context, item: string): FromBandeja | undefin
 // person answers.
 // The captures nobody took count among what waits for an absent secretary (the notice «te esperan
 // N»), beside the person's unread messages.
-addWaitingSource((db) => countWaitingEntries(db, systemClock()));
+addWaitingSource((db) => {
+  const at = systemClock();
+  return countWaitingEntries(db, at, goneHolders(db, at));
+});
 
 // How long a note may wait for a refiner that is there (busy with another note) before it is the
 // secretary's: it takes the notes in turn, and the secretary taking one meanwhile is what the
