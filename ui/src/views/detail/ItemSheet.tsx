@@ -180,12 +180,18 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   const onBoard = useMemo(
     () =>
       live
-        ? boardItemOf(live, item, {
-            done: boardSpeech(live).done,
-            dip: (n, at) => t('sheet.dip', { n, when: at ? dipWhen(at, now) : '' }),
-            redone: (n) => t('sheet.dipRedone', { n }),
-            reopen: (at) => t('sheet.reopenDip', { when: at ? dipWhen(at, now) : '' }),
-          })
+        ? boardItemOf(
+            live,
+            item,
+            {
+              done: boardSpeech(live).done,
+              dip: (n, at) => t('sheet.dip', { n, when: at ? dipWhen(at, now) : '' }),
+              redone: (n) => t('sheet.dipRedone', { n }),
+              reopen: (at) => t('sheet.reopenDip', { when: at ? dipWhen(at, now) : '' }),
+              bounce: (n) => t('sheet.dipBounced', { n }),
+            },
+            item.bounced,
+          )
         : null,
     [live, item, now],
   );

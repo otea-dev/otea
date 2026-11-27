@@ -168,6 +168,24 @@ describe('boardItemOf: the item page reads a published board through the step en
     expect(atAnimate?.route.words).toEqual(['Concepto', '', 'Animar', 'Pulir', 'Hecho']);
   });
 
+  // R2 left: an item approved and then taken back by an agent (a conflict at landing) was not
+  // sent back by the person, yet its route said «ronda 1 · devuelta hoy» under the step.
+  it('words the loop of an approved item an agent took back as the bounce it is, not a send-back', () => {
+    const events = [
+      created('sconcept'),
+      moved('sconcept', 'sconcept__review', agent('quill'), '2026-01-02T00:00:00Z'),
+      moved('sconcept__review', 'sanimate', you, '2026-01-03T00:00:00Z'),
+      moved('sanimate', 'sconcept', agent('quill'), '2026-01-04T00:00:00Z'),
+    ];
+    const said = { ...words, bounce: (n: number) => `ronda ${n} · volvió` };
+    const sentBack = boardItemOf(creatures(), item('sconcept', events), said);
+    expect(sentBack?.route.dips.map((dip) => dip.label)).toEqual(['ronda 1']);
+    const bounced = boardItemOf(creatures(), item('sconcept', events), said, {
+      at: '2026-01-04T00:00:00Z',
+    });
+    expect(bounced?.route.dips.map((dip) => dip.label)).toEqual(['ronda 1 · volvió']);
+  });
+
   it('draws a closed item at Hecho, and leaves a state the board does not know to the preset', () => {
     expect(boardItemOf(creatures(), item('done', [created('sconcept')]), words)?.route.ci).toBe(4);
     expect(boardItemOf(creatures(), item('fixing', [created('fixing')]), words)).toBeNull();

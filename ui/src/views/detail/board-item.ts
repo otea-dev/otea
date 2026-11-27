@@ -107,6 +107,8 @@ export function boardItemOf(
   def: BoardDefinition,
   item: ItemLike,
   words: RouteWords,
+  // The agent's taking the item back after its approval (`item.bounced`): that loop is no send-back.
+  bounced?: { at: string },
 ): BoardItem | null {
   const position = positionOf(item.state);
   if (isClosed(position) ? position.closed !== DONE : !stepById(def, position.step)) return null;
@@ -117,7 +119,10 @@ export function boardItemOf(
   const round = isClosed(position) ? 0 : (rounds.rounds[position.step] ?? 1);
   const at = isClosed(position) ? DONE : { step: position.step, phase: position.phase };
   const drawn = leadRoute(def, position, item.fields ?? {}, rounds.rounds);
-  const out: BoardItem = { agent, round, route: definitionRoute(drawn, at, rounds.dips, words) };
+  const dips = rounds.dips.map((dip) =>
+    bounced && dip.at === bounced.at ? { ...dip, bounced: true as const } : dip,
+  );
+  const out: BoardItem = { agent, round, route: definitionRoute(drawn, at, dips, words) };
   if (!isClosed(position) && position.phase === 'doing') {
     const index = reopenedAt(history.moves, position.step);
     const move = history.moves[index];
