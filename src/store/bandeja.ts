@@ -213,6 +213,28 @@ export function answerQuestionRow(
   return Number(result.changes) === 1;
 }
 
+// Takes the answer back off the question (the person's Deshacer): only the answer given at
+// `answeredAt`. True when this call did.
+export function retractQuestionRow(
+  db: DatabaseSync,
+  entry: number,
+  n: number,
+  answeredAt: string,
+): boolean {
+  const sql = `UPDATE bandeja_questions
+    SET answer_text = NULL, answer_mode = NULL, answer_option = NULL, answered_at = NULL
+    WHERE entry_id = :entry AND n = :n AND answered_at = :answeredAt`;
+  return Number(db.prepare(sql).run({ entry, n, answeredAt }).changes) === 1;
+}
+
+// When a refiner last took the entry (null when none did).
+export function selectClaimedAt(db: DatabaseSync, id: number): string | null {
+  const row = db.prepare('SELECT claimed_at FROM bandeja_entries WHERE id = ?').get(id) as
+    | { claimed_at: string | null }
+    | undefined;
+  return row?.claimed_at ?? null;
+}
+
 // Holds the entry for `agent` until `until`, unless another holds it still (its lease not run out
 // at `at`), it is filed, or `agent` asked and waits: atomic, so two refiners never both take it.
 // True when this call took (or kept) it.

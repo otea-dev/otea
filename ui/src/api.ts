@@ -406,6 +406,11 @@ export async function postAnswer(id: string, given: AnswerGiven): Promise<void> 
   await post(`/api/items/${encodeURIComponent(id)}/answer`, given);
 }
 
+// You take back the tap you just gave on an option of an agent's question (Deshacer): it asks again.
+export async function postUnanswer(id: string): Promise<void> {
+  await post(`/api/items/${encodeURIComponent(id)}/unanswer`, {});
+}
+
 // You let the item go on without a file its step asks for: its handoff stops asking for it.
 export async function postWaive(id: string, part: string, reason: string): Promise<void> {
   await post(`/api/items/${encodeURIComponent(id)}/waive`, {
@@ -749,6 +754,11 @@ export function postCapture(
 // (by number, from 1) or the decision left to the refiner.
 export function postBandejaAnswer(id: number, given: AnswerGiven): Promise<BandejaEntry> {
   return post<BandejaEntry>(`/api/bandeja/${id}/answer`, given);
+}
+
+// You take back the tap you just gave on an option of a refiner's question on a note.
+export function postBandejaUnanswer(id: number): Promise<BandejaEntry> {
+  return post<BandejaEntry>(`/api/bandeja/${id}/unanswer`, {});
 }
 
 // The person sets an agent's escalation aside (the `signal` number of its row in Te espera).

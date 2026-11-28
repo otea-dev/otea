@@ -10,6 +10,7 @@ import {
   type ItemQuestion,
   QUESTION_ANSWERED,
   QUESTION_ASKED,
+  QUESTION_UNANSWERED,
   questionsOf,
   waitAnswerText,
 } from '../core/board/questions.ts';
@@ -19,6 +20,7 @@ import { activeLease, DEFAULT_LEASE_TTL_MS } from '../core/lease.ts';
 import { transaction } from '../store/database.ts';
 import {
   appendEvent,
+  findAgent,
   type ItemRecord,
   selectEvents,
   selectEventsOfTypes,
@@ -27,7 +29,7 @@ import {
 } from '../store/queries.ts';
 import { askingItems } from './asking.ts';
 import type { Context } from './context.ts';
-import { traceAnswer } from './conversation.ts';
+import { dropTraceOf, RETRACT_ANSWER_MS, traceAnswer } from './conversation.ts';
 import { requireItem, requireWritableItem, systemClock } from './items.ts';
 import { assertMayWriteItem, takeItem } from './lease-take.ts';
 import { itemOnBoard, type LiveBoard, liveBoardOf, relayAllowed } from './next.ts';
@@ -222,6 +224,65 @@ export function answerQuestion(ctx: Context, input: PersonAnswer, now = systemCl
       now,
     );
   return answered;
+}
+
+// How long the person may take back a tap on an agent's question (Deshacer).
+const RETRACT_ITEM_ANSWER_MS = RETRACT_ANSWER_MS;
+
+// The person takes back the tap they just gave on an option of an agent's question: the question
+// waits for them again. The secretary's questions have the same rule (conversation.ts
+// retractAnswer): only the person, within 30 seconds, only a tapped option (not words, not leaving
+// it to the agent, not an answer an agent noted from the chat), and only while the agent has not
+// acted on it. Both events are dropped from the item's history (`undoes`).
+export function retractItemAnswer(
+  ctx: Context,
+  input: { id: string; actor: Actor },
+  now = systemClock,
+): ItemQuestion {
+  const { id } = input;
+  if (input.actor.kind !== 'human')
+    refuse('forbidden', id, 'not_person', `Not taken back: the person answers questions on ${id}`);
+  const undoable = (why: string): never => {
+    throw new OteaError('not_undoable', `${id}: ${why}`);
+  };
+  return transaction(ctx.db, () => {
+    const item = requireWritableItem(ctx.db, id);
+    const events = selectEvents(ctx.db, item.id);
+    const answered = questionsOf(events).findLast((each) => each.answer !== undefined);
+    const answer = answered?.answer;
+    const event = events.findLast(
+      ({ type, data }) => type === QUESTION_ANSWERED && data.question === answered?.question,
+    );
+    if (!answered || !answer || event?.id === undefined)
+      return undoable('there is no answer to take back');
+    if (answer.mode !== 'option' || answer.via !== undefined)
+      return undoable('only a tap on one of its options is taken back, not words you wrote');
+    // Whatever came after the tap that the agent or the desk did on its own: the item moved, or the
+    // agent called Otea since (it may have read the answer).
+    const after = events.filter(({ id: at }) => (at ?? 0) > (event.id ?? 0));
+    const quiet = new Set(['claimed', SET_ASIDE_LIFTED, 'question_unanswered']);
+    if (after.some(({ type }) => !quiet.has(type)))
+      return undoable('the agent already went on with your answer');
+    const acted = findAgent(ctx.db, answered.by)?.actedAt;
+    if (acted !== undefined && acted !== null && acted >= answer.at)
+      return undoable('the agent already has your answer');
+    if (Date.parse(now()) - Date.parse(answer.at) > RETRACT_ITEM_ANSWER_MS)
+      return undoable('the answer is too old to take back');
+    appendEvent(ctx.db, {
+      itemId: item.id,
+      type: QUESTION_UNANSWERED,
+      actor: input.actor,
+      at: now(),
+      data: { question: answered.question, undoes: event.id },
+    });
+    // The trace of the tap in the conversation goes with it.
+    dropTraceOf(ctx, item.id);
+    const back = questionsOf(selectEvents(ctx.db, item.id)).find(
+      ({ question }) => question === answered.question,
+    );
+    if (!back) throw new Error(`question ${answered.question} on ${item.id} was not kept`);
+    return back;
+  });
 }
 
 function answeredQuestion(

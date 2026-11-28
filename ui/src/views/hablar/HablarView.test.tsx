@@ -275,7 +275,8 @@ describe('the conversation on the two lanes', () => {
     await press(options[1]);
 
     // It says which question the tap is for, as the item page does.
-    expect(answer).toHaveBeenCalledWith('CAM-14', { option: 2, question: 2 }, expect.any(String));
+    // The card's own toast says it, with its Deshacer (D-53015b): no message goes with the call.
+    expect(answer).toHaveBeenCalledWith('CAM-14', { option: 2, question: 2 });
   });
 });
 

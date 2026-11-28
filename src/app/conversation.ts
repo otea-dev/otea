@@ -39,6 +39,7 @@ import {
   selectAnswerOf,
   selectDefaultTurn,
   selectKindNews,
+  selectLastTraceOf,
   selectLatestUnanswered,
   selectMessage,
   selectMessages,
@@ -708,6 +709,13 @@ export function traceAnswer(
       asked: trace.asked,
     },
   });
+}
+
+// The trace of a tap goes when the person takes the tap back (Deshacer): the latest one about `about`
+// (an item or a note), and only one of an option they tapped.
+export function dropTraceOf(ctx: Context, about: string): void {
+  const id = selectLastTraceOf(ctx.db, about);
+  if (id !== undefined) deleteMessage(ctx.db, id);
 }
 
 export type Look = {

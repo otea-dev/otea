@@ -1,6 +1,6 @@
 import { type CSSProperties, type RefObject, useLayoutEffect, useRef, useState } from 'react';
 import { optionsNeedingWords } from '../../../../src/core/own-words.ts';
-import type { AnswerWords } from '../../api.ts';
+import { type AnswerWords, postUnanswer } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { ShortText } from '../../components/ShortText.tsx';
 import { Ticked } from '../../components/Ticked.tsx';
@@ -117,9 +117,9 @@ export function AskCard({ item, gone = false }: { item: Item; gone?: boolean }) 
       optionText={asks.optionText ?? []}
       joined
       gone={gone}
-      send={(given) =>
-        app.answer(item.id, { ...given, question: asks.question }, t('hablar.ask.sent'))
-      }
+      // The card says what you answered, with its Deshacer, until the live feed takes the question.
+      retract={() => postUnanswer(item.id)}
+      send={(given) => app.answer(item.id, { ...given, question: asks.question })}
     />
   );
 }

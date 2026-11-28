@@ -34,6 +34,8 @@ import {
   releaseEntry,
   renewEntries,
   reopenEntry,
+  retractQuestionRow,
+  selectClaimedAt,
   selectEntryOfItem,
   selectEntryRow,
   selectEntryRows,
@@ -43,7 +45,12 @@ import { joinTransaction, transaction } from '../store/database.ts';
 import { findItem } from '../store/queries.ts';
 import { saveRole, selectRoles } from '../store/secretary.ts';
 import type { Context } from './context.ts';
-import { type MessageFileInput, traceAnswer } from './conversation.ts';
+import {
+  dropTraceOf,
+  type MessageFileInput,
+  RETRACT_ANSWER_MS,
+  traceAnswer,
+} from './conversation.ts';
 import { evidenceFile, namedReadPath, storeFile } from './evidence.ts';
 import { type Clock, requireItem, systemClock } from './items.ts';
 import { listAgents, sessionEnded } from './presence.ts';
@@ -577,6 +584,36 @@ export function answerBandeja(
       },
       () => at,
     );
+    return requireEntry(project, input.id, () => at);
+  });
+}
+
+// The person takes back a tap on an option of a refiner's question (Deshacer): the note waits for
+// their answer again. The same rule as every question of an agent: within 30 seconds, only a tapped
+// option, and only while the refiner has not taken the note again nor filed or closed it.
+export function retractBandejaAnswer(
+  project: Project,
+  input: { id: number },
+  now: Clock = systemClock,
+): BandejaEntry {
+  return transaction(project.db, () => {
+    const at = now();
+    const entry = requireEntry(project, input.id, () => at);
+    const undoable = (why: string): never => {
+      throw new OteaError('not_undoable', `${entry.ref}: ${why}`);
+    };
+    const answered = entry.questions.findLast((each) => each.answer !== undefined);
+    const answer = answered?.answer;
+    if (!answered || !answer) return undoable('there is no answer to take back');
+    if (answer.mode !== 'option')
+      return undoable('only a tap on one of its options is taken back, not words you wrote');
+    if (entry.filedAt !== null || entry.closedAt !== null || selectClaimedAt(project.db, input.id))
+      return undoable('the refiner already went on with your answer');
+    if (Date.parse(at) - Date.parse(answer.at) > RETRACT_ANSWER_MS)
+      return undoable('the answer is too old to take back');
+    if (!retractQuestionRow(project.db, input.id, answered.question, answer.at))
+      return undoable('there is no answer to take back');
+    dropTraceOf(project, entry.ref);
     return requireEntry(project, input.id, () => at);
   });
 }

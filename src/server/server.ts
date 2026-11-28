@@ -15,6 +15,7 @@ import {
   captureToBandeja,
   listBandeja,
   reopenBandeja,
+  retractBandejaAnswer,
 } from '../app/bandeja.ts';
 import { syncBoardPresets } from '../app/boards.ts';
 import { briefFor } from '../app/brief.ts';
@@ -73,7 +74,7 @@ import { listPresetViews } from '../app/preset-views.ts';
 import { estimatesOfItems, pinItems, priorityOf, setOrder } from '../app/priority.ts';
 import { type Env, type Project, projectView } from '../app/project.ts';
 import { projectLanguage } from '../app/project-language.ts';
-import { answerQuestion } from '../app/questions.ts';
+import { answerQuestion, retractItemAnswer } from '../app/questions.ts';
 import { linkItems, unlinkItems } from '../app/relations.ts';
 import { reopenDropped } from '../app/reopen-dropped.ts';
 import { reassignItem, restartItem, resumeItem, undoRelease } from '../app/restart.ts';
@@ -1174,6 +1175,15 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
           });
         },
       )
+      // The person takes back the tap they just gave on a refiner's question (Deshacer).
+      .post('/bandeja/:id/unanswer', (c) => {
+        assertWritable(c, auth);
+        return replaying(c, project, null, 200, () => {
+          const entry = retractBandejaAnswer(project, { id: bandejaIdOf(c.req.param('id')) });
+          feed.notify();
+          return entry;
+        });
+      })
       // The person reopens a note the secretary or its refiner closed: it waits for the secretary
       // again.
       .post('/bandeja/:id/reopen', (c) => {
@@ -1219,6 +1229,17 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
           return c.json(showItem(project, id, HUMAN_IN_UI));
         },
       )
+      // The person takes back the tap they just gave on an agent's question (Deshacer): it waits for
+      // them again, while the agent has not acted on it.
+      .post('/items/:id/unanswer', (c) => {
+        assertWritable(c, auth);
+        const id = c.req.param('id');
+        return replaying(c, project, null, 200, () => {
+          retractItemAnswer(project, { id, ...HUMAN_IN_UI });
+          feed.notify();
+          return showItem(project, id, HUMAN_IN_UI);
+        });
+      })
       // The person lets an item go on without a file its step asks for (a screenshot an agent
       // with no browser cannot make): its handoff then passes, and the review says so.
       .post('/items/:id/waive', async (c) => {

@@ -1,5 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
-import { bandejaFileUrl, fetchBandeja, postBandejaAnswer, postBandejaReopen } from '../../api.ts';
+import {
+  bandejaFileUrl,
+  fetchBandeja,
+  postBandejaAnswer,
+  postBandejaReopen,
+  postBandejaUnanswer,
+} from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { type BandejaEntry, entryTitle, isDone, ordered } from '../../bandeja.ts';
 import { useRemote } from '../../hooks.ts';
@@ -62,9 +68,13 @@ export function BandejaAsk({ entry, onAnswered }: { entry: BandejaEntry; onAnswe
       recommended={asking.recommended}
       optionText={asking.optionText ?? []}
       joined
+      // The card says what you answered, with its Deshacer.
+      retract={async () => {
+        await postBandejaUnanswer(entry.id);
+        onAnswered();
+      }}
       send={async (given) => {
         await postBandejaAnswer(entry.id, { ...given, question: asking.question });
-        toast({ msg: t('hablar.ask.sent') });
         onAnswered();
       }}
     />

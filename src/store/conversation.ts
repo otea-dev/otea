@@ -316,6 +316,17 @@ export function selectAnswerOf(db: DatabaseSync, id: number): Message | undefine
   return row ? hydrate(db, [row])[0] : undefined;
 }
 
+// The latest trace of a tap on an option of an agent's question about `about` (CAM-1, B-3).
+export function selectLastTraceOf(db: DatabaseSync, about: string): number | undefined {
+  const row = db
+    .prepare(
+      `SELECT id FROM conversation_messages
+        WHERE author = 'person' AND about = ? AND choice = 'option' ORDER BY id DESC LIMIT 1`,
+    )
+    .get(about) as { id: number } | undefined;
+  return row?.id;
+}
+
 export function deleteMessage(db: DatabaseSync, id: number): void {
   db.prepare('DELETE FROM conversation_messages WHERE id = ?').run(id);
 }

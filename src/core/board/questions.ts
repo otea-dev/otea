@@ -10,6 +10,9 @@ import { timeText } from '../time.ts';
 
 export const QUESTION_ASKED = 'question_asked';
 export const QUESTION_ANSWERED = 'question_answered';
+// The person took back a tap on an option (Deshacer): it names the answer event it undoes
+// (`undoes`), so readers drop the pair and the question is open again.
+export const QUESTION_UNANSWERED = 'question_unanswered';
 
 // How a question was answered: one of the options the agent gave (`option`, its 1-based number, and
 // `text` its words), the person's own words, or the person leaving the decision to the agent

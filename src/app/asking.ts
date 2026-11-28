@@ -4,6 +4,7 @@ import {
   openQuestion,
   QUESTION_ANSWERED,
   QUESTION_ASKED,
+  QUESTION_UNANSWERED,
 } from '../core/board/questions.ts';
 import { type EventRecord, selectEvents, selectEventsOfTypes } from '../store/queries.ts';
 
@@ -22,7 +23,12 @@ export type Asks = {
 
 // The open question of every item that has one, by item id, read in one query.
 export function askingItems(db: DatabaseSync): Map<string, ItemQuestion> {
-  const events = selectEventsOfTypes(db, [QUESTION_ASKED, QUESTION_ANSWERED, 'transitioned']);
+  const events = selectEventsOfTypes(db, [
+    QUESTION_ASKED,
+    QUESTION_ANSWERED,
+    QUESTION_UNANSWERED,
+    'transitioned',
+  ]);
   const byItem = new Map<string, EventRecord[]>();
   for (const event of events) {
     const list = byItem.get(event.itemId) ?? [];
