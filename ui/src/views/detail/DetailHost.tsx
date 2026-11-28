@@ -6,7 +6,7 @@ import { useWorkspace, workspace } from '../../app/workspace.ts';
 import { NewItemForm } from '../../components/NewItemForm.tsx';
 import { t } from '../../i18n/i18n.ts';
 import { useEscape } from '../../kit/escape.ts';
-import { returnFocus } from '../../kit/pop/focus.ts';
+import { onDialogTab, returnFocus } from '../../kit/pop/focus.ts';
 import { curView, listOrder, redrawLists, rowOf } from '../../lanes/dom.ts';
 import { motionBus } from '../../motion/bus.ts';
 import { Choreo, leaveTogether, mirrorDelays, type Part, part } from '../../motion/choreo.ts';
@@ -23,12 +23,21 @@ import { ItemMissing } from './ItemMissing.tsx';
 import { ItemSheet } from './ItemSheet.tsx';
 import { Pen } from './pen.ts';
 import { drawRoute, undrawRoute } from './Route.tsx';
+import { useSheetFocus } from './sheet-focus.ts';
 
 // The item beside the list (SPEC §10.2, mock:2770-3255): the sheet takes all the room right of the
 // divider; opening, closing and swapping are one gesture each, mirrored and reversible from where
 // they are; the pen draws from the row into the headline. On the phone the item is a pushed page.
 
 const INTAKE = '\u0000intake';
+// The new item form is a dialog, not an article beside the list: announced and named as one, and Tab
+// stays in it until it closes (Escape closes). It is set through props the sheet's element takes
+// while the form is up, since the sheet is one element that animates in place for every kind.
+const intakeDialog = {
+  role: 'dialog',
+  'aria-modal': true,
+  onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => onDialogTab(e.currentTarget, e.nativeEvent),
+} as const;
 // An agent's sheet (agents mock §3) shows here too, keyed by its name after this mark.
 const AGENT = '\u0000agent:';
 const agentOf = (target: string | null) =>
@@ -228,6 +237,13 @@ export function DetailHost() {
   });
   const st = S.current;
   st.last = sheetItem(st.last, want, item);
+  // Opened from a control, the sheet takes the focus (its headline, or its first field for the new
+  // item form); stepping to another item keeps it on the step.
+  const { keepNav } = useSheetFocus(
+    sheetRef,
+    shown,
+    shown === INTAKE ? 'intake' : (st.last?.id ?? ''),
+  );
   // What sits left of the sheet sizes the split: a board by how it lists, any other view as a page.
   const kind = splitKindOf(app.route.view, ws.listKind);
   const kindRef = useRef(kind);
@@ -743,7 +759,10 @@ export function DetailHost() {
     let i = o.indexOf(shown);
     if (i < 0) i = dir > 0 ? -1 : o.length;
     const k = o[i + dir];
-    if (k) app.openItem(k);
+    if (k) {
+      keepNav(dir);
+      app.openItem(k);
+    }
   };
   const intake = ws.intake ?? lastIntake.current;
   return (
@@ -799,7 +818,8 @@ export function DetailHost() {
       <article
         ref={sheetRef}
         className={ws.full ? 'sheet full' : 'sheet'}
-        aria-label={t('sheet.label')}
+        aria-label={shown === INTAKE ? t('app.newItem') : t('sheet.label')}
+        {...(shown === INTAKE ? intakeDialog : {})}
       >
         <div className="sheet-in" key={shown}>
           {shown === INTAKE && intake ? (

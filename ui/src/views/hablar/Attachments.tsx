@@ -53,6 +53,10 @@ export function Attachments({ files }: { files: readonly MessageFile[] }) {
         onClose={() => setOpen(null)}
       >
         {shown ? <img src={attachmentUrl(shown.id)} alt={shown.name} data-i /> : null}
+        {/* Always in sight, and where the focus starts: Tab stays between it and the picture. */}
+        <button type="button" className="btn quiet hb-big-x" data-i onClick={() => setOpen(null)}>
+          {t('common.close')}
+        </button>
       </Dialog>
     </div>
   );

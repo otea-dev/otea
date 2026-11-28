@@ -264,6 +264,14 @@
 .hb-te-head:hover {
   background: var(--hov);
 }
+/* The heads sit flush in boxes that clip (overflow hidden): the ring stays inside, or it is cut. */
+.hb-te-head:focus-visible,
+.hb-away-toggle:focus-visible,
+.hb-te-row:focus-visible,
+.hb-te-more:focus-visible {
+  outline-offset: -3px;
+  border-radius: 8px;
+}
 .hb-te-n {
   flex: none;
   min-width: 22px;
@@ -1051,8 +1059,11 @@ button.hb-chip:hover {
 .hb-opt:hover:not(:disabled) {
   background: var(--hov);
 }
+/* The recommended answer is marked by its word and a quiet ink wash, never by a blue line: a blue
+   edge is what a focused control wears, and the two read as one (pilot 1, a2). */
 .hb-opt[data-rec] {
-  border-color: color-mix(in oklch, var(--you) 70%, transparent);
+  border-color: var(--rule-2);
+  background: color-mix(in oklch, var(--you-wash) 55%, var(--ground));
 }
 .hb-rec {
   flex: none;
@@ -1177,6 +1188,11 @@ button.hb-chip:hover {
   max-height: calc(100dvh - 180px);
   margin: 0 auto;
   border-radius: 8px;
+}
+/* the way out of an enlarged picture: always under it, so a keyboard has a stop to close from */
+.dialog.hb-big .hb-big-x {
+  display: block;
+  margin: 12px auto 0;
 }
 
 /* ───────── the composer ───────── */
