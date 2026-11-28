@@ -144,6 +144,42 @@ describe('a bulk move from the tray', () => {
   });
 });
 
+// Field study s-real (D-1a3b09): a notice stands for the person's time, not the page's. The tray's
+// receipt said «closes in 6 s», shorter than the toast beside it, which stands ten.
+describe('the receipt a bulk move leaves', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({
+      toFake: [
+        'requestAnimationFrame',
+        'cancelAnimationFrame',
+        'performance',
+        'setTimeout',
+        'clearTimeout',
+      ],
+      shouldAdvanceTime: true,
+    });
+  });
+  const receipt = (root: Element) => root.querySelector('.swin .tprog b');
+  const pass = async (ms: number) => {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  };
+
+  it('stays at least ten seconds, as long as a notice stands', async () => {
+    const root = await tray(['ERR-1']);
+    await press(buttonNamed(root, 'Aprobar'));
+    await runThrough(1);
+    expect(receipt(root)).not.toBeNull();
+
+    await pass(8000);
+    expect(receipt(root)).not.toBeNull();
+    // …and is not the notice that stays for ever: it goes in the end.
+    await pass(30_000);
+    expect(receipt(root)).toBeNull();
+  });
+});
+
 // The tray closes over about half a second after the last item is unticked: what it says then is
 // what it said, never a count of none.
 let clearTicks = () => undefined as unknown;
