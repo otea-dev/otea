@@ -7,7 +7,7 @@ import type { Context } from './context.ts';
 import { createItem } from './items.ts';
 import { claimItem } from './leases.ts';
 import { pendingOf, pendingText } from './pending.ts';
-import { seeAgent } from './presence.ts';
+import { seeAgent, waitBeat } from './presence.ts';
 import { memoryContext, publishAs } from './testing.ts';
 
 const you = { kind: 'human' as const, name: 'fede' };
@@ -81,5 +81,22 @@ describe('a board with work and nobody on it waits for the person to open a work
     seeAgent(ctx.db, { agent: 'quill', channel: 'cli', call: true }, at(6));
     claimItem(ctx, { id: ids[0] ?? '', actor: { kind: 'agent', name: 'quill' } }, at(6));
     expect(pendingOf(ctx, at(7)).entries.filter(({ kind }) => kind === 'worker')).toEqual([]);
+  });
+
+  // D-41e74d (8 personas): «no agent works this board, open a session» while two agents listened
+  // for work in otea wait: they hold nothing yet, so the board read as nobody's.
+  it('is none while an agent listens for the boards’ work, and is back once it stops', () => {
+    const listens = (name: string, minute: number) =>
+      waitBeat(ctx.db, { agent: name, channel: 'cli', call: true }, at(minute)).run();
+    expect(pendingOf(ctx, at(5)).entries.some(({ kind }) => kind === 'worker')).toBe(true);
+
+    listens('quill', 6);
+    const heard = pendingOf(ctx, at(6));
+    expect(heard.entries.some(({ kind }) => kind === 'worker')).toBe(false);
+    expect(heard.queues[0]?.workers).toEqual(['quill']);
+    expect(pendingText(heard)).not.toContain('Launch its worker');
+
+    // Not heard for a good while: nobody is listening any more.
+    expect(pendingOf(ctx, at(30)).entries.some(({ kind }) => kind === 'worker')).toBe(true);
   });
 });

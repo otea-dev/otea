@@ -19,7 +19,7 @@ import { selectEvents, selectStateEntries } from '../store/queries.ts';
 import { selectOpenEscalations } from '../store/secretary.ts';
 import { landedAhead } from './approval-wait.ts';
 import { listBandeja } from './bandeja.ts';
-import { workerLimitOf, workersByBoard } from './board-workers.ts';
+import { listeningWorkers, workerLimitOf, workersByBoard } from './board-workers.ts';
 import type { Context } from './context.ts';
 import { escalationShown, parseEscalation } from './escalate.ts';
 import { type Clock, type Item, listItems, systemClock, workflowOf } from './items.ts';
@@ -258,7 +258,9 @@ function queuesOf(ctx: Context, items: readonly Item[], now: Clock): BoardQueue[
       liveBoardOf(ctx, collection) !== undefined,
   );
   if (waiting.length === 0) return [];
-  const workers = workersByBoard(ctx.db, items, listAgents(ctx.db, now), at);
+  const agents = listAgents(ctx.db, now);
+  const workers = workersByBoard(ctx.db, items, agents, at);
+  const listening = listeningWorkers(agents);
   return liveBoards(ctx).flatMap(({ collection, def }) => {
     const mine = waiting.filter((item) => item.collection === collection);
     const ids = mine.map(({ id }) => id);
@@ -287,7 +289,9 @@ function queuesOf(ctx: Context, items: readonly Item[], now: Clock): BoardQueue[
       {
         board: collection,
         waiting: ids,
-        workers: (workers.get(collection) ?? []).map(({ name }) => name),
+        workers: [
+          ...new Set([...(workers.get(collection) ?? []).map(({ name }) => name), ...listening]),
+        ],
         limit: workerLimitOf(def),
         ...(landing.length === 0 ? {} : { landing }),
         ...(bounced.length === 0 ? {} : { bounced }),

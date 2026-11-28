@@ -84,6 +84,20 @@ export function workersByBoard(
   );
 }
 
+// The agents that listen for the boards' work in otea wait (the secretary and the refiner are none):
+// they hold nothing yet, and any of them takes the next item of a board, so a board with work and
+// one of them listening is not nobody's (D-41e74d).
+export function listeningWorkers(
+  agents: readonly Pick<AgentPresence, 'name' | 'waiting' | 'live' | 'sessionEnded' | 'role'>[],
+): string[] {
+  return agents
+    .filter(
+      ({ waiting, live, sessionEnded, role }) =>
+        waiting && live && !sessionEnded && role !== 'secretary' && role !== 'refiner',
+    )
+    .map(({ name }) => name);
+}
+
 // One live worker per board (the canon of the secretary's project); a board that merges code (it
 // protects a branch) allows two, since one can be rebasing while the other works.
 export const WORKERS_PER_BOARD = 1;
