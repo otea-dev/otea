@@ -106,8 +106,7 @@ export function caseName(filename: string): string {
 }
 
 // The same words, as the key two files of one case share whatever their order.
-export const caseOf = (filename: string): string =>
-  caseName(filename).split(' ').sort().join(' ');
+export const caseOf = (filename: string): string => caseName(filename).split(' ').sort().join(' ');
 
 // The files of one side that stand beside a file of `viewport`: those of its own viewport, and those
 // that name none (nothing says they differ). A file of another viewport never does.
@@ -172,7 +171,8 @@ export function byViewport(
 export function byCase(files: readonly Evidence[]): { name: string; files: Evidence[] }[] {
   const sides = (role: Evidence['role']) =>
     new Set(files.filter((e) => e.role === role).map((e) => caseOf(e.filename)));
-  if (sides('before').size <= 1 && sides('after').size <= 1) return [{ name: '', files: [...files] }];
+  if (sides('before').size <= 1 && sides('after').size <= 1)
+    return [{ name: '', files: [...files] }];
   const groups = new Map<string, Evidence[]>();
   for (const file of files) {
     const key = caseOf(file.filename);
@@ -200,7 +200,8 @@ export function pairIn(
   const viewport = viewportOf(shown.filename);
   const sameSide = latestFirst(
     files.filter(
-      (e) => e !== shown && e.module === shown.module && e.role === shown.role && e.kind === 'image',
+      (e) =>
+        e !== shown && e.module === shown.module && e.role === shown.role && e.kind === 'image',
     ),
   );
   const other = ofCase(shown, ofViewport(others, viewport), [
