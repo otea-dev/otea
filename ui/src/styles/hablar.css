@@ -853,6 +853,31 @@ button.hb-kind::after {
   position: absolute;
   inset: -13px -6px;
 }
+/* The label that opens the kinds is a 44 px control: the button is the target, the chip is drawn
+   inside it, so the line it stands in keeps its height. */
+button.hb-kind.fix {
+  height: 44px;
+  min-width: 44px;
+  margin: -13px -6px;
+  padding: 0 12px;
+  justify-content: center;
+  background: none;
+  z-index: 0;
+}
+button.hb-kind.fix::after {
+  inset: 13px 6px;
+  z-index: -1;
+  border-radius: 5px;
+  background: var(--you-wash);
+  transition: background-color 360ms var(--o-drift);
+}
+button.hb-kind.fix[data-kind="consultation"]::after {
+  background: color-mix(in oklch, var(--plus) 13%, transparent);
+}
+button.hb-kind.fix[aria-expanded="true"] svg {
+  opacity: 1;
+  transform: rotate(180deg);
+}
 button.hb-kind:hover svg {
   opacity: 1;
 }
@@ -1990,6 +2015,36 @@ button.hb-kid:hover {
   :root:not([data-motion="full"]) .hb-branch > li[data-fresh] > .hb-chip {
     animation: hb-fade 160ms var(--o-drift) both;
     animation-delay: 0ms;
+  }
+}
+
+/* a desk window short by height (700 px and under; field study 6: at 566 the strip left the thread
+   two lines and its answers could not be reached): the strip folds (TeEspera), the heading is
+   slimmer, the suggestions go and the thread keeps a floor of its own */
+@media (min-width: 721px) and (max-height: 700px) {
+  .hb-main {
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+  .hb-main > .head .kicker,
+  .hb-main > .head .dek {
+    display: none;
+  }
+  .hb-main > .head .display {
+    font-size: 34px;
+    line-height: 1.05;
+  }
+  .hb-main > .head {
+    margin-bottom: 0;
+  }
+  .hb-status {
+    margin-top: 4px;
+  }
+  .hb-suggs {
+    display: none;
+  }
+  .hb-chat {
+    min-height: 180px;
   }
 }
 

@@ -32,6 +32,7 @@ import { reduced } from '../../motion/reduced.ts';
 import type { PendingEntry } from '../../pending.ts';
 import { useMedia } from '../../shell/use-media.ts';
 import type { Item } from '../../types.ts';
+import { CopiedSay } from './Away.tsx';
 import { useBandeja } from './Bandeja.tsx';
 import { Composer } from './Composer.tsx';
 import { SecretaryMark } from './SecretaryMark.tsx';
@@ -58,13 +59,30 @@ function putBox(box: HTMLElement, top: number) {
 // stands at the foot (the newest turn, or the questions waiting) is taller than the box, as on a
 // phone on its side. Then its top shows, and the rest is a scroll away: a card cut at the top, with
 // its first line gone, reads as broken.
+//
+// The questions waiting stand at the very end, and they never hold the view: when they are taller
+// than the box, the foot is the newest message above them (a message sent, then the reply, are what
+// the person looks for) with the card's first lines peeking in under it. A question is reached by
+// «Te toca ahora» or by scrolling.
+const PEEK = 40;
+const ASKS = new Set(['asks', 'note-asks']);
+
 export function footOf(box: HTMLElement): number {
   const end = box.scrollHeight;
-  const turns = box.querySelectorAll<HTMLElement>('.hb-lanes > .hb-turn');
-  const last = turns.item(turns.length - 1);
+  const turns = [...box.querySelectorAll<HTMLElement>('.hb-lanes > .hb-turn')];
+  const last = turns.at(-1);
   if (!last || last.offsetHeight + 16 <= box.clientHeight) return end;
-  const top = last.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
-  return Math.max(0, Math.min(end, top - 16));
+  const topOf = (el: HTMLElement) =>
+    el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+  const newest = ASKS.has(last.dataset.k ?? '')
+    ? turns.findLast((turn) => !ASKS.has(turn.dataset.k ?? ''))
+    : last;
+  if (!newest) return Math.max(0, Math.min(end, topOf(last) - 16));
+  if (newest.offsetHeight + 16 > box.clientHeight) {
+    return Math.max(0, Math.min(end, topOf(newest) - 16));
+  }
+  const bottom = topOf(newest) + newest.offsetHeight;
+  return Math.max(0, Math.min(end, bottom + PEEK - box.clientHeight));
 }
 
 // Scrolls a box to a place the way the app moves things: it settles, never jumps. The foot is
@@ -105,6 +123,7 @@ function NoSecretary() {
         <CopyGlyph />
         {copied ? t('hablar.none.copied') : t('hablar.none.copy')}
       </Button>
+      <CopiedSay copied={copied} />
       <p className="hb-or">{t('hablar.none.orRun')}</p>
       <CopyCommand command="otea prompt --role secretary" />
       <p className="hb-after">{t('hablar.none.after')}</p>

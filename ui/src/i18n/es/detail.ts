@@ -840,14 +840,14 @@ export const detail = {
   'bi.branch.roundSame':
     'Esta ronda tiene los mismos archivos que la ronda {round} ({earlier}): no cambió nada en {branch} desde esa ronda. Aprobar aprueba lo que esa ronda ya tenía.',
   'bi.branch.overlapLanding':
-    '{item} toca los mismos archivos que {other} ({files}), que se integra primero: main tendrá su cambio cuando {item} se integre, así que habrá que fusionar main y quizá resolver un conflicto.',
+    '{item} cambia los mismos archivos que {other} ({files}), que se integra primero. Cuando le toque a {item}, el agente incorporará antes ese cambio y volverá a tu revisión una vez, solo con esa unión.',
   'bi.branch.overlapOpen':
-    '{item} toca los mismos archivos que {other} ({files}), que también está abierto: el que se integre segundo debe fusionar main primero y puede chocar.',
+    '{item} y {other} cambian los mismos archivos ({files}). El que se integre segundo incorporará antes el cambio del otro: lo hace el agente y vuelve a tu revisión una vez, solo con esa unión.',
   'bi.branch.overlapMore': 'y {n} más',
   'bi.branch.overlapGroup': {
-    one: '{item} comparte archivos con {count} cambio abierto más ({others}): el que se integre segundo debe fusionar main primero y puede chocar.',
+    one: '{item} comparte archivos con {count} cambio abierto más ({others}). El que se integre segundo incorporará antes el cambio del otro: lo hace el agente y vuelve a tu revisión una vez, solo con esa unión.',
     other:
-      '{item} comparte archivos con {count} cambios abiertos más ({others}): el que se integre segundo debe fusionar main primero y puede chocar.',
+      '{item} comparte archivos con {count} cambios abiertos más ({others}). El que se integre segundo incorporará antes el cambio del otro: lo hace el agente y vuelve a tu revisión una vez, solo con esa unión.',
   },
   'bi.branch.overlapFirst': {
     one: ' Ese se integra primero.',

@@ -113,7 +113,17 @@ function WorkerCopy({ board }: { board: string }) {
 }
 
 // What waits, one line each: the blocks first, then the first rows, the rest behind «Ver todas».
-function TeRows({ pending, onJump }: { pending: Pending; onJump: (entry: PendingEntry) => void }) {
+// `workerCopy` off: a worker's text is not offered (the secretary is away, and its own text is the
+// one to copy: it starts the workers again).
+function TeRows({
+  pending,
+  onJump,
+  workerCopy = true,
+}: {
+  pending: Pending;
+  onJump: (entry: PendingEntry) => void;
+  workerCopy?: boolean;
+}) {
   const app = useApp();
   const [all, setAll] = useState(false);
   const { entries, blocks } = pending;
@@ -130,7 +140,9 @@ function TeRows({ pending, onJump }: { pending: Pending; onJump: (entry: Pending
           key={`${entry.kind}:${entry.ref}:${entry.signal ?? ''}`}
           // A row with a button at its end (set a notice aside, copy the worker text) keeps it on
           // the row's own line.
-          data-dismissable={entry.signal === undefined && entry.kind !== 'worker' ? undefined : ''}
+          data-dismissable={
+            entry.signal === undefined && !(entry.kind === 'worker' && workerCopy) ? undefined : ''
+          }
         >
           <button
             type="button"
@@ -151,7 +163,7 @@ function TeRows({ pending, onJump }: { pending: Pending; onJump: (entry: Pending
               {waitedText(entry.since, app.now)}
             </time>
           </button>
-          {entry.kind === 'worker' ? <WorkerCopy board={entry.ref} /> : null}
+          {entry.kind === 'worker' && workerCopy ? <WorkerCopy board={entry.ref} /> : null}
           {entry.kind === 'escalation' && entry.signal !== undefined ? (
             <button
               type="button"
@@ -270,7 +282,7 @@ function AwayStrip({
                 <b>{t('hablar.te.title')}</b>
                 <span>{summaryOf(here.entries)}</span>
               </p>
-              <TeRows pending={here} onJump={onJump} />
+              <TeRows pending={here} onJump={onJump} workerCopy={false} />
             </div>
           ) : null}
         </div>

@@ -74,6 +74,49 @@ describe('the «Te espera» strip of Hablar', () => {
     expect(html).toContain('Copy the agent’s text');
   });
 
+  // Field study 6 (D-f2d01b): with the secretary away the strip offered «Copiar» (its text) and,
+  // opened, «Copiar el texto del agente» (a worker's) at once: two texts to paste, and the person
+  // could not tell which brought anything back. Away, the one to copy is the secretary's.
+  it('offers one text to copy while the secretary is away: its own, not a worker’s', async () => {
+    const worker: PendingEntry = {
+      kind: 'worker',
+      ref: 'Documentos',
+      title: 'Documentos',
+      since: ago(30),
+      items: ['PIE-1'],
+    };
+    // The texts to copy are read from the server before the tap.
+    vi.stubGlobal(
+      'fetch',
+      async () =>
+        new Response(JSON.stringify({ prompt: 'texto' }), {
+          headers: { 'content-type': 'application/json' },
+        }),
+    );
+    const page = mount(
+      <AppTestProvider value={testApp({ phone: false, short: false })}>
+        <TeEspera
+          pending={pending([worker])}
+          onJump={none}
+          away={{ since: ago(5), waiting: 1, name: 'quill' }}
+        />
+      </AppTestProvider>,
+    );
+    await settle();
+    await press(page.root.querySelector('.hb-away-toggle'));
+
+    const labels = [...page.root.querySelectorAll('button')].map(
+      (button) => button.getAttribute('aria-label') ?? button.textContent?.trim() ?? '',
+    );
+    expect(labels.filter((label) => /^Copy the (secretary|agent)/.test(label))).toEqual([
+      'Copy the secretary text',
+    ]);
+    // The board with no agent is still said, and still opens: only its second copy is not offered.
+    expect(page.root.textContent).toContain('no agent works this board');
+    page.unmount();
+    vi.unstubAllGlobals();
+  });
+
   it('says which review holds the queue of a board, and what waits behind it', () => {
     const html = render(
       pending(reviews, {

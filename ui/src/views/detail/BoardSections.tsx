@@ -468,13 +468,14 @@ export function BranchLine({
   return plain ? <TechDetails notices={notices}>{lines}</TechDetails> : lines;
 }
 
-// Every other open change that shares files, said once: a line, and the files of each folded.
-function OverlapLine({ item, overlaps }: { item: string; overlaps: readonly Overlap[] }) {
+// Every other open change that shares files, said once: a line, and the files of each folded. It is
+// information, not a fault in this change: the neutral note, never the warn tone (DESIGN).
+export function OverlapLine({ item, overlaps }: { item: string; overlaps: readonly Overlap[] }) {
   const notice = overlapNotice(item, overlaps);
   if (!notice) return null;
   return (
-    <div className="bstrip drift" data-c role="status">
-      <Icon name="warn" />
+    <div className="bstrip note" data-c role="status">
+      <Icon name="branch" />
       <span>{notice.text}</span>
       {notice.each.length === 0 ? null : (
         <details>

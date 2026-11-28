@@ -790,6 +790,33 @@ describe('what came out, in cards', () => {
     ]);
   });
 
+  // Field study 6 (D-215eb4): five people read «Ahora es una consulta: lo que ya se había creado
+  // sigue abierto…» under consultations they never changed, because an item of the turn was open.
+  // It is what a correction leaves behind; a turn the secretary sorted as a consultation has none.
+  it('does not say items are left over from a consultation the person never changed', () => {
+    const asked = turnsOf([
+      say({ id: 1, author: 'person', text: '¿Qué hace el cron?' }),
+      say({
+        id: 2,
+        author: 'secretary',
+        replyTo: 1,
+        root: 1,
+        kind: 'consultation',
+        kindBy: 'secretary',
+        links: ['CAM-13'],
+        text: 'Corre cada hora.',
+      }),
+    ]);
+
+    expect(cardsOf(asked, items, NOW)).toEqual([
+      expect.objectContaining({
+        kind: 'consultation',
+        leftover: false,
+        chips: [expect.objectContaining({ id: 'CAM-13' })],
+      }),
+    ]);
+  });
+
   // R2 (field study 4, U3): a turn the secretary answered without ever classifying it vanished from
   // «Lo que salió». It stays in sight with no kind, titled by the person's own words, so one tap can
   // make it a request or a consultation; only «Todo» holds it.

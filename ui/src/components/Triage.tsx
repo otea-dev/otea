@@ -84,6 +84,7 @@ import {
   springHome,
   throwOut,
 } from './triage-flight.ts';
+import { focusNewCard, handedByKeys } from './triage-focus.ts';
 
 // Triaje (#/triage, SPEC §10.4, mock:829-847, 3995-4036): the reviews, one card at a time over the
 // next one. The card follows the pointer or the finger, stamped with the move a release would make;
@@ -839,6 +840,15 @@ export function Triage() {
 
   useEffect(() => () => flight.current?.cancel(), []);
 
+  // Whether the keys decided the card that went: the focus then follows to the card that comes up.
+  const handoff = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: when the card on top changes only
+  useLayoutEffect(() => {
+    if (!handoff.current) return;
+    handoff.current = false;
+    focusNewCard(root.current);
+  }, [cur]);
+
   // The stack keeps the top card's height as it changes (the notes unrolling, evidence loading).
   useEffect(() => {
     const top = cur ? els.current.get(cur) : undefined;
@@ -957,6 +967,9 @@ export function Triage() {
     flying.current = id;
     if (shown) frozen.current.set(id, shown);
     const card = els.current.get(id);
+    // Decided from the keys with the focus in the card: it goes to the next card's heading once it
+    // is up, never to its Aprobar.
+    handoff.current = handedByKeys() && !!card?.contains(document.activeElement);
     const pile = pileOf(kind);
     if (pile && move) setLanding({ id, pile, to: move.to });
     const out = card

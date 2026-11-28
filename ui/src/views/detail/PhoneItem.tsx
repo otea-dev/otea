@@ -518,6 +518,11 @@ function RoundView({
   // behind «Detalles técnicos».
   const lead = handed?.filter((f) => f.long) ?? [];
   const plain = handed?.filter((f) => !f.long) ?? [];
+  // On a code board the diff is what is reviewed: it reads with the pictures, never behind the fold
+  // (field study 6). The logs and the other files, the branch and the commit stay folded.
+  const diffs = files.filter((e) => e.kind === 'diff');
+  const folded = files.filter((e) => e.kind !== 'diff');
+  const judged = [...images, ...diffs];
   return (
     <>
       <section className="p-part" data-c>
@@ -550,11 +555,12 @@ function RoundView({
       ) : null}
       <section className="p-part" data-c>
         <Lab x={evidenceWords(images.length, files.length) || '—'}>{t('sheet.evidence')}</Lab>
-        {/* What a person judges comes first (the pictures); the diff, the test output and the files
-            that only a reader of code uses are folded behind «Detalles técnicos». */}
-        {images.length > 0 || files.length === 0 ? (
+        {/* What a person judges comes first (the pictures, and the diff of a code board); the test
+            output and the files that only a reader of code uses are folded behind «Detalles
+            técnicos». */}
+        {judged.length > 0 || files.length === 0 ? (
           <Files
-            evidence={images}
+            evidence={judged}
             noted={notes?.noted}
             marks={prior ? fileMarks(prior.evidence, r.evidence, blind) : undefined}
             parts={parts}
@@ -567,14 +573,14 @@ function RoundView({
         {gaps ? <EvidenceGaps gaps={gaps} required /> : null}
       </section>
       {/* One fold for what only a reader of code uses: the branch and what Otea says of it, the
-          fields the step handed off (the branch, the commit), the diff and the test output. */}
-      {technical || plain.length > 0 || files.length > 0 ? (
+          fields the step handed off (the branch, the commit), the test output and the other files. */}
+      {technical || plain.length > 0 || folded.length > 0 ? (
         <TechDetails notices={technicalNotices}>
           {technical}
           {plain.length > 0 ? <HandedList fields={plain} agent={r.by} /> : null}
-          {files.length > 0 ? (
+          {folded.length > 0 ? (
             <Files
-              evidence={files}
+              evidence={folded}
               noted={notes?.noted}
               marks={prior ? fileMarks(prior.evidence, r.evidence, blind) : undefined}
               parts={parts}

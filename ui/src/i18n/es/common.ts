@@ -148,6 +148,8 @@ export const common = {
   // Marcas y avisos (kit)
   'mark.you': 'tú',
   'toast.undo': 'Deshacer',
+  // Se dice una vez a un lector de pantalla con un aviso que ofrece un paso: la tecla que lo alcanza.
+  'toast.reach': 'Pulsa Alt+Mayús+Z para ir a «{move}».',
   // Un rechazo del servidor, dicho desde su código y sus datos (ui/src/refusals.ts); el mensaje en
   // inglés del servidor es para los agentes y la CLI.
   'refusal.itemMissing': 'No existe el ítem {item}.',

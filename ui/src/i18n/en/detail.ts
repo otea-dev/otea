@@ -834,14 +834,14 @@ export const detail = {
   'bi.branch.roundSame':
     'This round holds the same files as round {round} ({earlier}): nothing changed in {branch} since that round. Approving approves what that round already had.',
   'bi.branch.overlapLanding':
-    '{item} touches the same files as {other} ({files}), which lands first: main will hold its change when {item} lands, so expect to merge main and maybe resolve a conflict.',
+    '{item} changes the same files as {other} ({files}), which lands first. When it is {item}’s turn, the agent brings in that change first and the item returns to your review once, for that merge alone.',
   'bi.branch.overlapOpen':
-    '{item} touches the same files as {other} ({files}), which is open too: whichever lands second must merge main first and may meet a conflict.',
+    '{item} and {other} change the same files ({files}). Whichever lands second brings in the other’s change first: the agent does it, and it returns to your review once, for that merge alone.',
   'bi.branch.overlapMore': 'and {n} more',
   'bi.branch.overlapGroup': {
-    one: '{item} shares files with {count} other open change ({others}): whichever lands second must merge main first and may meet a conflict.',
+    one: '{item} shares files with {count} other open change ({others}). Whichever lands second brings in the other’s change first: the agent does it, and it returns to your review once, for that merge alone.',
     other:
-      '{item} shares files with {count} other open changes ({others}): whichever lands second must merge main first and may meet a conflict.',
+      '{item} shares files with {count} other open changes ({others}). Whichever lands second brings in the others’ changes first: the agent does it, and it returns to your review once, for that merge alone.',
   },
   'bi.branch.overlapFirst': {
     one: ' It lands first.',

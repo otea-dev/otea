@@ -9,8 +9,10 @@ export const LANDSCAPE_PHONE = '(max-height: 500px) and (pointer: coarse)';
 export const PHONE_QUERY = `(max-width: 720px), ${LANDSCAPE_PHONE}`;
 
 // A screen too short for what the desk and the phone both pile above the conversation (the strip
-// of what waits, the offline notice, the suggestions): they fold to one line or go. By height alone.
-export const SHORT_QUERY = '(max-height: 500px)';
+// of what waits, the offline notice, the suggestions): they fold to one line or go. By height alone:
+// a phone on its side, and a desk window as short as 700 px (field study 6: at 566 the open strip
+// left the thread two lines).
+export const SHORT_QUERY = '(max-height: 700px)';
 
 const NARROW = '(max-width: 720px)';
 const WIDE = '(min-width: 721px)';

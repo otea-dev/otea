@@ -589,8 +589,11 @@ export function cardsOf(
       chips,
       asks: chips.some((chip) => chip.asks),
       taking,
+      // Only after the person's own correction: items that stay open when they turn a request into
+      // a consultation. A consultation the secretary sorted that way has nothing «left over».
       leftover:
         kind === 'consultation' &&
+        turn.kindBy === 'person' &&
         chips.some((chip) => chip.look !== null && isOpenLook(chip.look)),
     });
   }

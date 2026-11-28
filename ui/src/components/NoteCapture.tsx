@@ -11,7 +11,7 @@ import {
   tooLarge,
   withFiles,
 } from '../intake-files.ts';
-import { Icon } from '../kit/index.ts';
+import { Icon, toast } from '../kit/index.ts';
 import { clearNoteDraft, keepNoteDraft, readNoteDraft } from '../note-draft.ts';
 import { keepNoteFiles, readNoteFiles } from '../note-draft-files.ts';
 import { QUEUE_MAX_MB } from '../offline/capture-queue.ts';
@@ -191,7 +191,10 @@ export function NoteCapture({
 
   // Throws away what a send that failed left: the words, the files, the error, and the copy kept
   // on this phone.
+  // A tap that wipes words and pictures is a tap that can be taken back: Deshacer puts them as they
+  // were (and the box keeps them again, as it keeps anything written).
   const discard = () => {
+    const was = { text, drafts, kept };
     attempt.current = null;
     clearNoteDraft(project);
     void keepNoteFiles(project, []);
@@ -200,6 +203,25 @@ export function NoteCapture({
     setDrafts([]);
     setError(null);
     field.current?.focus({ preventScroll: true });
+    if (was.text.trim() === '' && was.drafts.length === 0) return;
+    toast({
+      msg: t('bandeja.discarded'),
+      undo: () => {
+        if (!alive.current) {
+          // The sheet was closed meanwhile: the note waits in the box's keeping for the next time.
+          keepNoteDraft(project, was.text);
+          void keepNoteFiles(
+            project,
+            was.drafts.map(({ file }) => file),
+          );
+          return;
+        }
+        setText(was.text);
+        setDrafts(was.drafts);
+        setKept(was.kept);
+        field.current?.focus({ preventScroll: true });
+      },
+    });
   };
 
   const onPaste = (event: ClipboardEvent<HTMLFormElement>) => {
@@ -222,6 +244,12 @@ export function NoteCapture({
         placeholder={t('bandeja.placeholder')}
         enterKeyHint="enter"
         onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          // Ctrl+Enter (Cmd+Enter) sends; Enter stays a new line.
+          if (event.key !== 'Enter' || !(event.ctrlKey || event.metaKey)) return;
+          event.preventDefault();
+          void send();
+        }}
       />
       {drafts.length > 0 ? (
         <ul className="hb-drafts">

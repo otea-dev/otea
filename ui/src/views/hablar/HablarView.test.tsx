@@ -966,6 +966,28 @@ describe('the secretary thinking', () => {
     expect(q(away, 'details')?.hasAttribute('open')).toBe(false);
   });
 
+  // Field study 6 (D-e1d814): a button that only changes its own words is not heard to have worked.
+  // The copy is said in a live region beside it.
+  it('says in a live region that the secretary text was copied', async () => {
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText: async () => undefined },
+    });
+    const { root } = await open(
+      conversation({
+        messages: read,
+        secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 1 },
+        waiting: { count: 1, since: ago(120) },
+      }),
+    );
+    const away = q(root, '.hb-away') as HTMLElement;
+    const say = () => text(q(away, '[role="status"].hb-copied'));
+    expect(say()).toBe('');
+
+    await press(buttonNamed(away, 'Copiar'));
+    expect(say()).toBe('Copiado');
+  });
+
   // Field study 4 (design): a card for the secretary, another for what waits and a sliver of chat.
   // The two are one quiet line over the lanes, on the desk and on the phone alike: a dot, one
   // sentence, «Copiar», and what waits for you; a tap opens the rest under it.
@@ -1212,13 +1234,41 @@ describe('the composer', () => {
   });
 });
 
+// Field study 6 (D-6c3c31): the label flipped a request into a consultation with one tap on a chip
+// the size of a word. A tap on it opens the two kinds; the change is the choice, never the tap.
+const menuItem = (word: string) =>
+  [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+    (el) => el.textContent?.trim() === word,
+  );
+async function pickKind(label: Element | null | undefined, word: string) {
+  await press(label);
+  await press(menuItem(word));
+}
+
 describe('correcting what a turn is', () => {
-  it('turns a request into a consultation with one tap on its label', async () => {
+  it('asks which kind on a tap on its label, and changes nothing until one is chosen', async () => {
+    const { root, calls } = await open(conversation({ messages: request() }));
+    const label = q(root, '.hb-kind') as HTMLElement;
+    expect(label.getAttribute('aria-haspopup')).toBe('menu');
+
+    await press(label);
+
+    expect(calls).toEqual([]);
+    expect(text(q(root, '.hb-kind'))).toBe('pedido');
+    expect(menuItem('pedido')?.classList.contains('on')).toBe(true);
+    expect(menuItem('consulta')).toBeDefined();
+
+    // Choosing the kind it already is leaves it as it was.
+    await press(menuItem('pedido'));
+    expect(calls).toEqual([]);
+  });
+
+  it('turns a request into a consultation by choosing it from the label’s menu', async () => {
     const { root, calls } = await open(conversation({ messages: request() }));
     const label = q(root, '.hb-kind') as HTMLElement;
     expect(text(label)).toBe('pedido');
 
-    await press(label);
+    await pickKind(label, 'consulta');
 
     expect(calls).toEqual([
       expect.objectContaining({
@@ -1256,7 +1306,7 @@ describe('correcting what a turn is', () => {
     expect(names[0]).not.toContain('Un tablero por cliente');
     const before = seenAtMount();
 
-    await press(labels[1]);
+    await pickKind(labels[1], 'pedido');
 
     expect(seenAtMount()).toBeGreaterThan(before);
   });
@@ -1562,7 +1612,7 @@ describe('the kind you set, and the server’s word', () => {
       </AppTestProvider>,
     );
     await settle();
-    await press(q(page.root, '.hb-kind'));
+    await pickKind(q(page.root, '.hb-kind'), 'consulta');
 
     expect(calls).toHaveLength(1);
     expect(text(q(page.root, '.hb-kind'))).toBe('pedido');
@@ -1573,7 +1623,7 @@ describe('the kind you set, and the server’s word', () => {
     server(view);
     const ctl = mountLive();
     await settle();
-    await press(q(page?.root as HTMLElement, '.hb-kind'));
+    await pickKind(q(page?.root as HTMLElement, '.hb-kind'), 'consulta');
     expect(text(q(page?.root as HTMLElement, '.hb-kind'))).toBe('consulta');
 
     const setKind = (kind: 'request' | 'consultation') => {
@@ -1809,7 +1859,7 @@ describe('the kind of a turn whose last message says none', () => {
     server(view);
     const ctl = mountLive();
     await settle();
-    await press(q(page?.root as HTMLElement, '.hb-kind'));
+    await pickKind(q(page?.root as HTMLElement, '.hb-kind'), 'consulta');
     expect(text(q(page?.root as HTMLElement, '.hb-kind'))).toBe('consulta');
 
     for (const message of view.messages) if (message.kind !== null) message.kind = 'consultation';

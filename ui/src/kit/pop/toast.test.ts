@@ -1,5 +1,58 @@
 import { describe, expect, it } from 'vitest';
-import { holdsOn, itemOpened, seenAtMount, sentAway, toast, toastClass } from './toast.tsx';
+import {
+  afterHold,
+  dwellFor,
+  holdsOn,
+  itemOpened,
+  reachesToast,
+  seenAtMount,
+  sentAway,
+  toast,
+  toastClass,
+} from './toast.tsx';
+
+// Field study 6 (D-1a3b09): a notice with Deshacer or Responder went before a slow finger or a
+// screen reader reached it. The time it stands is for the person, not the page.
+describe('how long a toast stands', () => {
+  it('is at least ten seconds for any notice, and longer for one that offers a move', () => {
+    expect(dwellFor({}, false)).toBeGreaterThanOrEqual(10_000);
+    expect(dwellFor({ undo: () => undefined }, false)).toBeGreaterThan(dwellFor({}, false));
+    expect(dwellFor({ action: { label: 'Abrirlo', run: () => undefined } }, false)).toBeGreaterThan(
+      dwellFor({}, false),
+    );
+  });
+
+  it('is longer again for a person on a finger or who asked for less motion', () => {
+    expect(dwellFor({}, true)).toBeGreaterThanOrEqual(20_000);
+    expect(dwellFor({ undo: () => undefined }, true)).toBeGreaterThanOrEqual(
+      2 * dwellFor({ undo: () => undefined }, false),
+    );
+  });
+
+  it('keeps a few seconds when a hold ends, however little was left', () => {
+    expect(afterHold(500)).toBeGreaterThanOrEqual(4_000);
+    expect(afterHold(9_000)).toBe(9_000);
+  });
+});
+
+describe('the key that reaches the toast', () => {
+  const press = (o: { altKey?: boolean; shiftKey?: boolean; ctrlKey?: boolean }) =>
+    reachesToast({
+      code: 'KeyZ',
+      altKey: false,
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      ...o,
+    });
+  it('is Alt+Shift+Z, and nothing the browser or a text box already owns', () => {
+    expect(press({ altKey: true, shiftKey: true })).toBe(true);
+    expect(press({ altKey: true })).toBe(false);
+    expect(press({ shiftKey: true })).toBe(false);
+    expect(press({ ctrlKey: true })).toBe(false);
+    expect(press({ altKey: true, shiftKey: true, ctrlKey: true })).toBe(false);
+  });
+});
 
 describe('a toast host that mounts later', () => {
   it('starts past the toast already shown, so it never replays an old one', () => {

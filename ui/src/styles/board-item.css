@@ -159,21 +159,37 @@ button.lk2:hover {
   color: var(--warn);
   flex: none;
 }
-.bstrip.drift span {
+.bstrip.drift span,
+.bstrip.note span {
   flex: 1 1 0;
   min-width: 0;
 }
+/* information about the change, not a fault in it (items that share files): the quiet outline,
+   the branch's own icon, never the warn colour (DESIGN: --warn is a stuck agent or a critical) */
+.bstrip.note {
+  margin-top: 4px;
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--rule);
+  color: var(--ink);
+}
+.bstrip.note svg {
+  color: var(--ink-3);
+  flex: none;
+}
 /* a round that only merges main: what the merge changed by hand, folded under the line; the open
    changes that share files, each folded under their one line; what a rewritten request said */
-.bstrip.drift details {
+.bstrip.drift details,
+.bstrip.note details {
   flex: 1 1 100%;
   min-width: 0;
 }
-.bstrip.drift summary {
+.bstrip.drift summary,
+.bstrip.note summary {
   cursor: pointer;
   color: var(--ink-2);
 }
-.bstrip.drift ul {
+.bstrip.drift ul,
+.bstrip.note ul {
   flex: 1 1 100%;
   min-width: 0;
   margin: 4px 0 0;

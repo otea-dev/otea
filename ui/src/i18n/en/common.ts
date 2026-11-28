@@ -141,6 +141,8 @@ export const common = {
   // Marks and toasts (kit)
   'mark.you': 'you',
   'toast.undo': 'Undo',
+  // Said once to a screen reader with a toast that offers a move: the key that reaches it.
+  'toast.reach': 'Press Alt+Shift+Z to go to “{move}”.',
   // A refusal from the server, worded from its code and details (ui/src/refusals.ts); the
   // server's English message is for agents and the CLI.
   'refusal.itemMissing': 'There is no item {item}.',

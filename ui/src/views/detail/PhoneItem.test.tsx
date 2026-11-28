@@ -200,6 +200,29 @@ describe('reviewing an item on the phone', () => {
     expect(html).not.toContain('<details class="tech" open');
   });
 
+  // Field study 6 (u5): on a code board the diff is what is reviewed, and a phone hid it under a
+  // closed «Detalles técnicos». The diff reads with the pictures; the logs, the files and the
+  // branch stay folded.
+  it('keeps the diff of a code board in sight, and folds only the rest of the technical', () => {
+    setLanguage('es');
+    const withDiff: ItemView = {
+      ...review,
+      evidence: [
+        ...review.evidence,
+        { ...shot(4, 'cambio.diff', 50), kind: 'diff' as const },
+        { ...shot(5, 'pruebas.log', 40), kind: 'log' as const },
+      ],
+    };
+    const html = render(withDiff);
+    const at = (s: string) => html.indexOf(s);
+    expect(at('Detalles técnicos')).toBeGreaterThan(-1);
+    expect(at('cambio.diff')).toBeGreaterThan(-1);
+    // The diff is before the fold; the log and the file are after it.
+    expect(at('cambio.diff')).toBeLessThan(at('Detalles técnicos'));
+    expect(at('pruebas.log')).toBeGreaterThan(at('Detalles técnicos'));
+    expect(at('wolf.ts')).toBeGreaterThan(at('Detalles técnicos'));
+  });
+
   // Field study 3: the handoff note was one long paragraph in the big serif, with the evidence
   // far under it. It leads with its first sentence; the rest waits behind «ver más».
   it('sets a long handoff note as a conclusion with the rest folded', () => {

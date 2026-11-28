@@ -21,7 +21,6 @@ import {
   fencesOf,
   type Message,
   type MessageKind,
-  otherKind,
   quotedSnippet,
   type Row as RowOf,
   splitReply,
@@ -29,6 +28,7 @@ import {
   type Turn,
 } from '../../conversation.ts';
 import { t } from '../../i18n/i18n.ts';
+import { MenuItem, MenuLabel, Pop } from '../../kit/index.ts';
 import { drawIn } from '../../lanes/draw-in.ts';
 import { lightMarkup } from '../../lanes/light.ts';
 import { NodeGlyph } from '../../lanes/NodeGlyph.tsx';
@@ -231,8 +231,9 @@ function useLingering<T extends { id: string }>(
   return [...live, ...held];
 }
 
-// The kind of a turn, as a label that is also the correction: one tap turns a request into a
-// consultation and back.
+// The kind of a turn, as a label that is also the correction. A tap opens the two kinds and the
+// change is the choice (with Deshacer after it): a chip the size of a word never flips a request
+// into a consultation on a stray touch (field study 6).
 function KindLabel({
   turn,
   onKind,
@@ -240,27 +241,51 @@ function KindLabel({
   turn: Turn;
   onKind: (turn: Turn, kind: MessageKind) => void;
 }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   if (turn.kind === null) return null;
   const kind = turn.kind;
-  const other = otherKind(kind);
   const word = (k: MessageKind) => t(`hablar.kind.${k}`);
   return (
-    <button
-      type="button"
-      className="hb-kind"
-      data-kind={kind}
-      aria-label={t('hablar.kind.fix', {
-        kind: word(kind),
-        snippet: quotedSnippet(turn.person[0]?.text ?? turn.messages[0]?.text ?? '', 50),
-        other: word(other),
-      })}
-      onClick={() => onKind(turn, other)}
-    >
-      <span>{word(kind)}</span>
-      <svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true">
-        <path d="M2 3.5h6M6.2 1.7 8 3.5 6.2 5.3M8 6.5H2M3.8 4.7 2 6.5l1.8 1.8" />
-      </svg>
-    </button>
+    <>
+      <button
+        type="button"
+        className="hb-kind fix"
+        data-kind={kind}
+        aria-haspopup="menu"
+        aria-expanded={anchor !== null}
+        aria-label={t('hablar.kind.fix', {
+          kind: word(kind),
+          snippet: quotedSnippet(turn.person[0]?.text ?? turn.messages[0]?.text ?? '', 50),
+        })}
+        onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
+      >
+        <span>{word(kind)}</span>
+        <svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true">
+          <path d="M2.5 4 5 6.5 7.5 4" />
+        </svg>
+      </button>
+      <Pop
+        open={anchor !== null}
+        anchor={anchor}
+        place="below-left"
+        label={t('hablar.kind.menu')}
+        onClose={() => setAnchor(null)}
+      >
+        <MenuLabel>{t('hablar.kind.menu')}</MenuLabel>
+        {(['request', 'consultation'] as const).map((each) => (
+          <MenuItem
+            key={each}
+            on={each === kind}
+            onClick={() => {
+              setAnchor(null);
+              if (each !== kind) onKind(turn, each);
+            }}
+          >
+            {word(each)}
+          </MenuItem>
+        ))}
+      </Pop>
+    </>
   );
 }
 

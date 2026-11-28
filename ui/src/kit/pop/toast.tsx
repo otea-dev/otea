@@ -37,7 +37,31 @@ export function toastClass(at: ToastOptions['at']): string {
 
 type Shown = ToastOptions & { seq: number };
 
-const DWELL = 12_000;
+// How long a toast stands (field study 6): never under ten seconds, since a slow finger or a screen
+// reader needs the time; a notice that offers a move (Deshacer, Responder) stays longer, and so
+// does any for a person on a finger or who asked for less motion (the calm). Hover and focus hold
+// it besides.
+const DWELL = 10_000;
+const DWELL_MOVE = 15_000;
+// What is left when a hold ends: a person who looked away for a moment is not rushed.
+const RESUME = 4_000;
+
+export function dwellFor(o: Pick<ToastOptions, 'undo' | 'action'>, calm: boolean): number {
+  const base = o.undo || o.action ? DWELL_MOVE : DWELL;
+  return calm ? base * 2 : base;
+}
+
+export const afterHold = (left: number): number => Math.max(RESUME, left);
+
+const isCalm = (): boolean =>
+  reduced() || (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches);
+
+// The key that goes to the toast's move from wherever the focus is (the toast stands at the end of
+// the page, past the rail and the thread). Alt+Shift+Z: «Z» for Deshacer, and no text box or
+// browser menu owns it.
+export const reachesToast = (
+  e: Pick<KeyboardEvent, 'code' | 'altKey' | 'shiftKey' | 'ctrlKey' | 'metaKey'>,
+): boolean => e.code === 'KeyZ' && e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey;
 
 // A mouse resting on the toast holds it up; a finger never does: a tap fires mouseenter with no
 // mouseleave after it, and the toast stayed over Triage's buttons for minutes (P7-4).
@@ -92,6 +116,8 @@ export function ToastHost() {
   const sweep = useRef<number | undefined>(undefined);
   useEffect(() => () => clearTimeout(sweep.current), []);
   const seen = useRef(seenAtMount());
+  // What a screen reader is told: set into a live region that is on the page before it is needed.
+  const [say, setSay] = useState('');
   const dwell = useRef({ left: DWELL, t0: 0, timer: 0, due: Number.POSITIVE_INFINITY });
   const replaced = useRef(false);
   const pendingNode = useRef(false);
@@ -105,6 +131,7 @@ export function ToastHost() {
         choreo.current = null;
         setMounted(false);
         setMsgs([]);
+        setSay('');
       }
     });
   };
@@ -117,10 +144,7 @@ export function ToastHost() {
   const pause = () => {
     clearTimeout(dwell.current.timer);
     dwell.current.due = Number.POSITIVE_INFINITY;
-    dwell.current.left = Math.max(
-      1200,
-      dwell.current.left - (performance.now() - dwell.current.t0),
-    );
+    dwell.current.left = afterHold(dwell.current.left - (performance.now() - dwell.current.t0));
   };
 
   // A new toast: open the surface, or replace the message in place.
@@ -142,7 +166,7 @@ export function ToastHost() {
       current.msg === next.msg &&
       current.id === next.id
     ) {
-      dwell.current.left = DWELL;
+      dwell.current.left = dwellFor(next, isCalm());
       arm();
       return;
     }
@@ -157,9 +181,39 @@ export function ToastHost() {
         : [{ seq: next.seq, msg: next.msg, id: next.id }],
     );
     setMounted(true);
-    dwell.current.left = DWELL;
+    dwell.current.left = dwellFor(next, isCalm());
     arm();
   }, [next]);
+
+  // What the surface says, handed to the live region once it is drawn: the words, and for a toast
+  // with a move the key that reaches it.
+  useLayoutEffect(() => {
+    const node = el.current;
+    if (!node || !msgs.length) return;
+    const words = [...node.querySelectorAll('.tmsg:not(.out)')]
+      .map((p) =>
+        [...p.childNodes]
+          .map((n) => n.textContent)
+          .join(' ')
+          .trim(),
+      )
+      .join(' ');
+    const move = action?.label ?? (undo ? t('toast.undo') : undefined);
+    setSay(move ? `${words} ${t('toast.reach', { move })}` : words);
+  }, [msgs, undo, action]);
+
+  // The key that reaches the toast's move from wherever the focus is.
+  useEffect(() => {
+    const reach = (e: KeyboardEvent) => {
+      if (!reachesToast(e)) return;
+      const button = el.current?.querySelector<HTMLButtonElement>('.tbtns button:not([hidden])');
+      if (!button) return;
+      e.preventDefault();
+      button.focus();
+    };
+    document.addEventListener('keydown', reach);
+    return () => document.removeEventListener('keydown', reach);
+  }, []);
 
   useLayoutEffect(() => {
     const node = el.current;
@@ -302,13 +356,20 @@ export function ToastHost() {
     if (gone && gone === seen.current) close();
   }, [gone]);
 
-  if (!mounted) return null;
+  // The reader's own region stands on the page always, empty until a toast comes (a region made with
+  // its words already in it is not announced); the surface it mirrors does not speak twice.
+  const announcer = (
+    <p className="visually-hidden" role="status" aria-live="polite" data-toast-say="">
+      {say}
+    </p>
+  );
+  if (!mounted) return announcer;
   const surface = (
     <div
       ref={el}
       className={toastClass(at)}
       role="status"
-      aria-live="polite"
+      aria-live="off"
       onPointerEnter={(e) => holdsOn(e.pointerType) && pause()}
       onPointerLeave={(e) => holdsOn(e.pointerType) && arm()}
       // Only a keyboard's focus holds it: a tap focuses Deshacer too.
@@ -366,5 +427,10 @@ export function ToastHost() {
     </div>
   );
   const layer = layerEl();
-  return layer ? createPortal(surface, layer) : surface;
+  return (
+    <>
+      {announcer}
+      {layer ? createPortal(surface, layer) : surface}
+    </>
+  );
 }

@@ -34,16 +34,29 @@ export function useSecretaryText(name: string): {
 export function AwayCopy({ name }: { name: string }) {
   const { text, copied, copy } = useSecretaryText(name);
   return (
-    <Button
-      size="sm"
-      className="hb-away-copy"
-      disabled={text === ''}
-      aria-label={t('hablar.none.copy')}
-      onClick={copy}
-    >
-      <CopyGlyph />
-      <span className="lb">{copied ? t('hablar.none.copied') : t('hablar.block.copy')}</span>
-    </Button>
+    <>
+      <Button
+        size="sm"
+        className="hb-away-copy"
+        disabled={text === ''}
+        aria-label={t('hablar.none.copy')}
+        onClick={copy}
+      >
+        <CopyGlyph />
+        <span className="lb">{copied ? t('hablar.none.copied') : t('hablar.block.copy')}</span>
+      </Button>
+      <CopiedSay copied={copied} />
+    </>
+  );
+}
+
+// «Copiado», said to a reader: the button only changes its own words, which a reader on it does
+// not hear (field study 6).
+export function CopiedSay({ copied }: { copied: boolean }) {
+  return (
+    <span className="visually-hidden hb-copied" role="status">
+      {copied ? t('hablar.none.copied') : ''}
+    </span>
   );
 }
 
