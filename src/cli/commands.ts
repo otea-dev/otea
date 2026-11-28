@@ -5605,7 +5605,7 @@ const pending: Command = {
   execute: (input) =>
     withReader(input, (project) => {
       const waiting = pendingOf(project);
-      return { data: waiting, text: pendingText(waiting) };
+      return { data: waiting, text: pendingText(waiting, projectLanguage(project)) };
     }),
 };
 

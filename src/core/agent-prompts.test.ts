@@ -639,6 +639,18 @@ describe('the role prompts', () => {
       );
     });
 
+    // D-9207d2: a Spanish person heard «Done»; the secretary speaks the desk's words in their language.
+    it(`has the secretary speak the desk's words in the person's language, not Otea's state names (${lang})`, () => {
+      const text = rolePrompt('secretary', lang, { name: 'ana' });
+      if (lang === 'es') {
+        expect(text).not.toMatch(/como Done|esté Done|«Done|Done in the last/);
+        expect(text).toContain('«Hecho»');
+        expect(text).toContain('nunca los nombres internos de Otea');
+      } else {
+        expect(text).toContain("never Otea's internal state names");
+      }
+    });
+
     // Field study 3 (F4): «what waits for me today» left a review out because the secretary told it
     // from memory, and its «ready to review» notices came late or never.
     it(`has the secretary read what waits for the person from otea pending, never from memory (${lang})`, () => {

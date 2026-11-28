@@ -1,5 +1,6 @@
 import { isClosed, positionOf } from '../core/board/engine.ts';
 import { DONE } from '../core/board/model.ts';
+import type { Lang } from '../core/board/templates.ts';
 import { messageSnippet } from '../core/conversation.ts';
 import { activeLease } from '../core/lease.ts';
 import {
@@ -495,11 +496,13 @@ const GROUPS: readonly { kinds: readonly PendingKind[]; head: string }[] = [
 
 // What closed as Done in the last day, counted by Otea: the secretary answers «what got done?» from
 // this list, whole, never from memory (field study 4, U6: it said none, then 11 of 12).
-function doneLine(done: readonly PendingDone[]): string[] {
+function doneLine(done: readonly PendingDone[], lang: Lang): string[] {
   if (done.length === 0) return [];
   const list = done.map(({ id, title, at }) => `${id} ${quoteAgent(title, 80)} (${timeText(at)})`);
+  // The state word is the person's: a Spanish project hears «Hecho», never Otea's «Done».
+  const head = lang === 'es' ? 'Hecho en las últimas 24 horas' : 'Done in the last 24 hours';
   return [
-    `Done in the last 24 hours (${done.length}): ${list.join('; ')}. This is the whole list, counted now: when the person asks what got done, answer from it, say the count it gives, and name items from it only.`,
+    `${head} (${done.length}): ${list.join('; ')}. This is the whole list, counted now: when the person asks what got done, answer from it, say the count it gives, and name items from it only.`,
   ];
 }
 
@@ -517,10 +520,10 @@ function endedLines(ended: readonly PendingEnded[]): string[] {
 
 // What `otea pending` prints, for the secretary: the count, each thing with what it waits for and
 // since when, what holds a board's queue, and what to do with it.
-export function pendingText(pending: Pending): string {
+export function pendingText(pending: Pending, lang: Lang = 'en'): string {
   const { count, entries, blocks, queues } = pending;
   const loads = queues.map(queueLine);
-  const finished = [...endedLines(pending.ended ?? []), ...doneLine(pending.done ?? [])];
+  const finished = [...endedLines(pending.ended ?? []), ...doneLine(pending.done ?? [], lang)];
   if (count === 0) {
     return [
       'Nothing waits for the person: no review, question or step of their own. Do not say otherwise from memory.',

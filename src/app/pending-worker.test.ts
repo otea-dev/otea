@@ -63,6 +63,10 @@ describe('a board with work and nobody on it waits for the person to open a work
     const pending = pendingOf(ctx, at(10));
     expect(pending.done?.map(({ id }) => id)).toEqual(ids.slice(0, 2));
     expect(pendingText(pending)).toContain('Done in the last 24 hours (2)');
+    // D-9207d2: a Spanish project hears the state word in its own language, never «Done».
+    const spanish = pendingText(pending, 'es');
+    expect(spanish).toContain('Hecho en las últimas 24 horas (2)');
+    expect(spanish).not.toContain('Done in the last');
     // A day later it is no news.
     expect(pendingOf(ctx, at(26 * 60)).done).toEqual([]);
   });
