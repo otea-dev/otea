@@ -8,6 +8,7 @@ import {
   useRef,
 } from 'react';
 import type { FeedEvent } from '../activity.ts';
+import { answerUndoable } from '../answer-undo.ts';
 import {
   type AnswerGiven,
   linkItems,
@@ -18,6 +19,7 @@ import {
   postNote,
   editNote as postNoteEdit,
   withdrawNote as postNoteWithdraw,
+  postUnanswer,
   postWaive,
   reassignItem,
   reopenDropped,
@@ -246,7 +248,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await Q.run(() => postAnswer(id, given));
         if (message === undefined) return;
         await landed();
-        toast({ msg: message, id });
+        // A tap on an option can be taken back while the toast stands (Deshacer, Ctrl+Z).
+        toast({
+          msg: message,
+          id,
+          ...(answerUndoable(given)
+            ? {
+                undo: () =>
+                  void Q.run(() => postUnanswer(id)).catch((error: unknown) =>
+                    toast({ msg: error instanceof Error ? error.message : String(error), id }),
+                  ),
+              }
+            : {}),
+        });
       },
       async waive(id, part, reason, message) {
         await Q.run(() => postWaive(id, part, reason));
