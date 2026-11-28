@@ -142,9 +142,12 @@ body:has(.hb-composer) .toast:not(.at-top) {
   bottom: var(--above-composer, 22px);
 }
 /* While the desk reader is open its foot holds the note box and the moves: a toast goes over the top
-   bar instead of covering them (DR3-14). */
+   bar instead of covering them (DR3-14). Triage's cards keep Aprobar and Devolver at their foot, so
+   the toast there goes the same way: «Aprobaste… Deshacer» covered the next card's buttons
+   (D-5dc01e). */
 @media (min-width: 721px) {
-  body:has(.rd-dialog) .toast {
+  body:has(.rd-dialog) .toast,
+  body:has(.tri) .toast {
     top: 8px;
     bottom: auto;
   }
