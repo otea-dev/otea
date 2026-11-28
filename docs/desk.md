@@ -20,9 +20,9 @@ The person's own acts are the desk's alone (the browser, or the phone paired to 
 - **Approve** what waits for your review, or **send it back** with a note.
 - **Answer** an agent's question (a tap on an option, or your own words).
 - **Discard** an item, and reopen a discard.
-- **Write to the secretary** (Talk) and **jot a note in the Inbox**.
+- **Write to the assistant** (Talk) and **jot a note in the Inbox**.
 
-Why: an agent runs the same `otea` commands you do, from the same account, and a command cannot tell it from you. A tap on the desk is the one act Otea can show is yours, so it is the one that counts as your decision: the timeline records it as `human (ui)`, and the CLI refuses an approval ("The CLI refuses the approval", below). An agent can pass on your words (`otea relay`, `otea answer` with your quote, the secretary's cards that you tap), and the desk shows what it passed on as relayed, never as your own act; a decision that lands code or closes an item is never relayed.
+Why: an agent runs the same `otea` commands you do, from the same account, and a command cannot tell it from you. A tap on the desk is the one act Otea can show is yours, so it is the one that counts as your decision: the timeline records it as `human (ui)`, and the CLI refuses an approval ("The CLI refuses the approval", below). An agent can pass on your words (`otea relay`, `otea answer` with your quote, the assistant's cards that you tap), and the desk shows what it passed on as relayed, never as your own act; a decision that lands code or closes an item is never relayed.
 
 A terminal reads everything and loses nothing by it: `otea list --turn human` is what waits for you, `otea show <id>` an item with its evidence, `otea pending` the whole count, `otea events` what happened and `otea wait` blocks until something is yours. A person who prefers the terminal keeps a desk tab (or the phone) open for the taps, and `otea open` signs a browser in from the command line. A command for the person's own acts is not planned: it would let an agent do them in the person's name.
 

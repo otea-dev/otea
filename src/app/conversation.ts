@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
+import type { AssistantView, AssistantWaiting } from '../core/assistant.ts';
 import type { Performer } from '../core/authority.ts';
 import { checkOptions, DELEGATED } from '../core/board/questions.ts';
 import {
@@ -20,7 +21,6 @@ import { OteaError } from '../core/errors.ts';
 import { evidenceTypeOf, MAX_EVIDENCE_BYTES, MAX_EVIDENCE_MB } from '../core/evidence.ts';
 import type { Actor } from '../core/item.ts';
 import { plainLine, quoteAgent } from '../core/quote.ts';
-import type { SecretaryView, SecretaryWaiting } from '../core/secretary.ts';
 import { clockText, timeText } from '../core/time.ts';
 import { selectEntryOfItem } from '../store/bandeja.ts';
 import {
@@ -53,6 +53,8 @@ import {
 } from '../store/conversation.ts';
 import { joinTransaction, transaction } from '../store/database.ts';
 import { selectEvidence } from '../store/queries.ts';
+import { addAssistantSource, requireAssistant } from './assistant.ts';
+import { assistantView } from './assistant-waiting.ts';
 import type { Context } from './context.ts';
 import {
   evidenceFile,
@@ -64,14 +66,12 @@ import {
 } from './evidence.ts';
 import { type Clock, requireItem, requireWritableItem, systemClock } from './items.ts';
 import type { Project } from './project.ts';
-import { addSecretarySource, requireSecretary } from './secretary.ts';
-import { secretaryView } from './secretary-waiting.ts';
 
-// The conversation between the person and the project's secretary (core/conversation.ts).
+// The conversation between the person and the project's assistant (core/conversation.ts).
 //
 // Who may write what is decided here, not by the callers: a message of the person's is made only by
 // postPersonMessage, which only the desk's authenticated routes call (server/server.ts); the
-// secretary's by sayAsSecretary, which refuses anyone who is not the declared secretary. No command
+// assistant's by sayAsAssistant, which refuses anyone who is not the declared assistant. No command
 // of the command line or of MCP makes a person's message, so an agent can never post as the person.
 
 // A file already read: its name and its bytes (what the desk's form and `otea say --file` hand in).
@@ -80,7 +80,7 @@ export type MessageFileInput = { filename: string; bytes: Buffer };
 // How many messages one look at the conversation gives, unless it asks for fewer.
 export const PAGE_SIZE = 50;
 
-// What the secretary reads before the first message it has not read: the talk it answers into.
+// What the assistant reads before the first message it has not read: the talk it answers into.
 export const CONTEXT_SIZE = 5;
 
 function invalid(message: string): never {
@@ -172,7 +172,7 @@ export type PostInput = {
   by?: string;
 };
 
-// The person's message, to wait for the secretary: pending until it reads it. Only the desk's
+// The person's message, to wait for the assistant: pending until it reads it. Only the desk's
 // authenticated routes call this.
 export function postPersonMessage(
   project: Project,
@@ -240,17 +240,17 @@ export type SayInput = {
   // unless the turn is already classified. Without --reply-to the message is a notice and the items
   // are what it mentions: they never become the origin of anything.
   links?: string[];
-  // A question with 2 to 4 options to tap, and the number of the one the secretary recommends.
+  // A question with 2 to 4 options to tap, and the number of the one the assistant recommends.
   options?: readonly string[];
   recommended?: number;
   // What the person's tap on the FIRST option performs for them (their send-back of an item in
-  // their review, with a note the secretary drafted from their words). It needs the options: the
+  // their review, with a note the assistant drafted from their words). It needs the options: the
   // first does it, the others only answer. Only the person's tap performs it (conversation-act.ts).
   action?: MessageAction;
   // The numbers (from 1) of the options that need the person's own words ("I'll explain when I
   // answer"): tapping one opens the text box instead of answering at once.
   optionText?: readonly number[];
-  // Otea could not tie this to the session noted for the secretary: the desk marks it.
+  // Otea could not tie this to the session noted for the assistant: the desk marks it.
   unverified?: boolean;
 };
 
@@ -267,7 +267,7 @@ export type Said = {
 };
 
 // Gives the turn a kind, unless the person set it (their correction stands). True when it did. A
-// kind the secretary already gave is not turned into the other by saying something else about the
+// kind the assistant already gave is not turned into the other by saying something else about the
 // turn (a notice about items is a message of its own), and a notice has no kind.
 function classify(project: Project, root: number, kind: MessageKind): boolean {
   const current = selectRootKind(project.db, root);
@@ -277,17 +277,17 @@ function classify(project: Project, root: number, kind: MessageKind): boolean {
       `Message ${root} is already a ${current.kind}: saying more about it does not make it a ${kind} (the person corrects a kind with one tap). To tell them about items, send a notice: otea say "<text>" --links <item ids> with no --reply-to`,
     );
   }
-  if (selectMessage(project.db, root)?.author === 'secretary') {
+  if (selectMessage(project.db, root)?.author === 'assistant') {
     invalid(
       `Message ${root} is your own notice, and a notice has no kind: say it about the person's message it follows`,
     );
   }
-  setKind(project.db, root, kind, 'secretary');
+  setKind(project.db, root, kind, 'assistant');
   return true;
 }
 
 // `made`: the items were made from the turn (create --from-message). Otherwise an item counts as
-// made when it was created after the turn began, as the secretary does when it makes the item and
+// made when it was created after the turn began, as the assistant does when it makes the item and
 // then says so; an older one is only mentioned (D-274c07).
 function linkItems(
   project: Project,
@@ -314,7 +314,7 @@ function linkItems(
 // photo of the problem) go with each item made from it, as the person's own evidence, so the worker
 // that opens the item sees them (field study 7). A file the item already holds is not added twice.
 // An item that cannot take them (closed, archived, the part that takes them is full) is still linked:
-// the reason comes back as a warning for the secretary to tell the person.
+// the reason comes back as a warning for the assistant to tell the person.
 function carryFiles(
   project: Project,
   root: number,
@@ -383,7 +383,7 @@ function checkedAction(
   return { ...action, note };
 }
 
-// A message Otea could not tie to the secretary's session never carries a card: the person's tap
+// A message Otea could not tie to the assistant's session never carries a card: the person's tap
 // would do what a process of unknown origin drafted.
 export function refuseUnverifiedCard(
   unverified: boolean | undefined,
@@ -392,13 +392,13 @@ export function refuseUnverifiedCard(
   if (!unverified || card === undefined) return;
   throw new OteaError(
     'forbidden',
-    `Not said: this message could not be tied to the secretary's session, and a card (--${card === 'drop' ? 'drop' : 'send-back'}) only goes from it. If you are the secretary, declare your session first (otea profile --role secretary) and say it again; otherwise use otea escalate`,
+    `Not said: this message could not be tied to the assistant's session, and a card (--${card === 'drop' ? 'drop' : 'send-back'}) only goes from it. If you are the assistant, declare your session first (otea profile --role assistant) and say it again; otherwise use otea escalate`,
   );
 }
 
-// The secretary's message: only the project's declared secretary says anything.
-export function sayAsSecretary(project: Project, input: SayInput, now: Clock = systemClock): Said {
-  requireSecretary(project.db, input.agent, 'speaks for the project (say)');
+// The assistant's message: only the project's declared assistant says anything.
+export function sayAsAssistant(project: Project, input: SayInput, now: Clock = systemClock): Said {
+  requireAssistant(project.db, input.agent, 'speaks for the project (say)');
   const files = checkedFiles(input.files ?? []);
   const text = checkedText(input.text, files);
   const links = [...new Set((input.links ?? []).map((id) => id.trim()).filter((id) => id !== ''))];
@@ -419,7 +419,7 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
   }
   // Classifying is about a turn of the person's. Without --reply-to it is the latest message
   // already read, and only when that is no guess: another message not read yet, or another read
-  // turn not classified, and the secretary says which (a reply to the wrong turn would tie the
+  // turn not classified, and the assistant says which (a reply to the wrong turn would tie the
   // items to it). Links alone, with no --reply-to, are no classifying: the message is a notice that
   // mentions the items.
   const classifies = input.kind !== undefined;
@@ -439,7 +439,7 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
     replyTo = latest;
   }
   // A plain say with no --reply-to while a message of the person's waits for an answer is that
-  // answer: the desk and the secretary's wait count a message as answered only by a message in its
+  // answer: the desk and the assistant's wait count a message as answered only by a message in its
   // own turn, so a standalone reply left it «not answered yet» under the very answer (field study
   // 5, V4). A notice is no answer: one that names items (--links: the turn that waits has none),
   // asks with options, carries a card or classifies a turn stays a message of its own.
@@ -469,7 +469,7 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
   const at = now();
   return transaction(project.db, () => {
     const id = insertMessage(project.db, {
-      author: 'secretary',
+      author: 'assistant',
       name: input.agent,
       text,
       at,
@@ -499,11 +499,11 @@ export function sayAsSecretary(project: Project, input: SayInput, now: Clock = s
   });
 }
 
-// How long the person may take back a tap on a question, while the secretary has not read it.
+// How long the person may take back a tap on a question, while the assistant has not read it.
 export const RETRACT_ANSWER_MS = 30_000;
 
 // The person takes back the answer they just gave to a question (Deshacer): the question waits for
-// them again. Only while the secretary has not heard it, within a few seconds, and never a card's
+// them again. Only while the assistant has not heard it, within a few seconds, and never a card's
 // tap, which already did what it said.
 export function retractAnswer(project: Project, id: number, now: Clock = systemClock): Message {
   return joinTransaction(project.db, () => {
@@ -514,12 +514,12 @@ export function retractAnswer(project: Project, id: number, now: Clock = systemC
     };
     if (answer === undefined) return refuse('there is no answer to take back');
     if (question.action !== null) return refuse('its tap already did what the card says');
-    // A tap on an option only: what the person typed, or left to the secretary, is a message of
+    // A tap on an option only: what the person typed, or left to the assistant, is a message of
     // their own.
     if (answer.choice?.mode !== 'option')
       return refuse('only a tap on one of its options is taken back, not words you wrote');
     if (answer.readAt !== null || answer.heardAt !== null)
-      return refuse('the secretary already has your answer');
+      return refuse('the assistant already has your answer');
     if (Date.parse(now()) - Date.parse(answer.at) > RETRACT_ANSWER_MS)
       return refuse('the answer is too old to take back');
     deleteMessage(project.db, answer.id);
@@ -527,16 +527,16 @@ export function retractAnswer(project: Project, id: number, now: Clock = systemC
   });
 }
 
-// The secretary takes back a question of its own that nobody needs to answer any more (what it
+// The assistant takes back a question of its own that nobody needs to answer any more (what it
 // asked was settled some other way): it stops waiting for the person, who sees it was withdrawn.
 export function withdrawQuestion(
   project: Project,
   input: { agent: string; id: number },
   now: Clock = systemClock,
 ): Message {
-  requireSecretary(project.db, input.agent, 'withdraws its own question (say --withdraw)');
+  requireAssistant(project.db, input.agent, 'withdraws its own question (say --withdraw)');
   const question = requireMessage(project, input.id);
-  if (question.author !== 'secretary' || question.options.length === 0) {
+  if (question.author !== 'assistant' || question.options.length === 0) {
     invalid(`Message ${input.id} is not a question of yours with options to tap`);
   }
   if (question.closed !== null)
@@ -546,7 +546,7 @@ export function withdrawQuestion(
   return requireMessage(project, input.id);
 }
 
-// Links the turn a message belongs to with an item the secretary made out of it (otea create
+// Links the turn a message belongs to with an item the assistant made out of it (otea create
 // --from-message): the item says where it came from and the turn lists it. A turn not classified
 // yet becomes a request.
 export function linkMessageToItem(
@@ -561,7 +561,7 @@ export function linkMessageToItem(
     const warnings = linkItems(project, message.root, [item], now(), true);
     if (selectRootKind(project.db, message.root).kind === null)
       classify(project, message.root, 'request');
-    // The questions of this turn stay open: whether the item answers them is for the secretary to
+    // The questions of this turn stay open: whether the item answers them is for the assistant to
     // say (openQuestionsOfTurn tells it, and say --withdraw closes one), not for Otea to guess.
     // Making an item out of a turn is acting on it, whether or not it was read.
     clearKindNews(project.db, [message.root]);
@@ -569,24 +569,24 @@ export function linkMessageToItem(
   });
 }
 
-// The secretary's questions still waiting for the person in a turn, by message id.
+// The assistant's questions still waiting for the person in a turn, by message id.
 export function openQuestionsOfTurn(project: Project, root: number): number[] {
   return selectOpenQuestions(project.db)
     .filter((question) => question.root === root)
     .map(({ id }) => id);
 }
 
-// The message an item may be made from: the secretary's to ask, and a message of the person's turn
-// (a tap on a question included), never one of the secretary's own notices. Checked before the item
+// The message an item may be made from: the assistant's to ask, and a message of the person's turn
+// (a tap on a question included), never one of the assistant's own notices. Checked before the item
 // is made, so a refusal leaves nothing behind.
 export function requireLinkableMessage(
   project: Project,
   agent: string,
   messageId: number,
 ): Message {
-  requireSecretary(project.db, agent, 'links the conversation to items');
+  requireAssistant(project.db, agent, 'links the conversation to items');
   const message = requireMessage(project, messageId);
-  if (selectMessage(project.db, message.root)?.author === 'secretary') {
+  if (selectMessage(project.db, message.root)?.author === 'assistant') {
     invalid(
       `Message ${messageId} is your own notice, not something the person asked: make the item from the person's message (a tap on your question is one)`,
     );
@@ -594,24 +594,24 @@ export function requireLinkableMessage(
   return message;
 }
 
-// The person corrects what the secretary made of a turn, with one tap: it keeps the correction, and
-// the secretary's later say of that turn does not undo it. A change wakes the secretary (kind_changed,
+// The person corrects what the assistant made of a turn, with one tap: it keeps the correction, and
+// the assistant's later say of that turn does not undo it. A change wakes the assistant (kind_changed,
 // from the turn's own state) until it reads the turn.
 export function correctKind(project: Project, id: number, kind: MessageKind): Message {
   const message = requireMessage(project, id);
-  if (selectMessage(project.db, message.root)?.author === 'secretary') {
-    invalid(`Message ${id} is a notice of the secretary's: a notice has no kind to correct`);
+  if (selectMessage(project.db, message.root)?.author === 'assistant') {
+    invalid(`Message ${id} is a notice of the assistant's: a notice has no kind to correct`);
   }
   const changed = selectRootKind(project.db, message.root).kind !== kind;
   setKind(project.db, message.root, kind, 'person', changed);
-  // Taking the turn as the person means it is settled: what the secretary asked about it (is it
+  // Taking the turn as the person means it is settled: what the assistant asked about it (is it
   // worth noting?) no longer waits for them.
   if (changed) closeQuestions(project.db, { root: message.root }, systemClock(), 'settled');
   return requireMessage(project, id);
 }
 
-// What the person gives to a question of the secretary's: one of its options (the number from 1),
-// their own words, or the decision left to the secretary. Exactly one.
+// What the person gives to a question of the assistant's: one of its options (the number from 1),
+// their own words, or the decision left to the assistant. Exactly one.
 // `note`: with the first option of a question that carries an action, the person's own edit of the
 // note it performs with.
 // `explain`: with an option that needs the person's own words (say --option-text), what they added.
@@ -626,11 +626,11 @@ export type GivenAnswer =
   | { text: string; option?: never; delegate?: never; note?: never; explain?: never }
   | { delegate: true; text?: never; option?: never; note?: never; explain?: never };
 
-// The person's answer to a question of the secretary's (say --option): their own message, in reply
-// to it, that wakes the secretary like any message. Answered once: by a reply to that question;
+// The person's answer to a question of the assistant's (say --option): their own message, in reply
+// to it, that wakes the assistant like any message. Answered once: by a reply to that question;
 // other questions and what else the person says leave it open. Only the desk's authenticated routes
 // call this.
-export function answerSecretaryQuestion(
+export function answerAssistantQuestion(
   project: Project,
   id: number,
   given: GivenAnswer,
@@ -638,15 +638,15 @@ export function answerSecretaryQuestion(
   by = 'human',
 ): Message {
   const question = requireMessage(project, id);
-  if (question.author !== 'secretary' || question.options.length === 0) {
+  if (question.author !== 'assistant' || question.options.length === 0) {
     throw new OteaError('invalid_fields', `Message ${id} is not a question with options to tap`);
   }
-  // A question the secretary took back is not answered. One that was settled some other way may
-  // still be: the person's words reach the secretary all the same.
+  // A question the assistant took back is not answered. One that was settled some other way may
+  // still be: the person's words reach the assistant all the same.
   if (question.closed?.why === 'withdrawn') {
     throw new OteaError(
       'invalid_transition',
-      `Message ${id} was withdrawn by the secretary: it no longer waits for an answer`,
+      `Message ${id} was withdrawn by the assistant: it no longer waits for an answer`,
     );
   }
   let words: string;
@@ -654,7 +654,7 @@ export function answerSecretaryQuestion(
   let option: number | undefined;
   if (given.delegate && question.action !== null) {
     invalid(
-      `Message ${id} ${question.action.kind === 'drop' ? 'drops' : 'sends'} ${question.action.item}${question.action.kind === 'drop' ? '' : ' back'}: only you decide that, so it is not left to the secretary`,
+      `Message ${id} ${question.action.kind === 'drop' ? 'drops' : 'sends'} ${question.action.item}${question.action.kind === 'drop' ? '' : ' back'}: only you decide that, so it is not left to the assistant`,
     );
   }
   if (given.note !== undefined && (question.action === null || given.option !== 1)) {
@@ -751,13 +751,13 @@ export type Conversation = {
   messages: Message[];
   // More messages lie beyond this page (after `since`, before `before`, else earlier than the first).
   more: boolean;
-  // The secretary as M1 tells it, and what waits for it (the same object GET /api/secretary gives).
-  secretary: SecretaryView | null;
-  waiting: SecretaryWaiting;
+  // The assistant as M1 tells it, and what waits for it (the same object GET /api/assistant gives).
+  assistant: AssistantView | null;
+  waiting: AssistantWaiting;
 };
 
-// With no secretary nothing is read, so only the person's own messages wait.
-function withoutSecretary(db: DatabaseSync): SecretaryWaiting {
+// With no assistant nothing is read, so only the person's own messages wait.
+function withoutAssistant(db: DatabaseSync): AssistantWaiting {
   const messages = countPending(db);
   return { ...messages, messages: messages.count, notes: 0, reports: 0 };
 }
@@ -770,7 +770,7 @@ function limitOf(limit: number | undefined): number {
 }
 
 // What the desk shows: the newest page (or the one after `since`, or before `before`), in order,
-// beside the secretary's state and how many messages wait for it. Reading it marks nothing.
+// beside the assistant's state and how many messages wait for it. Reading it marks nothing.
 export function listConversation(
   project: Project,
   look: Look = {},
@@ -784,14 +784,14 @@ export function listConversation(
   if (look.since !== undefined && look.before !== undefined)
     invalid('Give since or before, not both');
   const { messages, more } = selectMessages(project.db, page);
-  const secretary = secretaryView(project.db, now) ?? null;
-  // What waits for the secretary is one count with the secretary's own state, never a second one:
+  const assistant = assistantView(project.db, now) ?? null;
+  // What waits for the assistant is one count with the assistant's own state, never a second one:
   // with none, only the person's messages wait for it.
   return {
     messages,
     more,
-    secretary,
-    waiting: secretary?.waiting ?? withoutSecretary(project.db),
+    assistant,
+    waiting: assistant?.waiting ?? withoutAssistant(project.db),
   };
 }
 
@@ -801,21 +801,21 @@ export type Read = {
   fresh: number[];
   more: boolean;
   // The path each attachment can be opened at, and why one has none: worked out before anything is
-  // marked read, so a file that cannot be made available never costs the secretary its message.
+  // marked read, so a file that cannot be made available never costs the assistant its message.
   paths: Map<number, string>;
   problems: Map<number, string>;
 };
 
-// The secretary reads the conversation, which marks the person's messages it returns as read. Without
+// The assistant reads the conversation, which marks the person's messages it returns as read. Without
 // `since`: the person's unread messages (the few before them, for context), else the latest ones.
 // With it: the messages after it. A look that does not reach every unread message leaves the rest
 // pending, so the next one finds them.
-export function readAsSecretary(
+export function readAsAssistant(
   project: Project,
   input: { agent: string; since?: number; limit?: number },
   now: Clock = systemClock,
 ): Read {
-  requireSecretary(project.db, input.agent, 'reads the conversation');
+  requireAssistant(project.db, input.agent, 'reads the conversation');
   const limit = limitOf(input.limit);
   return transaction(project.db, () => {
     let messages: Message[];
@@ -836,7 +836,7 @@ export function readAsSecretary(
         more = after.more;
       }
     }
-    // A kind the person changed is read with its turn, wherever it lies, so the secretary sees what
+    // A kind the person changed is read with its turn, wherever it lies, so the assistant sees what
     // they decided and the news stops waking it.
     const news = selectKindNews(project.db).map(({ root }) => root);
     const have = new Set(messages.map(({ id }) => id));
@@ -869,7 +869,7 @@ function sizeText(bytes: number): string {
     : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-// How a message of the person's answers a question, for the secretary's read of it.
+// How a message of the person's answers a question, for the assistant's read of it.
 function choiceHeads(message: Message): string[] {
   const { choice } = message;
   if (choice === null) return [];
@@ -883,7 +883,7 @@ function choiceHeads(message: Message): string[] {
   return ['answer to your question, in their own words'];
 }
 
-// The messages as the secretary reads them: plain text, each with its number, who wrote it and
+// The messages as the assistant reads them: plain text, each with its number, who wrote it and
 // when, the kind and the items of its turn, and each file with a path it can open.
 export function messagesText(
   messages: readonly Message[],
@@ -977,10 +977,10 @@ export function conversationText(
   ].join('\n');
 }
 
-// A registered source of the secretary's wait: while the person has a message the secretary has not
+// A registered source of the assistant's wait: while the person has a message the assistant has not
 // read, the wait returns it, from the messages' own state (not a signal that can be lost): it stops
-// when the secretary reads them.
-addSecretarySource((ctx) => {
+// when the assistant reads them.
+addAssistantSource((ctx) => {
   const pending = selectPending(ctx.db);
   const [first] = pending;
   if (first === undefined) return undefined;
@@ -992,9 +992,9 @@ addSecretarySource((ctx) => {
   };
 });
 
-// A kind the person changed wakes the secretary from the turn's own state, as a message of theirs
+// A kind the person changed wakes the assistant from the turn's own state, as a message of theirs
 // does, until it reads the turn.
-addSecretarySource((ctx) => {
+addAssistantSource((ctx) => {
   const [first] = selectKindNews(ctx.db, true);
   if (first === undefined) return undefined;
   const kind = selectRootKind(ctx.db, first.root).kind;

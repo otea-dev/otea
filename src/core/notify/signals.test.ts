@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ASSISTANT_WAIT_MS,
+  type AssistantFacts,
+  assistantSignalsOf,
   bandejaSignalsOf,
   freshSignals,
   type NotifyFacts,
-  SECRETARY_WAIT_MS,
-  type SecretaryFacts,
-  secretarySignalsOf,
   settleUnheard,
   signalsOf,
   UNHEARD_GRACE_MS,
@@ -172,8 +172,8 @@ describe('settleUnheard', () => {
   });
 });
 
-describe('secretarySignalsOf', () => {
-  const facts = (over: Partial<SecretaryFacts> = {}): SecretaryFacts => ({
+describe('assistantSignalsOf', () => {
+  const facts = (over: Partial<AssistantFacts> = {}): AssistantFacts => ({
     name: 'sage',
     state: 'offline',
     since: earlier,
@@ -182,16 +182,16 @@ describe('secretarySignalsOf', () => {
     ...over,
   });
 
-  it('says nothing while the project has no secretary', () => {
-    expect(secretarySignalsOf(undefined, NOW)).toEqual([]);
+  it('says nothing while the project has no assistant', () => {
+    expect(assistantSignalsOf(undefined, NOW)).toEqual([]);
   });
 
   it('tells each reply under its own key, at the turn it answered', () => {
     const replies = [{ id: 9, turn: 4, by: 'sage', text: 'Listo' }];
-    expect(secretarySignalsOf(facts({ state: 'listening', replies }), NOW)).toEqual([
+    expect(assistantSignalsOf(facts({ state: 'listening', replies }), NOW)).toEqual([
       {
-        key: 'secretary_reply:9',
-        kind: 'secretary_reply',
+        key: 'assistant_reply:9',
+        kind: 'assistant_reply',
         item: 'hablar:4',
         title: '',
         by: 'sage',
@@ -201,18 +201,18 @@ describe('secretarySignalsOf', () => {
     ]);
   });
 
-  it('tells an offline secretary only once messages have waited the threshold', () => {
+  it('tells an offline assistant only once messages have waited the threshold', () => {
     const waiting = (since: string) => ({ count: 2, since });
-    const kindsAt = (since: string, state: SecretaryFacts['state'] = 'offline') =>
-      secretarySignalsOf(facts({ state, waiting: waiting(since) }), NOW).map(({ kind }) => kind);
-    expect(kindsAt(new Date(NOW - SECRETARY_WAIT_MS + 1000).toISOString())).toEqual([]);
-    expect(kindsAt(new Date(NOW - SECRETARY_WAIT_MS).toISOString())).toEqual(['secretary_offline']);
-    expect(kindsAt(new Date(NOW - 2 * SECRETARY_WAIT_MS).toISOString(), 'connected')).toEqual([]);
-    expect(secretarySignalsOf(facts({ waiting: { count: 0, since: null } }), NOW)).toEqual([]);
+    const kindsAt = (since: string, state: AssistantFacts['state'] = 'offline') =>
+      assistantSignalsOf(facts({ state, waiting: waiting(since) }), NOW).map(({ kind }) => kind);
+    expect(kindsAt(new Date(NOW - ASSISTANT_WAIT_MS + 1000).toISOString())).toEqual([]);
+    expect(kindsAt(new Date(NOW - ASSISTANT_WAIT_MS).toISOString())).toEqual(['assistant_offline']);
+    expect(kindsAt(new Date(NOW - 2 * ASSISTANT_WAIT_MS).toISOString(), 'connected')).toEqual([]);
+    expect(assistantSignalsOf(facts({ waiting: { count: 0, since: null } }), NOW)).toEqual([]);
   });
 
   it('keys the offline notice to the stretch, not to what waits', () => {
-    const key = (over: Partial<SecretaryFacts>) => secretarySignalsOf(facts(over), NOW)[0]?.key;
+    const key = (over: Partial<AssistantFacts>) => assistantSignalsOf(facts(over), NOW)[0]?.key;
     expect(key({ waiting: { count: 5, since: '2026-11-14T09:45:00.000Z' } })).toBe(
       key({ waiting: { count: 2, since: '2026-11-14T09:30:00.000Z' } }),
     );

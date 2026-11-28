@@ -22,7 +22,7 @@ describe('the Bandeja from the refiner', () => {
 
   beforeEach(async () => {
     ({ repo, otea } = seeded.fresh());
-    await otea('profile', '--role', 'secretary', '--as', 'sol');
+    await otea('profile', '--role', 'assistant', '--as', 'sol');
   });
 
   afterEach(() => repo.remove());
@@ -75,16 +75,16 @@ describe('the Bandeja from the refiner', () => {
       expect(text).toContain('otea bandeja take B-1 --as lia');
     });
 
-    it('wakes the secretary’s wait until the entry is taken, then not', async () => {
+    it('wakes the assistant’s wait until the entry is taken, then not', async () => {
       capture('an idea');
 
-      const woke = JSON.parse((await otea('wait', '--secretary', '--as', 'sol', '--json')).out);
+      const woke = JSON.parse((await otea('wait', '--assistant', '--as', 'sol', '--json')).out);
       expect(woke).toMatchObject({ kind: 'bandeja_item', ref: 'B-1' });
 
       const taken = await otea('bandeja', 'take', 'B-1', '--as', 'lia');
       expect(taken.code).toBe(0);
       expect(taken.out).toContain('Took B-1 until');
-      const idle = await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1');
+      const idle = await otea('wait', '--assistant', '--as', 'sol', '--timeout', '1');
       expect(idle.code).toBe(13);
     });
 
@@ -102,10 +102,10 @@ describe('the Bandeja from the refiner', () => {
       expect(again.out).toContain('Still holding B-1');
     });
 
-    it('is taken only by the refiner itself: the secretary never takes a note for one (no --for)', async () => {
+    it('is taken only by the refiner itself: the assistant never takes a note for one (no --for)', async () => {
       capture('an idea');
 
-      // The secretary's own text says never to take a note for a refiner, so the help says nothing
+      // The assistant's own text says never to take a note for a refiner, so the help says nothing
       // of it and the option does not exist.
       const command = COMMANDS.find(({ name }) => name === 'bandeja take');
       expect(command?.summary).not.toMatch(/--for|for a refiner it launches/);
@@ -187,8 +187,8 @@ describe('the Bandeja from the refiner', () => {
       );
       const json = JSON.parse((await otea('show', item.id, '--as', 'worker', '--json')).out);
       expect(json.fromBandeja).toMatchObject({ ref: 'B-1', snippet: expect.any(String) });
-      // Nothing waits for the secretary, and nobody takes it again.
-      expect((await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1')).code).toBe(13);
+      // Nothing waits for the assistant, and nobody takes it again.
+      expect((await otea('wait', '--assistant', '--as', 'sol', '--timeout', '1')).code).toBe(13);
       const again = await otea('bandeja', 'take', 'B-1', '--as', 'max');
       expect(again.code).toBe(4);
       expect(again.err).toContain('filed already');
@@ -250,7 +250,7 @@ describe('the Bandeja from the refiner', () => {
   });
 
   describe('asking the person on an entry', () => {
-    it('shows options on the entry, waits for the answer, and wakes the secretary with it', async () => {
+    it('shows options on the entry, waits for the answer, and wakes the assistant with it', async () => {
       capture('make it better');
       await otea('bandeja', 'take', 'B-1', '--as', 'lia');
 
@@ -274,15 +274,15 @@ describe('the Bandeja from the refiner', () => {
         state: 'asking',
         asking: { text: 'Better how?', options: ['Faster', 'Prettier'], recommended: 2 },
       });
-      // Nothing for the secretary until they answer.
-      expect((await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1')).code).toBe(13);
+      // Nothing for the assistant until they answer.
+      expect((await otea('wait', '--assistant', '--as', 'sol', '--timeout', '1')).code).toBe(13);
       const busy = await otea('bandeja', 'take', 'B-1', '--as', 'max');
       expect(busy.code).toBe(4);
 
       // The person taps an option on the desk.
       inProject((project) => answerBandeja(project, { id: 1, question: 1, option: 2 }));
 
-      const woke = JSON.parse((await otea('wait', '--secretary', '--as', 'sol', '--json')).out);
+      const woke = JSON.parse((await otea('wait', '--assistant', '--as', 'sol', '--json')).out);
       expect(woke).toMatchObject({ kind: 'bandeja_item', ref: 'B-1' });
       await otea('bandeja', 'take', 'B-1', '--as', 'lia');
       const read = await otea('bandeja', 'B-1', '--as', 'lia');

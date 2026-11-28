@@ -48,7 +48,7 @@ function lapsed(
 // How often a wait keeps its agent's home: well inside HOME_HOLD_MS.
 const HOME_KEEP_MS = 10 * 60_000;
 
-// Keeps the home of an agent that is only waiting (a secretary's wait lasts hours and writes
+// Keeps the home of an agent that is only waiting (an assistant's wait lasts hours and writes
 // nothing, so its home would lapse after HOME_HOLD_MS and the next write would be refused): the
 // returned function is called on each beat of the wait, and renews the home at most every
 // HOME_KEEP_MS. Where the home is another project's, or the registry cannot be read, it does

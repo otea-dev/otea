@@ -182,13 +182,13 @@ export type ItemView = Omit<ItemWithEvents, 'relations'> & {
   // On an archived board (Studio's Archivados): read-only. The board by its name and hidden id, and
   // its collection, which no list holds, to read the item's words.
   archived?: { board: string; id: string; collection?: CollectionView };
-  // The turns of the conversation with the secretary it came out of (Hablar), when it came out of one.
+  // The turns of the conversation with the assistant it came out of (Hablar), when it came out of one.
   fromMessages?: FromMessage[];
   // The Bandeja entry it was refined from, when it was.
   fromBandeja?: FromBandeja;
   // While it waits for the person: its request was rewritten after the delivery was handed in.
   requestChanged?: RequestChanged;
-  // While it waits for the person: what the secretary or the delivering agent said of this delivery.
+  // While it waits for the person: what the assistant or the delivering agent said of this delivery.
   advice?: Advice;
 };
 
@@ -371,7 +371,7 @@ export type ProjectOverview = {
   waiting: WaitingItem[];
   // Side topics an agent answered there: yours to read, never work (absent from an older server).
   topics?: AnsweredTopic[];
-  // What waits for you there that is no item: a question on a Bandeja note, the secretary's own,
+  // What waits for you there that is no item: a question on a Bandeja note, the assistant's own,
   // what agents escalated while it is away (absent from an older server).
   asking?: PendingEntry[];
   withAgents: number;

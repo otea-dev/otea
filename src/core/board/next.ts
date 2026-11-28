@@ -1163,7 +1163,7 @@ export function takenBackText(
 function relayDropText(def: BoardDefinition, id: string): string {
   if (def.drop.by === 'page') return '';
   // A relay never drops (adversarial review of S): the person's own tap does, or the desk.
-  return ` If the person may want it dropped, ask them with otea ask ${id} "<your question>"; the secretary offers them a card to tap (otea say --drop ${id}), and a relayed sentence never drops an item.`;
+  return ` If the person may want it dropped, ask them with otea ask ${id} "<your question>"; the assistant offers them a card to tap (otea say --drop ${id}), and a relayed sentence never drops an item.`;
 }
 
 // Why a discard was refused (engine drop codes), in the agent's words.

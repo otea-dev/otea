@@ -2302,17 +2302,17 @@
     gap: 0 14px;
     margin-bottom: 6px;
   }
-  /* the secretary-away card over the rows: its title and its way to Hablar, the sentence between
+  /* the assistant-away card over the rows: its title and its way to Hablar, the sentence between
      them waits for an upright phone */
-  body:has(.tabbar) .secoff {
+  body:has(.tabbar) .assistant-off {
     padding: 8px 12px;
     margin-bottom: 8px;
     gap: 10px;
   }
-  body:has(.tabbar) .secoff p {
+  body:has(.tabbar) .assistant-off p {
     display: none;
   }
-  body:has(.tabbar) .secoff-go {
+  body:has(.tabbar) .assistant-off-go {
     margin-top: 2px;
   }
   body:has(.tabbar) .panel .head .kicker,

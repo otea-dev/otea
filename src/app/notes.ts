@@ -242,13 +242,13 @@ export function agentStepOf(
   return board && step && step.doer !== 'you' ? { board, step } : undefined;
 }
 
-// The secretary tells the agent doing a step what the person changed, as a note it must answer
+// The assistant tells the agent doing a step what the person changed, as a note it must answer
 // before it hands off (the person's own words, relayed: the change reached the item first). Only
 // while an agent does the step; undefined for an item nobody is working on, which a worker reads
 // as changed when it takes it.
 export function relayChange(
   ctx: Context,
-  input: { id: string; text: string; actor: Actor; channel: Channel; role?: 'secretary' },
+  input: { id: string; text: string; actor: Actor; channel: Channel; role?: 'assistant' },
   now = systemClock,
 ): ItemNote | undefined {
   const text = input.text.trim();

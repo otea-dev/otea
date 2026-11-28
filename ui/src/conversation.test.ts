@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type AssistantStatus,
   asksOf,
   awayOf,
   blocksOf,
@@ -18,7 +19,6 @@ import {
   piecesOf,
   quotedSnippet,
   rowsOf,
-  type SecretaryStatus,
   splitQuestion,
   splitReply,
   thinkingRoot,
@@ -62,8 +62,8 @@ function say(o: Partial<Message> & { author: Message['author'] }): Message {
   };
 }
 
-const listening: SecretaryStatus = { name: 'quill', state: 'listening', since: null, pending: 0 };
-const offline: SecretaryStatus = {
+const listening: AssistantStatus = { name: 'quill', state: 'listening', since: null, pending: 0 };
+const offline: AssistantStatus = {
   name: 'quill',
   state: 'offline',
   since: ago(300),
@@ -77,7 +77,7 @@ describe('the conversation worked into turns', () => {
     const ask = say({ id: 1, author: 'person' });
     const answer = say({
       id: 2,
-      author: 'secretary',
+      author: 'assistant',
       replyTo: 1,
       root: 1,
       kind: 'request',
@@ -103,16 +103,16 @@ describe('the conversation worked into turns', () => {
 });
 
 describe('the thread in time', () => {
-  // The secretary's news arrive as messages of their own and stand where they were said, below
+  // The assistant's news arrive as messages of their own and stand where they were said, below
   // what the person wrote since; a reply to an older message says which one it answers.
   it('lists every message once, in the order it was said, whatever turn it belongs to', () => {
     const messages = [
       say({ id: 1, author: 'person', text: 'Armá el tablero' }),
-      say({ id: 2, author: 'secretary', replyTo: 1, root: 1, text: 'Hecho.' }),
+      say({ id: 2, author: 'assistant', replyTo: 1, root: 1, text: 'Hecho.' }),
       say({ id: 3, author: 'person', text: '¿Y los reintentos?' }),
-      say({ id: 4, author: 'secretary', replyTo: 3, root: 3, text: 'Mejor con backoff.' }),
-      say({ id: 5, author: 'secretary', replyTo: 1, root: 1, text: 'CAM-1 está listo.' }),
-      say({ id: 6, author: 'secretary', text: 'CAM-2 espera tu revisión.', links: ['CAM-2'] }),
+      say({ id: 4, author: 'assistant', replyTo: 3, root: 3, text: 'Mejor con backoff.' }),
+      say({ id: 5, author: 'assistant', replyTo: 1, root: 1, text: 'CAM-1 está listo.' }),
+      say({ id: 6, author: 'assistant', text: 'CAM-2 espera tu revisión.', links: ['CAM-2'] }),
     ];
     const rows = rowsOf(messages, turnsOf(messages));
 
@@ -148,7 +148,7 @@ describe('the thread in time', () => {
   it('shows what the person chose as its own row, and a question as open until they speak after it', () => {
     const question = say({
       id: 2,
-      author: 'secretary',
+      author: 'assistant',
       text: '¿Lo anoto?',
       options: ['Anotarlo', 'Dejarlo'],
       recommended: 1,
@@ -169,7 +169,7 @@ describe('the thread in time', () => {
     expect(answered[0]).toMatchObject({ question: 'answered' });
 
     // What they chose on an agent's question about an item is a trace: it answers no question of
-    // the secretary's, and the secretary is not thinking about it.
+    // the assistant's, and the assistant is not thinking about it.
     const trace = say({
       id: 4,
       author: 'person',
@@ -184,8 +184,8 @@ describe('the thread in time', () => {
   // Each question is answered by a reply to it: another question stays open when the person
   // answers one, or says something else.
   it('keeps each question open until a reply to that one, whatever else was said', () => {
-    const one = say({ id: 2, author: 'secretary', text: '¿Uno?', options: ['Sí', 'No'] });
-    const two = say({ id: 3, author: 'secretary', text: '¿Dos?', options: ['Sí', 'No'] });
+    const one = say({ id: 2, author: 'assistant', text: '¿Uno?', options: ['Sí', 'No'] });
+    const two = say({ id: 3, author: 'assistant', text: '¿Dos?', options: ['Sí', 'No'] });
     const tapTwo = say({
       id: 4,
       author: 'person',
@@ -204,7 +204,7 @@ describe('the thread in time', () => {
   });
 });
 
-describe('the secretary thinking', () => {
+describe('the assistant thinking', () => {
   it('knows a message was heard the moment the wait returned it, before it was read', () => {
     const [turn] = turnsOf([
       say({ id: 1, author: 'person', delivery: 'pending', heardAt: ago(1) }),
@@ -216,7 +216,7 @@ describe('the secretary thinking', () => {
   it('holds the turn it read and has not answered, only while it is there', () => {
     const turns = turnsOf([
       say({ id: 1, author: 'person', delivery: 'read' }),
-      say({ id: 2, author: 'secretary', replyTo: 1, root: 1 }),
+      say({ id: 2, author: 'assistant', replyTo: 1, root: 1 }),
       say({ id: 3, author: 'person', delivery: 'read' }),
     ]);
     expect(thinkingRoot(turns, listening)).toBe(3);
@@ -236,9 +236,9 @@ describe('the secretary thinking', () => {
     expect(thinkingRoot(turns, listening, NOW)).toBe(1);
   });
 
-  // Field study 5, V4: the secretary made the items and answered elsewhere; the desk kept saying it
+  // Field study 5, V4: the assistant made the items and answered elsewhere; the desk kept saying it
   // had not answered, under a turn the wait itself counts as answered.
-  it('never says it has not answered a turn the secretary made items from', () => {
+  it('never says it has not answered a turn the assistant made items from', () => {
     const [turn] = turnsOf([
       say({ id: 1, author: 'person', delivery: 'read', readAt: ago(5), heardAt: ago(5) }),
       say({ id: 2, author: 'person', delivery: 'read', readAt: ago(5), links: ['CAM-1'], root: 1 }),
@@ -253,7 +253,7 @@ describe('the secretary thinking', () => {
     expect(thinkingRoot(pending, listening)).toBeUndefined();
     const answered = turnsOf([
       say({ id: 1, author: 'person', delivery: 'read' }),
-      say({ id: 2, author: 'secretary', replyTo: 1, root: 1 }),
+      say({ id: 2, author: 'assistant', replyTo: 1, root: 1 }),
     ]);
     expect(thinkingRoot(answered, listening)).toBeUndefined();
   });
@@ -265,7 +265,7 @@ describe('the secretary thinking', () => {
   });
 });
 
-// Field study 3 (S4): without background subagents the secretary pastes the text of each session to
+// Field study 3 (S4): without background subagents the assistant pastes the text of each session to
 // open in its message; one block of plain text with no Copy, 2470 px on the phone. A fenced block
 // under its number is a text to copy.
 describe('texts to paste, in fenced blocks', () => {
@@ -401,9 +401,9 @@ describe('a reply folding', () => {
     expect(splitReply(`Lead\n${'x'.repeat(FOLD_CHARS)}`).folds).toBe(false);
   });
 
-  // The secretary's rule (M4, its role text): the conclusion, then at most 3 short lines. The page
+  // The assistant's rule (M4, its role text): the conclusion, then at most 3 short lines. The page
   // shows exactly that much and folds the first line over it.
-  it('keeps what the secretary rule allows, a line and 3 short ones, and folds a fourth', () => {
+  it('keeps what the assistant rule allows, a line and 3 short ones, and folds a fourth', () => {
     const short = 'x'.repeat(70);
     expect(FOLD_LINES).toBe(3);
     expect(splitReply(['Lead', short, short, short].join('\n')).folds).toBe(false);
@@ -516,7 +516,7 @@ describe('plain words with ids and links', () => {
 });
 
 // R2 (field study 4, V2 and V4): a «(CAM-1)» broke at the line's end and left a lone «)» or «(»,
-// and the secretary's `commands` showed their backticks as written.
+// and the assistant's `commands` showed their backticks as written.
 describe('a quoted snippet', () => {
   it('leaves the backticks out, so a cut in a code span never shows one with no mate', () => {
     const said = 'Resúmeme qué me espera hoy y corre `otea pending` si hace falta, por favor.';
@@ -534,7 +534,7 @@ describe('a quoted snippet', () => {
       kind: 'consultation',
     });
     const reply = say({
-      author: 'secretary',
+      author: 'assistant',
       replyTo: person.id,
       root: person.id,
       kind: 'consultation',
@@ -665,13 +665,13 @@ describe('what a request produced', () => {
     expect(chipOf('CAM-21', items, NOW).state).toBe('hablar.st.merging');
   });
 
-  it('lists the chips in the order the secretary linked them, and the questions that wait', () => {
+  it('lists the chips in the order the assistant linked them, and the questions that wait', () => {
     const items = byId(working, queued, asking);
     const [turn] = turnsOf([
       say({ id: 1, author: 'person' }),
       say({
         id: 2,
-        author: 'secretary',
+        author: 'assistant',
         replyTo: 1,
         root: 1,
         kind: 'request',
@@ -697,7 +697,7 @@ describe('what came out, in cards', () => {
     say({ id: 1, author: 'person', text: 'El botón queda tapado' }),
     say({
       id: 2,
-      author: 'secretary',
+      author: 'assistant',
       replyTo: 1,
       root: 1,
       kind: 'request',
@@ -706,7 +706,7 @@ describe('what came out, in cards', () => {
     say({ id: 3, author: 'person', text: '¿Un tablero por cliente?' }),
     say({
       id: 4,
-      author: 'secretary',
+      author: 'assistant',
       replyTo: 3,
       root: 3,
       kind: 'consultation',
@@ -714,7 +714,7 @@ describe('what came out, in cards', () => {
     }),
     // A request with nothing linked yet is still being worked out; ordinary talk has no card.
     say({ id: 5, author: 'person', text: 'Armá algo' }),
-    say({ id: 6, author: 'secretary', replyTo: 5, root: 5, kind: 'request' }),
+    say({ id: 6, author: 'assistant', replyTo: 5, root: 5, kind: 'request' }),
     say({ id: 7, author: 'person', text: 'Gracias' }),
   ]);
 
@@ -729,13 +729,13 @@ describe('what came out, in cards', () => {
     expect(cards[0]).toMatchObject({ answer: 'Sí, si cada cliente revisa distinto.' });
   });
 
-  // D-274c07 (final study): four code requests read «hecho» because the secretary linked them to the
+  // D-274c07 (final study): four code requests read «hecho» because the assistant linked them to the
   // board's sketch (PED-1), which was done, while nothing was made from any of them.
   describe('the outcome of a request', () => {
     const request = (links: string[], made: string[]) =>
       turnsOf([
         say({ id: 30, author: 'person', text: 'Agrega POST /products', kind: 'request' }),
-        say({ id: 31, author: 'secretary', replyTo: 30, root: 30, kind: 'request', links, made }),
+        say({ id: 31, author: 'assistant', replyTo: 30, root: 30, kind: 'request', links, made }),
       ]);
     const sketch = item({ id: 'PED-1', title: 'Esbozar el tablero', turn: 'none', closes: 'done' });
     const made = item({ id: 'CAM-20', title: 'POST /products', turn: 'agent' });
@@ -761,26 +761,26 @@ describe('what came out, in cards', () => {
     it('says nothing of a consultation', () => {
       const asked = turnsOf([
         say({ id: 40, author: 'person', text: '¿Y los reintentos?', kind: 'consultation' }),
-        say({ id: 41, author: 'secretary', replyTo: 40, root: 40, kind: 'consultation' }),
+        say({ id: 41, author: 'assistant', replyTo: 40, root: 40, kind: 'consultation' }),
       ]);
       expect(cardsOf(asked, all, NOW)[0]?.outcome).toBeNull();
     });
   });
 
-  // U3 (field study 4): a request that came out of the person's tap on the secretary's question was
+  // U3 (field study 4): a request that came out of the person's tap on the assistant's question was
   // titled by the tap («Sí, encárgalo»); it is titled by the question it answers.
-  it('titles a turn that began with the secretary’s question by that question, not by the tap', () => {
+  it('titles a turn that began with the assistant’s question by that question, not by the tap', () => {
     const asked = turnsOf([
       say({
         id: 20,
-        author: 'secretary',
+        author: 'assistant',
         text: 'Hay dos formas de recuperar la columna.\n¿Lo encargo a un agente?',
         options: ['Sí, encárgalo', 'No'],
       }),
       say({ id: 21, author: 'person', replyTo: 20, root: 20, text: 'Sí, encárgalo' }),
       say({
         id: 22,
-        author: 'secretary',
+        author: 'assistant',
         replyTo: 21,
         root: 20,
         kind: 'request',
@@ -792,13 +792,13 @@ describe('what came out, in cards', () => {
   });
 
   // The person's own tap on «consulta ⇄» makes the turn a request nothing has taken yet: it stays
-  // in sight, saying the secretary is taking it, instead of vanishing from the list.
-  it('keeps a request the person corrected, with no items yet, saying the secretary takes it', () => {
+  // in sight, saying the assistant is taking it, instead of vanishing from the list.
+  it('keeps a request the person corrected, with no items yet, saying the assistant takes it', () => {
     const corrected = turnsOf([
       say({ id: 1, author: 'person', text: '¿Vale la pena exportar a Markdown?' }),
       say({
         id: 2,
-        author: 'secretary',
+        author: 'assistant',
         replyTo: 1,
         root: 1,
         kind: 'request',
@@ -823,7 +823,7 @@ describe('what came out, in cards', () => {
       say({ id: 1, author: 'person', text: 'agrega DELETE /orders/:id' }),
       say({
         id: 2,
-        author: 'secretary',
+        author: 'assistant',
         replyTo: 1,
         root: 1,
         kind: 'consultation',
@@ -844,17 +844,17 @@ describe('what came out, in cards', () => {
 
   // Field study 6 (D-215eb4): five people read «Ahora es una consulta: lo que ya se había creado
   // sigue abierto…» under consultations they never changed, because an item of the turn was open.
-  // It is what a correction leaves behind; a turn the secretary sorted as a consultation has none.
+  // It is what a correction leaves behind; a turn the assistant sorted as a consultation has none.
   it('does not say items are left over from a consultation the person never changed', () => {
     const asked = turnsOf([
       say({ id: 1, author: 'person', text: '¿Qué hace el cron?' }),
       say({
         id: 2,
-        author: 'secretary',
+        author: 'assistant',
         replyTo: 1,
         root: 1,
         kind: 'consultation',
-        kindBy: 'secretary',
+        kindBy: 'assistant',
         links: ['CAM-13'],
         text: 'Corre cada hora.',
       }),
@@ -869,14 +869,14 @@ describe('what came out, in cards', () => {
     ]);
   });
 
-  // R2 (field study 4, U3): a turn the secretary answered without ever classifying it vanished from
+  // R2 (field study 4, U3): a turn the assistant answered without ever classifying it vanished from
   // «Lo que salió». It stays in sight with no kind, titled by the person's own words, so one tap can
   // make it a request or a consultation; only «Todo» holds it.
   it('keeps an answered turn nobody classified, titled by the person, and counts it in all', () => {
     const open = turnsOf([
       say({ id: 1, author: 'person', text: '¿Cuánto tarda el envío a Mendoza?' }),
-      say({ id: 2, author: 'secretary', replyTo: 1, root: 1, text: 'Dos días.' }),
-      // Still unanswered, read a moment ago: the secretary holds it, it is not unclassified.
+      say({ id: 2, author: 'assistant', replyTo: 1, root: 1, text: 'Dos días.' }),
+      // Still unanswered, read a moment ago: the assistant holds it, it is not unclassified.
       say({ id: 3, author: 'person', text: 'Y a Salta?' }),
       // A side topic's record has its own place.
       say({ id: 4, author: 'person', text: 'Guarda esto' }),
@@ -906,7 +906,7 @@ describe('what came out, in cards', () => {
 describe('finding a turn', () => {
   const turns = turnsOf([
     say({ id: 10, author: 'person' }),
-    say({ id: 11, author: 'secretary', replyTo: 10, root: 10 }),
+    say({ id: 11, author: 'assistant', replyTo: 10, root: 10 }),
     say({ id: 20, author: 'person' }),
     say({ id: 21, author: 'agent', replyTo: 20, root: 20, topic: 'TEM-3' }),
   ]);

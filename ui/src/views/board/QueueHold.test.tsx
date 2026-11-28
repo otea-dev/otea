@@ -9,7 +9,7 @@ const pending = (blocks: Pending['blocks']): Pending => ({
   entries: [],
   blocks,
   queues: [],
-  secretary: null,
+  assistant: null,
 });
 
 const hold = {

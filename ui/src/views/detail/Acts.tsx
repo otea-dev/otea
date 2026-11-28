@@ -89,7 +89,7 @@ type ActsProps = {
   // hold on Aprobar.
   unopened?: string | undefined;
   // Beside Aprobar: what the person should know before it (the attached diff is not what lands,
-  // what the secretary advised). Advice and warnings, never a hold on the move.
+  // what the assistant advised). Advice and warnings, never a hold on the move.
   notices?: readonly ReviewNotice[] | undefined;
   // Reviewing an item that carries options (mode 'pick'): the options and the ways on, named for
   // the pick; `plan` then holds the rest (the send-backs, the closes).

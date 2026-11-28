@@ -15,8 +15,9 @@ import {
 } from '../../derive/fixtures.ts';
 import { setLanguage } from '../../i18n/i18n.ts';
 import type { LaneBlock } from '../../lanes/LaneList.tsx';
+import { roundOf } from '../../rounds.ts';
 import type { Item } from '../../types.ts';
-import { roundOf, rowCall, tocaBlocks } from './TocaView.tsx';
+import { rowCall, tocaBlocks } from './TocaView.tsx';
 
 afterEach(() => setLanguage('en'));
 
@@ -362,13 +363,12 @@ describe('a row’s call to act', () => {
       moved('A', 'fixing', you, { minutes: 40, from: 'verify', reason: 'Falta.' }),
       moved('A', 'verify', agent('Mender'), { minutes: 30 }),
     ];
-    expect(roundOf(item({ id: 'A' }), feed, bug)).toBe(2);
-    expect(roundOf(item({ id: 'A', turn: 'agent', state: 'fixing' }), feed.slice(0, 2), bug)).toBe(
-      2,
-    );
-    expect(roundOf(item({ id: 'A' }), [], bug)).toBe(0);
+    expect(roundOf(item({ id: 'A' }), feed)).toBe(2);
+    expect(roundOf(item({ id: 'A', turn: 'agent', state: 'fixing' }), feed.slice(0, 2))).toBe(2);
+    // Nothing sent back yet: the first round, as on every other surface (the one reading).
+    expect(roundOf(item({ id: 'A' }), [])).toBe(1);
     // On a board the engine's round wins over what the feed reads.
-    expect(roundOf({ ...item({ id: 'A' }), round: 1 }, feed, bug)).toBe(1);
+    expect(roundOf({ ...item({ id: 'A' }), round: 1 }, feed)).toBe(1);
   });
 });
 

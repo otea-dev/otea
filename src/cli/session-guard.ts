@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { assistantName } from '../app/assistant.ts';
 import { noteHarness } from '../app/presence.ts';
 import { openProject, type Project } from '../app/project.ts';
-import { secretaryName } from '../app/secretary.ts';
 import { type Noted, notedSession, type SessionVerdict, sameStart } from '../app/session-bound.ts';
 import { OteaError } from '../core/errors.ts';
 import { findItem, forgetHarness } from '../store/queries.ts';
@@ -9,13 +9,13 @@ import type { Command, Input } from './command.ts';
 import { ancestorsOf, harnessOf, isKnownHarness, listProcesses, type ProcessRow } from './owner.ts';
 import { STARTED_BY } from './started-by.ts';
 
-// An agent name proves nothing: `otea say "..." --as <the secretary>` from any process spoke as it
+// An agent name proves nothing: `otea say "..." --as <the assistant>` from any process spoke as it
 // (field study 4, U8). The session noted for a name (app/session-bound.ts) is what ties it to one,
-// so while that session runs, the commands that act under the name of the secretary, or on an item
+// so while that session runs, the commands that act under the name of the assistant, or on an item
 // its worker's session leased, are refused from another session, over the command line and over MCP
 // alike; once the session is gone, a new one takes the name over. Reading the processes costs a
 // listing, so it happens only when a session is noted and runs, and a listing that cannot be read in
-// time leaves the command alone, said as unverified (which the desk marks on the secretary's
+// time leaves the command alone, said as unverified (which the desk marks on the assistant's
 // messages, and which never carries a card). A listing that is read but reaches no harness from the
 // caller (an orphan process, an MCP server whose launcher is gone) does not leave it alone: while
 // the noted session runs, what cannot be proven to be it is refused (field study 5, V8).
@@ -23,8 +23,8 @@ import { STARTED_BY } from './started-by.ts';
 // What this stops is a process that misuses Otea's own interfaces. A local process that writes the
 // SQLite file directly is outside it: Otea cannot stop that, and docs/working-with-agents.md says so.
 
-// The commands the secretary acts through: they speak, link or hold for it.
-const SECRETARY_ACTS = new Set([
+// The commands the assistant acts through: they speak, link or hold for it.
+const ASSISTANT_ACTS = new Set([
   'say',
   'relay',
   'conversation',
@@ -67,9 +67,9 @@ export function sessionVerdictOf(input: Input): SessionVerdict {
   return verdicts.get(input) ?? 'unverified';
 }
 
-// The commands that read under the secretary's name from a session that is not the bound one: they
-// are answered, but are no sign of life of the secretary (field study 4, T1c: `otea pending --as
-// <secretary>` from any process kept a dead secretary «connected» and its role taken).
+// The commands that read under the assistant's name from a session that is not the bound one: they
+// are answered, but are no sign of life of the assistant (field study 4, T1c: `otea pending --as
+// <assistant>` from any process kept a dead assistant «connected» and its role taken).
 const strangers = new WeakSet<Input>();
 
 export const isFromAnotherSession = (input: Input): boolean => strangers.has(input);
@@ -106,31 +106,31 @@ async function callerOf(): Promise<Caller | undefined> {
 
 type Bound = { noted: Noted; refusal: string };
 
-// What a command under the secretary's name is told when the session noted for it is another.
-export function secretaryElsewhere(agent: string): string {
-  return `${agent} is this project's secretary and runs in another session: this command is not from it. If you are the secretary, it is that session; if that one ended, take over from yours once its process is gone. Otherwise use your own name (otea whoami) and ask the secretary through otea escalate`;
+// What a command under the assistant's name is told when the session noted for it is another.
+export function assistantElsewhere(agent: string): string {
+  return `${agent} is this project's assistant and runs in another session: this command is not from it. If you are the assistant, it is that session; if that one ended, take over from yours once its process is gone. Otherwise use your own name (otea whoami) and ask the assistant through otea escalate`;
 }
 
-// What a declaration of the secretary role is told when another session already declared it (the
+// What a declaration of the assistant role is told when another session already declared it (the
 // session noted for the name runs, or won the declaration at the same moment): one session is the
-// secretary, the others are refused whole, nothing of theirs kept.
-export function secretaryDeclaredElsewhere(agent: string): string {
-  return `${agent} is this project's secretary, declared by another session, and runs in another session: this declaration is not from it. If you are the secretary, it is that session; if that one ended, declare again from yours once its process is gone. Otherwise use your own name (otea whoami)`;
+// assistant, the others are refused whole, nothing of theirs kept.
+export function assistantDeclaredElsewhere(agent: string): string {
+  return `${agent} is this project's assistant, declared by another session, and runs in another session: this declaration is not from it. If you are the assistant, it is that session; if that one ended, declare again from yours once its process is gone. Otherwise use your own name (otea whoami)`;
 }
 
-// The session the command is bound to, if it acts as the secretary or on an item its own session
+// The session the command is bound to, if it acts as the assistant or on an item its own session
 // leased and that session runs.
 function boundOf(project: Project, input: Input, agent: string): Bound | undefined {
   const command = input.command ?? '';
-  const declares = command === 'profile' && input.option('role') === 'secretary';
-  const secretaryAct =
-    SECRETARY_ACTS.has(command) || declares || (command === 'wait' && input.flag('secretary'));
-  if (secretaryAct && secretaryName(project.db) === agent) {
+  const declares = command === 'profile' && input.option('role') === 'assistant';
+  const assistantAct =
+    ASSISTANT_ACTS.has(command) || declares || (command === 'wait' && input.flag('assistant'));
+  if (assistantAct && assistantName(project.db) === agent) {
     const noted = notedSession(project.db, agent);
     if (noted !== undefined) {
       return {
         noted,
-        refusal: declares ? secretaryDeclaredElsewhere(agent) : secretaryElsewhere(agent),
+        refusal: declares ? assistantDeclaredElsewhere(agent) : assistantElsewhere(agent),
       };
     }
   }
@@ -198,10 +198,10 @@ export async function guardSession(input: Input): Promise<void> {
     const project = openProject(input.cwd);
     try {
       bound = boundOf(project, input, agent);
-      declares = input.command === 'profile' && input.option('role') === 'secretary';
-      // A read under the secretary's name: not refused, but not taken for its sign of life unless it
+      declares = input.command === 'profile' && input.option('role') === 'assistant';
+      // A read under the assistant's name: not refused, but not taken for its sign of life unless it
       // comes from its session.
-      if (bound === undefined && !declares && secretaryName(project.db) === agent) {
+      if (bound === undefined && !declares && assistantName(project.db) === agent) {
         reading = notedSession(project.db, agent);
       }
     } finally {
@@ -231,7 +231,7 @@ export async function guardSession(input: Input): Promise<void> {
       }
     }
   }
-  // A secretary's declaration notes the harness it runs under, so its binding stands before any
+  // An assistant's declaration notes the harness it runs under, so its binding stands before any
   // wait of anyone's: an impersonator's first wait cannot take the role before the real one. The
   // harness is read here (a listing takes long); the declaration notes it in its own transaction
   // (declaredHarnessOf), where sessions that declare together find one winner. Over MCP the server
@@ -244,18 +244,18 @@ export async function guardSession(input: Input): Promise<void> {
   }
 }
 
-// The harness a declaration of the secretary role runs under, when the guard could read it.
+// The harness a declaration of the assistant role runs under, when the guard could read it.
 type Declaring = { pid: number; known: boolean; started: number | undefined };
 const declaring = new WeakMap<Input, Declaring>();
 
-// Notes the harness of the secretary's declaration, inside the declaration's own transaction: the
+// Notes the harness of the assistant's declaration, inside the declaration's own transaction: the
 // first session to note it for the name wins, and the others are refused with nothing of theirs
 // kept (the transaction rolls back), like the sessions that wait together (presence.ts noteHarness).
 export function noteDeclaringHarness(db: DatabaseSync, input: Input, agent: string): void {
   const harness = declaring.get(input);
   if (harness === undefined) return;
   if (!noteHarness(db, agent, harness.pid, undefined, harness.known, harness.started)) {
-    throw new OteaError('forbidden', secretaryDeclaredElsewhere(agent));
+    throw new OteaError('forbidden', assistantDeclaredElsewhere(agent));
   }
 }
 

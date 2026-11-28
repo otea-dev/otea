@@ -14,7 +14,7 @@ import type { FeedEvent } from './activity.ts';
 import type { BandejaEntry, BandejaView } from './bandeja.ts';
 import { apiUrl } from './base.ts';
 import type { WrittenBrief } from './brief.ts';
-import type { ConversationView, Message, MessageKind, SecretaryView } from './conversation.ts';
+import type { AssistantView, ConversationView, Message, MessageKind } from './conversation.ts';
 import { type Language, t } from './i18n/i18n.ts';
 import type { NotifyView } from './notify/offer.ts';
 import { noteRead, readOf } from './offline/sync-state.ts';
@@ -610,7 +610,7 @@ export async function fetchProjects(signal: AbortSignal): Promise<ProjectOvervie
 // moment (the first contact while it has no board of its own, then one more agent joining).
 // `first`: a join prompt for a project's first agent, which connects since nobody else works there.
 export type AgentPromptView = {
-  kind: 'start' | 'join' | 'design' | 'secretary' | 'worker' | 'refiner';
+  kind: 'start' | 'join' | 'design' | 'assistant' | 'worker' | 'refiner';
   prompt: string;
   first?: boolean;
   // For the plain words beside the prompt (core/agent-prompts.ts connectFacts): whether the work is
@@ -627,10 +627,10 @@ export async function fetchAgentPrompt(
   return (await get(`/api/agent-prompt?${query}`, signal)).json();
 }
 
-// The canonical text of a role (the secretary, a refiner, or a worker of one board, under a name
+// The canonical text of a role (the assistant, a refiner, or a worker of one board, under a name
 // when it has one): what a desk button copies, the same text `otea prompt --role` prints.
 export async function fetchRolePrompt(
-  role: 'secretary' | 'worker' | 'refiner',
+  role: 'assistant' | 'worker' | 'refiner',
   options: { board?: string; name?: string },
   signal: AbortSignal,
 ): Promise<AgentPromptView> {
@@ -661,8 +661,8 @@ export async function forgetProjectPath(path: string): Promise<void> {
   await post('/api/project/paths/forget', { path });
 }
 
-// The conversation with the project's secretary (Hablar): the newest page of messages, the page
-// before `before`, or what came after `since`; the secretary's state beside them.
+// The conversation with the project's assistant (Hablar): the newest page of messages, the page
+// before `before`, or what came after `since`; the assistant's state beside them.
 export async function fetchConversation(
   query: {
     before?: number;
@@ -679,13 +679,13 @@ export async function fetchConversation(
   return (await get(`/api/conversation${qs === '' ? '' : `?${qs}`}`, signal)).json();
 }
 
-// The project's secretary as the desk tells it: listening, connected or offline since when; null
+// The project's assistant as the desk tells it: listening, connected or offline since when; null
 // while the project has none.
-export async function fetchSecretary(signal: AbortSignal): Promise<SecretaryView | null> {
-  const body = (await (await get('/api/secretary', signal)).json()) as {
-    secretary: SecretaryView | null;
+export async function fetchAssistant(signal: AbortSignal): Promise<AssistantView | null> {
+  const body = (await (await get('/api/assistant', signal)).json()) as {
+    assistant: AssistantView | null;
   };
-  return body.secretary;
+  return body.assistant;
 }
 
 // What waits for the person, as Otea counts it (src/app/pending.ts): Te toca, the numbers beside
@@ -694,7 +694,7 @@ export async function fetchPending(signal: AbortSignal): Promise<Pending> {
   return (await get('/api/pending', signal)).json();
 }
 
-// What the person says to the secretary: the text and the files, as a form when it has files. The
+// What the person says to the assistant: the text and the files, as a form when it has files. The
 // Idempotency-Key makes a send that is repeated (a phone that never heard back) one message.
 export function postMessage(
   input: { text: string; files?: readonly File[]; replyTo?: number },
@@ -718,15 +718,15 @@ export function correctTurn(message: number, kind: MessageKind): Promise<Message
   return post<Message>(`/api/conversation/messages/${message}/kind`, { kind });
 }
 
-// The person's tap on a question of the secretary's (a message with options): one of its options
-// (by number, from 1), their own words, or the decision left to the secretary. It is their own
-// message in reply to it, which the secretary hears.
-export function answerSecretaryQuestion(message: number, given: AnswerWords): Promise<Message> {
+// The person's tap on a question of the assistant's (a message with options): one of its options
+// (by number, from 1), their own words, or the decision left to the assistant. It is their own
+// message in reply to it, which the assistant hears.
+export function answerAssistantQuestion(message: number, given: AnswerWords): Promise<Message> {
   return post<Message>(`/api/conversation/messages/${message}/answer`, given);
 }
 
-// Deshacer after such a tap, while the secretary has not heard it: the question waits again.
-export function unanswerSecretaryQuestion(message: number): Promise<Message> {
+// Deshacer after such a tap, while the assistant has not heard it: the question waits again.
+export function unanswerAssistantQuestion(message: number): Promise<Message> {
   return post<Message>(`/api/conversation/messages/${message}/unanswer`, {});
 }
 
@@ -766,7 +766,7 @@ export function postEscalationDismiss(signal: number): Promise<{ ok: true }> {
   return post<{ ok: true }>(`/api/escalations/${signal}/dismiss`, {});
 }
 
-// A note the secretary or its refiner closed, opened again by the person.
+// A note the assistant or its refiner closed, opened again by the person.
 export function postBandejaReopen(id: number): Promise<BandejaEntry> {
   return post<BandejaEntry>(`/api/bandeja/${id}/reopen`, {});
 }

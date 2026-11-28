@@ -70,19 +70,19 @@ describe.each(['README.md', 'README.es.md'])('the links of %s', (name) => {
 });
 
 describe('the first steps of the READMEs', () => {
-  it('end Start in a minute with the secretary, in both languages', () => {
+  it('end Start in a minute with the assistant, in both languages', () => {
     const english = readFileSync(join(ROOT, 'README.md'), 'utf8');
     const start = english.slice(english.indexOf('## Start in a minute'));
     const steps = start.slice(0, start.indexOf('\n## ', 5));
-    expect(steps).toMatch(/3\. \*\*Meet your secretary\.\*\*/);
-    expect(steps).toContain('otea prompt --role secretary');
+    expect(steps).toMatch(/3\. \*\*Meet your assistant\.\*\*/);
+    expect(steps).toContain('otea prompt --role assistant');
     expect(steps).toContain('1-2 minutes');
 
     const spanish = readFileSync(join(ROOT, 'README.es.md'), 'utf8');
     const empezar = spanish.slice(spanish.indexOf('## Empezar en un minuto'));
     const pasos = empezar.slice(0, empezar.indexOf('\n## ', 5));
-    expect(pasos).toMatch(/3\. \*\*Conoce a tu secretario\.\*\*/);
-    expect(pasos).toContain('otea prompt --role secretary');
+    expect(pasos).toMatch(/3\. \*\*Conoce a tu asistente\.\*\*/);
+    expect(pasos).toContain('otea prompt --role assistant');
     expect(pasos).toContain('1-2 minutos');
   });
 
@@ -112,7 +112,7 @@ describe('the first steps of the READMEs', () => {
 
   it('give the two-line pitch under the tagline, and name no coordinator', () => {
     const english = readFileSync(join(ROOT, 'README.md'), 'utf8');
-    expect(english.indexOf('You talk with one agent, your secretary')).toBeLessThan(
+    expect(english.indexOf('You talk with one agent, your assistant')).toBeLessThan(
       english.indexOf('## Start in a minute'),
     );
     for (const name of ['README.md', 'README.es.md']) {

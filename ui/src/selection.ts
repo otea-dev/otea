@@ -51,7 +51,7 @@ export const PERFORMANCE_HASH = `#${PERFORMANCE}`;
 // What is yours on this browser, not the project's: theme, language, notifications, the window.
 export const PREFERENCES_HASH = `#${PREFERENCES}`;
 
-// Hablar: the conversation with the project's secretary, open at a turn (the number of the message
+// Hablar: the conversation with the project's assistant, open at a turn (the number of the message
 // that began it), at the consultation a side topic became (TEM-3) or at a Bandeja note (B-3).
 export function hablarHash(at: { turn?: number; topic?: string; bandeja?: string } = {}): string {
   if (at.turn !== undefined) return `#${HABLAR}/${at.turn}`;

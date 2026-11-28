@@ -11,7 +11,7 @@ import { createServer, type OteaServer } from './server.ts';
 import { LOCAL_HOST, memoryProject, SESSION_COOKIE, TOKEN } from './testing.ts';
 
 // D-53015b (final study): a tap on an agent's question, on an item or on an Inbox note, sent the
-// answer at once and offered no Deshacer, while the secretary's questions had one. The same rule:
+// answer at once and offered no Deshacer, while the assistant's questions had one. The same rule:
 // only the person, signed in, within 30 seconds, only a tapped option, and only while the agent has
 // not acted on it; sent again under the same Idempotency-Key it gives the first result.
 const kiln = { kind: 'agent' as const, name: 'kiln' };

@@ -9,7 +9,7 @@ import { declareProfiles, type TempRepo, tempGitRepo } from './testing.ts';
 const LISTING_MS = 200;
 
 const sessionRows = (starter: number): ProcessRow[] => [
-  // The secretary's session (this process, which runs) and, apart, the harness the caller runs under.
+  // The assistant's session (this process, which runs) and, apart, the harness the caller runs under.
   { pid: process.pid, parent: 1, name: 'claude' },
   { pid: 4242, parent: 1, name: 'codex' },
   { pid: starter, parent: 4242, name: 'bash' },
@@ -42,7 +42,7 @@ describe('the caller’s environment cannot shorten the guard’s wait for the p
     const owner = cliAt(repo.dir);
     await owner('init', '--local');
     declareProfiles(repo.dir, 'sol');
-    const declared = await owner('profile', '--role', 'secretary', '--as', 'sol');
+    const declared = await owner('profile', '--role', 'assistant', '--as', 'sol');
     expect(declared.code, declared.err).toBe(0);
     const project = openProject(repo.dir);
     try {

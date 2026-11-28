@@ -1,4 +1,4 @@
-// How text an agent wrote is shown wherever the secretary or another agent reads it (a wake, `otea
+// How text an agent wrote is shown wherever the assistant or another agent reads it (a wake, `otea
 // pending`, `otea conversation`, `otea bandeja`): as data, never as a line of Otea's own. One quoting
 // for all: control and format characters and line breaks become one space, the quote marks are taken
 // out of the words (so they cannot close the quote from inside), the length is cut, and the whole is

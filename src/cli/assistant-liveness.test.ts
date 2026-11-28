@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { assistantStatus } from '../app/assistant.ts';
 import { postPersonMessage } from '../app/conversation.ts';
 import { listAgents, processAlive } from '../app/presence.ts';
 import { openProject, type Project } from '../app/project.ts';
-import { secretaryStatus } from '../app/secretary.ts';
 import { forgetHarness, selectListenerProcesses } from '../store/queries.ts';
 import {
   type Cli,
@@ -21,10 +21,10 @@ import {
 
 const MAIN = fileURLToPath(new URL('./main.ts', import.meta.url));
 
-// F2 (field study 3): the person's desk told «conectado» for minutes after the secretary's process
-// was killed. These tests run the secretary as a real process, as a harness does, and end it the
+// F2 (field study 3): the person's desk told «conectado» for minutes after the assistant's process
+// was killed. These tests run the assistant as a real process, as a harness does, and end it the
 // way a crash does: no goodbye, no cleanup.
-describe('the secretary seen offline once its process is gone', () => {
+describe('the assistant seen offline once its process is gone', () => {
   let repo: TempRepo;
   let otea: Cli;
   const children: ChildProcess[] = [];
@@ -35,11 +35,11 @@ describe('the secretary seen offline once its process is gone', () => {
     const made = await otea('init', '--local', '--template', 'none');
     if (made.code !== 0) throw new Error(made.err);
     declareProfiles(repo.dir, 'sol', 'sol-worker');
-    const declared = await otea('profile', '--role', 'secretary', '--as', 'sol');
+    const declared = await otea('profile', '--role', 'assistant', '--as', 'sol');
     if (declared.code !== 0) throw new Error(declared.err);
   }, 60_000);
 
-  // Each test is its own session of the secretary. A harness noted by the test before (here the
+  // Each test is its own session of the assistant. A harness noted by the test before (here the
   // test's own worker, which runs on after the wait it started was killed, and which a fast
   // process table reads before the kill on Linux and macOS) is a live process a later wait that
   // wakes at once keeps as cached (it reads the table again only on a wait of five seconds or
@@ -68,7 +68,7 @@ describe('the secretary seen offline once its process is gone', () => {
   // Windows holds the folder of processes that just ended a moment longer.
   afterAll(() => removeOnceReleased(repo.dir), 30_000);
 
-  // A real `otea wait --secretary` process, as the harness's background task runs it.
+  // A real `otea wait --assistant` process, as the harness's background task runs it.
   const startWait = (): ChildProcess => {
     const child = spawn(
       process.execPath,
@@ -76,7 +76,7 @@ describe('the secretary seen offline once its process is gone', () => {
         '--disable-warning=ExperimentalWarning',
         MAIN,
         'wait',
-        '--secretary',
+        '--assistant',
         '--as',
         'sol',
         '--timeout',
@@ -103,7 +103,7 @@ describe('the secretary seen offline once its process is gone', () => {
     }
   };
 
-  const stateNow = () => lookAt((project) => secretaryStatus(project.db)?.state);
+  const stateNow = () => lookAt((project) => assistantStatus(project.db)?.state);
 
   const harnessNoted = () =>
     lookAt((project) => selectListenerProcesses(project.db).get('sol')?.harness);
@@ -120,7 +120,7 @@ describe('the secretary seen offline once its process is gone', () => {
     expect(Date.now() - killedAt).toBeLessThan(8_000);
   }, 60_000);
 
-  // The harness session is the secretary's real process: it runs `otea wait --secretary` in the
+  // The harness session is the assistant's real process: it runs `otea wait --assistant` in the
   // background, answers when it returns, and waits again. Killed between two waits, nothing of
   // Otea's runs, and it stayed «conectado» for the whole 30-minute hold.
   // A harness known by name (claude, codex...) is trusted at its first find (G1 review): `named`
@@ -151,7 +151,7 @@ describe('the secretary seen offline once its process is gone', () => {
           '--disable-warning=ExperimentalWarning',
           MAIN,
           'wait',
-          '--secretary',
+          '--assistant',
           '--as',
           'sol',
           '--timeout',
@@ -201,7 +201,7 @@ describe('the secretary seen offline once its process is gone', () => {
 
   // A harness runs its commands through a shell, which on Windows outlives it: killed in the
   // middle of its wait, the wait behind the shell still ends within seconds, and the desk reads the
-  // secretary offline long before the wait's own timeout.
+  // assistant offline long before the wait's own timeout.
   it('reads offline within seconds of its harness being killed in the middle of its wait, behind a shell', async () => {
     const starter = [
       "const { spawn } = require('node:child_process');",
@@ -216,7 +216,7 @@ describe('the secretary seen offline once its process is gone', () => {
     writeFileSync(script, starter);
     const line = [process.execPath, '--disable-warning=ExperimentalWarning', MAIN, 'wait']
       .map((word) => `"${word}"`)
-      .concat(['--secretary', '--as', 'sol', '--timeout', '10m'])
+      .concat(['--assistant', '--as', 'sol', '--timeout', '10m'])
       .join(' ');
     const harness = spawn(process.execPath, [script, JSON.stringify(line)], {
       cwd: repo.dir,
@@ -245,10 +245,10 @@ describe('the secretary seen offline once its process is gone', () => {
     }
   }, 120_000);
 
-  // U5 (the final study): the secretary's subagents (its worker and its refiner) wait from the same
+  // U5 (the final study): the assistant's subagents (its worker and its refiner) wait from the same
   // harness, under their own names. After the harness was killed the desk still said «conectado»
   // 14 minutes later, with a change «working» and nobody alive. Everything under the harness is
-  // gone with it: the secretary reads offline within seconds, and its worker is not there.
+  // gone with it: the assistant reads offline within seconds, and its worker is not there.
   it.each([{ named: true }, { named: false }])(
     'reads offline within seconds of its harness being killed while its subagent waits under it (named: $named)',
     async ({ named }) => {
@@ -272,7 +272,7 @@ describe('the secretary seen offline once its process is gone', () => {
           script,
           MAIN,
           'wait',
-          '--secretary',
+          '--assistant',
           '--as',
           'sol',
           '--timeout',
@@ -303,9 +303,9 @@ describe('the secretary seen offline once its process is gone', () => {
         } finally {
           project.db.close();
         }
-        // The secretary's wait returns; the worker's starts and listens under the same harness.
+        // The assistant's wait returns; the worker's starts and listens under the same harness.
         await until(() => pids.length >= 2, 30_000);
-        // A harness Otea does not know by name is only a candidate for the secretary, whose wait
+        // A harness Otea does not know by name is only a candidate for the assistant, whose wait
         // returned after one find: nothing but the worker's wait watches it from here on.
         if (named) await until(() => harnessNoted() === harness.pid, 30_000);
         const workerBeats = () =>

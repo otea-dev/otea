@@ -17,10 +17,12 @@ import {
 import { quoteAgent } from '../core/quote.ts';
 import { timeText } from '../core/time.ts';
 import { isStuck } from '../core/waiting.ts';
+import { selectOpenEscalations } from '../store/assistant.ts';
 import { selectOpenQuestions } from '../store/conversation.ts';
 import { findItem, selectEvents, selectStateEntries } from '../store/queries.ts';
-import { selectOpenEscalations } from '../store/secretary.ts';
 import { landedAhead } from './approval-wait.ts';
+import { assistantStatus } from './assistant.ts';
+import { assistantView } from './assistant-waiting.ts';
 import { listBandeja } from './bandeja.ts';
 import { listeningWorkers, workerLimitOf, workersByBoard } from './board-workers.ts';
 import type { Context } from './context.ts';
@@ -29,21 +31,19 @@ import { type Clock, type Item, listItems, systemClock, workflowOf } from './ite
 import { landWaitOf, liveBoardOf, liveBoards } from './next.ts';
 import { scanned } from './overlap.ts';
 import { listAgents, sessionEnded } from './presence.ts';
-import { secretaryStatus } from './secretary.ts';
-import { secretaryView } from './secretary-waiting.ts';
 import { stepFactsOf } from './step-facts.ts';
 
 // What waits for the person, read from the records as they stand now (F4): the items on their turn
 // (a question to answer, a review, a step of their own), the ones an agent left stuck, the
-// questions a refiner asked on a Bandeja note and the ones the secretary asked in Hablar, and which
+// questions a refiner asked on a Bandeja note and the ones the assistant asked in Hablar, and which
 // review holds the rest of a board's queue. The desk (Te toca, Hablar's «Te espera») and the
-// secretary (`otea pending`) read this one answer, so neither depends on what anyone remembers.
+// assistant (`otea pending`) read this one answer, so neither depends on what anyone remembers.
 
 // How the person should look at them: what holds an agent up first, then what they decide.
 const ORDER: readonly PendingKind[] = [
   'question',
   'bandeja',
-  'secretary',
+  'assistant',
   'escalation',
   'stuck',
   'worker',
@@ -52,7 +52,7 @@ const ORDER: readonly PendingKind[] = [
 ];
 
 // How long a board's work may wait with nobody on it before it is the person's to open a worker: the
-// secretary launches one within moments when it can.
+// assistant launches one within moments when it can.
 export const OPEN_WORKER_AFTER_MS = 3 * 60_000;
 
 // The step of a board the person does themselves is theirs to do; a preset item they created and
@@ -68,14 +68,14 @@ function kindOfTurn(ctx: Context, item: Item): 'step' | 'review' {
     : 'review';
 }
 
-// Whether the secretary is away: none declared, or offline. What an agent escalated is the person's
-// to read only then; with the secretary at work it relays it itself.
-function secretaryAway(ctx: Context, now: Clock): boolean {
-  const state = secretaryStatus(ctx.db, now)?.state;
+// Whether the assistant is away: none declared, or offline. What an agent escalated is the person's
+// to read only then; with the assistant at work it relays it itself.
+function assistantAway(ctx: Context, now: Clock): boolean {
+  const state = assistantStatus(ctx.db, now)?.state;
   return state === undefined || state === 'offline';
 }
 
-// The item a question of the secretary's is about: the one its tap acts on, else the one it was sent
+// The item a question of the assistant's is about: the one its tap acts on, else the one it was sent
 // with (a notice's own links), else the first item the question names that the project has. A
 // question that answers a turn of the person's does not take that turn's links: they are the turn's.
 const ITEM_NAMED = /\b[A-Z][A-Z0-9]*-[1-9][0-9]*\b/g;
@@ -87,7 +87,7 @@ function aboutOf(ctx: Context, message: Message): string | undefined {
 }
 
 // What waits for the person that no list of items holds: a refiner's question on a note, the
-// secretary's own questions, and what agents escalated while the secretary is away. Cheap: the
+// assistant's own questions, and what agents escalated while the assistant is away. Cheap: the
 // project's overview of every project reads it (server/projects.ts).
 export function offItemOf(ctx: Context, now: Clock = systemClock): PendingEntry[] {
   const at = now();
@@ -110,7 +110,7 @@ export function offItemOf(ctx: Context, now: Clock = systemClock): PendingEntry[
   for (const message of selectOpenQuestions(ctx.db)) {
     const about = aboutOf(ctx, message);
     out.push({
-      kind: 'secretary',
+      kind: 'assistant',
       ref: String(message.id),
       ...(about === undefined ? {} : { about }),
       title: messageSnippet(message.text),
@@ -122,10 +122,10 @@ export function offItemOf(ctx: Context, now: Clock = systemClock): PendingEntry[
       turn: message.root,
     });
   }
-  // What agents escalated: the person's own while the secretary is away, and once it was delivered
-  // twice or waited a while unacted, even with the secretary connected (never lost to a wait whose
+  // What agents escalated: the person's own while the assistant is away, and once it was delivered
+  // twice or waited a while unacted, even with the assistant connected (never lost to a wait whose
   // output nobody read).
-  const away = secretaryAway(ctx, now);
+  const away = assistantAway(ctx, now);
   const nowMs = Date.parse(at);
   const escalated = selectOpenEscalations(ctx.db).filter((kept) =>
     escalationShown(kept, away, nowMs),
@@ -203,7 +203,7 @@ const BLOCKS_KEPT_MS = 20_000;
 const kept = new WeakMap<object, { key: string; at: number; behind: [string, string[]][] }>();
 
 export type PendingOptions = {
-  // Without the queue blocks (the cheap count the secretary's wait and reading end with).
+  // Without the queue blocks (the cheap count the assistant's wait and reading end with).
   blocks?: boolean;
   // Which item an item waits for (tests count the questions asked of git).
   landWait?: typeof landWaitOf;
@@ -259,7 +259,7 @@ function blocksOf(
 }
 
 // Each board with items that wait for an agent nobody holds: who works it and how many it takes, so
-// the secretary launches a second worker by itself when two wait and the board has room.
+// the assistant launches a second worker by itself when two wait and the board has room.
 function queuesOf(ctx: Context, items: readonly Item[], now: Clock): BoardQueue[] {
   const at = now();
   const waiting = items.filter(
@@ -320,7 +320,7 @@ const isDoing = (state: string): boolean => {
 };
 
 // A board whose work has waited for an agent for a while with nobody working it: the person opens a
-// session for it (U3, field study 4: the secretary had no way to launch one, and nothing said they
+// session for it (U3, field study 4: the assistant had no way to launch one, and nothing said they
 // had to).
 function workerEntries(
   ctx: Context,
@@ -389,7 +389,7 @@ export function pendingOf(
     ...entriesOf(ctx, items, now),
     ...workerEntries(ctx, queues, items, now),
   ]);
-  const status = secretaryView(ctx.db, now);
+  const status = assistantView(ctx.db, now);
   const ended = options.blocks === false ? [] : endedOf(ctx, items, now);
   return {
     count: counted(entries).length,
@@ -401,7 +401,7 @@ export function pendingOf(
     queues: options.blocks === false ? [] : queues,
     ...(options.blocks === false ? {} : { done: doneOf(ctx, items, now) }),
     ...(ended.length === 0 ? {} : { ended }),
-    secretary: status
+    assistant: status
       ? {
           name: status.name,
           state: status.state,
@@ -412,7 +412,7 @@ export function pendingOf(
   };
 }
 
-// The line at the foot of the secretary's wait and reading: how many wait for the person, and the
+// The line at the foot of the assistant's wait and reading: how many wait for the person, and the
 // command that says which. Empty while nothing waits.
 export function pendingLine(pending: Pending, agent?: string): string {
   const { count } = pending;
@@ -435,7 +435,7 @@ function lineOf(entry: PendingEntry): string {
       return `${entry.ref} ${quoted(entry.title)}: ${entry.by ?? 'an agent'} asks ${quoted(entry.text ?? '')}${options}${ago(entry.since)}`;
     case 'bandeja':
       return `${entry.ref} (note ${quoted(entry.title)}): ${entry.by ?? 'a refiner'} asks ${quoted(entry.text ?? '')}${options}${ago(entry.since)}`;
-    case 'secretary':
+    case 'assistant':
       return `your question in message ${entry.ref}${entry.about === undefined ? '' : ` (about ${entry.about})`} ${quoted(entry.text ?? entry.title)}${options}${ago(entry.since)}`;
     case 'escalation':
       return `${entry.ref} ${quoted(entry.title)}: ${entry.by ?? 'an agent'} says ${quoted(entry.text ?? '')}${ago(entry.since)}`;
@@ -450,7 +450,7 @@ function lineOf(entry: PendingEntry): string {
   }
 }
 
-// A board's queue for a worker, and what the secretary does about it: nobody works it, launch one;
+// A board's queue for a worker, and what the assistant does about it: nobody works it, launch one;
 // one works it, two items wait and the board takes another, launch the second without asking.
 function queueLine({
   board,
@@ -497,7 +497,7 @@ function queueLine({
 }
 
 const GROUPS: readonly { kinds: readonly PendingKind[]; head: string }[] = [
-  { kinds: ['question', 'bandeja', 'secretary'], head: 'Questions' },
+  { kinds: ['question', 'bandeja', 'assistant'], head: 'Questions' },
   { kinds: ['escalation'], head: 'Escalated by agents' },
   { kinds: ['stuck'], head: 'Stuck' },
   { kinds: ['worker'], head: 'Boards with nobody on them' },
@@ -505,7 +505,7 @@ const GROUPS: readonly { kinds: readonly PendingKind[]; head: string }[] = [
   { kinds: ['step'], head: 'Their own steps' },
 ];
 
-// What closed as Done in the last day, counted by Otea: the secretary answers «what got done?» from
+// What closed as Done in the last day, counted by Otea: the assistant answers «what got done?» from
 // this list, whole, never from memory (field study 4, U6: it said none, then 11 of 12).
 function doneLine(done: readonly PendingDone[], lang: Lang): string[] {
   if (done.length === 0) return [];
@@ -518,7 +518,7 @@ function doneLine(done: readonly PendingDone[], lang: Lang): string[] {
 }
 
 // The items nobody works though an agent holds them: said apart from what waits for the person, so
-// the secretary never reports a worker on an item whose session is over.
+// the assistant never reports a worker on an item whose session is over.
 function endedLines(ended: readonly PendingEnded[]): string[] {
   if (ended.length === 0) return [];
   const list = ended.map(
@@ -529,7 +529,7 @@ function endedLines(ended: readonly PendingEnded[]): string[] {
   ];
 }
 
-// What `otea pending` prints, for the secretary: the count, each thing with what it waits for and
+// What `otea pending` prints, for the assistant: the count, each thing with what it waits for and
 // since when, what holds a board's queue, and what to do with it.
 export function pendingText(pending: Pending, lang: Lang = 'en'): string {
   const { count, entries, blocks, queues } = pending;

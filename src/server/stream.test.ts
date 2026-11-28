@@ -1,10 +1,10 @@
 import { spawn } from 'node:child_process';
 import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { declareAssistant } from '../app/assistant.ts';
 import { addCollection } from '../app/collections.ts';
 import { createItem, moveItem } from '../app/items.ts';
 import { noteHarness, seeAgent } from '../app/presence.ts';
-import { declareSecretary } from '../app/secretary.ts';
 import { catalogWith, projectOf } from '../app/testing.ts';
 import { migrate } from '../store/migrations.ts';
 import { createServer, type OteaServer } from './server.ts';
@@ -136,14 +136,14 @@ describe('GET /api/stream', () => {
     await reader.cancel();
   });
 
-  // F2 (field study 3): a secretary killed with its session writes nothing, so no change ever told
+  // F2 (field study 3): an assistant killed with its session writes nothing, so no change ever told
   // the open desk its «conectado» was no longer true.
-  it('emits change and presence when the secretary goes offline with nothing written', async () => {
+  it('emits change and presence when the assistant goes offline with nothing written', async () => {
     const dying = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], {
       stdio: 'ignore',
     });
     try {
-      declareSecretary(other, 'sol');
+      declareAssistant(other, 'sol');
       seeAgent(other, { agent: 'sol', channel: 'cli', call: true });
       // Two waits found it above them: it is the session.
       noteHarness(other, 'sol', dying.pid as number);

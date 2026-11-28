@@ -50,7 +50,7 @@ describe('migrate', () => {
         'name_offers',
         'mcp_loads',
         'process_beats',
-        'secretary_signals',
+        'assistant_signals',
         'unheard_stretches',
         'conversation_messages',
         'conversation_attachments',
@@ -60,7 +60,7 @@ describe('migrate', () => {
         'bandeja_questions',
       ]),
     );
-    expect(userVersion(db)).toBe(56);
+    expect(userVersion(db)).toBe(57);
   });
 
   // Cold review G2: what answers a message, and the notes and turns of an item by its id, were
@@ -87,7 +87,7 @@ describe('migrate', () => {
     migrate(db);
     migrate(db);
 
-    expect(userVersion(db)).toBe(56);
+    expect(userVersion(db)).toBe(57);
   });
 
   // The desk and the agents' commands open a project the moment an upgrade lands: one that read the
@@ -117,7 +117,7 @@ describe('migrate', () => {
       });
 
       expect(() => migrate(slow)).not.toThrow();
-      expect(userVersion(second)).toBe(56);
+      expect(userVersion(second)).toBe(57);
     } finally {
       first.close();
       second.close();
@@ -478,6 +478,59 @@ describe('migrate', () => {
         { item_id: 'TASKS-1', made: 0 },
         { item_id: 'TASKS-2', made: 1 },
       ]);
+    });
+  });
+
+  // The assistant was "the secretary" while 0.8 was built: what was stored under that word is
+  // rewritten, and the event log stays append-only.
+  describe('from version 56, which stored the assistant as "secretary"', () => {
+    beforeEach(() => {
+      migrate(db, 56);
+      db.exec(`
+        INSERT INTO collections (name, prefix, preset, preset_version, next_seq)
+        VALUES ('tasks', 'TASKS', 'tasks', 1, 2);
+        INSERT INTO items (id, collection, seq, title, fields, preset_version, state, created_at,
+          updated_at, created_by_kind, created_by_name)
+        VALUES ('TASKS-1', 'tasks', 1, 'A', '{}', 1, 'todo', 't', 't', 'human', 'ana');
+        INSERT INTO events (item_id, type, actor_kind, actor_name, at, data)
+        VALUES ('TASKS-1', 'note_left', 'agent', 'sec', 't', '{"relayed":true,"role":"secretary"}'),
+               ('TASKS-1', 'note_left', 'agent', 'bot', 't', '{"relayed":true,"role":"refiner"}');
+        INSERT INTO agents (name, last_seen, role) VALUES ('sec', 't', 'secretary'),
+          ('bot', 't', 'refiner');
+        INSERT INTO conversation_messages (id, author, author_name, text, at, root, kind_by)
+        VALUES (1, 'person', 'ana', 'hi', 't', 1, 'secretary'),
+               (2, 'secretary', 'sec', 'hello', 't', 1, NULL);
+        INSERT INTO secretary_signals (kind, ref, text, at) VALUES ('person_message', '1', 'hi', 't');
+      `);
+      migrate(db);
+    });
+
+    it('rewrites the role, the author, who set a kind and the signals table', () => {
+      expect(db.prepare('SELECT name, role FROM agents ORDER BY name').all()).toEqual([
+        { name: 'bot', role: 'refiner' },
+        { name: 'sec', role: 'assistant' },
+      ]);
+      expect(
+        db.prepare('SELECT id, author, kind_by FROM conversation_messages ORDER BY id').all(),
+      ).toEqual([
+        { id: 1, author: 'person', kind_by: 'assistant' },
+        { id: 2, author: 'assistant', kind_by: null },
+      ]);
+      expect(tables(db)).toContain('assistant_signals');
+      expect(tables(db)).not.toContain('secretary_signals');
+      expect(db.prepare('SELECT kind, ref FROM assistant_signals').all()).toEqual([
+        { kind: 'person_message', ref: '1' },
+      ]);
+    });
+
+    it('rewrites the role a relayed note recorded, and keeps events append-only', () => {
+      const roles = db.prepare(
+        "SELECT json_extract(data, '$.role') AS role FROM events ORDER BY id",
+      );
+
+      expect(roles.all()).toEqual([{ role: 'assistant' }, { role: 'refiner' }]);
+      expect(() => db.exec("UPDATE events SET type = 'edited'")).toThrow(/append-only/);
+      expect(() => db.exec('DELETE FROM events')).toThrow(/append-only/);
     });
   });
 });

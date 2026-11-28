@@ -69,8 +69,8 @@ describe('an item in the person’s review does not change under any agent name'
     expect(await request()).toBe('Lenta');
   });
 
-  it('points the secretary to the card that sends it back', async () => {
-    await as('sol')('profile', '--role', 'secretary');
+  it('points the assistant to the card that sends it back', async () => {
+    await as('sol')('profile', '--role', 'assistant');
 
     const refused = await as('sol')('update', 'CRI-1', '--field', 'fdesc=Rápida');
 
@@ -120,8 +120,8 @@ describe('an item in the person’s review does not change under any agent name'
     expect(await files()).toBe(1);
   });
 
-  it('points the secretary to the card that sends it back when it attaches', async () => {
-    await as('sol')('profile', '--role', 'secretary');
+  it('points the assistant to the card that sends it back when it attaches', async () => {
+    await as('sol')('profile', '--role', 'assistant');
 
     const refused = await as('sol')('attach', 'CRI-1', another(), '--module', 'eart');
 

@@ -1,5 +1,4 @@
 import { activeLease } from '../../active-lease.ts';
-import type { FeedEvent } from '../../activity.ts';
 import { type App, typeOfItem } from '../../app/context.tsx';
 import { onPublishedBoard, publishedDefinition } from '../../board-studio/home/boards-store.ts';
 import { Prof } from '../../components/Prof.tsx';
@@ -34,8 +33,8 @@ import {
 import { offItemEntries, type PendingEntry, rowKeyOf } from '../../pending.ts';
 import { actedWith } from '../../presence.ts';
 import { stateWord } from '../../preset-words.ts';
-import { roundsOf } from '../../rounds.ts';
-import type { Item, TypeView } from '../../types.ts';
+import { roundOf } from '../../rounds.ts';
+import type { Item } from '../../types.ts';
 import { byPriority } from '../board/matrix.ts';
 import { rowText } from '../hablar/TeEspera.tsx';
 import { deliveryOf, evidenceWords, quietLine } from './phone.ts';
@@ -68,24 +67,6 @@ export function universeOf(items: readonly Item[], now: number): Universe {
       { lane: laneOf(it.turn), look: lookOf(it, now), closed: it.turn === 'none' },
     ]),
   );
-}
-
-// The rounds an item has been through: each agent handoff to you ends one; while an agent works
-// again after you sent it back, the next is under way.
-export function roundOf(
-  item: Item,
-  feed: readonly FeedEvent[],
-  type: TypeView | undefined,
-): number {
-  if (item.round !== undefined) return item.round;
-  if (!type) return 0;
-  const rounds = roundsOf(
-    feed.filter((e) => e.itemId === item.id),
-    [],
-    type.states,
-  );
-  const last = rounds.at(-1);
-  return rounds.length + (item.turn === 'agent' && last?.verdict?.kind === 'sent-back' ? 1 : 0);
 }
 
 export type SubKey =
@@ -257,10 +238,10 @@ export function notesMark(notes: NonNullable<Item['notes']>): string | null {
 type TocaApp = Pick<App, 'all' | 'now' | 'feed' | 'collectionOf' | 'route'> &
   Partial<Pick<App, 'agents' | 'pending'>>;
 
-// A question that is no item (on a Bandeja note, or the secretary's own), as a row of «Preguntas para
+// A question that is no item (on a Bandeja note, or the assistant's own), as a row of «Preguntas para
 // ti»: what it is about, who asks, since when. It opens Hablar, where its buttons are.
 function OffRow({ entry, now }: { entry: PendingEntry; now: number }) {
-  const secretary = entry.kind === 'secretary';
+  const assistant = entry.kind === 'assistant';
   const report = entry.kind === 'escalation';
   const worker = entry.kind === 'worker';
   if (worker) {
@@ -294,18 +275,18 @@ function OffRow({ entry, now }: { entry: PendingEntry; now: number }) {
       <div className="main-c">
         <div className="t" data-leaf="" data-title="">
           <span className="tt">
-            {secretary || report ? (entry.text ?? entry.title) : entry.title}
+            {assistant || report ? (entry.text ?? entry.title) : entry.title}
           </span>
         </div>
         <div className="m" data-leaf="">
           <span className="id">
-            {secretary ? (entry.about ?? t('toca.off.secretary')) : entry.ref}
+            {assistant ? (entry.about ?? t('toca.off.assistant')) : entry.ref}
           </span>
           <span className="bd">
             <span className="bdc">
-              {t(secretary ? 'toca.off.inHablar' : report ? 'toca.off.report' : 'toca.off.bandeja')}
+              {t(assistant ? 'toca.off.inHablar' : report ? 'toca.off.report' : 'toca.off.bandeja')}
             </span>
-            {entry.text !== undefined && !secretary && !report ? (
+            {entry.text !== undefined && !assistant && !report ? (
               <span className="bds">› {entry.text}</span>
             ) : null}
             {report ? <span className="bds">› {entry.title}</span> : null}
@@ -344,7 +325,7 @@ function TocaRow({
   const type = ctx.types(it);
   const call = rowCall(it, sec, ctx);
   const stuck = sec === 'atasco' && it.expiredLease;
-  const round = stuck ? 0 : roundOf(it, app.feed, type);
+  const round = stuck ? 0 : roundOf(it, app.feed);
   // On the phone a review says what the agent delivered: its note and how much evidence.
   const delivered = phone && sec === 'revisiones' ? deliveryOf(it, app.feed) : null;
   const files = delivered ? evidenceWords(delivered.images, delivered.files) : '';
@@ -528,12 +509,12 @@ export function tocaBlocks(
     const s = tocaSection(it, ctx);
     if (s) by.set(s, [...(by.get(s) ?? []), it]);
   }
-  // What Otea counts that is no item: the questions of the Bandeja and of the secretary join the
+  // What Otea counts that is no item: the questions of the Bandeja and of the assistant join the
   // questions for you, beside the items that ask. An agent's report and a board nobody works are not
   // questions: each has a heading of its own, so «Preguntas para ti» counts only questions
   // (s-real2, D-0454fd, D-35c7b8).
   const off = atasco ? [] : offItemEntries(app);
-  const questions = off.filter(({ kind }) => kind === 'bandeja' || kind === 'secretary');
+  const questions = off.filter(({ kind }) => kind === 'bandeja' || kind === 'assistant');
   const reports = off.filter(({ kind }) => kind === 'escalation');
   const noWorker = off.filter(({ kind }) => kind === 'worker');
   const blocks: LaneBlock[] = [];

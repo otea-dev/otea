@@ -82,7 +82,7 @@ export function assertMayWriteItem(
   item: ItemRecord,
   actor: Actor,
   at: string,
-  // The secretary telling a worker what the person changed goes over a live lease, and only over
+  // The assistant telling a worker what the person changed goes over a live lease, and only over
   // that: every other check below still holds (app/relay-change.ts).
   overLease = false,
 ): void {

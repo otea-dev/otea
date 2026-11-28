@@ -34,9 +34,9 @@ function boardWithOneItem(ctx: Context): string {
   ).id;
 }
 
-// Field study 5, V7: a restarted secretary said «un trabajador lo tiene en marcha» about an item
+// Field study 5, V7: a restarted assistant said «un trabajador lo tiene en marcha» about an item
 // whose worker had died: `otea show` only gave «Held by <agent> until <time>», and nothing told
-// the secretary the session was over. Both say it now.
+// the assistant the session was over. Both say it now.
 describe('an item held by an agent whose session ended', () => {
   const held = (ctx: Context) => {
     const id = boardWithOneItem(ctx);

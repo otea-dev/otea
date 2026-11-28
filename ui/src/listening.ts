@@ -54,17 +54,17 @@ function worksOnlyElsewhere(
   return held.length > 0 && held.every(({ collection }) => collection !== board);
 }
 
-// The agents that take items, the workers: every one but the secretary, which talks with the
+// The agents that take items, the workers: every one but the assistant, which talks with the
 // person, and the refiner, which turns the Bandeja's notes into items and waits for the next note
 // (neither takes an item, so neither is the one an item waits in the queue for, and neither counts
 // as a listener on the boards: field study 3, S2, and the review of F6).
 //
 // «Agents» is said of these and only these on every surface: the pill and its menu count them, and
-// the notices say «no agent is connected» when none is. The secretary has its own place (the rail's
-// dot, Hablar), so a project with the secretary alone never reads «1 listening» in the pill and «no
+// the notices say «no agent is connected» when none is. The assistant has its own place (the rail's
+// dot, Hablar), so a project with the assistant alone never reads «1 listening» in the pill and «no
 // agent connected» on its items at once (the owner's rule: what is shown must be true).
 export function workersOf(agents: readonly Agent[] | null | undefined): Agent[] {
-  return (agents ?? []).filter((a) => a.role !== 'secretary' && a.role !== 'refiner');
+  return (agents ?? []).filter((a) => a.role !== 'assistant' && a.role !== 'refiner');
 }
 
 const takers = workersOf;

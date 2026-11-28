@@ -1,10 +1,10 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { assistantStatus } from './assistant.ts';
 import { type Clock, systemClock } from './items.ts';
 import { type AgentPresence, listAgents, presenceSignatureOf, processAlive } from './presence.ts';
-import { secretaryStatus } from './secretary.ts';
 
-// What flips with no write: a process that ended (a secretary killed with its session leaves
-// nothing behind) and a window that ran out (the secretary's held 30 minutes, an agent quiet past
+// What flips with no write: a process that ended (an assistant killed with its session leaves
+// nothing behind) and a window that ran out (the assistant's held 30 minutes, an agent quiet past
 // the listening window). The server looks at it on a timer while a desk is open and tells the desk
 // when it differs, so «conectado» never outlives the process it was true of. `agents`: already
 // read by the caller, which reads them once per look.
@@ -17,8 +17,8 @@ export function livenessSignature(
   const states = agents
     .map(({ name, status, sessionEnded }) => [name, status, sessionEnded])
     .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
-  const secretary = secretaryStatus(db, now, processes, agents);
-  return JSON.stringify([states, secretary ? [secretary.name, secretary.state] : null]);
+  const assistant = assistantStatus(db, now, processes, agents);
+  return JSON.stringify([states, assistant ? [assistant.name, assistant.state] : null]);
 }
 
 // What a desk's stream compares between two changes: who is there and what each is doing (the

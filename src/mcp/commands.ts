@@ -24,15 +24,15 @@ export const AGENT_COMMANDS = [
   // Agents read the topics kept to answer what was said before.
   'topic list',
   'topic show',
-  // The secretary's side of the conversation with the person: reading marks what it reads, so it
+  // The assistant's side of the conversation with the person: reading marks what it reads, so it
   // is no read-only tool. The person's side is the desk's alone.
   'conversation',
   'say',
-  // What waits for the person, counted by Otea (the secretary reads it), and what an agent tells
-  // the secretary to relay (a worker or a refiner).
+  // What waits for the person, counted by Otea (the assistant reads it), and what an agent tells
+  // the assistant to relay (a worker or a refiner).
   'pending',
   'escalate',
-  // The secretary or the delivering agent says on an item in review what it recommends (advice).
+  // The assistant or the delivering agent says on an item in review what it recommends (advice).
   'advise',
   // The refiner's side of the Bandeja: read the person's captures, take one, file it as an item
   // (create --from-bandeja) or ask what it lacks (ask B-n). The person's side is the desk's alone.

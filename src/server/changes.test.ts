@@ -90,7 +90,7 @@ describe('createChangeFeed', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  // What the clock alone changes (a secretary's process ending) is looked at for an open desk only:
+  // What the clock alone changes (an assistant's process ending) is looked at for an open desk only:
   // the notifier has its own, slower tick.
   describe('with a watch of what the clock changes', () => {
     let signature: ReturnType<typeof vi.fn<() => string>>;

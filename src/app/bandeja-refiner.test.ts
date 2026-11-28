@@ -1,30 +1,30 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { assistantWake, declareAssistant, startAssistantWait } from './assistant.ts';
 import { captureToBandeja, noteRefiner, takeBandeja } from './bandeja.ts';
 import { addCollection } from './collections.ts';
 import { seeAgent } from './presence.ts';
 import type { Project } from './project.ts';
-import { declareSecretary, secretaryWake, startSecretaryWait } from './secretary.ts';
 import { memoryContext, projectOf } from './testing.ts';
 
 const T0 = Date.parse('2026-11-27T10:00:00.000Z');
 const MIN = 60_000;
 const clock = (offsetMs: number) => () => new Date(T0 + offsetMs).toISOString();
 
-// U6 (field study 4, wave 2b): with a refiner opened by hand and busy on B-1, the secretary took B-2
-// and B-3 itself. A note waits for the secretary only when no refiner is there, or after the
+// U6 (field study 4, wave 2b): with a refiner opened by hand and busy on B-1, the assistant took B-2
+// and B-3 itself. A note waits for the assistant only when no refiner is there, or after the
 // refiner has left it a while.
-describe('a Bandeja note waits for the secretary only when no refiner is there to take it', () => {
+describe('a Bandeja note waits for the assistant only when no refiner is there to take it', () => {
   let project: Project;
 
   beforeEach(() => {
     project = projectOf('/nowhere', memoryContext());
     addCollection(project, { name: 'tasks' });
-    declareSecretary(project.db, 'sol', clock(0));
+    declareAssistant(project.db, 'sol', clock(0));
   });
 
   afterEach(() => project.db.close());
 
-  const wake = (at: number) => secretaryWake(project, startSecretaryWait(clock(at)), clock(at));
+  const wake = (at: number) => assistantWake(project, startAssistantWait(clock(at)), clock(at));
 
   it('leaves the next notes to a live refiner busy on one, and wakes for them once it is gone', () => {
     captureToBandeja(project, { text: 'first' }, clock(1000));
@@ -38,7 +38,7 @@ describe('a Bandeja note waits for the secretary only when no refiner is there t
     seeAgent(project.db, { agent: 'lia', channel: 'cli', call: true }, clock(MIN));
     expect(wake(MIN + 1000)).toBeUndefined();
 
-    // It left them for long, or is gone: they are the secretary's.
+    // It left them for long, or is gone: they are the assistant's.
     expect(wake(12 * MIN)).toMatchObject({ kind: 'bandeja_item', ref: 'B-2' });
   });
 

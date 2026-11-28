@@ -271,7 +271,7 @@ describe('an agent belongs to the project it works in', () => {
     }
   });
 
-  // G1: a secretary waits for hours, and a wait is no command: its home must not lapse for it.
+  // G1: an assistant waits for hours, and a wait is no command: its home must not lapse for it.
   it('keeps the home of an agent that only waits, so a wait of hours is no silence', async () => {
     const inA = openProject(a.dir);
     const inB = openProject(b.dir);

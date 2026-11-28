@@ -36,7 +36,7 @@ export function createChangeFeed(
     for (const listener of listeners) listener();
   };
 
-  // A process that ended writes nothing (a secretary killed with its session): an open desk is told
+  // A process that ended writes nothing (an assistant killed with its session): an open desk is told
   // by looking, now and then, at what depends on the clock and on the processes.
   const look = () => {
     if (!watch || desks.size === 0 || Date.now() - looked < watch.everyMs) return false;

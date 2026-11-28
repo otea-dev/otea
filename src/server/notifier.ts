@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { assistantFacts } from '../app/assistant-waiting.ts';
 import { bandejaAskFacts } from '../app/bandeja.ts';
 import { workersByBoard } from '../app/board-workers.ts';
 import { listItems } from '../app/items.ts';
@@ -15,7 +16,6 @@ import {
 import { pendingOf } from '../app/pending.ts';
 import { listAgents } from '../app/presence.ts';
 import type { Project } from '../app/project.ts';
-import { secretaryFacts } from '../app/secretary-waiting.ts';
 import { setAsideOf } from '../app/set-aside.ts';
 import { unheardOf } from '../app/unheard.ts';
 import {
@@ -28,11 +28,11 @@ import {
   Planner,
 } from '../core/notify/planner.ts';
 import {
+  assistantSignalsOf,
   bandejaSignalsOf,
   freshSignals,
   type NotifyFacts,
   type NotifyKind,
-  secretarySignalsOf,
   settleUnheard,
   signalsOf,
   unheardKey,
@@ -218,24 +218,24 @@ export function createNotifier(
       );
     });
     if (items === undefined) return;
-    const secretary = fromSource('secretary', () =>
-      secretarySignalsOf(secretaryFacts(project.db, clock), at),
+    const assistant = fromSource('assistant', () =>
+      assistantSignalsOf(assistantFacts(project.db, clock), at),
     );
     // A refiner's question on a Bandeja note waits for the person as an item's does.
     const bandeja = fromSource('Bandeja', () => bandejaSignalsOf(bandejaAskFacts(project, clock)));
-    const signals = [...items, ...(secretary ?? []), ...(bandeja ?? [])];
+    const signals = [...items, ...(assistant ?? []), ...(bandeja ?? [])];
     // A source that could not be read keeps what it showed before: those keys stay in `seen`, so a
     // notice waiting for them is not dropped, and they are not told again when it reads again.
     const carried = [
-      ...(secretary === undefined ? (kept.get('secretary') ?? []) : []),
+      ...(assistant === undefined ? (kept.get('assistant') ?? []) : []),
       ...(bandeja === undefined ? (kept.get('Bandeja') ?? []) : []),
     ];
     // Only a good look replaces what a source showed: after two failed looks in a row its keys
     // are still the last good ones.
-    if (secretary !== undefined) {
+    if (assistant !== undefined) {
       kept.set(
-        'secretary',
-        secretary.map(({ key }) => key),
+        'assistant',
+        assistant.map(({ key }) => key),
       );
     }
     if (bandeja !== undefined) {
@@ -276,7 +276,7 @@ export function createNotifier(
       }
     }
     // With a source unread, what it holds is unknown: nothing is closed on that look.
-    if (secretary !== undefined && bandeja !== undefined) {
+    if (assistant !== undefined && bandeja !== undefined) {
       closeGone(targets, new Set(signals.map((signal) => `${aboutOf(signal)}|${signal.kind}`)), at);
     }
   };

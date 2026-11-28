@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { Pending, PendingEntry } from '../../../../src/core/pending.ts';
 import { type App, AppTestProvider } from '../../app/context.tsx';
-import type { SecretaryView } from '../../conversation.ts';
+import type { AssistantView } from '../../conversation.ts';
 import { item, NOW } from '../../derive/fixtures.ts';
 import type { CollectionView } from '../../types.ts';
 import { TocaView } from './TocaView.tsx';
@@ -23,7 +23,7 @@ const note: PendingEntry = {
   options: ['Te toca', 'Hablar'],
 };
 const asked: PendingEntry = {
-  kind: 'secretary',
+  kind: 'assistant',
   ref: '14',
   title: 'What do I do with it?',
   since: at(15),
@@ -38,7 +38,7 @@ const waiting = (entries: PendingEntry[], over: Partial<Pending> = {}): Pending 
   entries,
   blocks: [],
   queues: [],
-  secretary: null,
+  assistant: null,
   ...over,
 });
 
@@ -86,7 +86,7 @@ describe('Te toca counts what is no item', () => {
       expect(html).toContain('data-k="B-1"');
     });
 
-    it(`lists a question of the secretary the same way (${where})`, () => {
+    it(`lists a question of the assistant the same way (${where})`, () => {
       const html = render(fake({ all: [working], phone, pending: waiting([asked]) }));
 
       expect(html).toContain('What do I do with it?');
@@ -95,8 +95,8 @@ describe('Te toca counts what is no item', () => {
     });
   }
 
-  // F4 review round: what an agent escalated while the secretary is away is the person's to read.
-  it('shows what an agent reports while the secretary is away, as a notice rather than a question', () => {
+  // F4 review round: what an agent escalated while the assistant is away is the person's to read.
+  it('shows what an agent reports while the assistant is away, as a notice rather than a question', () => {
     const report: PendingEntry = {
       kind: 'escalation',
       ref: 'ERR-2',
@@ -127,9 +127,9 @@ describe('Te toca counts what is no item', () => {
   });
 });
 
-describe('Te toca with the secretary offline', () => {
+describe('Te toca with the assistant offline', () => {
   const working = item({ id: 'ERR-2', turn: 'agent', state: 'fixing' });
-  const offline = (messages: number, notes = 0): SecretaryView => ({
+  const offline = (messages: number, notes = 0): AssistantView => ({
     name: 'sol',
     state: 'offline',
     since: at(50),
@@ -139,7 +139,7 @@ describe('Te toca with the secretary offline', () => {
 
   for (const phone of [false, true]) {
     it(`says so with how many things wait for it, and links to Hablar (${phone ? 'phone' : 'desk'})`, () => {
-      const html = render(fake({ all: [working], phone, secretary: offline(3) }));
+      const html = render(fake({ all: [working], phone, assistant: offline(3) }));
 
       expect(html).toContain('sol is offline');
       expect(html).toContain('3 messages waiting for it');
@@ -149,22 +149,22 @@ describe('Te toca with the secretary offline', () => {
 
   // s-real2, D-fbe122: «2 messages are waiting for it» was a note and a report, not messages.
   it('names what waits for it by what each is, never as messages', () => {
-    const html = render(fake({ all: [working], secretary: offline(1, 2) }));
+    const html = render(fake({ all: [working], assistant: offline(1, 2) }));
     expect(html).toContain('1 message and 2 notes waiting for it');
   });
 
   it('is silent when it is offline with nothing waiting for it', () => {
-    expect(render(fake({ all: [working], secretary: offline(0) }))).not.toContain('is offline');
+    expect(render(fake({ all: [working], assistant: offline(0) }))).not.toContain('is offline');
   });
 
-  it('is silent while the secretary is connected', () => {
-    const connected: SecretaryView = {
+  it('is silent while the assistant is connected', () => {
+    const connected: AssistantView = {
       name: 'sol',
       state: 'connected',
       since: null,
       pending: 0,
       waiting: { count: 2, since: null, messages: 2, notes: 0, reports: 0 },
     };
-    expect(render(fake({ all: [working], secretary: connected }))).not.toContain('is offline');
+    expect(render(fake({ all: [working], assistant: connected }))).not.toContain('is offline');
   });
 });

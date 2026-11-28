@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { SILENT_AFTER_MS } from '../core/agent-status.ts';
 import { cambios, tareasDeRepo } from '../core/board/testing.ts';
 import { appendEvent, updateItemState } from '../store/queries.ts';
+import { declareAssistant } from './assistant.ts';
 import { BETWEEN_ITEMS_MS } from './board-workers.ts';
 import type { Context } from './context.ts';
 import { createItem } from './items.ts';
 import { claimItem, releaseItem } from './leases.ts';
 import { nextFor } from './next.ts';
 import { seeAgent } from './presence.ts';
-import { declareSecretary } from './secretary.ts';
 import { memoryContext, publishAs } from './testing.ts';
 
 const T0 = Date.parse('2026-11-26T10:00:00.000Z');
@@ -17,7 +17,7 @@ const you = { kind: 'human' as const, name: 'fede' };
 const agent = (name: string) => ({ kind: 'agent' as const, name });
 const running = () => true;
 
-// F2 (field study 3): the secretary launched a second worker beside a live one on the same board;
+// F2 (field study 3): the assistant launched a second worker beside a live one on the same board;
 // both did the same item and a branch was pushed that no item owned.
 describe('one live worker per board', () => {
   let ctx: Context;
@@ -60,7 +60,7 @@ describe('one live worker per board', () => {
   };
 
   it('refuses a second worker an item while a live one holds another of the board', () => {
-    declareSecretary(ctx.db, 'sol', at(0), running);
+    declareAssistant(ctx.db, 'sol', at(0), running);
     const [first, second] = [change('A'), change('B')] as [string, string];
     claim('ana-cambios', first);
 
@@ -73,7 +73,7 @@ describe('one live worker per board', () => {
   });
 
   it('lets the worker that is there take its next item, and any worker once it is gone', () => {
-    declareSecretary(ctx.db, 'sol', at(0), running);
+    declareAssistant(ctx.db, 'sol', at(0), running);
     const [first, second] = [change('A'), change('B')] as [string, string];
     claim('ana-cambios', first);
     releaseItem(ctx, { id: first, actor: agent('ana-cambios') }, at(1500));
@@ -86,7 +86,7 @@ describe('one live worker per board', () => {
   });
 
   it('says who holds the board, until when, and what to run to wait for it', () => {
-    declareSecretary(ctx.db, 'sol', at(0), running);
+    declareAssistant(ctx.db, 'sol', at(0), running);
     const [first, second] = [change('A'), change('B')] as [string, string];
     claim('ana-cambios', first);
 
@@ -102,7 +102,7 @@ describe('one live worker per board', () => {
   // A CLI worker that crashed leaves a lease and no process: the board is free once it has given no
   // sign for SILENT_AFTER_MS, not when the (longer) lease runs out.
   it('frees the board of a crashed CLI worker once it gave no sign for the silent time', () => {
-    declareSecretary(ctx.db, 'sol', at(0), running);
+    declareAssistant(ctx.db, 'sol', at(0), running);
     const [first, second] = [change('A'), change('B')] as [string, string];
     claimItem(ctx, { id: first, actor: agent('ana-cambios'), ttlMs: 60 * 60_000 }, at(0));
     seeAgent(ctx.db, { agent: 'ana-cambios', channel: 'cli', call: true }, at(0));
@@ -116,7 +116,7 @@ describe('one live worker per board', () => {
   });
 
   it('does not count an agent that only reviewed or sent back: that is no worker of the board', () => {
-    declareSecretary(ctx.db, 'sol', at(0), running);
+    declareAssistant(ctx.db, 'sol', at(0), running);
     const [first, second] = [change('A'), change('B')] as [string, string];
     // A reviewer, connected, whose last move was out of a review step (a send-back).
     seeAgent(ctx.db, { agent: 'rita-review', channel: 'cli', call: true }, at(1000));
@@ -132,7 +132,7 @@ describe('one live worker per board', () => {
   });
 
   it('counts an agent that just handed a doing step off, though it holds nothing now', () => {
-    declareSecretary(ctx.db, 'sol', at(0), running);
+    declareAssistant(ctx.db, 'sol', at(0), running);
     const [first, second] = [change('A'), change('B')] as [string, string];
     seeAgent(ctx.db, { agent: 'ana-cambios', channel: 'cli', call: true }, at(1000));
     appendEvent(ctx.db, {
@@ -151,7 +151,7 @@ describe('one live worker per board', () => {
   // G1: the last 400 events of the project were read, so a busy minute of other work pushed a
   // worker's handoff out of sight and a second worker was let in.
   it('still counts the worker that handed off a moment ago after a flood of other events', () => {
-    declareSecretary(ctx.db, 'sol', at(0), running);
+    declareAssistant(ctx.db, 'sol', at(0), running);
     const [first, second] = [change('A'), change('B')] as [string, string];
     seeAgent(ctx.db, { agent: 'ana-cambios', channel: 'cli', call: true }, at(1000));
     appendEvent(ctx.db, {
@@ -176,7 +176,7 @@ describe('one live worker per board', () => {
     );
   });
 
-  it('takes no stand in a project with no secretary: agents are free to share a board', () => {
+  it('takes no stand in a project with no assistant: agents are free to share a board', () => {
     const [first, second] = [change('A'), change('B')] as [string, string];
     claim('ana-cambios', first);
 
@@ -184,7 +184,7 @@ describe('one live worker per board', () => {
   });
 
   it('offers a second worker the next item of another board, not the one it would be refused', () => {
-    declareSecretary(ctx.db, 'sol', at(0), running);
+    declareAssistant(ctx.db, 'sol', at(0), running);
     const [first] = [change('A'), change('B')] as [string, string];
     const task = repoTask('C', 'feat/c');
     claim('ana-cambios', first);
@@ -196,7 +196,7 @@ describe('one live worker per board', () => {
   });
 
   it('allows two on a board that merges code, and no third', () => {
-    declareSecretary(ctx.db, 'sol', at(0), running);
+    declareAssistant(ctx.db, 'sol', at(0), running);
     const [a, b, c] = [
       repoTask('A', 'feat/a'),
       repoTask('B', 'feat/b'),
@@ -211,7 +211,7 @@ describe('one live worker per board', () => {
   });
 
   it('says so, and takes nothing, when it offers work to a second worker through next --claim', () => {
-    declareSecretary(ctx.db, 'sol', at(0), running);
+    declareAssistant(ctx.db, 'sol', at(0), running);
     const [first] = [change('A'), change('B')] as [string, string];
     claim('ana-cambios', first);
     seeAgent(ctx.db, { agent: 'bea-cambios', channel: 'cli', call: true }, at(2000));

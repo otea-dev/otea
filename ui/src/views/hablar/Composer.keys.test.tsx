@@ -7,7 +7,7 @@ import { testApp } from '../../shell/test-app.ts';
 import { type Mounted, mount, settle } from '../../test-dom.tsx';
 import { Composer } from './Composer.tsx';
 
-// Field study s-final (D-7bb68e): the way to the box that writes to the secretary, from a thread of
+// Field study s-final (D-7bb68e): the way to the box that writes to the assistant, from a thread of
 // links and cards, was twenty Tabs. «/» is the way, as in a search box.
 
 let page: Mounted | undefined;
@@ -99,7 +99,7 @@ describe('the way to the message box by a key', () => {
   });
 });
 
-// s-real D-a0b4a2: «Anotar idea» is in reach of the box that talks to the secretary, and opens the
+// s-real D-a0b4a2: «Anotar idea» is in reach of the box that talks to the assistant, and opens the
 // quick note, not a message.
 describe('the quick note from the message box', () => {
   it('opens the note form with «Anotar idea», writing nothing in the box', async () => {

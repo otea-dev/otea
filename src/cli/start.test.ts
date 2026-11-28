@@ -118,8 +118,8 @@ describe('otea start', () => {
     expect(text.out).toContain('Boards: already has');
     expect(text.out).toContain('was not added');
     expect(text.out).toContain('Desk: already running');
-    // Hablar's conversation is the secretary's: start says where its text is (field study 3).
-    expect(text.out).toContain('otea prompt --role secretary');
+    // Hablar's conversation is the assistant's: start says where its text is (field study 3).
+    expect(text.out).toContain('otea prompt --role assistant');
   }, 120_000);
 
   it('makes no board unless one is named, and leaves the boards to the agent', async () => {
@@ -153,21 +153,21 @@ describe('otea start', () => {
     );
     // With a board made, the agent's text is the one that joins it, in Spanish.
     expect(started.out).toContain('Empieza a trabajar en este proyecto');
-    // U1/U2 (field study 4): the way to the secretary comes first, short and in the project's
+    // U1/U2 (field study 4): the way to the assistant comes first, short and in the project's
     // language, before the status and before the long text for an agent.
     expect(started.out.startsWith('Para empezar (1 minuto):\n')).toBe(true);
-    expect(started.out).toContain('Entra en Hablar y copia el texto del secretario');
+    expect(started.out).toContain('Entra en Hablar y copia el texto del asistente');
     expect(started.out).toContain('La primera respuesta tarda 1-2 minutos');
-    expect(started.out).toContain('otea prompt --role secretary');
+    expect(started.out).toContain('otea prompt --role assistant');
     expect(started.out.indexOf('Para empezar')).toBeLessThan(started.out.indexOf('Project:'));
     expect(started.out.indexOf('Para empezar')).toBeLessThan(
       started.out.indexOf('Empieza a trabajar en este proyecto'),
     );
   }, 120_000);
 
-  // O (field study 4): the secretary's three steps are the first thing `otea start` prints, before
+  // O (field study 4): the assistant's three steps are the first thing `otea start` prints, before
   // any board text, whether or not a board was made; and an English project gets them in English.
-  it('starts its report with the three steps to the secretary, in the language of the project', async () => {
+  it('starts its report with the three steps to the assistant, in the language of the project', async () => {
     const none = await person(
       repo.dir,
       'start',
@@ -190,7 +190,7 @@ describe('otea start', () => {
 
     const english = await person(repo.dir, 'start', '--no-open', '--port', '0', '--lang', 'en');
     expect(english.out.split('\n')[0]).toBe('To start (1 minute):');
-    expect(english.out).toContain("Go to Talk and copy the secretary's text");
+    expect(english.out).toContain("Go to Talk and copy the assistant's text");
     expect(english.out).not.toMatch(/Hablar|Bandeja|Te toca/);
   }, 120_000);
 

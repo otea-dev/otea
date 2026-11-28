@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { clockText, timeText } from './time.ts';
 
 // Field study 3: «lo tomó a las 06:19 UTC» when it was 07:19 for the person. The times of the
-// texts stay UTC (one clock for every agent); the text that reaches the secretary says what the
+// texts stay UTC (one clock for every agent); the text that reaches the assistant says what the
 // person's clock reads, so it can say times as they do.
 describe('clockText', () => {
   const noon = Date.parse('2026-11-26T12:00:00Z');

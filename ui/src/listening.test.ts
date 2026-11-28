@@ -200,21 +200,21 @@ describe('hearing', () => {
     expect(hearing([silent, idle], [], NOW)).toEqual({ kind: 'connected', agents: ['a'] });
   });
 
-  // Field study 3, S2: «en cola: lucia-sec está conectado» named the secretary, which never takes an
+  // Field study 3, S2: «en cola: lucia-sec está conectado» named the assistant, which never takes an
   // item, as if it would do the work. The queue is about the agents that take items.
-  it('never counts the secretary as one that will see what waits for an agent', () => {
-    const secretary = agent('sec', { role: 'secretary', status: 'connected' });
-    expect(connectedAgents([secretary])).toEqual([]);
+  it('never counts the assistant as one that will see what waits for an agent', () => {
+    const assistant = agent('sec', { role: 'assistant', status: 'connected' });
+    expect(connectedAgents([assistant])).toEqual([]);
     expect(
-      workingAgents([agent('sec', { role: 'secretary', status: 'working' })], [], NOW),
+      workingAgents([agent('sec', { role: 'assistant', status: 'working' })], [], NOW),
     ).toEqual([]);
-    expect(hearing([secretary], [], NOW)).toEqual({ kind: 'nobody' });
-    expect(noAgents([secretary])).toBe(true);
+    expect(hearing([assistant], [], NOW)).toEqual({ kind: 'nobody' });
+    expect(noAgents([assistant])).toBe(true);
     // A worker beside it is the one named.
     const worker = agent('w', { status: 'connected' });
-    expect(hearing([secretary, worker], [], NOW)).toEqual({ kind: 'connected', agents: ['w'] });
-    expect(unheardLead([], [secretary, worker], 'TASK-1')).toContain('w');
-    expect(unheardLead([], [secretary, worker], 'TASK-1')).not.toContain('sec');
+    expect(hearing([assistant, worker], [], NOW)).toEqual({ kind: 'connected', agents: ['w'] });
+    expect(unheardLead([], [assistant, worker], 'TASK-1')).toContain('w');
+    expect(unheardLead([], [assistant, worker], 'TASK-1')).not.toContain('sec');
   });
 
   it('raises the alarm only when the agents that remain gave no signal', () => {
@@ -240,15 +240,15 @@ describe('hearing', () => {
     expect(unheardWords([], true)).toEqual({ text: 'no agent is connected', calm: true });
   });
 
-  // Review of F6: a refiner waiting on the Bandeja, like the secretary, takes no item: with only
+  // Review of F6: a refiner waiting on the Bandeja, like the assistant, takes no item: with only
   // those connected the queue says no worker is there.
-  it('counts only workers: a refiner or the secretary alone leaves the queue with no worker connected', () => {
+  it('counts only workers: a refiner or the assistant alone leaves the queue with no worker connected', () => {
     const refiner = agent('ref', { role: 'refiner', status: 'connected' });
-    const secretary = agent('sec', { role: 'secretary', status: 'listening', waiting: true });
+    const assistant = agent('sec', { role: 'assistant', status: 'listening', waiting: true });
     expect(connectedAgents([refiner])).toEqual([]);
-    expect(hearing([refiner, secretary], [], NOW)).toEqual({ kind: 'nobody' });
-    expect(noAgents([refiner, secretary])).toBe(true);
-    expect(unheardLead([], [refiner, secretary], 'TASK-1')).toBe('No agent is connected.');
+    expect(hearing([refiner, assistant], [], NOW)).toEqual({ kind: 'nobody' });
+    expect(noAgents([refiner, assistant])).toBe(true);
+    expect(unheardLead([], [refiner, assistant], 'TASK-1')).toBe('No agent is connected.');
     // A worker beside them is the one named.
     const worker = agent('w', { status: 'connected' });
     expect(hearing([refiner, worker], [], NOW)).toEqual({ kind: 'connected', agents: ['w'] });

@@ -3,9 +3,9 @@ import { answerBandeja, captureToBandeja } from '../app/bandeja.ts';
 import { openProject, type Project } from '../app/project.ts';
 import { type Cli, declareProfiles, presetCollection, seedOnce, type TempRepo } from './testing.ts';
 
-// G1 (cold review): what the secretary was told is not lost until it acted, and what agents write
+// G1 (cold review): what the assistant was told is not lost until it acted, and what agents write
 // reaches it quoted as data.
-describe('what the secretary is told and what it reads', () => {
+describe('what the assistant is told and what it reads', () => {
   let repo: TempRepo;
   let otea: Cli;
 
@@ -16,7 +16,7 @@ describe('what the secretary is told and what it reads', () => {
 
   beforeEach(async () => {
     ({ repo, otea } = seeded.fresh());
-    await otea('profile', '--role', 'secretary', '--as', 'sol');
+    await otea('profile', '--role', 'assistant', '--as', 'sol');
   });
 
   afterEach(() => repo.remove());
@@ -35,7 +35,7 @@ describe('what the secretary is told and what it reads', () => {
       (project) =>
         project.db
           .prepare(
-            "SELECT id FROM secretary_signals WHERE kind = 'escalation' AND acked_at IS NULL",
+            "SELECT id FROM assistant_signals WHERE kind = 'escalation' AND acked_at IS NULL",
           )
           .all().length,
     );
@@ -59,10 +59,10 @@ describe('what the secretary is told and what it reads', () => {
     ).id as string;
 
   describe('an escalation its wait returned', () => {
-    it('stays open through commands that only read, and is acked by the secretary saying something', async () => {
+    it('stays open through commands that only read, and is acked by the assistant saying something', async () => {
       const id = await newItem();
       await otea('escalate', id, 'The push failed twice.', '--as', 'worker');
-      const woke = JSON.parse((await otea('wait', '--secretary', '--as', 'sol', '--json')).out);
+      const woke = JSON.parse((await otea('wait', '--assistant', '--as', 'sol', '--json')).out);
       expect(woke).toMatchObject({ kind: 'escalation', ref: id });
 
       // The wait's output may sit unread (a background wait): looking at the project is no act.
@@ -82,7 +82,7 @@ describe('what the secretary is told and what it reads', () => {
   });
 
   describe('a refiner’s question on a note', () => {
-    it('cannot forge a line of the conversation when the secretary reads it', async () => {
+    it('cannot forge a line of the conversation when the assistant reads it', async () => {
       inProject((project) => captureToBandeja(project, { text: 'a rough note' }));
       await otea('bandeja', 'take', 'B-1', '--as', 'lia');
       await otea(
@@ -106,7 +106,7 @@ describe('what the secretary is told and what it reads', () => {
     });
 
     // The thread is the record of what was asked: only printing makes it one short line.
-    it('keeps the whole question in the thread, and shows a short one to the secretary', async () => {
+    it('keeps the whole question in the thread, and shows a short one to the assistant', async () => {
       const long = `${'Which of these do you want first? '.repeat(20)}END`;
       inProject((project) => captureToBandeja(project, { text: 'a rough note' }));
       await otea('bandeja', 'take', 'B-1', '--as', 'lia');

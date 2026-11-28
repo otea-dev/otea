@@ -12,7 +12,7 @@ import { TOKEN } from '../server/testing.ts';
 // The 0.8 end-to-end check (SPEC section 6): a real server on a random port, a throwaway git repo
 // and a temp OTEA_HOME, with the person on the desk's API (signed in, from its own origin) and the
 // agents as real CLI commands. One story, in order: a request with an image, a worker's question
-// answered by option, a Bandeja capture refined and filed, the secretary away while the person
+// answered by option, a Bandeja capture refined and filed, the assistant away while the person
 // writes, and every link between the conversation, the items and the Bandeja read back from the
 // API.
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -29,11 +29,11 @@ type Message = {
 };
 type Conversation = {
   messages: Message[];
-  secretary: { name: string; state: string } | null;
+  assistant: { name: string; state: string } | null;
   waiting: { count: number };
 };
 
-describe('the secretary, end to end', () => {
+describe('the assistant, end to end', () => {
   let repo: TempRepo;
   let home: string;
   let project: Project;
@@ -87,7 +87,7 @@ describe('the secretary, end to end', () => {
       if (result.code !== 0) throw new Error(`otea ${argv.join(' ')}: ${result.err}`);
     }
     declareProfiles(repo.dir, 'sol', 'ana', 'rita');
-    await said('sol', 'profile', '--role', 'secretary');
+    await said('sol', 'profile', '--role', 'assistant');
 
     project = openProject(repo.dir, env);
     listening = await listen(createServer(project, { token: TOKEN, env }), 0);
@@ -102,8 +102,8 @@ describe('the secretary, end to end', () => {
   });
 
   it('runs the whole way: request, worker question, Bandeja, away and back, links both ways', async () => {
-    // 1. The secretary listens; the person posts a request with an image from the desk.
-    const waiting = otea('wait', '--secretary', '--as', 'sol', '--timeout', '30s', '--json');
+    // 1. The assistant listens; the person posts a request with an image from the desk.
+    const waiting = otea('wait', '--assistant', '--as', 'sol', '--timeout', '30s', '--json');
     const form = new FormData();
     form.set('message', JSON.stringify({ text: 'the Aprobar button is hidden on the phone' }));
     form.append('file', new File([PNG], 'phone.png', { type: 'image/png' }));
@@ -153,7 +153,7 @@ describe('the secretary, end to end', () => {
     const afterSay = await conversation();
     expect(afterSay.messages.map(({ author, delivery }) => [author, delivery])).toEqual([
       ['person', 'read'],
-      ['secretary', null],
+      ['assistant', null],
     ]);
     expect(afterSay.messages[1]).toMatchObject({ kind: 'request', links: [item.id] });
     expect(afterSay.messages[0]?.attachments).toEqual([
@@ -186,7 +186,7 @@ describe('the secretary, end to end', () => {
     expect(answered.status).toBe(200);
     expect(await json<{ turn: string }>(answered)).toMatchObject({ turn: 'agent' });
 
-    // 4. A rough capture lands in the Bandeja; the secretary hears it, takes it for a refiner, and
+    // 4. A rough capture lands in the Bandeja; the assistant hears it, takes it for a refiner, and
     // the refiner files it as an item with its fields filled.
     const captured = await desk('/bandeja', {
       method: 'POST',
@@ -197,7 +197,7 @@ describe('the secretary, end to end', () => {
     const heard = await agent<{ kind: string; ref?: string }>(
       'sol',
       'wait',
-      '--secretary',
+      '--assistant',
       '--timeout',
       '30s',
     );
@@ -224,7 +224,7 @@ describe('the secretary, end to end', () => {
       expect.objectContaining({ ref: entry.ref, state: 'filed', item: refined.id }),
     ]);
 
-    // 5. The secretary goes away (its last sign is long past, nothing listens); the person writes;
+    // 5. The assistant goes away (its last sign is long past, nothing listens); the person writes;
     // Hablar says it is offline and the message waits.
     const longAgo = new Date(Date.now() - 45 * 60_000).toISOString();
     project.db
@@ -232,10 +232,10 @@ describe('the secretary, end to end', () => {
         "UPDATE agents SET last_seen = ?, acted_at = ?, listening_at = NULL WHERE name = 'sol'",
       )
       .run(longAgo, longAgo);
-    const away = await json<{ secretary: { state: string; since: string } }>(
-      await desk('/secretary'),
+    const away = await json<{ assistant: { state: string; since: string } }>(
+      await desk('/assistant'),
     );
-    expect(away.secretary).toMatchObject({ state: 'offline', since: longAgo });
+    expect(away.assistant).toMatchObject({ state: 'offline', since: longAgo });
     const late = await json<Message>(
       await desk('/conversation/messages', {
         method: 'POST',
@@ -247,13 +247,13 @@ describe('the secretary, end to end', () => {
     expect(waits.messages.at(-1)).toMatchObject({ id: late.id, delivery: 'pending' });
 
     // 6. It comes back: its wait returns for that message, it reads it, and the desk sees it read.
-    const back = await agent<{ kind: string }>('sol', 'wait', '--secretary', '--timeout', '30s');
+    const back = await agent<{ kind: string }>('sol', 'wait', '--assistant', '--timeout', '30s');
     expect(back.kind).toBe('person_message');
     await agent('sol', 'conversation');
     const delivered = await conversation();
     expect(delivered.waiting.count).toBe(0);
     expect(delivered.messages.at(-1)).toMatchObject({ id: late.id, delivery: 'read' });
-    expect(delivered.secretary?.state).not.toBe('offline');
+    expect(delivered.assistant?.state).not.toBe('offline');
 
     // 7. The links resolve both ways: the item names its message, the message its item, and the
     // refined item its Bandeja entry.

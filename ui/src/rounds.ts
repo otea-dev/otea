@@ -6,8 +6,28 @@ import {
   withoutUndone,
 } from '../../src/core/board/history.ts';
 import { type BoardDefinition, stepIndex } from '../../src/core/board/model.ts';
+import type { FeedEvent } from './activity.ts';
 import { relayOf } from './format.ts';
-import type { Actor, Closing, Evidence, ItemEvent, State } from './types.ts';
+import type { Actor, Closing, Evidence, Item, ItemEvent, State } from './types.ts';
+
+// The round an item is in: the one reading every surface calls (Te toca's row, the board's rows
+// and steps, Triage's card; docs/internal/shown-facts.md, fact 15). On a board it is the step
+// engine's, which the server sends with the item (`item.round`); off a board it is one, plus every
+// time the person sent the item back with notes.
+export function roundOf(item: Pick<Item, 'id' | 'round'>, feed: readonly FeedEvent[]): number {
+  if (item.round !== undefined) return item.round;
+  return (
+    1 +
+    feed.filter(
+      (e) =>
+        e.itemId === item.id &&
+        e.type === 'transitioned' &&
+        e.actor.kind === 'human' &&
+        typeof e.data.reason === 'string' &&
+        e.data.reason.trim() !== '',
+    ).length
+  );
+}
 
 // Rounds are read from an item's history, never stored. Round n ends with the agent's nth move into
 // a state on the human's turn; that move's note (else its reason) is the round's note, and what was

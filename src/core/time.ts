@@ -8,7 +8,7 @@ export function timeText(iso: string): string {
 
 // What the person's own clock reads at `now`, with its offset and zone: "09:00 (UTC-3,
 // America/Argentina/Buenos_Aires)". The texts stay in UTC; this is for the agent that talks with the
-// person (the secretary), so it says times as they read them. `zone` defaults to this computer's.
+// person (the assistant), so it says times as they read them. `zone` defaults to this computer's.
 export function clockText(now: number, zone?: string): string {
   const named = zone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const parts = (timeZoneName: 'shortOffset' | undefined) =>

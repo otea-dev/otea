@@ -14,11 +14,11 @@ import {
   type TempRepo,
 } from './testing.ts';
 
-// The secretary's side of the conversation (0.8, M2): `otea conversation` reads what the person
-// wrote from the desk (and marks it read), `otea say` answers, and only the project's secretary does
+// The assistant's side of the conversation (0.8, M2): `otea conversation` reads what the person
+// wrote from the desk (and marks it read), `otea say` answers, and only the project's assistant does
 // either. The person's messages come only from the desk's routes: here the test posts them through
 // the app function those routes call.
-describe('the conversation from the secretary', () => {
+describe('the conversation from the assistant', () => {
   let repo: TempRepo;
   let otea: Cli;
 
@@ -29,7 +29,7 @@ describe('the conversation from the secretary', () => {
 
   beforeEach(async () => {
     ({ repo, otea } = seeded.fresh());
-    await otea('profile', '--role', 'secretary', '--as', 'sol');
+    await otea('profile', '--role', 'assistant', '--as', 'sol');
   });
 
   afterEach(() => repo.remove());
@@ -53,7 +53,7 @@ describe('the conversation from the secretary', () => {
     it('wakes the wait, is read once with the talk before it, and is answered', async () => {
       const sent = person('the Aprobar button is hidden on the phone');
 
-      const woke = await otea('wait', '--secretary', '--as', 'sol', '--json');
+      const woke = await otea('wait', '--assistant', '--as', 'sol', '--json');
       expect(JSON.parse(woke.out)).toMatchObject({ kind: 'person_message', ref: String(sent.id) });
 
       const read = await otea('conversation', '--as', 'sol');
@@ -65,7 +65,7 @@ describe('the conversation from the secretary', () => {
       expect(conversation()[0]?.delivery).toBe('read');
 
       // Read is not answered: a wait that begins now brings the message back, saying it was read.
-      const again = await otea('wait', '--secretary', '--as', 'sol', '--json');
+      const again = await otea('wait', '--assistant', '--as', 'sol', '--json');
       expect(JSON.parse(again.out)).toMatchObject({ kind: 'person_message', ref: String(sent.id) });
       expect(JSON.parse(again.out).text).toContain('already read');
 
@@ -79,21 +79,21 @@ describe('the conversation from the secretary', () => {
       );
       expect(said.out).toContain(`Said as message ${sent.id + 1}, answering ${sent.id}.`);
       // Answered: the wait has nothing more to say.
-      const idle = await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1');
+      const idle = await otea('wait', '--assistant', '--as', 'sol', '--timeout', '1');
       expect(idle.code).toBe(13);
       expect(conversation().map(({ author, by, text }) => [author, by, text])).toEqual([
         ['person', 'human', 'the Aprobar button is hidden on the phone'],
-        ['secretary', 'sol', 'Fixing it now.'],
+        ['assistant', 'sol', 'Fixing it now.'],
       ]);
     });
 
-    it('does not mark the messages read for anyone but the secretary', async () => {
+    it('does not mark the messages read for anyone but the assistant', async () => {
       person('hello');
 
       const luna = await otea('conversation', '--as', 'luna');
 
       expect(luna.code).toBe(7);
-      expect(luna.err).toContain("luna is not this project's secretary (sol is)");
+      expect(luna.err).toContain("luna is not this project's assistant (sol is)");
       expect(conversation()[0]?.delivery).toBe('pending');
     });
 
@@ -131,14 +131,14 @@ describe('the conversation from the secretary', () => {
   });
 
   describe('who may say', () => {
-    it('refuses another agent, and says who the secretary is', async () => {
+    it('refuses another agent, and says who the assistant is', async () => {
       const sent = person('hello');
 
       const { code, err } = await otea('say', 'hi', '--reply-to', String(sent.id), '--as', 'luna');
 
       expect(code).toBe(7);
       expect(err).toContain(
-        "luna is not this project's secretary (sol is). Only the secretary speaks for the project",
+        "luna is not this project's assistant (sol is). Only the assistant speaks for the project",
       );
       expect(conversation()).toHaveLength(1);
     });
@@ -149,11 +149,11 @@ describe('the conversation from the secretary', () => {
       const forged = await otea('say', 'I am the person', '--as', 'human');
 
       expect(forged.code).not.toBe(0);
-      expect(conversation().map(({ author }) => author)).toEqual(['secretary', 'secretary']);
+      expect(conversation().map(({ author }) => author)).toEqual(['assistant', 'assistant']);
     });
 
-    it('is refused for an agent that is not the secretary even with a name that looks like one', async () => {
-      const { code } = await otea('say', 'x', '--as', 'secretary');
+    it('is refused for an agent that is not the assistant even with a name that looks like one', async () => {
+      const { code } = await otea('say', 'x', '--as', 'assistant');
 
       expect(code).toBe(7);
       expect(conversation()).toEqual([]);
@@ -161,7 +161,7 @@ describe('the conversation from the secretary', () => {
   });
 
   describe('attachments', () => {
-    it('come to the secretary as files it can open, and go back with --file', async () => {
+    it('come to the assistant as files it can open, and go back with --file', async () => {
       person('see the screenshot', [{ filename: 'phone.png', bytes: Buffer.from('png-bytes') }]);
 
       const read = JSON.parse((await otea('conversation', '--as', 'sol', '--json')).out);
@@ -288,9 +288,9 @@ describe('the conversation from the secretary', () => {
       expect(next.out).toContain(`Asked in the conversation, message ${sent.id} (request)`);
     });
 
-    it('make a consultation of a question the secretary answers', async () => {
+    it('make a consultation of a question the assistant answers', async () => {
       const sent = person('why is the lease 15 minutes?');
-      // Unread, it is no sure target: the secretary reads it first.
+      // Unread, it is no sure target: the assistant reads it first.
       const refused = await otea('say', 'It covers a long build.', '--consultation', '--as', 'sol');
       expect(refused.code).toBe(8);
       expect(refused.err).toContain('--reply-to');
@@ -312,13 +312,13 @@ describe('the conversation from the secretary', () => {
 
       repo.remove();
       ({ repo, otea } = seeded.fresh());
-      await otea('profile', '--role', 'secretary', '--as', 'sol');
+      await otea('profile', '--role', 'assistant', '--as', 'sol');
       const none = await otea('say', 'x', '--request', '--as', 'sol');
       expect(none.code).not.toBe(0);
       expect(none.err).toContain('There is no message of the person to classify');
     });
 
-    it('keep the person’s correction when the secretary says the turn again', async () => {
+    it('keep the person’s correction when the assistant says the turn again', async () => {
       const sent = person('what about dark mode?');
       await otea('conversation', '--as', 'sol');
       await otea('say', 'Filed.', '--request', '--as', 'sol');
@@ -364,8 +364,8 @@ describe('the conversation from the secretary', () => {
         conversation().map(({ author, kind, links, replyTo }) => [author, kind, links, replyTo]),
       ).toEqual([
         ['person', 'consultation', [], null],
-        ['secretary', 'consultation', [], sent.id],
-        ['secretary', null, [fix], null],
+        ['assistant', 'consultation', [], sent.id],
+        ['assistant', null, [fix], null],
       ]);
       const shown = JSON.parse((await otea('show', fix, '--as', 'worker', '--json')).out);
       expect(shown.fromMessages).toBeUndefined();
@@ -473,7 +473,7 @@ describe('the conversation from the secretary', () => {
       expect(JSON.parse((await otea('list', '--as', 'sol', '--json')).out)).toEqual([]);
     });
 
-    it('--from-message is the secretary’s alone, and refused before the item is made', async () => {
+    it('--from-message is the assistant’s alone, and refused before the item is made', async () => {
       const sent = person('add dark mode');
 
       const { code, err } = await otea(
@@ -491,14 +491,14 @@ describe('the conversation from the secretary', () => {
       );
 
       expect(code).toBe(7);
-      expect(err).toContain('Only the secretary links the conversation to items');
+      expect(err).toContain('Only the assistant links the conversation to items');
       const list = JSON.parse((await otea('list', '--as', 'worker', '--json')).out);
       expect(list).toEqual([]);
     });
   });
 
   describe('as MCP tools', () => {
-    it('serves conversation and say, which say as the secretary only', async () => {
+    it('serves conversation and say, which say as the assistant only', async () => {
       const server = createMcpServer(COMMANDS, { cwd: repo.dir, agent: 'sol', warn: () => {} });
       const client = new Client({ name: 'test', version: '0' });
       const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
@@ -527,7 +527,7 @@ describe('the conversation from the secretary', () => {
           arguments: { text: 'hi', reply_to: '1', request: false },
         });
 
-        expect(conversation().map(({ author }) => author)).toEqual(['person', 'secretary']);
+        expect(conversation().map(({ author }) => author)).toEqual(['person', 'assistant']);
       } finally {
         await client.close();
       }

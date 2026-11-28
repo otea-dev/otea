@@ -47,7 +47,7 @@ export type ProjectOverview = {
   // Side topics an agent answered: the person's turn to read, though never work.
   topics: AnsweredTopic[];
   // What waits for you there that is no item: a refiner's question on a Bandeja note, the
-  // secretary's own questions, what agents escalated while it is away (app/pending.ts).
+  // assistant's own questions, what agents escalated while it is away (app/pending.ts).
   asking?: PendingEntry[];
   // Open items on an agent's turn.
   withAgents: number;
@@ -115,10 +115,10 @@ export function countsOf(project: Project): Counts {
     topics: answeredTopics(project),
     asking: countedOff(offItemOf(project), new Set(waiting.map(({ id }) => id))),
     withAgents: open.filter((item) => !yours(item)).length,
-    // The agents there that take items: the secretary and a refiner are agents of their own kind,
+    // The agents there that take items: the assistant and a refiner are agents of their own kind,
     // never counted as the ones that do the work (the same rule as the desk's pill, ui listening.ts).
     agents: listAgents(project.db)
-      .filter((agent) => agent.role !== 'secretary' && agent.role !== 'refiner')
+      .filter((agent) => agent.role !== 'assistant' && agent.role !== 'refiner')
       .filter((agent) => agent.status !== 'away' || leftStuck.has(agent.name))
       .map((agent) => ({ name: agent.name, status: agent.status, holding: agent.holding.length })),
     open: open.length,

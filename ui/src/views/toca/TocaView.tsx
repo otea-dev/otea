@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { activeLease } from '../../active-lease.ts';
 import { typeOfItem, useApp } from '../../app/context.tsx';
+import { waitingWords } from '../../assistant-waiting.ts';
 import { EmptyProject } from '../../components/EmptyProject.tsx';
 import { NextStep } from '../../components/NextStep.tsx';
-import type { SecretaryView } from '../../conversation.ts';
+import type { AssistantView } from '../../conversation.ts';
 import { t, tx } from '../../i18n/i18n.ts';
 import { Button } from '../../kit/Button.tsx';
 import { Count } from '../../kit/Count.tsx';
@@ -23,7 +24,6 @@ import {
   oldestOffItem,
   rowKeyOf,
 } from '../../pending.ts';
-import { waitingWords } from '../../secretary-waiting.ts';
 import { hablarHash } from '../../selection.ts';
 import type { Item } from '../../types.ts';
 import { AnsweredTopics } from '../topics/AnsweredTopics.tsx';
@@ -35,7 +35,7 @@ import { type Today, todayCounts } from './today.ts';
 // its dek and the day's recap under it, the lanes with the sections in order, closed work on the
 // trunk. Who does what is on each row and in the topbar's menu; an agent's last hours in its sheet.
 
-export { dayLine, roundOf, rowCall, tocaBlocks, universeOf } from './blocks.tsx';
+export { dayLine, rowCall, tocaBlocks, universeOf } from './blocks.tsx';
 
 // The day's recap under the title: what they handed over, what you approved (in your colour) and
 // what you sent back.
@@ -101,17 +101,17 @@ function NoAgents({
   );
 }
 
-// The secretary is offline and things wait for it: Te toca says so (it never reads «nothing waits»
+// The assistant is offline and things wait for it: Te toca says so (it never reads «nothing waits»
 // while the person's messages and notes sit unread), with how many and the way to Hablar, where
 // the way to bring it back is.
-function SecretaryAway({ secretary }: { secretary: SecretaryView }) {
+function AssistantAway({ assistant }: { assistant: AssistantView }) {
   return (
-    <div className="secoff" role="status" data-leaf="">
+    <div className="assistant-off" role="status" data-leaf="">
       <i aria-hidden="true" />
       <div>
-        <h4>{t('toca.secOff.title', { name: secretary.name })}</h4>
-        <p>{t('toca.secOff.waiting', { what: waitingWords(secretary.waiting) })}</p>
-        <a className="secoff-go" href={hablarHash()}>
+        <h4>{t('toca.secOff.title', { name: assistant.name })}</h4>
+        <p>{t('toca.secOff.waiting', { what: waitingWords(assistant.waiting) })}</p>
+        <a className="assistant-off-go" href={hablarHash()}>
           {t('toca.secOff.go')}
         </a>
       </div>
@@ -124,17 +124,17 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
   const types = (it: Item) => typeOfItem(it, app.collectionOf);
   const ctx = { now: app.now, items: app.all, types };
   const today = todayCounts(app.feed, ctx);
-  // A row that is no item (a question on a Bandeja note, the secretary's own) opens Hablar.
+  // A row that is no item (a question on a Bandeja note, the assistant's own) opens Hablar.
   const off = new Map(offItemEntries(app).map((entry) => [rowKeyOf(entry), entry]));
   const open = (id: string) => {
     const entry = off.get(id);
     if (entry) return app.go(entryRoute(entry));
     return app.route.item === id ? app.closeItem() : app.openItem(id);
   };
-  // On the phone without the PC the secretary's state is the last one kept: the offline line says
+  // On the phone without the PC the assistant's state is the last one kept: the offline line says
   // the PC is out of reach, and this card waits for an answer to be true.
   const away =
-    atasco || (app.sync?.offline === true && app.phone) ? null : offlineWithWaiting(app.secretary);
+    atasco || (app.sync?.offline === true && app.phone) ? null : offlineWithWaiting(app.assistant);
   // No item on any board (every project has Pedidos, so never no board): the project's own page.
   const empty =
     app.items.status === 'ready' &&
@@ -210,7 +210,7 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
           <EmptyProject />
         ) : (
           <>
-            {away ? <SecretaryAway secretary={away} /> : null}
+            {away ? <AssistantAway assistant={away} /> : null}
             {lonely ? <NoAgents items={app.all} now={app.now} onConnect={app.openConnect} /> : null}
             <LaneHead />
             <LaneList

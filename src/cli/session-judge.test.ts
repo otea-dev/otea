@@ -4,7 +4,7 @@ import type { ProcessRow } from './owner.ts';
 import { callerIn, judgeCaller, readMsOf } from './session-guard.ts';
 
 // Field study 5, V8: an orphan background process (no live parent, so no harness resolves from it)
-// said as the secretary while the real one ran. While the noted session runs, a caller the table
+// said as the assistant while the real one ran. While the noted session runs, a caller the table
 // reads but cannot tie to it is not it, over the command line and over MCP.
 const rows: ProcessRow[] = [
   { pid: 100, parent: 1, name: 'claude', started: 1_000_000 },
@@ -33,7 +33,7 @@ describe('the verdict on a caller read from the processes', () => {
     expect(judgeCaller(mcp, callerIn(rows, 999)).verdict).toBe('other');
   });
 
-  // D-6f56ce: the secretary's own wait was refused as «another session» and the secretary, told so,
+  // D-6f56ce: the assistant's own wait was refused as «another session» and the assistant, told so,
   // retired. A process of the harness that is a harness itself (claude below claude) holds the
   // command: its first harness is not the noted one, but the noted one is above it.
   it('takes a command under a harness the noted one started for the same session', () => {

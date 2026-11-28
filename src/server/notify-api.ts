@@ -49,8 +49,8 @@ const Prefs = z.object({
   aside: z.boolean(),
   // Newer than the first clients: one that does not send them gets them on.
   unheard: z.boolean().default(DEFAULT_PREFS.unheard),
-  secretary_reply: z.boolean().default(DEFAULT_PREFS.secretary_reply),
-  secretary_offline: z.boolean().default(DEFAULT_PREFS.secretary_offline),
+  assistant_reply: z.boolean().default(DEFAULT_PREFS.assistant_reply),
+  assistant_offline: z.boolean().default(DEFAULT_PREFS.assistant_offline),
   askText: z.boolean().default(DEFAULT_PREFS.askText),
   quiet: z.object({ from: Time, to: Time }).nullable(),
   // The projects muted, by id.
@@ -186,7 +186,7 @@ export function notifyApi(
         const { prefs, lang } = await body(
           c,
           PrefsBody,
-          '{"prefs": {"turn", "ask", "replied", "stuck", "aside": boolean, "unheard"?: boolean, "secretary_reply"?: boolean, "secretary_offline"?: boolean, "askText"?: boolean, "quiet": {"from": "HH:MM", "to": "HH:MM"} | null, "muted": [project id]}, "lang": "es" | "en"}',
+          '{"prefs": {"turn", "ask", "replied", "stuck", "aside": boolean, "unheard"?: boolean, "assistant_reply"?: boolean, "assistant_offline"?: boolean, "askText"?: boolean, "quiet": {"from": "HH:MM", "to": "HH:MM"} | null, "muted": [project id]}, "lang": "es" | "en"}',
         );
         const client = clientOf(c);
         if (client.kind === 'device') savePrefs(machine, client.device.id, prefs, lang);

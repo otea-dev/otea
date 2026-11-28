@@ -3,7 +3,7 @@ import { rolePrompt } from '../core/agent-prompts.ts';
 import { type Cli, cliAt, declareProfiles, type TempRepo, tempGitRepo } from './testing.ts';
 
 // D-997a37 (field study s-real): a note written «no urgente, revisarlo después» became an item and an
-// agent started it at once. The texts of the secretary and the refiner say to set such an item aside
+// agent started it at once. The texts of the assistant and the refiner say to set such an item aside
 // as soon as it is made, and an item set aside that way is not offered to any worker.
 describe('a note that says it is not urgent', () => {
   let repo: TempRepo;
@@ -60,7 +60,7 @@ describe('a note that says it is not urgent', () => {
   });
 
   for (const lang of ['en', 'es'] as const) {
-    for (const role of ['secretary', 'refiner'] as const) {
+    for (const role of ['assistant', 'refiner'] as const) {
       it(`is told to the ${role} in ${lang}: set the item aside with release --later --quote`, () => {
         const text = rolePrompt(role, lang, { name: 'quill' });
 

@@ -48,10 +48,10 @@ describe('otea prompt', () => {
   });
 
   it('prints the canonical text of a role, with the board and name filled in', async () => {
-    // The secretary's and the refiner's texts need no project.
-    const secretary = await otea('prompt', '--role', 'secretary', '--lang', 'en');
-    expect(secretary.code).toBe(0);
-    expect(secretary.out.trim()).toBe(rolePrompt('secretary', 'en', {}));
+    // The assistant's and the refiner's texts need no project.
+    const assistant = await otea('prompt', '--role', 'assistant', '--lang', 'en');
+    expect(assistant.code).toBe(0);
+    expect(assistant.out.trim()).toBe(rolePrompt('assistant', 'en', {}));
     const refiner = await otea('prompt', '--role', 'refiner', '--as', 'rita', '--lang', 'es');
     expect(refiner.code).toBe(0);
     expect(refiner.out.trim()).toBe(rolePrompt('refiner', 'es', { name: 'rita' }));
@@ -80,7 +80,7 @@ describe('otea prompt', () => {
     );
   });
 
-  // The name is the one given with --as, never the session's own: a secretary printing the text
+  // The name is the one given with --as, never the session's own: an assistant printing the text
   // for a worker must not hand it its own name.
   it('does not give a worker the name of the agent that prints its text', async () => {
     await otea('init', '--local', '--template', 'changes');
@@ -96,7 +96,7 @@ describe('otea prompt', () => {
       ['--role', 'boss'],
       ['--role', 'worker'],
       ['--role', 'coordinator'],
-      ['--role', 'secretary', '--board', 'Cambios'],
+      ['--role', 'assistant', '--board', 'Cambios'],
       ['--role', 'refiner', '--board', 'Cambios'],
       ['--role', 'worker', '--board', 'Cambios', 'design'],
       ['--board', 'Cambios'],
@@ -129,15 +129,15 @@ describe('otea prompt', () => {
     }
   });
 
-  // `otea wait` without --turn fails; the one the secretary is told to run is the secretary's own,
+  // `otea wait` without --turn fails; the one the assistant is told to run is the assistant's own,
   // and must be a command the CLI accepts (it times out here, exit 13, with nothing waiting).
   for (const lang of ['en', 'es']) {
-    it(`gives the secretary a wait command that parses and runs (${lang})`, async () => {
+    it(`gives the assistant a wait command that parses and runs (${lang})`, async () => {
       await otea('init', '--local', '--template', 'none');
-      await otea('profile', '--role', 'secretary', '--as', 'ana');
-      const text = (await otea('prompt', '--role', 'secretary', '--as', 'ana', '--lang', lang)).out;
+      await otea('profile', '--role', 'assistant', '--as', 'ana');
+      const text = (await otea('prompt', '--role', 'assistant', '--as', 'ana', '--lang', lang)).out;
       const command = /`(otea wait [^`]*)`/.exec(text)?.[1];
-      expect(command).toBe('otea wait --secretary --as ana');
+      expect(command).toBe('otea wait --assistant --as ana');
       const args = (command ?? '').split(' ').slice(1);
       const waited = await otea(...args, '--timeout', '1s');
       expect(waited.code, waited.err).toBe(13);
@@ -150,7 +150,7 @@ describe('otea prompt', () => {
   describe('the commands in the role texts', () => {
     const GLOBAL = new Set(['json', 'as', 'help', 'version']);
     const texts = (['en', 'es'] as const).flatMap((lang) => [
-      { what: `secretary ${lang}`, text: rolePrompt('secretary', lang, {}) },
+      { what: `assistant ${lang}`, text: rolePrompt('assistant', lang, {}) },
       { what: `worker ${lang}`, text: rolePrompt('worker', lang, { board: 'Cambios' }) },
       { what: `refiner ${lang}`, text: rolePrompt('refiner', lang, {}) },
     ]);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { withoutUndone } from '../../../src/core/board/history.ts';
 import { FEED_DAY_MAX, FEED_SIZE, type FeedEvent, mergeFeed } from '../activity.ts';
 import {
+  fetchAssistant,
   fetchCollections,
   fetchEvents,
   fetchItems,
@@ -9,11 +10,10 @@ import {
   fetchPresets,
   fetchProject,
   fetchProjects,
-  fetchSecretary,
   fetchSession,
 } from '../api.ts';
 import { currentProjectId } from '../base.ts';
-import type { SecretaryView } from '../conversation.ts';
+import type { AssistantView } from '../conversation.ts';
 import { type Connection, useBeat, useLive, useRemote, useThrottled } from '../hooks.ts';
 import { flushQueue, queueAvailable } from '../offline/queue-store.ts';
 import { type SyncState, useSync } from '../offline/sync-state.ts';
@@ -53,9 +53,9 @@ export type LoadedData = {
   agents: Agent[] | null | undefined;
   // What waits for the person, as Otea counts it; undefined until the first answer.
   pending: Pending | undefined;
-  // The project's secretary and what waits for it, as GET /api/secretary says; null while the
+  // The project's assistant and what waits for it, as GET /api/assistant says; null while the
   // project has none, undefined until the first answer.
-  secretary: SecretaryView | null | undefined;
+  assistant: AssistantView | null | undefined;
   feed: FeedEvent[];
   studioWrites: number;
   studioChanged(): void;
@@ -199,14 +199,14 @@ export function useAppData(): LoadedData {
   const projectsVersion = useThrottled(version, PROJECTS_READ_MS);
   const projects = useRemote(fetchProjects, projectsVersion * 1000 + beat, connection);
   const agents = useAgents(version, presence, connection);
-  // A secretary gone offline sends presence, not a change: both read it again (both only grow).
+  // An assistant gone offline sends presence, not a change: both read it again (both only grow).
   // A burst of changes (an agent at work writes often) reads it once per window, the last one.
   const pendingKey = useThrottled(version + presence, PENDING_READ_MS);
   const pending = useRemote(fetchPending, pendingKey, connection);
-  // The secretary's state is read here once, on the same trigger, and every screen shows this one:
+  // The assistant's state is read here once, on the same trigger, and every screen shows this one:
   // the rail, Hablar, Te toca, the phone's sheet (s-real2, D-51081c: Hablar kept «conectado» after
   // the agents menu had dropped it, because it read the state only when an item changed).
-  const secretary = useRemote(fetchSecretary, pendingKey, connection);
+  const assistant = useRemote(fetchAssistant, pendingKey, connection);
   const feed = useFeed(version);
   const studioChanged = useCallback(() => setStudioWrites((n) => n + 1), []);
   // The PC is back (the live stream reconnected): what was captured without it goes now.
@@ -241,7 +241,7 @@ export function useAppData(): LoadedData {
     presetsRemote: presets,
     agents,
     pending: ready(pending),
-    secretary: ready(secretary),
+    assistant: ready(assistant),
     feed,
     studioWrites,
     studioChanged,

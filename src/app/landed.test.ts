@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { creatures, step } from '../core/board/testing.ts';
 import { updateItemState } from '../store/queries.ts';
+import {
+  ackAssistantReturns,
+  assistantWake,
+  declareAssistant,
+  startAssistantWait,
+} from './assistant.ts';
 import { createItem, getItem } from './items.ts';
 import { claimItem } from './leases.ts';
 import { handoffItem } from './next.ts';
 import type { Project } from './project.ts';
-import {
-  ackSecretaryReturns,
-  declareSecretary,
-  secretaryWake,
-  startSecretaryWait,
-} from './secretary.ts';
 import { memoryContext, projectOf, publishAs } from './testing.ts';
 
 const you = { kind: 'human' as const, name: 'human' };
@@ -28,12 +28,12 @@ const landing = () => {
 
 // Field study 5, V8: nine items reached Done during a half hour away and Hablar still showed the
 // last message from before: nobody told the person. An agent closing an item as Done wakes the
-// secretary, and several landings are one wake.
-describe('the secretary hears what landed', () => {
+// assistant, and several landings are one wake.
+describe('the assistant hears what landed', () => {
   let project: Project;
   let tick = 0;
   const now = () => new Date(T0 + 1000 * ++tick).toISOString();
-  const wake = () => secretaryWake(project, startSecretaryWait(now), now);
+  const wake = () => assistantWake(project, startAssistantWait(now), now);
   // An item the person approved: it waits at the land step for an agent.
   const made = (title: string) => {
     const { id } = createItem(
@@ -54,7 +54,7 @@ describe('the secretary hears what landed', () => {
     const ctx = memoryContext();
     publishAs(ctx, landing(), 'bcri', now);
     project = projectOf('/nowhere', ctx);
-    declareSecretary(project.db, 'sol', now);
+    declareAssistant(project.db, 'sol', now);
   });
 
   afterEach(() => project.db.close());
@@ -72,7 +72,7 @@ describe('the secretary hears what landed', () => {
     expect(woke?.text).toMatch(/since my last message/);
   });
 
-  it('batches several landings into one wake, then stops once the secretary acted', () => {
+  it('batches several landings into one wake, then stops once the assistant acted', () => {
     const ids = ['One', 'Two', 'Three'].map(made);
     for (const id of ids) land(id);
 
@@ -81,11 +81,11 @@ describe('the secretary hears what landed', () => {
     expect(woke?.kind).toBe('landed');
     expect(woke?.items).toEqual(ids);
     expect(woke?.text).toContain(ids.join(','));
-    ackSecretaryReturns(project.db, 'sol', now, []);
+    ackAssistantReturns(project.db, 'sol', now, []);
     expect(wake()).toBeUndefined();
   });
 
-  it('brings the landings back to a later wait if the secretary did not act, once more at most', () => {
+  it('brings the landings back to a later wait if the assistant did not act, once more at most', () => {
     const ids = ['One', 'Two'].map(made);
     for (const id of ids) land(id);
     expect(wake()?.items).toEqual(ids);
@@ -101,7 +101,7 @@ describe('the secretary hears what landed', () => {
   });
 });
 
-describe('a project with no secretary', () => {
+describe('a project with no assistant', () => {
   it('keeps no landing for one that comes later', () => {
     let tick = 0;
     const now = () => new Date(T0 + 1000 * ++tick).toISOString();
@@ -118,9 +118,9 @@ describe('a project with no secretary', () => {
       claimItem(project, { id, actor: quill }, now);
       handoffItem(project, { id, actor: quill, channel: 'cli' }, now);
 
-      declareSecretary(project.db, 'sol', now);
+      declareAssistant(project.db, 'sol', now);
 
-      expect(secretaryWake(project, startSecretaryWait(now), now)).toBeUndefined();
+      expect(assistantWake(project, startAssistantWait(now), now)).toBeUndefined();
     } finally {
       project.db.close();
     }

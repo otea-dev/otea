@@ -5,7 +5,7 @@ import { mount, press } from '../test-dom.tsx';
 import { OfflineBar } from './OfflineBar.tsx';
 
 // Field study 5: on a phone the offline notice was a card (the cause, the wifi, since when, the
-// queue, a button) that said what the pill, the secretary's line and the composer's note said. It is
+// queue, a button) that said what the pill, the assistant's line and the composer's note said. It is
 // one quiet line, with the cause one tap away.
 
 beforeEach(() => setLanguage('es'));
@@ -46,7 +46,7 @@ describe('the offline line on the phone', () => {
     expect(view.root.querySelector<HTMLElement>('.ob-more')?.hidden).toBe(false);
     expect(more?.textContent).toContain('¿Tailscale está conectado en este teléfono?');
     expect(more?.textContent).toContain('última sincronización 16:55');
-    // Notes queue; a message to the secretary does not: the line says the first, never «en cola»
+    // Notes queue; a message to the assistant does not: the line says the first, never «en cola»
     // for what Hablar writes.
     expect(more?.textContent).toContain('solo lectura · lo que captures queda en cola');
     view.unmount();

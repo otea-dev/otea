@@ -3,7 +3,7 @@ import { act, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Pending } from '../../../../src/core/pending.ts';
 import { type App, AppTestProvider } from '../../app/context.tsx';
-import type { ConversationView, Message, SecretaryView } from '../../conversation.ts';
+import type { AssistantView, ConversationView, Message } from '../../conversation.ts';
 import { ago, item, NOW } from '../../derive/fixtures.ts';
 import { setLanguage } from '../../i18n/i18n.ts';
 import { seenAtMount } from '../../kit/pop/toast.tsx';
@@ -16,7 +16,7 @@ import { HablarView } from './HablarView.tsx';
 
 // Hablar as a person meets it: the conversation on two lanes, the branch of items a request
 // produced, a question to answer in place, a long reply folded, the composer, «Lo que salió», the
-// secretary away, and no secretary at all.
+// assistant away, and no assistant at all.
 
 let seq = 0;
 function say(o: Partial<Message> & { author: Message['author'] }): Message {
@@ -62,13 +62,13 @@ const yours: Pending = {
   ],
   blocks: [],
   queues: [],
-  secretary: null,
+  assistant: null,
 };
 
 const conversation = (o: Partial<ConversationView> = {}): ConversationView => ({
   messages: [],
   more: false,
-  secretary: LISTENING,
+  assistant: LISTENING,
   waiting: { count: 0, since: null },
   ...o,
 });
@@ -109,9 +109,9 @@ function server(view: ConversationView, o: { failures?: number; hold?: Promise<v
         );
         return json({ ...view, messages: view.messages.filter((m) => turns.has(m.root)) });
       }
-      if (path.endsWith('/secretary')) return json({ secretary: view.secretary });
+      if (path.endsWith('/assistant')) return json({ assistant: view.assistant });
       if (path.endsWith('/agent-prompt'))
-        return json({ kind: 'secretary', prompt: 'Eres el secretario de este proyecto.' });
+        return json({ kind: 'assistant', prompt: 'Eres el asistente de este proyecto.' });
       return json({ error: { code: 'not_found' } }, 404);
     }
     const body =
@@ -144,17 +144,17 @@ afterEach(() => {
   setLanguage('en');
 });
 
-// The secretary as the desk holds it (`app.secretary`, one read for every screen): the fixture's
+// The assistant as the desk holds it (`app.assistant`, one read for every screen): the fixture's
 // state, with its messages waiting counted as the server counts them.
-const secretaryOf = (view: ConversationView): SecretaryView | null =>
-  view.secretary && {
-    ...view.secretary,
+const assistantOf = (view: ConversationView): AssistantView | null =>
+  view.assistant && {
+    ...view.assistant,
     waiting: { ...view.waiting, messages: view.waiting.count, notes: 0, reports: 0 },
   };
 
 async function open(view: ConversationView, app: Partial<App> = {}, route = {}) {
   const calls = server(view);
-  const value = testApp({ now: NOW, secretary: secretaryOf(view), ...app });
+  const value = testApp({ now: NOW, assistant: assistantOf(view), ...app });
   page = mount(
     <AppTestProvider value={value}>
       <HablarView {...route} />
@@ -171,7 +171,7 @@ const all = (root: HTMLElement, selector: string) => [
 ];
 const text = (el: Element | null | undefined) => el?.textContent?.replace(/\s+/g, ' ').trim();
 
-// A request: what the person said, what the secretary answered, and the items it linked.
+// A request: what the person said, what the assistant answered, and the items it linked.
 const request = (links: string[] = ['CAM-12', 'CAM-13']) => [
   say({
     id: 1,
@@ -182,7 +182,7 @@ const request = (links: string[] = ['CAM-12', 'CAM-13']) => [
   }),
   say({
     id: 2,
-    author: 'secretary',
+    author: 'assistant',
     replyTo: 1,
     root: 1,
     kind: 'request',
@@ -213,19 +213,19 @@ const asking = item({
 });
 
 describe('the conversation on the two lanes', () => {
-  it('puts what you said on your lane and the secretary on its own, the secretary’s lane named first', async () => {
+  it('puts what you said on your lane and the assistant on its own, the assistant’s lane named first', async () => {
     const { root } = await open(conversation({ messages: request() }));
 
     const rows = all(root, '.hb-row');
-    expect(rows.map((row) => (row.classList.contains('you') ? 'you' : 'secretary'))).toEqual([
+    expect(rows.map((row) => (row.classList.contains('you') ? 'you' : 'assistant'))).toEqual([
       'you',
-      'secretary',
+      'assistant',
     ]);
     expect(rows[0]?.style.getPropertyValue('--x')).toBe('40.5px');
     expect(rows[1]?.style.getPropertyValue('--x')).toBe('16.5px');
     expect(q(rows[0] as HTMLElement, '.nd')).not.toBeNull();
     expect(text(rows[0])).toContain('El botón Aprobar queda tapado en el celu');
-    expect(text(rows[1])).toContain('secretario');
+    expect(text(rows[1])).toContain('asistente');
     expect(text(rows[1])).toContain('Lo anoté en Cambios');
     const heads = all(root, '.lane-head span').map((span) => text(span));
     expect(heads).toEqual(['sec', 'tú']);
@@ -269,7 +269,7 @@ describe('the conversation on the two lanes', () => {
       ],
       blocks: [],
       queues: [],
-      secretary: null,
+      assistant: null,
     };
     const { root } = await open(conversation(), { pending: waiting, openItem, go });
 
@@ -319,16 +319,16 @@ describe('the conversation as a thread in time', () => {
     say({ id: 3, author: 'person', text: '¿Y los reintentos con backoff?', kind: 'consultation' }),
     say({
       id: 4,
-      author: 'secretary',
+      author: 'assistant',
       replyTo: 3,
       root: 3,
       kind: 'consultation',
       text: 'Conviene, con tope.',
     }),
-    // The secretary's news about the first request, said later with --reply-to.
+    // The assistant's news about the first request, said later with --reply-to.
     say({
       id: 5,
-      author: 'secretary',
+      author: 'assistant',
       replyTo: 1,
       root: 1,
       kind: 'request',
@@ -338,7 +338,7 @@ describe('the conversation as a thread in time', () => {
     // And news of its own, with no message it answers.
     say({
       id: 6,
-      author: 'secretary',
+      author: 'assistant',
       links: ['CAM-13'],
       text: 'CAM-13 también espera tu revisión.',
     }),
@@ -373,13 +373,13 @@ describe('the conversation as a thread in time', () => {
     ]);
   });
 
-  // U1 (field study 4): the chip that corrects a turn's kind sat on the secretary's answer once it
+  // U1 (field study 4): the chip that corrects a turn's kind sat on the assistant's answer once it
   // had answered, so it read as the answer's own. It is on what the person said, always.
-  it('keeps the kind label on the person’s own message, never on the secretary’s reply', async () => {
+  it('keeps the kind label on the person’s own message, never on the assistant’s reply', async () => {
     const { root } = await open(conversation({ messages: thread() }), { all: [working, queued] });
 
     expect(all(root, '.hb-row.you .hb-kind')).toHaveLength(2);
-    expect(all(root, '.hb-row.secretary .hb-kind')).toHaveLength(0);
+    expect(all(root, '.hb-row.assistant .hb-kind')).toHaveLength(0);
   });
 
   it('shows an agent’s question at the foot of the conversation, below what was said after it', async () => {
@@ -415,17 +415,17 @@ describe('the conversation as a thread in time', () => {
     const chose = q(root, '.hb-row.you .hb-chose') as HTMLElement;
     expect(text(chose)).toContain('Elegiste: Celular, tablet y escritorio');
     expect(text(chose)).toContain('CAM-14');
-    // A trace is no message waiting for the secretary.
+    // A trace is no message waiting for the assistant.
     expect(q(root, '.hb-thinking')).toBeNull();
   });
 });
 
-describe('a question of the secretary', () => {
+describe('a question of the assistant', () => {
   const question = () => [
     say({ id: 1, author: 'person', text: '¿no estaría bueno un jefe en el piso 3?' }),
     say({
       id: 2,
-      author: 'secretary',
+      author: 'assistant',
       replyTo: 1,
       root: 1,
       text: '¿Qué hago con esto?',
@@ -434,10 +434,10 @@ describe('a question of the secretary', () => {
     }),
   ];
 
-  it('comes with buttons, the recommended one marked, and a tap goes back to the secretary', async () => {
+  it('comes with buttons, the recommended one marked, and a tap goes back to the assistant', async () => {
     const { root, calls } = await open(conversation({ messages: question() }));
 
-    const options = all(root, '.hb-row.secretary .hb-opt');
+    const options = all(root, '.hb-row.assistant .hb-opt');
     expect(options.map((option) => text(option))).toEqual([
       'Anotarlorecomendada',
       'Dejarlo como idea',
@@ -454,7 +454,7 @@ describe('a question of the secretary', () => {
     const { root } = await open(conversation({ messages: question() }));
 
     // A fieldset is a group, named here by the question.
-    const group = q(root, '.hb-row.secretary fieldset') as HTMLElement;
+    const group = q(root, '.hb-row.assistant fieldset') as HTMLElement;
     expect(group).not.toBeNull();
     expect(group.getAttribute('aria-label')).toContain('¿Qué hago con esto?');
     expect(all(group, '.hb-opt')).toHaveLength(2);
@@ -475,7 +475,7 @@ describe('a question of the secretary', () => {
 
     expect(q(root, '.hb-opt')).toBeNull();
     expect(text(q(root, '.hb-chose'))).toContain('Elegiste: Dejarlo como idea');
-    // It is waiting for the secretary, as any message of yours.
+    // It is waiting for the assistant, as any message of yours.
     expect(q(root, '.hb-thinking')).not.toBeNull();
   });
 });
@@ -487,7 +487,7 @@ describe('a card that sends an item back', () => {
     say({ id: 1, author: 'person', text: 'cambié de idea: déjalo en 404' }),
     say({
       id: 2,
-      author: 'secretary',
+      author: 'assistant',
       replyTo: 1,
       root: 1,
       text: '¿Devuelvo CAM-7 con tu cambio?',
@@ -503,7 +503,7 @@ describe('a card that sends an item back', () => {
   ];
 
   // What the first button does is said by Otea from the stored action, never by the label the
-  // secretary gave it: a label written under an injected instruction cannot mislead.
+  // assistant gave it: a label written under an injected instruction cannot mislead.
   it('says what the first button does in Otea’s own words, from the action and not its label', async () => {
     const { root } = await open(
       conversation({
@@ -511,7 +511,7 @@ describe('a card that sends an item back', () => {
           say({ id: 1, author: 'person', text: 'cambié de idea' }),
           say({
             id: 2,
-            author: 'secretary',
+            author: 'assistant',
             replyTo: 1,
             root: 1,
             text: '¿Seguimos?',
@@ -525,13 +525,13 @@ describe('a card that sends an item back', () => {
     expect(text(q(root, '.hb-does'))).toBe('Devuelve CAM-7 a Hacerlo con esta nota');
   });
 
-  it('shows the note it goes back with, taps once to send it back, and never offers to leave the decision to the secretary', async () => {
+  it('shows the note it goes back with, taps once to send it back, and never offers to leave the decision to the assistant', async () => {
     const { root, calls } = await open(conversation({ messages: card() }));
 
     expect(text(q(root, '.hb-note'))).toBe('Que dé 404 y solo cambie el mensaje.');
     expect(buttonNamed(root, 'Decide tú')).toBeUndefined();
 
-    await press(all(root, '.hb-row.secretary .hb-opt')[0]);
+    await press(all(root, '.hb-row.assistant .hb-opt')[0]);
 
     expect(calls.map(({ method, url, body }) => [method, url, body])).toEqual([
       ['POST', '/api/conversation/messages/2/answer', { option: 1 }],
@@ -553,13 +553,13 @@ describe('a card that sends an item back', () => {
   });
 });
 
-// U8 (field study 4, the red-team persona): what the desk shows about what the secretary asks.
-describe('a question that needs your words, a question that is over, a secretary that is silent', () => {
+// U8 (field study 4, the red-team persona): what the desk shows about what the assistant asks.
+describe('a question that needs your words, a question that is over, an assistant that is silent', () => {
   const asked = (extra: Partial<Message> = {}) => [
     say({ id: 1, author: 'person', text: '¿qué hago con la cancha?' }),
     say({
       id: 2,
-      author: 'secretary',
+      author: 'assistant',
       replyTo: 1,
       root: 1,
       text: '¿Qué hago con la cancha?',
@@ -572,7 +572,7 @@ describe('a question that needs your words, a question that is over, a secretary
   it('opens the text box for an option that needs your words, and sends them with the option', async () => {
     const { root, calls } = await open(conversation({ messages: asked() }));
 
-    await press(all(root, '.hb-row.secretary .hb-opt')[1]);
+    await press(all(root, '.hb-row.assistant .hb-opt')[1]);
     // Nothing was sent by the tap.
     expect(calls).toHaveLength(0);
     const field = q(root, '.hb-own textarea') as HTMLTextAreaElement;
@@ -587,12 +587,12 @@ describe('a question that needs your words, a question that is over, a secretary
   it('answers at once an option that needs no words', async () => {
     const { root, calls } = await open(conversation({ messages: asked() }));
 
-    await press(all(root, '.hb-row.secretary .hb-opt')[0]);
+    await press(all(root, '.hb-row.assistant .hb-opt')[0]);
 
     expect(calls.map(({ body }) => body)).toEqual([{ option: 1 }]);
   });
 
-  it('has no buttons once the secretary took the question back, and says so', async () => {
+  it('has no buttons once the assistant took the question back, and says so', async () => {
     const { root } = await open(
       conversation({
         messages: asked({ closed: { at: ago(1), why: 'withdrawn' } }),
@@ -603,20 +603,20 @@ describe('a question that needs your words, a question that is over, a secretary
     expect(text(q(root, '.hb-closed'))).toContain('retiró esta pregunta');
   });
 
-  it('marks a message of the secretary that Otea could not tie to its session', async () => {
+  it('marks a message of the assistant that Otea could not tie to its session', async () => {
     const { root } = await open(
       conversation({
         messages: [
           say({ id: 1, author: 'person', text: 'hola' }),
           say({
             id: 2,
-            author: 'secretary',
+            author: 'assistant',
             replyTo: 1,
             root: 1,
             text: 'Aprobé todo.',
             unverified: true,
           }),
-          say({ id: 3, author: 'secretary', replyTo: 1, root: 1, text: 'Hecho.' }),
+          say({ id: 3, author: 'assistant', replyTo: 1, root: 1, text: 'Hecho.' }),
         ],
       }),
     );
@@ -635,7 +635,7 @@ describe('a question that needs your words, a question that is over, a secretary
           say({ id: 1, author: 'person', text: 'hola' }),
           say({
             id: 2,
-            author: 'secretary',
+            author: 'assistant',
             replyTo: 1,
             root: 1,
             text: 'Aprobé todo.',
@@ -665,7 +665,7 @@ describe('a one-paragraph reply', () => {
       conversation({
         messages: [
           say({ id: 1, author: 'person' }),
-          say({ id: 2, author: 'secretary', replyTo: 1, root: 1, text: paragraph }),
+          say({ id: 2, author: 'assistant', replyTo: 1, root: 1, text: paragraph }),
         ],
       }),
     );
@@ -678,12 +678,12 @@ describe('a one-paragraph reply', () => {
 });
 
 describe('a kind you corrected', () => {
-  it('stays in «Lo que salió» with no items yet, saying the secretary is taking it', async () => {
+  it('stays in «Lo que salió» with no items yet, saying the assistant is taking it', async () => {
     const messages = [
       say({ id: 1, author: 'person', text: '¿Vale la pena exportar a Markdown?' }),
       say({
         id: 2,
-        author: 'secretary',
+        author: 'assistant',
         replyTo: 1,
         root: 1,
         kind: 'request',
@@ -696,7 +696,7 @@ describe('a kind you corrected', () => {
 
     const card = q(root, '.hb-card') as HTMLElement;
     expect(text(card)).toContain('¿Vale la pena exportar a Markdown?');
-    expect(text(q(card, '.hb-taking'))).toBe('el secretario lo está tomando');
+    expect(text(q(card, '.hb-taking'))).toBe('tu asistente lo está tomando');
   });
 });
 
@@ -715,7 +715,7 @@ describe('a long reply', () => {
       conversation({
         messages: [
           say({ id: 1, author: 'person' }),
-          say({ id: 2, author: 'secretary', replyTo: 1, root: 1, text: long }),
+          say({ id: 2, author: 'assistant', replyTo: 1, root: 1, text: long }),
         ],
       }),
     );
@@ -734,7 +734,7 @@ describe('a long reply', () => {
     expect(text(toggle)).toBe('ver menos');
   });
 
-  // Field study 3 (S4): no subagents, so the secretary pastes the text of each session to open. It
+  // Field study 3 (S4): no subagents, so the assistant pastes the text of each session to open. It
   // was one plain text with no Copy; each is now a numbered block with its own button, in view.
   it('draws a text to paste as a numbered block with a Copy button, never folded', async () => {
     const written: string[] = [];
@@ -749,7 +749,7 @@ describe('a long reply', () => {
           say({ id: 1, author: 'person' }),
           say({
             id: 2,
-            author: 'secretary',
+            author: 'assistant',
             replyTo: 1,
             root: 1,
             text: [
@@ -779,16 +779,16 @@ describe('a long reply', () => {
     expect(written).toEqual(['Eres el refinador.']);
   });
 
-  // The badge is the number the secretary gave the session, whatever its place in the message; a
+  // The badge is the number the assistant gave the session, whatever its place in the message; a
   // caption with only the number says what the block is without repeating it.
-  it("shows the secretary's own number on the badge, and a generic label for a bare one", async () => {
+  it("shows the assistant's own number on the badge, and a generic label for a bare one", async () => {
     const { root } = await open(
       conversation({
         messages: [
           say({ id: 1, author: 'person' }),
           say({
             id: 2,
-            author: 'secretary',
+            author: 'assistant',
             replyTo: 1,
             root: 1,
             text: [
@@ -820,7 +820,7 @@ describe('a long reply', () => {
           say({ id: 1, author: 'person' }),
           say({
             id: 2,
-            author: 'secretary',
+            author: 'assistant',
             replyTo: 1,
             root: 1,
             text: 'Corre esto y dime qué sale:\n```sh\nnpm test\n```',
@@ -838,7 +838,7 @@ describe('a long reply', () => {
       conversation({
         messages: [
           say({ id: 1, author: 'person' }),
-          say({ id: 2, author: 'secretary', replyTo: 1, root: 1, text: 'Hecho.\nUna nota más.' }),
+          say({ id: 2, author: 'assistant', replyTo: 1, root: 1, text: 'Hecho.\nUna nota más.' }),
         ],
       }),
     );
@@ -846,14 +846,14 @@ describe('a long reply', () => {
     expect(text(q(root, '.hb-more-open'))).toBe('Una nota más.');
   });
 
-  // The secretary's rule (its role text): the conclusion, then at most 3 short lines. A reply that
+  // The assistant's rule (its role text): the conclusion, then at most 3 short lines. A reply that
   // keeps it shows whole; one longer than that folds behind «ver más».
   const rule = ['Listo.', 'Primera.', 'Segunda.', 'Tercera.'];
   const reply = (lines: string[]) =>
     conversation({
       messages: [
         say({ id: 1, author: 'person' }),
-        say({ id: 2, author: 'secretary', replyTo: 1, root: 1, text: lines.join('\n') }),
+        say({ id: 2, author: 'assistant', replyTo: 1, root: 1, text: lines.join('\n') }),
       ],
     });
 
@@ -870,7 +870,7 @@ describe('a long reply', () => {
   });
 });
 
-describe('the secretary thinking', () => {
+describe('the assistant thinking', () => {
   const read = [
     say({
       id: 1,
@@ -885,14 +885,14 @@ describe('the secretary thinking', () => {
   const working = { name: 'quill', state: 'connected' as const, since: null, pending: 0 };
 
   it('says «leído · pensando…» on its lane while it holds a turn it read and has not answered', async () => {
-    const { root } = await open(conversation({ messages: read, secretary: working }));
+    const { root } = await open(conversation({ messages: read, assistant: working }));
     expect(text(q(root, '.hb-thinking'))).toBe('leído · pensando…');
-    expect(q(root, '.nd.secretary[data-busy]')).not.toBeNull();
+    expect(q(root, '.nd.assistant[data-busy]')).not.toBeNull();
   });
 
-  // U6 (field study 4): «escuchando» and «leído · pensando…» for twenty minutes. A secretary in its
+  // U6 (field study 4): «escuchando» and «leído · pensando…» for twenty minutes. An assistant in its
   // wait holds nothing: its wait brings the message back, and if it has not, the desk says so.
-  it('never says «pensando…» to a secretary that listens, and says it has not answered once it stays', async () => {
+  it('never says «pensando…» to an assistant that listens, and says it has not answered once it stays', async () => {
     const listening = { name: 'quill', state: 'listening' as const, since: null, pending: 0 };
     const { root } = await open(
       conversation({
@@ -906,19 +906,19 @@ describe('the secretary thinking', () => {
             text: '¿Tailscale o el relay?',
           }),
         ],
-        secretary: listening,
+        assistant: listening,
       }),
     );
     expect(q(root, '.hb-thinking .bar')).toBeNull();
-    expect(text(q(root, '.hb-silent'))).toContain('El secretario no ha respondido aún.');
+    expect(text(q(root, '.hb-silent'))).toContain('Tu asistente no ha respondido aún.');
   });
 
-  // The secretary's wait returned the message: the person sees it arrived at once, before it is read.
+  // The assistant's wait returned the message: the person sees it arrived at once, before it is read.
   it('says it at once when the wait only heard the message, without calling it waiting', async () => {
     const { root } = await open(
       conversation({
         messages: [say({ id: 1, author: 'person', delivery: 'pending', heardAt: ago(0) })],
-        secretary: working,
+        assistant: working,
       }),
     );
     expect(text(q(root, '.hb-thinking'))).toBe('leído · pensando…');
@@ -941,7 +941,7 @@ describe('the secretary thinking', () => {
       }),
     );
 
-    expect(text(q(root, '.hb-silent'))).toContain('El secretario no ha respondido aún.');
+    expect(text(q(root, '.hb-silent'))).toContain('Tu asistente no ha respondido aún.');
     expect(text(q(root, '.hb-silent'))).toContain('Tu mensaje se guarda');
     expect(q(root, '.hb-thinking .bar')).toBeNull();
   });
@@ -950,7 +950,7 @@ describe('the secretary thinking', () => {
     const { root } = await open(
       conversation({
         messages: read,
-        secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 1 },
+        assistant: { name: 'quill', state: 'offline', since: ago(240), pending: 1 },
       }),
     );
     expect(q(root, '.hb-thinking')).toBeNull();
@@ -962,19 +962,19 @@ describe('the secretary thinking', () => {
     const { root } = await open(
       conversation({
         messages: read,
-        secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 1 },
+        assistant: { name: 'quill', state: 'offline', since: ago(240), pending: 1 },
       }),
     );
     const away = q(root, '.hb-away') as HTMLElement;
     await press(q(away, '.hb-away-toggle'));
-    expect(text(away)).toContain('otea wait --secretary --as quill');
-    expect(text(away)).toContain('otea prompt --role secretary --as quill');
+    expect(text(away)).toContain('otea wait --assistant --as quill');
+    expect(text(away)).toContain('otea prompt --role assistant --as quill');
   });
 
   // H3 (field study 4, U2 and U7 on the phone): the notice gave a terminal command and no way to
   // copy what restarts it. The restart is on the computer: say so plainly, give the text to copy
   // (the one the first run has), keep the commands as the second way, and say the messages wait.
-  it('says the restart is on the computer, copies the secretary text, and keeps the commands behind a fold', async () => {
+  it('says the restart is on the computer, copies the assistant text, and keeps the commands behind a fold', async () => {
     const written: string[] = [];
     vi.stubGlobal('navigator', {
       ...navigator,
@@ -983,7 +983,7 @@ describe('the secretary thinking', () => {
     const { root } = await open(
       conversation({
         messages: read,
-        secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 1 },
+        assistant: { name: 'quill', state: 'offline', since: ago(240), pending: 1 },
         waiting: { count: 1, since: ago(120) },
       }),
     );
@@ -991,7 +991,7 @@ describe('the secretary thinking', () => {
 
     // The line has «Copiar» (the text that brings it back) without opening anything.
     await press(buttonNamed(away, 'Copiar'));
-    expect(written).toEqual(['Eres el secretario de este proyecto.']);
+    expect(written).toEqual(['Eres el asistente de este proyecto.']);
     // Where it restarts, and the commands as the second way, folded: words first.
     expect(text(away)).not.toContain('en tu equipo');
     await press(q(away, '.hb-away-toggle'));
@@ -1002,7 +1002,7 @@ describe('the secretary thinking', () => {
 
   // Field study 6 (D-e1d814): a button that only changes its own words is not heard to have worked.
   // The copy is said in a live region beside it.
-  it('says in a live region that the secretary text was copied', async () => {
+  it('says in a live region that the assistant text was copied', async () => {
     vi.stubGlobal('navigator', {
       ...navigator,
       clipboard: { writeText: async () => undefined },
@@ -1010,7 +1010,7 @@ describe('the secretary thinking', () => {
     const { root } = await open(
       conversation({
         messages: read,
-        secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 1 },
+        assistant: { name: 'quill', state: 'offline', since: ago(240), pending: 1 },
         waiting: { count: 1, since: ago(120) },
       }),
     );
@@ -1022,13 +1022,13 @@ describe('the secretary thinking', () => {
     expect(say()).toBe('Copiado');
   });
 
-  // Field study 4 (design): a card for the secretary, another for what waits and a sliver of chat.
+  // Field study 4 (design): a card for the assistant, another for what waits and a sliver of chat.
   // The two are one quiet line over the lanes, on the desk and on the phone alike: a dot, one
   // sentence, «Copiar», and what waits for you; a tap opens the rest under it.
   it('is one quiet line on the desk and the phone, holding «Te espera» under it', async () => {
     const view = conversation({
       messages: read,
-      secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 2 },
+      assistant: { name: 'quill', state: 'offline', since: ago(240), pending: 2 },
       waiting: { count: 2, since: ago(120) },
     });
     for (const phone of [false, true]) {
@@ -1037,7 +1037,7 @@ describe('the secretary thinking', () => {
       const toggle = q<HTMLButtonElement>(away, '.hb-away-toggle') as HTMLButtonElement;
       expect(q(root, '.hb-te')).toBeNull();
       expect(text(q(away, '.hb-away-full'))).toBe(
-        'Tu secretario está desconectado · 2 mensajes esperando',
+        'Tu asistente está desconectado · 2 mensajes esperando',
       );
       expect(toggle.getAttribute('aria-expanded')).toBe('false');
       expect(buttonNamed(away, 'Copiar')).toBeDefined();
@@ -1051,15 +1051,15 @@ describe('the secretary thinking', () => {
     }
   });
 
-  // Field study 5 (D2): a phone with no PC and the secretary away showed the pill, a card saying so,
-  // «sol está conectado» (the last it had kept, for a PC out of reach), the secretary's strip and a
+  // Field study 5 (D2): a phone with no PC and the assistant away showed the pill, a card saying so,
+  // «sol está conectado» (the last it had kept, for a PC out of reach), the assistant's strip and a
   // footnote under the composer, and «queda en cola» beside «podrás escribir cuando vuelva». The
   // offline line over the page (the app's, not this view's) says it; nothing here repeats it or
   // says what the phone cannot know.
-  it('on a phone without the PC says nothing about the secretary, and nothing twice', async () => {
+  it('on a phone without the PC says nothing about the assistant, and nothing twice', async () => {
     const view = conversation({
       messages: read,
-      secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 2 },
+      assistant: { name: 'quill', state: 'offline', since: ago(240), pending: 2 },
       waiting: { count: 2, since: ago(120) },
     });
     const offline = { offline: true, syncedAt: NOW };
@@ -1082,10 +1082,10 @@ describe('the secretary thinking', () => {
     expect(text(q(desk.root, '.hb-note'))).toContain('podrás escribir cuando vuelva');
   });
 
-  it('says the secretary is connected only while the PC answers, on the phone', async () => {
+  it('says the assistant is connected only while the PC answers, on the phone', async () => {
     const view = conversation({
       messages: read,
-      secretary: { name: 'quill', state: 'connected', since: null, pending: 0 },
+      assistant: { name: 'quill', state: 'connected', since: null, pending: 0 },
     });
     const live = await open(view, { phone: true });
     expect(text(q(live.root, '.hb-status'))).toContain('quill está conectado');
@@ -1094,12 +1094,12 @@ describe('the secretary thinking', () => {
     expect(q(kept.root, '.hb-status')).toBeNull();
   });
 
-  // R2 (field study 4, V4): the desk told a person already at the computer that the secretary
+  // R2 (field study 4, V4): the desk told a person already at the computer that the assistant
   // «se reinicia en tu equipo, no desde aquí». That is for the phone; the desk says where to paste.
-  it('says where the secretary restarts in words that fit where you are', async () => {
+  it('says where the assistant restarts in words that fit where you are', async () => {
     const view = conversation({
       messages: read,
-      secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 2 },
+      assistant: { name: 'quill', state: 'offline', since: ago(240), pending: 2 },
       waiting: { count: 2, since: ago(120) },
     });
     const how = async (phone: boolean) => {
@@ -1118,7 +1118,7 @@ describe('the secretary thinking', () => {
     expect(desk).toContain('pégale este texto');
   });
 
-  it('is the line «Te espera» alone while the secretary is there', async () => {
+  it('is the line «Te espera» alone while the assistant is there', async () => {
     const { root } = await open(conversation({ messages: read }), { pending: yours });
     expect(q(root, '.hb-away')).toBeNull();
     expect(q(root, '.hb-te')).not.toBeNull();
@@ -1323,7 +1323,7 @@ describe('correcting what a turn is', () => {
       say({ id: 3, author: 'person', text: '¿Un tablero por cliente?', kind: 'consultation' }),
       say({
         id: 4,
-        author: 'secretary',
+        author: 'assistant',
         replyTo: 3,
         root: 3,
         kind: 'consultation',
@@ -1346,12 +1346,12 @@ describe('correcting what a turn is', () => {
   });
 });
 
-// R2 (field study 4, U3): a turn the secretary answered without classifying it stayed out of «Lo que
+// R2 (field study 4, U3): a turn the assistant answered without classifying it stayed out of «Lo que
 // salió»; it shows there as «sin clasificar», titled by what the person said, and one tap says what it is.
 describe('a turn nobody classified', () => {
   const unsorted = () => [
     say({ id: 1, author: 'person', text: 'Dime cuánto tarda el envío a Mendoza' }),
-    say({ id: 2, author: 'secretary', replyTo: 1, root: 1, text: 'Dos días hábiles.' }),
+    say({ id: 2, author: 'assistant', replyTo: 1, root: 1, text: 'Dos días hábiles.' }),
   ];
 
   it('is in «Lo que salió» with its words, and a tap on «pedido» marks it', async () => {
@@ -1375,40 +1375,40 @@ describe('a turn nobody classified', () => {
   });
 });
 
-describe('the secretary away, or never there', () => {
+describe('the assistant away, or never there', () => {
   it('says that it is away, how many messages wait, and since when', async () => {
     const { root } = await open(
       conversation({
         messages: [say({ id: 1, author: 'person', delivery: 'pending' })],
-        secretary: { name: 'quill', state: 'offline', since: ago(240), pending: 2 },
+        assistant: { name: 'quill', state: 'offline', since: ago(240), pending: 2 },
         waiting: { count: 2, since: ago(120) },
       }),
     );
     expect(text(q(root, '.hb-away-full'))).toBe(
-      'Tu secretario está desconectado · 2 mensajes esperando',
+      'Tu asistente está desconectado · 2 mensajes esperando',
     );
     // Since when, and that the messages are kept, once the line is opened.
     await press(q(root, '.hb-away-toggle'));
     expect(text(q(root, '.hb-away-since'))).toMatch(
-      /^Tu secretario está desconectado desde .+\. Tus mensajes se guardan hasta que vuelva\./,
+      /^Tu asistente está desconectado desde .+\. Tus mensajes se guardan hasta que vuelva\./,
     );
   });
 
-  // Field study 3: the empty state gave `otea profile --role secretary`, which only declares a role
-  // and brings none of the instructions. What makes an agent a secretary is its text.
-  it('gives the secretary text to copy when the project has none, and still lets you write', async () => {
+  // Field study 3: the empty state gave `otea profile --role assistant`, which only declares a role
+  // and brings none of the instructions. What makes an agent an assistant is its text.
+  it('gives the assistant text to copy when the project has none, and still lets you write', async () => {
     const written: string[] = [];
     vi.stubGlobal('navigator', {
       ...navigator,
       clipboard: { writeText: async (words: string) => void written.push(words) },
     });
-    const { root } = await open(conversation({ secretary: null }));
+    const { root } = await open(conversation({ assistant: null }));
     const none = q(root, '.hb-nosec') as HTMLElement;
     expect(text(none)).toContain('Abre la sesión de un agente y pégale este texto');
-    expect(text(q(none, 'code'))).toBe('otea prompt --role secretary');
+    expect(text(q(none, 'code'))).toBe('otea prompt --role assistant');
     expect(text(none)).not.toContain('otea profile');
-    await press(buttonNamed(none, 'Copiar el texto del secretario'));
-    expect(written).toEqual(['Eres el secretario de este proyecto.']);
+    await press(buttonNamed(none, 'Copiar el texto del asistente'));
+    expect(written).toEqual(['Eres el asistente de este proyecto.']);
     expect(q<HTMLTextAreaElement>(root, '.hb-input textarea')?.disabled).toBe(false);
   });
 
@@ -1416,18 +1416,18 @@ describe('the secretary away, or never there', () => {
   // empty state said, and they stopped there. It says the one step that is left, outside Otea, as
   // three numbered moves in plain words.
   it('explains the one step left as a numbered mini-guide, in plain words', async () => {
-    const { root } = await open(conversation({ secretary: null }));
+    const { root } = await open(conversation({ assistant: null }));
 
     const steps = all(root, '.hb-nosec ol.hb-steps li').map((step) => text(step));
 
     expect(steps).toEqual([
-      'Pulsa «Copiar el texto del secretario».',
+      'Pulsa «Copiar el texto del asistente».',
       'Abre la app de tu agente (Claude Code, Codex, OpenCode…) y empieza una conversación nueva.',
       'Pega el texto y envíalo. Vuelve aquí: ya puedes escribirle.',
     ]);
   });
 
-  it('says nothing about a secretary that is there and has not been spoken to yet', async () => {
+  it('says nothing about an assistant that is there and has not been spoken to yet', async () => {
     const { root } = await open(conversation());
     expect(q(root, '.hb-nosec')).toBeNull();
     expect(q(root, '.hb-away')).toBeNull();
@@ -1441,7 +1441,7 @@ describe('«Lo que salió»', () => {
     say({ id: 3, author: 'person', text: '¿Un tablero por cliente?', kind: 'consultation' }),
     say({
       id: 4,
-      author: 'secretary',
+      author: 'assistant',
       replyTo: 3,
       root: 3,
       kind: 'consultation',
@@ -1707,7 +1707,7 @@ describe('following the foot after a link to a turn', () => {
       const view = conversation({
         messages: [
           say({ id: 1, author: 'person' }),
-          say({ id: 2, author: 'secretary', root: 1, replyTo: 1 }),
+          say({ id: 2, author: 'assistant', root: 1, replyTo: 1 }),
         ],
       });
       server(view);
@@ -1983,7 +1983,7 @@ describe('Hablar for assistive technology', () => {
       return text(heading);
     });
     expect(names[0]).toMatch(/^tú, /);
-    expect(names[1]).toMatch(/^secretario, /);
+    expect(names[1]).toMatch(/^asistente, /);
   });
 
   it('tells two questions of the same words apart by the item they are about', async () => {
@@ -2013,11 +2013,11 @@ describe('Hablar for assistive technology', () => {
       conversation({
         messages: [
           say({ id: 1, author: 'person' }),
-          say({ id: 2, author: 'secretary', replyTo: 1, root: 1, text: longReply }),
+          say({ id: 2, author: 'assistant', replyTo: 1, root: 1, text: longReply }),
           say({ id: 3, author: 'person', text: 'otra' }),
           say({
             id: 4,
-            author: 'secretary',
+            author: 'assistant',
             replyTo: 3,
             root: 3,
             text: `Otra respuesta.\n${longReply}`,
@@ -2035,12 +2035,12 @@ describe('Hablar for assistive technology', () => {
     expect(toggles.map((toggle) => text(toggle))).toEqual(['ver más', 'ver más']);
   });
 
-  // The secretary going away and coming back is said, once and politely, by a status the page keeps.
-  it('keeps one polite status that says whether the secretary is there', async () => {
+  // The assistant going away and coming back is said, once and politely, by a status the page keeps.
+  it('keeps one polite status that says whether the assistant is there', async () => {
     const away = await open(
       conversation({
         messages: request(),
-        secretary: { name: 'quill', state: 'offline', since: ago(5), pending: 0 },
+        assistant: { name: 'quill', state: 'offline', since: ago(5), pending: 0 },
       }),
     );
     const status = (root: HTMLElement) =>

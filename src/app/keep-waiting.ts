@@ -13,16 +13,16 @@ export function keepWaitingCommand(agent: string, collection?: string, unclaimed
   return `otea wait --turn agent${unclaimed ? ' --unclaimed' : ''}${on(collection)} --as ${agent}`;
 }
 
-// The secretary's wait (otea wait --secretary), as it runs it.
-export function secretaryWaitCommand(agent: string): string {
-  return `otea wait --secretary --as ${agent}`;
+// The assistant's wait (otea wait --assistant), as it runs it.
+export function assistantWaitCommand(agent: string): string {
+  return `otea wait --assistant --as ${agent}`;
 }
 
-// What otea wait --secretary ends with once it woke: act on what woke it, then wait again.
-export function secretaryWaitAgainLine(agent: string, channel: AgentChannel): string {
-  const shell = secretaryWaitCommand(agent);
+// What otea wait --assistant ends with once it woke: act on what woke it, then wait again.
+export function assistantWaitAgainLine(agent: string, channel: AgentChannel): string {
+  const shell = assistantWaitCommand(agent);
   return channel === 'mcp'
-    ? `Then wait again in a background shell, which keeps your chat free: $ ${shell}. Without a shell, wait { secretary: true } holds your chat until it returns.`
+    ? `Then wait again in a background shell, which keeps your chat free: $ ${shell}. Without a shell, wait { assistant: true } holds your chat until it returns.`
     : `Then wait again: ${shell} in the background if you can.`;
 }
 

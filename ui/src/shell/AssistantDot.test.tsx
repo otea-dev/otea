@@ -1,14 +1,14 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { textOf } from '../html-text.ts';
-import { SecretaryDot } from './Rail.tsx';
+import { AssistantDot } from './Rail.tsx';
 
-// The secretary's state on its row of the rail is a colour; a screen reader gets it in words.
-describe('the secretary’s dot', () => {
+// The assistant's state on its row of the rail is a colour; a screen reader gets it in words.
+describe('the assistant’s dot', () => {
   const state = (name: 'listening' | 'connected' | 'offline') =>
     textOf(
       renderToStaticMarkup(
-        <SecretaryDot status={{ name: 'quill', state: name, since: null, pending: 0 }} />,
+        <AssistantDot status={{ name: 'quill', state: name, since: null, pending: 0 }} />,
       ),
     );
 
@@ -18,7 +18,7 @@ describe('the secretary’s dot', () => {
     expect(state('offline')).toBe('quill is offline');
   });
 
-  it('is nothing while the project has no secretary', () => {
-    expect(renderToStaticMarkup(<SecretaryDot status={null} />)).toBe('');
+  it('is nothing while the project has no assistant', () => {
+    expect(renderToStaticMarkup(<AssistantDot status={null} />)).toBe('');
   });
 });

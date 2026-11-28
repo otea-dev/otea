@@ -551,7 +551,7 @@ export function TriCard({
   const waitId = `tc-wait-${item.id}`;
   const pickId = `tc-pick-${item.id}`;
   // What every page that offers Aprobar says beside it (the attached diff is not what lands, what
-  // the secretary advised), asked of the card that is on top and can approve.
+  // the assistant advised), asked of the card that is on top and can approve.
   const notices = useReviewNotices(
     { id: item.id, updatedAt: view?.updatedAt ?? item.updatedAt, advice: view?.advice },
     !under && !!forward,

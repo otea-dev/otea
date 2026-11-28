@@ -31,7 +31,7 @@ describe('what Otea says to an agent in English', () => {
 
   it('names them in the role texts and the guide', () => {
     const texts = [
-      ...(['secretary', 'worker', 'refiner'] as const).map((role) =>
+      ...(['assistant', 'worker', 'refiner'] as const).map((role) =>
         rolePrompt(role, 'en', { board: 'Changes', name: 'ana' }),
       ),
       startPrompt('en'),
@@ -44,8 +44,8 @@ describe('what Otea says to an agent in English', () => {
   });
 
   it('keeps the Spanish names in the Spanish role texts', () => {
-    expect(rolePrompt('secretary', 'es', {})).toContain('Hablar');
-    expect(rolePrompt('secretary', 'es', {})).toContain('Bandeja');
+    expect(rolePrompt('assistant', 'es', {})).toContain('Hablar');
+    expect(rolePrompt('assistant', 'es', {})).toContain('Bandeja');
   });
 
   it('names them in what the commands answer', async () => {

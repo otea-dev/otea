@@ -423,7 +423,7 @@ export function watchOwner(
     alive?: (pid: number) => boolean;
     everyMs?: number;
     // List the processes at once, not on the first check: for a command that must know its
-    // session soon (the secretary's wait), at the cost of one listing even when it ends at once.
+    // session soon (the assistant's wait), at the cost of one listing even when it ends at once.
     early?: boolean;
   } = {},
 ): OwnerWatch {

@@ -10,7 +10,7 @@ import type { SyncState } from './sync-state.ts';
 // it is one line with all of it. On the phone it is one quiet line, a dot, the word, the hour of the
 // last sync and Reintentar, and a tap on it opens the cause and what still works: the conversation
 // keeps the pane (field study 5: a card with the question, the wifi, the queue and a button took a
-// third of a phone, and said the same as the pill, the secretary's line and the composer).
+// third of a phone, and said the same as the pill, the assistant's line and the composer).
 
 // The time of the last sync: its hour alone when it was today, with its day otherwise.
 export function syncedTime(at: number, now: number, lang: string): string {

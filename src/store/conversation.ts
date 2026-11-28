@@ -50,14 +50,14 @@ export type NewMessage = {
   topic?: string | undefined;
   // Who sent it (the device, or the desk's session), the key it sent it under and a digest of it.
   client?: { scope: string; key: string; digest: string } | undefined;
-  // Already read: what is not the person's for the secretary to answer (and a topic's record).
+  // Already read: what is not the person's for the assistant to answer (and a topic's record).
   read?: boolean;
   // A question with options to tap.
   options?: readonly string[] | undefined;
   recommended?: number | undefined;
   // What the first option does when the person taps it.
   action?: MessageAction | undefined;
-  // The secretary's message that Otea could not tie to the session noted for it.
+  // The assistant's message that Otea could not tie to the session noted for it.
   unverified?: boolean | undefined;
   // The numbers (from 1) of the options that need the person's own words.
   optionText?: readonly number[] | undefined;
@@ -156,8 +156,8 @@ export function messageOfClientKey(
 }
 
 // Sets (or, with the same, keeps) the kind of the turn whose root is `root`, and who set it.
-// `news`: the person changed it, and the secretary has not read that yet (a later setKind by anyone
-// else keeps it until the secretary reads the turn).
+// `news`: the person changed it, and the assistant has not read that yet (a later setKind by anyone
+// else keeps it until the assistant reads the turn).
 export function setKind(
   db: DatabaseSync,
   root: number,
@@ -170,7 +170,7 @@ export function setKind(
   ).run(kind, by, news ? 1 : 0, root);
 }
 
-// The turns whose kind the person changed and the secretary has not read yet, oldest first: the root
+// The turns whose kind the person changed and the assistant has not read yet, oldest first: the root
 // and the words of the message that began each. `waking`: only those still worth a wake (not the
 // ones already brought back KIND_WAKES times); a read takes them all.
 export function selectKindNews(db: DatabaseSync, waking = false): { root: number; text: string }[] {
@@ -181,13 +181,13 @@ export function selectKindNews(db: DatabaseSync, waking = false): { root: number
     .all() as { root: number; text: string }[];
 }
 
-// The secretary read these turns: their kind is no news any more.
+// The assistant read these turns: their kind is no news any more.
 export function clearKindNews(db: DatabaseSync, roots: readonly number[]): void {
   const clear = db.prepare('UPDATE conversation_messages SET kind_news = 0 WHERE id = ?');
   for (const root of roots) clear.run(root);
 }
 
-// The person's messages the secretary's wait returned and it has not read yet: noted once, the
+// The person's messages the assistant's wait returned and it has not read yet: noted once, the
 // first time, so the desk can say it was heard. The ones this call marked.
 export function markHeard(db: DatabaseSync, at: string): number {
   return Number(
@@ -199,13 +199,13 @@ export function markHeard(db: DatabaseSync, at: string): number {
   );
 }
 
-// How many times a message the secretary read and left unanswered is brought back to its waits.
+// How many times a message the assistant read and left unanswered is brought back to its waits.
 export const OWED_RETURNS = 2;
 // How long a message stays owed: an older one is no wait's business.
 const OWED_FOR_MS = 24 * 60 * 60_000;
 
-// The latest message of the person's the secretary read and has not answered, as selectOwed counts
-// it (no message of the secretary's after it in its turn, nothing made from the turn, not a record
+// The latest message of the person's the assistant read and has not answered, as selectOwed counts
+// it (no message of the assistant's after it in its turn, nothing made from the turn, not a record
 // nor a tap on a card), however many times a wait brought it back: what a say with no --reply-to
 // answers (field study 5, V4). Undefined when there is none, or the latest read message is answered.
 export function selectLatestUnanswered(
@@ -231,8 +231,8 @@ export function selectLatestUnanswered(
   return row;
 }
 
-// The person's messages the secretary read before `readBefore` (an ISO time) and has not answered:
-// no message of the secretary's after it in its turn, nothing made from the turn, and not a record
+// The person's messages the assistant read before `readBefore` (an ISO time) and has not answered:
+// no message of the assistant's after it in its turn, nothing made from the turn, and not a record
 // (a tap on an agent's question, a topic) or a tap on a card that acts by itself. Oldest first.
 export function selectOwed(
   db: DatabaseSync,
@@ -268,14 +268,14 @@ export function bumpOwed(db: DatabaseSync, id: number, at: string): void {
   ).run(at, id);
 }
 
-// A secretary session begins: what the earlier one left unanswered is owed to it again.
+// An assistant session begins: what the earlier one left unanswered is owed to it again.
 export function resetOwed(db: DatabaseSync): void {
   db.prepare(
     "UPDATE conversation_messages SET owed_returns = 0 WHERE author = 'person' AND owed_returns > 0",
   ).run();
 }
 
-// Whether the person has answered this question of the secretary's: a message of theirs that replies
+// Whether the person has answered this question of the assistant's: a message of theirs that replies
 // to it. What else they say, or answer to other questions, leaves it open.
 export function isAnswered(db: DatabaseSync, id: number): boolean {
   return (
@@ -287,7 +287,7 @@ export function isAnswered(db: DatabaseSync, id: number): boolean {
   );
 }
 
-// A wake for a changed kind is returned at most this many times when the secretary does nothing
+// A wake for a changed kind is returned at most this many times when the assistant does nothing
 // about it (the counter kind_news runs 1, 2, then it is let go).
 export const KIND_WAKES = 2;
 
@@ -298,13 +298,13 @@ export function bumpKindNews(db: DatabaseSync, root: number): void {
   ).run(root, KIND_WAKES);
 }
 
-// The secretary's questions with options to tap that the person has not answered (no message of
+// The assistant's questions with options to tap that the person has not answered (no message of
 // theirs replies to it; see isAnswered). Oldest first.
 export function selectOpenQuestions(db: DatabaseSync): Message[] {
   const rows = db
     .prepare(
       `SELECT ${COLUMNS} FROM conversation_messages m
-       WHERE m.author = 'secretary' AND m.options IS NOT NULL AND m.closed_at IS NULL
+       WHERE m.author = 'assistant' AND m.options IS NOT NULL AND m.closed_at IS NULL
          AND NOT EXISTS (
            SELECT 1 FROM conversation_messages p
            WHERE p.author = 'person' AND p.reply_to = m.id)
@@ -314,7 +314,7 @@ export function selectOpenQuestions(db: DatabaseSync): Message[] {
   return hydrate(db, rows);
 }
 
-// The person's message that answers a question of the secretary's, if there is one.
+// The person's message that answers a question of the assistant's, if there is one.
 export function selectAnswerOf(db: DatabaseSync, id: number): Message | undefined {
   const row = db
     .prepare(
@@ -340,8 +340,8 @@ export function deleteMessage(db: DatabaseSync, id: number): void {
   db.prepare('DELETE FROM conversation_messages WHERE id = ?').run(id);
 }
 
-// Closes the secretary's open questions that what the person did settled (it sent the item back,
-// the turn became an item), or that the secretary withdrew: they stop counting as waiting for the
+// Closes the assistant's open questions that what the person did settled (it sent the item back,
+// the turn became an item), or that the assistant withdrew: they stop counting as waiting for the
 // person and the desk says why. Returns how many closed. `item`: the questions about that item (the
 // one their card acts on, or one their turn is linked to); `root`: the questions of that turn; `id`:
 // that question alone.
@@ -351,7 +351,7 @@ export function closeQuestions(
   at: string,
   why: string,
 ): number {
-  const open = `m.author = 'secretary' AND m.options IS NOT NULL AND m.closed_at IS NULL
+  const open = `m.author = 'assistant' AND m.options IS NOT NULL AND m.closed_at IS NULL
      AND NOT EXISTS (SELECT 1 FROM conversation_messages p WHERE p.author = 'person' AND p.reply_to = m.id)`;
   const picks: string[] = [];
   const params: Record<string, string | number> = { at, why };
@@ -577,7 +577,7 @@ export function selectMessages(
   return { messages: hydrate(db, kept), more };
 }
 
-// The person's messages the secretary has not read, oldest first.
+// The person's messages the assistant has not read, oldest first.
 export function selectPending(db: DatabaseSync): { id: number; text: string }[] {
   return db
     .prepare(
@@ -586,7 +586,7 @@ export function selectPending(db: DatabaseSync): { id: number; text: string }[] 
     .all() as { id: number; text: string }[];
 }
 
-// The secretary's messages said in a turn the person began, from `since` (an ISO time), oldest first.
+// The assistant's messages said in a turn the person began, from `since` (an ISO time), oldest first.
 // What a notice about a reply reads; never the topics' records.
 export function selectRepliesSince(
   db: DatabaseSync,
@@ -596,7 +596,7 @@ export function selectRepliesSince(
     .prepare(
       `SELECT m.id, m.root, m.author_name, m.text FROM conversation_messages m
        JOIN conversation_messages r ON r.id = m.root
-       WHERE m.author = 'secretary' AND r.author = 'person' AND m.topic IS NULL AND m.at >= ?
+       WHERE m.author = 'assistant' AND r.author = 'person' AND m.topic IS NULL AND m.at >= ?
          AND m.options IS NULL
        ORDER BY m.id`,
     )
@@ -629,7 +629,7 @@ export function selectTurnsOfItem(db: DatabaseSync, item: string): Message[] {
     .prepare(
       `SELECT ${COLUMNS} FROM conversation_messages m
        JOIN conversation_links l ON l.message_id = m.id
-       WHERE l.item_id = ? AND m.author <> 'secretary' ORDER BY m.id`,
+       WHERE l.item_id = ? AND m.author <> 'assistant' ORDER BY m.id`,
     )
     // An item's id is kept in capitals, so the id is made one and compared as it is: the index on
     // item_id serves it, which a NOCASE comparison cannot use.
@@ -646,7 +646,7 @@ export function latestOfTopic(db: DatabaseSync, topic: string): number | undefin
 }
 
 // What a say that classifies or links with no --reply-to would aim at: the latest of the person's
-// messages that the secretary already read (never a topic's record), and what makes that a guess:
+// messages that the assistant already read (never a topic's record), and what makes that a guess:
 // messages not read yet, and other read turns not classified.
 export function selectDefaultTurn(db: DatabaseSync): {
   latest: number | undefined;

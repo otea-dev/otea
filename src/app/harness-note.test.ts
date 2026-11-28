@@ -7,7 +7,7 @@ import { noteHarness, seeAgent } from './presence.ts';
 const at = () => '2026-11-27T10:00:00.000Z';
 
 // Adversarial review of S: an impersonator's first wait overwrote the harness noted for the
-// secretary and took the binding. A live harness noted for a name is not replaced by another's.
+// assistant and took the binding. A live harness noted for a name is not replaced by another's.
 describe('the harness noted for an agent', () => {
   const agentWith = () => {
     const db = openDatabase(':memory:');
@@ -32,7 +32,7 @@ describe('the harness noted for an agent', () => {
   });
 
   // D-6f56ce: a wait that runs under a harness the noted one started is the same session: it is
-  // not a loser (the secretary's wait ended with «runs in another session» and it retired), and it
+  // not a loser (the assistant's wait ended with «runs in another session» and it retired), and it
   // does not take the binding from the harness above it.
   it('takes a wait under a harness the noted one started for the same session', () => {
     const db = agentWith();

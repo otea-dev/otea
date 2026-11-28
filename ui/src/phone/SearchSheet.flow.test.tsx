@@ -84,7 +84,7 @@ describe('the phone search sheet', () => {
               },
             ]
           : [];
-      return new Response(JSON.stringify({ messages, more: false, secretary: null }), {
+      return new Response(JSON.stringify({ messages, more: false, assistant: null }), {
         headers: { 'content-type': 'application/json' },
       });
     });
@@ -123,7 +123,7 @@ describe('the phone search sheet', () => {
         attachments: [],
         links: [],
       };
-      return new Response(JSON.stringify({ messages: [said], more: false, secretary: null }), {
+      return new Response(JSON.stringify({ messages: [said], more: false, assistant: null }), {
         headers: { 'content-type': 'application/json' },
       });
     });

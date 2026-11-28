@@ -65,7 +65,7 @@ function server(entries: BandejaEntry[], o: { failures?: number } = {}) {
         return json({
           messages: [],
           more: false,
-          secretary: null,
+          assistant: null,
           waiting: { count: 0, since: null },
         });
       }
@@ -272,7 +272,7 @@ describe('the Bandeja beside what came out', () => {
       'refining',
       'filed',
     ]);
-    expect(text(q(rows[1] as HTMLElement, '.bn-st'))).toBe('esperando al secretario');
+    expect(text(q(rows[1] as HTMLElement, '.bn-st'))).toBe('esperando a tu asistente');
     expect(text(q(rows[2] as HTMLElement, '.bn-st'))).toBe('refinando · lia');
     expect(text(q(rows[0] as HTMLElement, '.bn-st'))).toBe('te pregunta');
     expect(text(q(rows[3] as HTMLElement, '.bn-st'))).toBe('archivado en CAM-12');
@@ -343,7 +343,7 @@ describe('the Bandeja beside what came out', () => {
     expect(calls[0]?.body).toEqual({ delegate: true, question: 1 });
   });
 
-  // Field study 3, S4: a duplicate the secretary closed says why, and you can reopen it.
+  // Field study 3, S4: a duplicate the assistant closed says why, and you can reopen it.
   it('shows a closed note with the reason it was closed for, and reopens it with one tap', async () => {
     const calls = server([
       entry({ id: 1, state: 'waiting', text: 'dark mode somewhere' }),
@@ -386,14 +386,47 @@ describe('Hablar with the Bandeja', () => {
     asking: { question: 1, by: 'lia', at: ago(3), text: '¿Mejor en qué?', options: ['a', 'b'] },
   });
 
+  const waits = (...refs: string[]) => ({
+    count: refs.length,
+    entries: refs.map((ref) => ({
+      kind: 'bandeja' as const,
+      ref,
+      title: 'make it better',
+      since: ago(3),
+    })),
+    blocks: [],
+    queues: [],
+    assistant: null,
+  });
+
   it('counts the notes that wait for your answer in the tab of what came out', async () => {
     server([entry({ id: 1 }), asking, entry({ id: 4, state: 'filed', item: 'CAM-1' })]);
-    const root = await show(<HablarView />);
+    const root = await show(<HablarView />, { pending: waits('B-3') });
 
     const tabs = all(root, '[role=tab]').map((tab) => text(tab));
     // Nothing came out of the conversation yet; one note asks you. Waiting and filed notes do not
     // call for you.
     expect(tabs).toEqual(['Conversación', 'Lo que salió · 1']);
+  });
+
+  // docs/internal/shown-facts.md, fact 21: the tab's number is what pending says (the number every
+  // other surface counts with), never a second read of the Bandeja's own list, which may be a tick
+  // ahead or behind.
+  it('says the number pending says, even while the Bandeja’s list has not caught up', async () => {
+    server([entry({ id: 1 }), asking]);
+    const root = await show(<HablarView />, { pending: waits() });
+    expect(all(root, '[role=tab]').map((tab) => text(tab))).toEqual([
+      'Conversación',
+      'Lo que salió · 0',
+    ]);
+    page?.unmount();
+
+    server([entry({ id: 1 })]);
+    const again = await show(<HablarView />, { pending: waits('B-3', 'B-5') });
+    expect(all(again, '[role=tab]').map((tab) => text(tab))).toEqual([
+      'Conversación',
+      'Lo que salió · 2',
+    ]);
   });
 
   // F4 review round: one question, one place to answer it. The thread's foot is where you answer
@@ -474,7 +507,7 @@ describe('a link to a question on a note, on a wide screen', () => {
         return json({
           messages: [],
           more: false,
-          secretary: null,
+          assistant: null,
           waiting: { count: 0, since: null },
         });
       }

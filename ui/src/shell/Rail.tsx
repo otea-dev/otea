@@ -6,7 +6,7 @@ import type { BoardSummary } from '../board-studio/api.ts';
 import { useBoards } from '../board-studio/home/boards-store.ts';
 import { freshlyLive } from '../board-studio/home/home-model.ts';
 import { openNewBoard } from '../board-studio/home/studio-dialogs.ts';
-import type { SecretaryStatus } from '../conversation.ts';
+import type { AssistantStatus } from '../conversation.ts';
 import { stuckCount } from '../derive/toca.ts';
 import { t } from '../i18n/i18n.ts';
 import { TypeIcon } from '../icons/TypeIcon.tsx';
@@ -18,13 +18,13 @@ import { type Drive, drive } from '../motion/drive.ts';
 import { reduced } from '../motion/reduced.ts';
 import { waitingCount } from '../pending.ts';
 import { studioHash, type ViewRoute } from '../selection.ts';
-import { SecretaryMark } from '../views/hablar/SecretaryMark.tsx';
+import { AssistantMark } from '../views/hablar/AssistantMark.tsx';
 import { focusContentSoon, livePlace } from './focus-content.ts';
 import { PrefsButton } from './Preferences.tsx';
 import { type BoardIcon, boardEntries, foldClip, type RailKey, railKey } from './rail-model.ts';
 
 // The rail (SPEC §7.2, mock:159-198, 1420-1458, 4038-4069): the head (fold, + Nuevo ítem, named so
-// it never reads as a new view, P7-14), vistas with Hablar (the secretary's mark, lit while it
+// it never reads as a new view, P7-14), vistas with Hablar (the assistant's mark, lit while it
 // listens), Te toca and Atasco (what waits for you),
 // the boards with yours / open, Nuevo tablero, the project's Studio, settings and performance (set
 // up and reviewed now and then), one selection pill that slides to the row in view, and
@@ -33,13 +33,13 @@ import { type BoardIcon, boardEntries, foldClip, type RailKey, railKey } from '.
 // the labels like any desk, and folds when the person says so (s-real D-3874e1: below 1024 px it was
 // always folded, with the button disabled, and nobody found "Hablar" or "Te toca").
 
-// The secretary's state on its row: a dot in its colour while it is there, a ring while it is away;
+// The assistant's state on its row: a dot in its colour while it is there, a ring while it is away;
 // nothing while the project has none. The colour is for the eye; the state is also said in words.
-export function SecretaryDot({ status }: { status: SecretaryStatus | null | undefined }) {
+export function AssistantDot({ status }: { status: AssistantStatus | null | undefined }) {
   if (!status) return null;
   return (
     <>
-      <i className="sec-dot" data-state={status.state} aria-hidden="true" />
+      <i className="assistant-dot" data-state={status.state} aria-hidden="true" />
       <span className="visually-hidden">
         {t(`hablar.status.${status.state}`, { name: status.name })}
       </span>
@@ -66,7 +66,7 @@ type RowProps = {
   // What the row's numbers say in words, after its label («1 pendiente»): its name is its label and
   // this, never the digits drawn beside it.
   say?: string | undefined;
-  // What more is known of the row (the secretary's state), read after its name.
+  // What more is known of the row (the assistant's state), read after its name.
   hint?: string | undefined;
   // A small gap above it, no heading: a row of another kind in the same list (Temas under the views).
   apart?: boolean;
@@ -239,8 +239,8 @@ export function Rail() {
   const yours = waitingCount(app);
   const stuck = stuckCount(app.all, { now: app.now });
   const boards = boardEntries(app.collections, app.all, app.now);
-  // The secretary as the whole desk shows it, read once (app.secretary), never again by the rail.
-  const secretary = app.secretary;
+  // The assistant as the whole desk shows it, read once (app.assistant), never again by the rail.
+  const assistant = app.assistant;
   const foldLabel = folded ? t('nav.show') : t('nav.hide');
 
   useSelPill(navs, key);
@@ -316,13 +316,13 @@ export function Rail() {
           <Row
             k="hablar"
             on={key === 'hablar'}
-            icon={<SecretaryMark />}
+            icon={<AssistantMark />}
             label={t('hablar.nav')}
             to={{ view: 'hablar' }}
-            pair={<SecretaryDot status={secretary} />}
+            pair={<AssistantDot status={assistant} />}
             hint={
-              secretary
-                ? t(`hablar.status.${secretary.state}`, { name: secretary.name })
+              assistant
+                ? t(`hablar.status.${assistant.state}`, { name: assistant.name })
                 : undefined
             }
           />

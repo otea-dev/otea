@@ -18,6 +18,7 @@ import { evidenceTypeOf, MAX_EVIDENCE_BYTES, MAX_EVIDENCE_MB } from '../core/evi
 import type { BandejaAskFacts } from '../core/notify/signals.ts';
 import { plainLine, quoteAgent } from '../core/quote.ts';
 import { timeText } from '../core/time.ts';
+import { saveRole, selectRoles } from '../store/assistant.ts';
 import {
   answerQuestionRow,
   closeEntry,
@@ -43,7 +44,8 @@ import {
 } from '../store/bandeja.ts';
 import { joinTransaction, transaction } from '../store/database.ts';
 import { findItem } from '../store/queries.ts';
-import { saveRole, selectRoles } from '../store/secretary.ts';
+import { addAssistantSource, assistantName } from './assistant.ts';
+import { addWaitingSource } from './assistant-waiting.ts';
 import type { Context } from './context.ts';
 import {
   dropTraceOf,
@@ -55,8 +57,6 @@ import { evidenceFile, namedReadPath, storeFile } from './evidence.ts';
 import { type Clock, requireItem, systemClock } from './items.ts';
 import { listAgents, sessionEnded } from './presence.ts';
 import type { Project } from './project.ts';
-import { addSecretarySource, secretaryName } from './secretary.ts';
-import { addWaitingSource } from './secretary-waiting.ts';
 
 // The Bandeja (core/bandeja.ts): the person's rough captures, and the way a refiner turns each into
 // an item. Who may do what is decided here, not by the callers: an entry is made only by
@@ -70,7 +70,7 @@ function invalid(message: string): never {
 }
 
 // What an agent writes into an entry (a refiner's question, the reason for closing one) is read by
-// the secretary and the person: a bound, as a capture has.
+// the assistant and the person: a bound, as a capture has.
 export const MAX_QUESTION_CHARS = 2000;
 export const MAX_REASON_CHARS = 500;
 
@@ -102,7 +102,7 @@ export type CaptureInput = {
   by?: string;
 };
 
-// The person's rough note, to wait for the secretary. Only the desk's authenticated routes call
+// The person's rough note, to wait for the assistant. Only the desk's authenticated routes call
 // this.
 export function captureToBandeja(
   project: Project,
@@ -267,7 +267,7 @@ export function listBandeja(
 export type Held = { entry: BandejaEntry; renewed: boolean };
 
 // A refiner takes an entry to work on it, for a lease: two never hold one at once. Only the refiner
-// itself takes a note (the secretary never takes one for it). A refiner that already holds it keeps
+// itself takes a note (the assistant never takes one for it). A refiner that already holds it keeps
 // it (the lease starts again).
 export function takeBandeja(
   project: Project,
@@ -343,13 +343,13 @@ export function takeNextBandeja(
 
 // The agent that takes the notes in turn is the project's refiner: noted once, so the desk never
 // counts it as a worker connected (it takes no item, and waiting for a note is no listening on the
-// boards). The secretary's own role stays, and so does any other it already has.
+// boards). The assistant's own role stays, and so does any other it already has.
 export function noteRefiner(project: Project, agent: string, now: Clock = systemClock): void {
   if (selectRoles(project.db).has(agent)) return;
   saveRole(project.db, agent, 'refiner', now());
 }
 
-// The secretary closes an entry that needs no item (a duplicate of one that exists, a note that asks
+// The assistant closes an entry that needs no item (a duplicate of one that exists, a note that asks
 // nothing), or the refiner that holds it does; the reason is kept and shown, and the person may
 // reopen it. A filed entry is an item's already.
 export function closeBandeja(
@@ -385,10 +385,10 @@ export function closeBandeja(
       invalid(`Not closed: ${MAX_REASON_CHARS} characters at most for the reason, in one line`);
     }
     const holds = entry.state === 'refining' && entry.claimedBy === input.agent;
-    if (!holds && secretaryName(project.db) !== input.agent) {
+    if (!holds && assistantName(project.db) !== input.agent) {
       throw new OteaError(
         'forbidden',
-        `Only the project's secretary, or the refiner that holds ${entry.ref}, closes it${entry.claimedBy === null ? '' : ` (${entry.claimedBy} holds it)`}`,
+        `Only the project's assistant, or the refiner that holds ${entry.ref}, closes it${entry.claimedBy === null ? '' : ` (${entry.claimedBy} holds it)`}`,
       );
     }
     if (reason === '') {
@@ -404,7 +404,7 @@ export function closeBandeja(
   });
 }
 
-// The person reopens a closed entry on the desk: it waits for the secretary again.
+// The person reopens a closed entry on the desk: it waits for the assistant again.
 export function reopenBandeja(
   project: Project,
   input: { id: number },
@@ -465,7 +465,7 @@ export type BandejaAsk = {
 };
 
 // The refiner asks the person what the entry lacks, with options to tap (as an item's question
-// has): the entry waits for their answer, the refiner's hold ends, and the secretary is told once
+// has): the entry waits for their answer, the refiner's hold ends, and the assistant is told once
 // they answer.
 export function askOnBandeja(
   project: Project,
@@ -530,7 +530,7 @@ export type PersonAnswer = { id: number; question?: number; by?: string } & (
 );
 
 // The person's answer to the question that waits on an entry. Only the desk's authenticated routes
-// call this. The entry is free again: the secretary's wait returns it, and a refiner takes it.
+// call this. The entry is free again: the assistant's wait returns it, and a refiner takes it.
 export function answerBandeja(
   project: Project,
   input: PersonAnswer,
@@ -651,11 +651,11 @@ export function bandejaOfItem(ctx: Context, item: string): FromBandeja | undefin
   return { id: row.id, ref: bandejaRef(row.id), at: row.at, snippet: messageSnippet(row.text) };
 }
 
-// The secretary's wait returns an entry while one waits for it, from the entries' own state (never a
+// The assistant's wait returns an entry while one waits for it, from the entries' own state (never a
 // signal that can be lost): not held by a refiner, not filed, no question waiting for the person.
 // It stops when the entry is taken (otea bandeja take), and returns once its lease runs out or the
 // person answers.
-// The captures nobody took count among what waits for an absent secretary (the notice «te esperan
+// The captures nobody took count among what waits for an absent assistant (the notice «te esperan
 // N»), beside the person's unread messages.
 addWaitingSource((db) => {
   const at = systemClock();
@@ -663,11 +663,11 @@ addWaitingSource((db) => {
 });
 
 // How long a note may wait for a refiner that is there (busy with another note) before it is the
-// secretary's: it takes the notes in turn, and the secretary taking one meanwhile is what the
+// assistant's: it takes the notes in turn, and the assistant taking one meanwhile is what the
 // refiner is for (field study 4, U6).
 export const REFINER_BUSY_MS = 10 * 60_000;
 
-addSecretarySource((ctx, now) => {
+addAssistantSource((ctx, now) => {
   const at = Date.parse(now());
   const waiting = hydrate(ctx, selectEntryRows(ctx.db, 0), now()).filter(
     ({ state }) => state === 'waiting',
@@ -675,7 +675,7 @@ addSecretarySource((ctx, now) => {
   const [first] = waiting;
   if (first === undefined) return undefined;
   // A refiner is there (connected, or at work on a note): the notes are its next. Only one that
-  // waited for it a long while, or with no refiner there, is the secretary's.
+  // waited for it a long while, or with no refiner there, is the assistant's.
   const refinerThere = listAgents(ctx.db, now).some(
     ({ role, status }) =>
       role === 'refiner' &&

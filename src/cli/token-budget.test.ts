@@ -74,9 +74,9 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // work that does not need one (measured at 857).
   // Raised again for rule 10: ask with 2 to 4 options and the one you recommend, so the person
   // taps instead of reading and typing (raised to 895 and 890; measured at 894 and 885).
-  // Raised for rule 13, the secretary (0.8): who alone talks with the person in Hablar, so no other
+  // Raised for rule 13, the assistant (0.8): who alone talks with the person in Hablar, so no other
   // agent writes there (raised to 945 and 935; measured at 942 and 933).
-  // Raised again for the secretary skipping rules 3, 6 and 12 and rule 4's second heading (raised
+  // Raised again for the assistant skipping rules 3, 6 and 12 and rule 4's second heading (raised
   // to 990 and 975; measured at 980 and 970).
   'board index': { text: 990, json: 53, mcp: 975 },
   // The bug board's own words and each step's instructions, read once per session; show's Next:
@@ -131,28 +131,28 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // a duration, the board JSON as board_draft's own argument (P8-F2), model and effort on next, and
   // every tool's `additionalProperties`, so a key it does not take is refused by name, not dropped.
   // Raised to 6160 for ask's options and recommended (measured at 6143).
-  // Raised to 6230 for the secretary: profile's role and wait's secretary (measured at 6215).
-  // Raised to 6620 for the secretary's conversation: two tools (conversation, say) and create's
+  // Raised to 6230 for the assistant: profile's role and wait's assistant (measured at 6215).
+  // Raised to 6620 for the assistant's conversation: two tools (conversation, say) and create's
   // from_message (measured at 6577).
   // Raised to 6930 for the Bandeja's refiner: two tools (bandeja, bandeja_take), create's
   // from_bandeja and ask on an entry (measured at 6924).
-  // Raised to 7000 for say's options and recommended, so the secretary's question has buttons
+  // Raised to 7000 for say's options and recommended, so the assistant's question has buttons
   // (measured at 6994).
   // Raised to 7150 for land sync, the one step that brings the person's main checkout up to date
   // (measured at 7144).
   // Raised to 7420 for what waits for the person: two tools (pending, escalate; measured at 7410).
   // Raised to 7600 for closing a Bandeja note and taking the next one (bandeja_close, and --next,
   // --wait and --timeout on bandeja_take; measured at 7593).
-  // Raised to 7860 for the secretary's change of mind (H1): say's --send-back and --note, the card
+  // Raised to 7860 for the assistant's change of mind (H1): say's --send-back and --note, the card
   // that sends an item of the person's review back on their tap, and update's --tell, which tells
   // the worker at once (measured at 7764).
   // Raised to 7940 for the security package (S): relay's --from-message, say's --drop, --motive,
   // --option-text and --withdraw (measured at 7930).
   // Raised to 7990 for ask's --option-text, the option that promises the person's own words, which
   // opens the text box, and land sync's no-remote words (field study 5; measured at 7987).
-  // Raised to 8010 for answer's --from-message, the person's message in Talk the secretary notes an
+  // Raised to 8010 for answer's --from-message, the person's message in Talk the assistant notes an
   // answer from, as relay does (D-816632; measured at 7997).
-  // Raised to 8180 for the new tool advise (s-real2 D-00b356), with which the secretary or the
+  // Raised to 8180 for the new tool advise (s-real2 D-00b356), with which the assistant or the
   // delivering agent tells the person, on an item in their review, what it recommends (measured at
   // 8158).
   tools: { mcp: 8180 },
@@ -190,8 +190,8 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // a new session or a compacted agent would otherwise be handed without the step (measured at
   // 796). Raised to 850 with rule 11's four outcomes (measured at 826).
   // Raised to 870 for rule 10: ask always with options and a recommendation (measured at 865).
-  // Raised to 915 for rule 13: the secretary alone talks with the person in Hablar (measured at 913).
-  // Raised to 960 for rule 13 telling the secretary to skip rules 3, 6 and 12 (it is printed to it
+  // Raised to 915 for rule 13: the assistant alone talks with the person in Hablar (measured at 913).
+  // Raised to 960 for rule 13 telling the assistant to skip rules 3, 6 and 12 (it is printed to it
   // too, and told it to claim and wait for turns), rule 4's second heading and the real silent time
   // (measured at 952).
   instructions: { mcp: 960 },

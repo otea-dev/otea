@@ -20,7 +20,7 @@ const MAIN = fileURLToPath(new URL('./main.ts', import.meta.url));
 
 // H2 (field study 4): a worker at a long step makes no otea call, and the desk read its item
 // «atascado» and the worker «sin señal» while its session ran. The command that starts its work
-// notes the harness session it runs under, as the secretary's wait does, so the session ending is
+// notes the harness session it runs under, as the assistant's wait does, so the session ending is
 // what says it is gone.
 describe('a worker is noted under the harness that ran its claim', () => {
   let repo: TempRepo;

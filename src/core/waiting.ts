@@ -31,14 +31,14 @@ export function waitsForPerson(item: WaitFacts, now: number): boolean {
   return item.turn === 'human' || isStuck(item, now);
 }
 
-// A question of the secretary's about an item that waits for the person on its own (a card offering
+// A question of the assistant's about an item that waits for the person on its own (a card offering
 // to send it back, a reminder) is that same thing, not another one: it is listed with the item and
 // counted once (s-real2, D-3c918d). `waiting`: the refs of the items that wait for the person.
 export function isCovered(
   entry: Pick<PendingEntry, 'kind' | 'about'>,
   waiting: ReadonlySet<string>,
 ): boolean {
-  return entry.kind === 'secretary' && entry.about !== undefined && waiting.has(entry.about);
+  return entry.kind === 'assistant' && entry.about !== undefined && waiting.has(entry.about);
 }
 
 // The entries that are no item and not already an item's own: what the person counts beside their

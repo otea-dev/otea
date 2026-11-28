@@ -1,22 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { markRead } from '../store/conversation.ts';
+import { declareAssistant } from './assistant.ts';
 import { captureToBandeja, fileBandeja, takeBandeja } from './bandeja.ts';
 import { addCollection } from './collections.ts';
 import {
-  answerSecretaryQuestion,
+  answerAssistantQuestion,
   correctKind,
   linkMessageToItem,
   listConversation,
   openQuestionsOfTurn,
   postPersonMessage,
   retractAnswer,
-  sayAsSecretary,
+  sayAsAssistant,
   withdrawQuestion,
 } from './conversation.ts';
 import { createItem, moveItem } from './items.ts';
 import { pendingOf } from './pending.ts';
 import type { Project } from './project.ts';
-import { declareSecretary } from './secretary.ts';
 import { memoryContext, projectOf } from './testing.ts';
 
 const T0 = Date.parse('2026-11-27T10:00:00.000Z');
@@ -26,13 +26,13 @@ const lia = { kind: 'agent' as const, name: 'lia' };
 
 // U8 (field study 4): a `say` refused because one link came from the Bandeja left the person on
 // «leído · pensando…» for ten minutes; two questions already settled kept counting in Te espera.
-describe('what the secretary says and asks', () => {
+describe('what the assistant says and asks', () => {
   let project: Project;
 
   beforeEach(() => {
     project = projectOf('/nowhere', memoryContext());
     addCollection(project, { name: 'tasks' });
-    declareSecretary(project.db, 'sol', now);
+    declareAssistant(project.db, 'sol', now);
   });
 
   afterEach(() => project.db.close());
@@ -46,7 +46,7 @@ describe('what the secretary says and asks', () => {
 
   const waiting = () =>
     pendingOf(project, now, { blocks: false })
-      .entries.filter(({ kind }) => kind === 'secretary')
+      .entries.filter(({ kind }) => kind === 'assistant')
       .map(({ ref }) => Number(ref));
 
   describe('an answer that names an item that came from the Bandeja', () => {
@@ -58,7 +58,7 @@ describe('what the secretary says and asks', () => {
       const plain = made('Plain');
       const asked = postPersonMessage(project, { text: '¿qué me espera hoy?' }, now).message;
 
-      const said = sayAsSecretary(
+      const said = sayAsAssistant(
         project,
         { agent: 'sol', text: 'Te espera uno.', replyTo: asked.id, links: [fromNote, plain] },
         now,
@@ -74,7 +74,7 @@ describe('what the secretary says and asks', () => {
 
   describe('an option that needs the person’s own words', () => {
     const asked = () =>
-      sayAsSecretary(
+      sayAsAssistant(
         project,
         {
           agent: 'sol',
@@ -89,13 +89,13 @@ describe('what the secretary says and asks', () => {
       const question = asked();
       expect(question.optionText).toEqual([2]);
 
-      expect(() => answerSecretaryQuestion(project, question.id, { option: 2 }, now)).toThrow(
+      expect(() => answerAssistantQuestion(project, question.id, { option: 2 }, now)).toThrow(
         /needs your own words/,
       );
       expect(() =>
-        answerSecretaryQuestion(project, question.id, { option: 1, explain: 'x' }, now),
+        answerAssistantQuestion(project, question.id, { option: 1, explain: 'x' }, now),
       ).toThrow(/takes no words/);
-      const answer = answerSecretaryQuestion(
+      const answer = answerAssistantQuestion(
         project,
         question.id,
         { option: 2, explain: 'la explico al responder' },
@@ -106,9 +106,9 @@ describe('what the secretary says and asks', () => {
       expect(answer.choice).toMatchObject({ mode: 'option', option: 2 });
     });
 
-    it('is taken back with Deshacer while the secretary has not heard it, and not after', () => {
+    it('is taken back with Deshacer while the assistant has not heard it, and not after', () => {
       const question = asked();
-      const answer = answerSecretaryQuestion(project, question.id, { option: 1 }, now);
+      const answer = answerAssistantQuestion(project, question.id, { option: 1 }, now);
       expect(waiting()).toEqual([]);
 
       retractAnswer(project, question.id, now);
@@ -116,21 +116,21 @@ describe('what the secretary says and asks', () => {
       expect(waiting()).toEqual([question.id]);
       expect(listConversation(project).messages.map(({ id }) => id)).not.toContain(answer.id);
       // Heard, or too old: it stays.
-      const again = answerSecretaryQuestion(project, question.id, { option: 3 }, now);
+      const again = answerAssistantQuestion(project, question.id, { option: 3 }, now);
       markRead(project.db, [again.id], now());
       expect(() => retractAnswer(project, question.id, now)).toThrow(/already has your answer/);
     });
 
     it('is not taken back when it was words the person wrote, only a tap on an option', () => {
       const question = asked();
-      answerSecretaryQuestion(project, question.id, { text: 'mejor la explico aquí' }, now);
+      answerAssistantQuestion(project, question.id, { text: 'mejor la explico aquí' }, now);
 
       expect(() => retractAnswer(project, question.id, now)).toThrow(/only a tap/);
     });
 
     it('names no option that is not there', () => {
       expect(() =>
-        sayAsSecretary(
+        sayAsAssistant(
           project,
           { agent: 'sol', text: '¿?', options: ['a', 'b'], optionText: [3] },
           now,
@@ -140,10 +140,10 @@ describe('what the secretary says and asks', () => {
   });
 
   describe('a question that was settled elsewhere', () => {
-    const ask = (text: string, extra: Partial<Parameters<typeof sayAsSecretary>[1]> = {}) =>
-      sayAsSecretary(project, { agent: 'sol', text, options: ['Sí', 'No'], ...extra }, now).message;
+    const ask = (text: string, extra: Partial<Parameters<typeof sayAsAssistant>[1]> = {}) =>
+      sayAsAssistant(project, { agent: 'sol', text, options: ['Sí', 'No'], ...extra }, now).message;
 
-    it('stops counting once the secretary withdraws it, and only its own question', () => {
+    it('stops counting once the assistant withdraws it, and only its own question', () => {
       const question = ask('¿Lo anoto?');
       expect(waiting()).toEqual([question.id]);
 
@@ -165,7 +165,7 @@ describe('what the secretary says and asks', () => {
     it('stops counting once the person answered it, as it always did', () => {
       const question = ask('¿Lo anoto?');
 
-      answerSecretaryQuestion(project, question.id, { option: 1 }, now);
+      answerAssistantQuestion(project, question.id, { option: 1 }, now);
 
       expect(waiting()).toEqual([]);
     });
@@ -180,7 +180,7 @@ describe('what the secretary says and asks', () => {
       expect(waiting()).toEqual([]);
     });
 
-    it('stays open when an item is made from its turn: the secretary says if the item answers it', () => {
+    it('stays open when an item is made from its turn: the assistant says if the item answers it', () => {
       const wrote = postPersonMessage(project, { text: 'agrega /health' }, now).message;
       const question = ask('¿Lo anoto?', { replyTo: wrote.id });
 

@@ -1,7 +1,7 @@
 import type { FromMessage } from '../../conversation.ts';
 import { t } from '../../i18n/i18n.ts';
 import { hablarHash } from '../../selection.ts';
-import { SecretaryMark } from './SecretaryMark.tsx';
+import { AssistantMark } from './AssistantMark.tsx';
 
 // The way back from an item page to the turn of the conversation it came out of: «salió de Hablar
 // · "…"», which opens Hablar at that turn. Nothing at all for an item that came from elsewhere.
@@ -10,7 +10,7 @@ export function FromTurns({ turns }: { turns: readonly FromMessage[] | undefined
   if (!first) return null;
   return (
     <p className="hb-from">
-      <SecretaryMark />
+      <AssistantMark />
       <a href={hablarHash({ turn: first.id })}>
         {first.snippet.trim() === ''
           ? t('hablar.from.file')

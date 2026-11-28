@@ -5,8 +5,8 @@ import type { Item } from './items.ts';
 import type { AgentPresence } from './presence.ts';
 
 // Whether an item waits for an agent that nobody brings (the desk's «nadie está escuchando»): the
-// one place the notifier and the secretary's wait ask it. Only an agent in otea wait on the boards
-// is listening (status `listening`), never the secretary, whose wait presence says it is not (see
+// one place the notifier and the assistant's wait ask it. Only an agent in otea wait on the boards
+// is listening (status `listening`), never the assistant, whose wait presence says it is not (see
 // AgentPresence.waiting); an item whose holder is at work is heard. `setAside`: left for later.
 // `workers`: who works each board (workersByBoard): a board with a worker at work on another item,
 // or between two items, is not unheard, the worker comes to it when its step ends.

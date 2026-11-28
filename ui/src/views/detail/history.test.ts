@@ -384,7 +384,7 @@ describe('a board reading in the history', () => {
   });
 });
 
-// D-eb906c (s-real2): the secretary's note and Otea's own diff were read as «you» by the person,
+// D-eb906c (s-real2): the assistant's note and Otea's own diff were read as «you» by the person,
 // who never wrote either. An agent's act, or Otea's, is never labelled as the person's.
 describe('what was written or done for you, never as you', () => {
   afterEach(() => setLanguage('en'));
@@ -393,21 +393,21 @@ describe('what was written or done for you, never as you', () => {
   const left = (data: Record<string, unknown>) =>
     ev('note_left', sol, { note: 1, text: 'Quick, not slow.', step: 'fix', round: 1, ...data }, 5);
 
-  it('says the secretary left a note for you, in both languages', () => {
-    const events = [left({ relayed: true, role: 'secretary' })];
+  it('says the assistant left a note for you, in both languages', () => {
+    const events = [left({ relayed: true, role: 'assistant' })];
     const [line] = historyOf(events, bug, word, NOW);
     expect(line).toMatchObject({
-      text: 'The secretary, for you, left it a note',
+      text: 'The assistant, for you, left it a note',
       quote: 'Quick, not slow.',
       dot: 'relay',
     });
     setLanguage('es');
     expect(historyOf(events, bug, word, NOW)[0]?.text).toBe(
-      'La secretaria, de tu parte, le dejó una nota',
+      'Tu asistente, de tu parte, le dejó una nota',
     );
   });
 
-  it('names the agent when the one that relayed it is not the secretary', () => {
+  it('names the agent when the one that relayed it is not the assistant', () => {
     const [line] = historyOf([left({ relayed: true })], bug, word, NOW);
     expect(line?.text).toBe('sol, for you, left it a note');
   });

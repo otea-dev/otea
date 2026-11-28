@@ -10,7 +10,7 @@ import {
 } from './diff-tip.ts';
 
 // What every page that offers Aprobar on an item in review says beside it, from this one source (s-real2
-// D-13751d, D-00b356): that the attached diff is not what lands, and what the secretary or the
+// D-13751d, D-00b356): that the attached diff is not what lands, and what the assistant or the
 // delivering agent advised. Said in the words of someone who does not read code; the technical
 // sentences ride along as `detail`, one tap away. Advice and warnings never block the move: the
 // person's act stays theirs.
@@ -24,7 +24,7 @@ export type ReviewNotice = {
 };
 
 function adviceText(advice: Advice, agent: string): string {
-  const who = advice.secretary ? 'secretary' : 'agent';
+  const who = advice.assistant ? 'assistant' : 'agent';
   const kind = advice.kind === 'send_back' ? 'sendBack' : 'doubt';
   return t(`rvn.advice.${kind}.${who}`, { agent, note: advice.note });
 }

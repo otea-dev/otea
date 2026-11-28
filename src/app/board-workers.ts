@@ -4,8 +4,8 @@ import { type BoardDefinition, guardedBranch } from '../core/board/model.ts';
 import { OteaError } from '../core/errors.ts';
 import { activeLease } from '../core/lease.ts';
 import { timeText } from '../core/time.ts';
+import { selectRoles } from '../store/assistant.ts';
 import { selectItems, selectRecentAgentWork } from '../store/queries.ts';
-import { selectRoles } from '../store/secretary.ts';
 import type { Item } from './items.ts';
 import type { AgentPresence } from './presence.ts';
 import { listAgents, processAlive } from './presence.ts';
@@ -13,7 +13,7 @@ import { listAgents, processAlive } from './presence.ts';
 // The agents working a board (F2, field study 3): the one holding an item of it on a live lease, at
 // work however long its step runs between two otea calls, and the one that handed an item of it off
 // or let it go a moment ago, between two items. Neither is «nobody listening», and neither is a
-// worker to launch another beside. The secretary never counts: it does no item. Both must be
+// worker to launch another beside. The assistant never counts: it does no item. Both must be
 // there: a holder whose session ended, or that gave no sign for SILENT_AFTER_MS, left the board
 // free (a crashed worker frees it by itself).
 export const BETWEEN_ITEMS_MS = 5 * 60_000;
@@ -45,7 +45,7 @@ export function workersByBoard(
   at: string,
 ): TendedBy {
   const byName = new Map(
-    agents.filter(({ role }) => role !== 'secretary').map((agent) => [agent.name, agent]),
+    agents.filter(({ role }) => role !== 'assistant').map((agent) => [agent.name, agent]),
   );
   const boards = new Map<string, Map<string, string | null>>();
   const add = (collection: string, agent: string, until: string | null) => {
@@ -84,7 +84,7 @@ export function workersByBoard(
   );
 }
 
-// The agents that listen for the boards' work in otea wait (the secretary and the refiner are none):
+// The agents that listen for the boards' work in otea wait (the assistant and the refiner are none):
 // they hold nothing yet, and any of them takes the next item of a board, so a board with work and
 // one of them listening is not nobody's (D-41e74d).
 export function listeningWorkers(
@@ -93,12 +93,12 @@ export function listeningWorkers(
   return agents
     .filter(
       ({ waiting, live, sessionEnded, role }) =>
-        waiting && live && !sessionEnded && role !== 'secretary' && role !== 'refiner',
+        waiting && live && !sessionEnded && role !== 'assistant' && role !== 'refiner',
     )
     .map(({ name }) => name);
 }
 
-// One live worker per board (the canon of the secretary's project); a board that merges code (it
+// One live worker per board (the canon of the assistant's project); a board that merges code (it
 // protects a branch) allows two, since one can be rebasing while the other works.
 export const WORKERS_PER_BOARD = 1;
 export const WORKERS_PER_CODE_BOARD = 2;
@@ -107,7 +107,7 @@ export const workerLimitOf = (def: BoardDefinition): number =>
   guardedBranch(def) === undefined ? WORKERS_PER_BOARD : WORKERS_PER_CODE_BOARD;
 
 // What refuses an agent an item of a board while it has its limit of other workers at work, or
-// undefined when there is room. Only a project with a secretary keeps this canon: it launches the
+// undefined when there is room. Only a project with an assistant keeps this canon: it launches the
 // workers and obeys the refusal, so a second one is never started beside a live one (the duplicate
 // branch of field study 3). The agent that already works the board is one of them, never refused
 // for being there. The facts (who is on each board) are read once, at the first question, and kept
@@ -126,7 +126,7 @@ export function crowdCheck(
   let workers: TendedBy | undefined;
   let keeps: boolean | undefined;
   return (item, agent, def) => {
-    keeps ??= [...selectRoles(db).values()].includes('secretary');
+    keeps ??= [...selectRoles(db).values()].includes('assistant');
     if (!keeps) return undefined;
     // Only the work of a step counts: a review is another agent's by design, and holds no worker.
     if (!isDoing(item.state)) return undefined;
@@ -145,7 +145,7 @@ export function crowdCheck(
     const many = others.length > 1;
     return new OteaError(
       'not_claimable',
-      `${who} already ${many ? 'work' : 'works'} the board ${def.name}, and a board has ${limit === 1 ? 'one worker' : 'two workers'} at a time${limit === 1 ? '' : ' (it merges code)'}: ${agent} takes no item of it while ${many ? 'those are' : 'that one is'} there. Take other work, or wait for it to free up: otea wait --turn agent --unclaimed --as ${agent}. The secretary starts no second worker for ${def.name}.`,
+      `${who} already ${many ? 'work' : 'works'} the board ${def.name}, and a board has ${limit === 1 ? 'one worker' : 'two workers'} at a time${limit === 1 ? '' : ' (it merges code)'}: ${agent} takes no item of it while ${many ? 'those are' : 'that one is'} there. Take other work, or wait for it to free up: otea wait --turn agent --unclaimed --as ${agent}. The assistant starts no second worker for ${def.name}.`,
     );
   };
 }

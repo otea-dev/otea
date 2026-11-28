@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { creatures } from '../core/board/testing.ts';
 import { insertEvidence } from '../store/queries.ts';
+import { declareAssistant } from './assistant.ts';
 import { addCollection } from './collections.ts';
-import { answerSecretaryQuestion, postPersonMessage, sayAsSecretary } from './conversation.ts';
+import { answerAssistantQuestion, postPersonMessage, sayAsAssistant } from './conversation.ts';
 import { createItem, getItem } from './items.ts';
 import { handoffItem } from './next.ts';
 import type { Project } from './project.ts';
 import { relayDecision } from './relay.ts';
-import { declareSecretary } from './secretary.ts';
 import { memoryContext, projectOf, publishAs } from './testing.ts';
 
 const you = { kind: 'human' as const, name: 'human' };
@@ -19,7 +19,7 @@ const DAY = 24 * 3600_000;
 
 // Adversarial review of S: a relay is words an agent says the person said, so it may never do what
 // cannot be taken back or what is the person's alone: drop, finish or approve, in review or not,
-// with a secretary or without. Those are a card they tap, or the desk.
+// with an assistant or without. Those are a card they tap, or the desk.
 describe('what a relay may never do', () => {
   let project: Project;
 
@@ -62,7 +62,7 @@ describe('what a relay may never do', () => {
     return id;
   };
 
-  it('never drops an item in review, with no secretary: the U8 repro with any worker', () => {
+  it('never drops an item in review, with no assistant: the U8 repro with any worker', () => {
     const id = creature();
     const before = getItem(project, id).state;
 
@@ -83,7 +83,7 @@ describe('what a relay may never do', () => {
     expect(getItem(project, id).state).toBe(before);
   });
 
-  it('never closes an item, with no secretary either', () => {
+  it('never closes an item, with no assistant either', () => {
     const id = bug();
 
     expect(() =>
@@ -115,27 +115,27 @@ describe('what a relay may never do', () => {
         now,
       );
 
-    it('takes a quote of two words or more with no secretary', () => {
+    it('takes a quote of two words or more with no assistant', () => {
       const id = bug();
 
       expect(() => relay(id, 'sí')).toThrow(/two words/);
       expect(relay(id, 'sí, aceptalo').state).toBe('accepted');
     });
 
-    describe('with a secretary', () => {
-      beforeEach(() => declareSecretary(project.db, 'sol', now));
+    describe('with an assistant', () => {
+      beforeEach(() => declareAssistant(project.db, 'sol', now));
 
       const said = (text: string, at = now) => postPersonMessage(project, { text }, at).message;
-      const secretaryRelay = (id: string, fromMessage: number, quote: string) =>
+      const assistantRelay = (id: string, fromMessage: number, quote: string) =>
         relay(id, quote, { via: 'sol', fromMessage });
 
       it('takes the person’s words from a message, once per message', () => {
         const id = bug();
         const message = said('aceptalo, es un bug real');
-        secretaryRelay(id, message.id, 'aceptalo, es un bug real');
+        assistantRelay(id, message.id, 'aceptalo, es un bug real');
         project.db.exec(`UPDATE items SET state = 'reported' WHERE id = '${id}'`);
 
-        expect(() => secretaryRelay(id, message.id, 'aceptalo, es un bug real')).toThrow(
+        expect(() => assistantRelay(id, message.id, 'aceptalo, es un bug real')).toThrow(
           /already|once/,
         );
       });
@@ -144,20 +144,20 @@ describe('what a relay may never do', () => {
         const id = bug();
         const old = said('aceptalo, es un bug real', () => new Date(T0 - 2 * DAY).toISOString());
 
-        expect(() => secretaryRelay(id, old.id, 'aceptalo, es un bug real')).toThrow(/old|day/);
+        expect(() => assistantRelay(id, old.id, 'aceptalo, es un bug real')).toThrow(/old|day/);
         expect(getItem(project, id).state).toBe('reported');
       });
 
       it('refuses what the person only tapped on a card', () => {
         const id = bug();
-        const question = sayAsSecretary(
+        const question = sayAsAssistant(
           project,
           { agent: 'sol', text: '¿Lo acepto?', options: ['Aceptarlo ya mismo', 'No'] },
           now,
         ).message;
-        const tap = answerSecretaryQuestion(project, question.id, { option: 1 }, now);
+        const tap = answerAssistantQuestion(project, question.id, { option: 1 }, now);
 
-        expect(() => secretaryRelay(id, tap.id, 'Aceptarlo ya mismo')).toThrow(/tap|typed|wrote/);
+        expect(() => assistantRelay(id, tap.id, 'Aceptarlo ya mismo')).toThrow(/tap|typed|wrote/);
         expect(getItem(project, id).state).toBe('reported');
       });
     });

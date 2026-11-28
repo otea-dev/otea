@@ -7,12 +7,13 @@ import {
   LISTEN_WINDOW_MS,
   THERE_FOR_MS,
 } from '../core/agent-status.ts';
+import type { AgentRole } from '../core/assistant.ts';
 import type { AgentChannel } from '../core/authority.ts';
 import { OteaError } from '../core/errors.ts';
 import { isAgentName } from '../core/item.ts';
 import { activeLease, DEFAULT_LEASE_TTL_MS, leaseExpiry } from '../core/lease.ts';
 import { pathKey } from '../core/path-key.ts';
-import type { AgentRole } from '../core/secretary.ts';
+import { clearStretchesFor, selectRoles } from '../store/assistant.ts';
 import { resetOwed } from '../store/conversation.ts';
 import { joinTransaction } from '../store/database.ts';
 import {
@@ -55,7 +56,6 @@ import {
   unconfirmProfile,
   upsertAgent,
 } from '../store/queries.ts';
-import { clearStretchesFor, selectRoles } from '../store/secretary.ts';
 import { askingItems } from './asking.ts';
 import { type Clock, systemClock } from './items.ts';
 
@@ -138,10 +138,10 @@ export type AgentPresence = {
   listening: boolean;
   // Heard waiting in otea wait within LISTEN_WINDOW_MS: what the person does on the desk reaches
   // it. An agent idle in its chat with its MCP server open listens, but hears nothing. Never the
-  // secretary: it waits for the person and for what the boards leave unheard, and is no listener
+  // assistant: it waits for the person and for what the boards leave unheard, and is no listener
   // on the boards, so the desk and the notifier do not count it (`attending`).
   waiting: boolean;
-  // Heard waiting in otea wait, whatever it waits for: `waiting`, or the secretary in its wait.
+  // Heard waiting in otea wait, whatever it waits for: `waiting`, or the assistant in its wait.
   attending: boolean;
   // The role it declared (otea profile --role), or null: an agent like any other.
   role: AgentRole | null;
@@ -227,7 +227,7 @@ export function hearAgent(db: DatabaseSync, sighting: Sighting, now: Clock = sys
 
 // The harness session a command-line agent's wait runs under (its process, above the shells that
 // run its commands), for as long as that session lives: when it is gone the agent's session is over
-// though no process of Otea's runs, which is what a secretary between two waits looks like.
+// though no process of Otea's runs, which is what an assistant between two waits looks like.
 export function noteHarness(
   db: DatabaseSync,
   agent: string,
@@ -257,10 +257,10 @@ export function noteHarness(
     }
     saveHarness(db, agent, pid, known, started);
     beatProcess(db, pid, now);
-    // The secretary's session is another one: the messages the earlier sessions read and left
+    // The assistant's session is another one: the messages the earlier sessions read and left
     // unanswered are owed to it again, however many times they were told (a session that never
     // declares the role again would otherwise find the returns used up).
-    if (bound !== pid && selectRoles(db).get(agent) === 'secretary') resetOwed(db);
+    if (bound !== pid && selectRoles(db).get(agent) === 'assistant') resetOwed(db);
     return true;
   });
 }
@@ -439,9 +439,9 @@ export function runningProcesses(
   };
 }
 
-// A harness session is no Otea process, so nothing of Otea beats for it, but what the secretary
+// A harness session is no Otea process, so nothing of Otea beats for it, but what the assistant
 // does keeps noting it as running (a wait's beat every minute, each command it runs): its id means
-// the session while it was noted lately, and only then. Past the secretary's held time with no
+// the session while it was noted lately, and only then. Past the assistant's held time with no
 // sign of it, an id that still runs may be another process's, as Windows hands them out within
 // seconds of one ending.
 export const HARNESS_BEAT_MS = THERE_FOR_MS;
@@ -662,7 +662,7 @@ export function waitBeat(
     const at = hearAgent(db, sighting, now);
     if (boards) {
       markWaiting(db, sighting.agent, at);
-      // A listener on the boards ends every stretch of work nobody heard (the secretary is none).
+      // A listener on the boards ends every stretch of work nobody heard (the assistant is none).
       clearStretchesFor(db, sighting.agent);
     }
     // The harness its wait was noted under still runs: noted again, a minute at a time.
@@ -717,7 +717,7 @@ function renewLapsingLeases(
   // Each holder that is there, with when its silence began: its last sign.
   const there = new Map<string, number>();
   for (const agent of listAgents(db, () => at, processes)) {
-    if (!agent.there || agent.role === 'secretary') continue;
+    if (!agent.there || agent.role === 'assistant') continue;
     there.set(
       agent.name,
       Math.max(Date.parse(agent.lastSeen), Date.parse(agent.actedAt ?? agent.lastSeen)),
@@ -947,8 +947,8 @@ export function listAgents(
     const live = !ended && (listening || active || called);
     const attending = within(waits.get(name)) && !gone;
     const role = roles.get(name) ?? null;
-    // The secretary's wait hears the person, not the boards' desk: it is never a board listener.
-    const waiting = attending && role !== 'secretary';
+    // The assistant's wait hears the person, not the boards' desk: it is never a board listener.
+    const waiting = attending && role !== 'assistant';
     const sessionEnded = silenced(name);
     const quietMs =
       Date.parse(at) - Math.max(Date.parse(lastSeen), Date.parse(record.actedAt ?? lastSeen));
@@ -971,10 +971,10 @@ export function listAgents(
       live,
       status: agentStatus({
         live,
-        // The secretary talks and keeps others at work: whatever it holds (a note of the Bandeja it
+        // The assistant talks and keeps others at work: whatever it holds (a note of the Bandeja it
         // refines itself, an item it made) is never the work the person counts as «trabajando»
         // (field study 4, U7: with it dead, the top bar still said «1 trabajando»).
-        holding: role === 'secretary' ? 0 : held.length,
+        holding: role === 'assistant' ? 0 : held.length,
         waiting,
         asking: askers.has(name),
         sessionEnded: sessionEnded || ended,

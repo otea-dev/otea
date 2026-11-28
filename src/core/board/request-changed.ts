@@ -33,7 +33,7 @@ const quoted = (value: string | null): string =>
     ? '(empty)'
     : JSON.stringify(value.length > SHOWN ? `${value.slice(0, SHOWN)}…` : value);
 
-// What `otea show` and the secretary's wake say of it, in one sentence.
+// What `otea show` and the assistant's wake say of it, in one sentence.
 export function requestChangedText(changed: RequestChanged): string {
   const list = changed.changes
     .map(({ field, from, to }) => `${field}: ${quoted(from)} -> ${quoted(to)}`)

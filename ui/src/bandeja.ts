@@ -14,7 +14,7 @@ export type { BandejaEntry, BandejaQuestion, BandejaState, FromBandeja };
 // What GET /api/bandeja answers.
 export type BandejaView = { entries: BandejaEntry[] };
 
-// How an entry shows its state, by its message key: «esperando al secretario», «puliendo · <agent>»,
+// How an entry shows its state, by its message key: «esperando a tu asistente», «puliendo · <agent>»,
 // «te pregunta», «archivado en CAM-12». The words are the catalog's.
 export function stateKey(entry: BandejaEntry): `bandeja.st.${BandejaState}` {
   return `bandeja.st.${entry.state}`;
@@ -40,9 +40,4 @@ export function ordered(entries: readonly BandejaEntry[]): BandejaEntry[] {
     if (by !== 0) return by;
     return rank(a) === 2 ? b.id - a.id : a.id - b.id;
   });
-}
-
-// How many entries wait for the person to answer.
-export function askingCount(entries: readonly BandejaEntry[]): number {
-  return entries.filter(({ state }) => state === 'asking').length;
 }

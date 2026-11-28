@@ -8,7 +8,7 @@ import { type Mounted, mount, stubServer } from '../../test-dom.tsx';
 import type { CollectionView, ItemView } from '../../types.ts';
 import { ItemSheet } from './ItemSheet.tsx';
 
-// An item that came out of the conversation with the secretary says so on its page, and the line
+// An item that came out of the conversation with the assistant says so on its page, and the line
 // opens Hablar at that turn.
 
 const bug = officialType('bug-triage');

@@ -1956,7 +1956,7 @@ export function backWithComments(ctx: Context, item: ItemRecord, to: string): bo
 
 // A send-back from a review (the person's Devolver, an agent reviewer's Pedir otra ronda): the item
 // goes back to the step's `back` for its next round, with why. Part of a larger atomic act when one
-// is open (the person's tap on a card of the secretary's sends back and answers in one).
+// is open (the person's tap on a card of the assistant's sends back and answers in one).
 export function sendBackItem(
   ctx: Context,
   input: BoardMoveInput,

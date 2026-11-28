@@ -26,6 +26,16 @@ import {
 } from '../app/agents.ts';
 import { mergeFirstLines } from '../app/approval-wait.ts';
 import {
+  ackAssistantReturns,
+  assistantName,
+  assistantStatus,
+  assistantWake,
+  declareAssistant,
+  isAssistantAct,
+  requireAssistant,
+  startAssistantWait,
+} from '../app/assistant.ts';
+import {
   askOnBandeja,
   bandejaOfItem,
   bandejaPaths,
@@ -60,7 +70,7 @@ import {
   messageFileAt,
   messageIdOf,
   openQuestionsOfTurn,
-  readAsSecretary,
+  readAsAssistant,
   requireLinkableMessage,
   requireMessage,
   turnsOfItem,
@@ -70,7 +80,7 @@ import { sayWithSendBack } from '../app/conversation-act.ts';
 import { cropNote } from '../app/crop.ts';
 import { listDevices, revokeDevice } from '../app/devices.ts';
 import { handInText, openDraftsOf } from '../app/draft-request.ts';
-import { escalateToSecretary } from '../app/escalate.ts';
+import { escalateToAssistant } from '../app/escalate.ts';
 import { listEvents } from '../app/events.ts';
 import {
   attachEvidence,
@@ -104,10 +114,10 @@ import {
   updateItem,
 } from '../app/items.ts';
 import {
+  assistantWaitAgainLine,
+  assistantWaitCommand,
   keepWaitingCommand,
   keepWaitingLine,
-  secretaryWaitAgainLine,
-  secretaryWaitCommand,
   waitAgainLine,
 } from '../app/keep-waiting.ts';
 import { defaultLang, isLang } from '../app/language.ts';
@@ -210,16 +220,6 @@ import {
   repoNameAt,
   UnknownRepo,
 } from '../app/repos.ts';
-import {
-  ackSecretaryReturns,
-  declareSecretary,
-  isSecretaryAct,
-  requireSecretary,
-  secretaryName,
-  secretaryStatus,
-  secretaryWake,
-  startSecretaryWait,
-} from '../app/secretary.ts';
 import { bindsToAnother } from '../app/session-bound.ts';
 import { startProject } from '../app/start.ts';
 import type { TailscaleCli } from '../app/tailscale.ts';
@@ -258,6 +258,7 @@ import {
   rolePrompt,
   roleTakesBoard,
 } from '../core/agent-prompts.ts';
+import { AGENT_ROLES, ROLE_ABOUT } from '../core/assistant.ts';
 import { bandejaIdOf } from '../core/bandeja.ts';
 import { isClosed, isLandStep, positionOf, waysOf } from '../core/board/engine.ts';
 import {
@@ -283,7 +284,6 @@ import { type Actor, assertAgentName } from '../core/item.ts';
 import { parseDuration, parseWaitTimeout } from '../core/lease.ts';
 import { profileLine, UNKNOWN } from '../core/profile.ts';
 import { describeRelation, RELATION_KINDS } from '../core/relations.ts';
-import { AGENT_ROLES, ROLE_ABOUT } from '../core/secretary.ts';
 import { timeText } from '../core/time.ts';
 import { TURNS, type Turn } from '../core/workflow.ts';
 import { branchDiffOf } from '../server/diff-files.ts';
@@ -380,9 +380,9 @@ import { probeSignIn } from './probe.ts';
 import { saysWhereItLives, unreachedWhere } from './reach.ts';
 import { readServeFile, removeServeFile, serverVersionNote, writeServeFile } from './serve-file.ts';
 import {
+  assistantElsewhere,
   isFromAnotherSession,
   noteDeclaringHarness,
-  secretaryElsewhere,
   sessionBound,
   sessionVerdictOf,
 } from './session-guard.ts';
@@ -497,7 +497,7 @@ async function withProjectWhile<T>(cwd: string, use: (project: Project) => Promi
   }
 }
 
-// The items and notes an act of the secretary is about, by the ids it names: what an escalation
+// The items and notes an act of the assistant is about, by the ids it names: what an escalation
 // on them is answered by (say --links, ask/update <id>, bandeja take/close <B-n>).
 function actRefs(input: Input): string[] {
   const named = [
@@ -511,7 +511,7 @@ function actRefs(input: Input): string[] {
 function seen(project: Project, input: Input, actor: Actor = input.actor): void {
   const { channel, harness, newSession } = input;
   if (actor.kind !== 'agent') return;
-  // A read under the secretary's name from another session is answered, never a sign of its life.
+  // A read under the assistant's name from another session is answered, never a sign of its life.
   if (isFromAnotherSession(input)) return;
   // Through an MCP server the agent is connected: the open server is listening for it.
   const note = channel === 'mcp' ? hearAgent : seeAgent;
@@ -528,10 +528,10 @@ function seen(project: Project, input: Input, actor: Actor = input.actor): void 
   // Any call of it keeps what it holds (P1-R3-6).
   renewLeases(project.db, actor.name);
   keepHeldEntries(project, actor.name);
-  // The secretary acting on what its wait returned: a command that acts (say, create...), not one
+  // The assistant acting on what its wait returned: a command that acts (say, create...), not one
   // that only looks, which would lose what a wait running in the background returned unread.
-  if (isSecretaryAct(input.command)) {
-    ackSecretaryReturns(project.db, actor.name, systemClock, actRefs(input));
+  if (isAssistantAct(input.command)) {
+    ackAssistantReturns(project.db, actor.name, systemClock, actRefs(input));
   }
 }
 
@@ -1106,8 +1106,8 @@ const connect: Command = {
         }
         // An agent on the command line only asked for no MCP: the desk has nothing to warn about.
         if (!cliOnly) markMcpAsked(project.db, name, systemClock());
-        // The one secretary of the project: refused while another is connected.
-        if (role !== undefined) declareSecretary(project.db, name);
+        // The one assistant of the project: refused while another is connected.
+        if (role !== undefined) declareAssistant(project.db, name);
       }
       return { root: project.root, id: project.identity.id };
     });
@@ -1264,7 +1264,7 @@ const create: Command = {
     from: { placeholder: 'topic' },
     'from-message': {
       placeholder: 'id',
-      about: "secretary: the person's message this item answers",
+      about: "assistant: the person's message this item answers",
     },
     'from-bandeja': {
       placeholder: 'B-n',
@@ -1293,7 +1293,7 @@ const create: Command = {
       // The Bandeja entry too: held by this agent, checked before anything is made.
       const entry = fromBandeja === undefined ? undefined : bandejaIdOf(fromBandeja);
       if (entry !== undefined) requireBandejaHold(project, entry, actor.name);
-      // The message too, and that this agent may link it: only the secretary does.
+      // The message too, and that this agent may link it: only the assistant does.
       const message = fromMessage === undefined ? undefined : messageIdOf(fromMessage);
       if (message !== undefined) requireLinkableMessage(project, actor.name, message);
       // The item, what it came from and the note filed under it are one step: a note that cannot be
@@ -1488,7 +1488,7 @@ const show: Command = {
       const sharing = overlapsOf(project, requireItem(project.db, shown.id));
       // A round that only merges main into the approved work (src/app/merge-only.ts).
       const mergeOnly = mergeOnlyOf(project, shown.id);
-      // The turn of the conversation it came from (the secretary's requests).
+      // The turn of the conversation it came from (the assistant's requests).
       const fromMessages = turnsOfItem(project, shown.id);
       // The Bandeja entry it was refined from.
       const fromBandeja = bandejaOfItem(project, shown.id);
@@ -1814,7 +1814,7 @@ function projectRolePrompt(
   try {
     project = openProject(cwd);
   } catch (error) {
-    // No project: a secretary's or a refiner's text needs none, a worker's board cannot exist.
+    // No project: an assistant's or a refiner's text needs none, a worker's board cannot exist.
     if (error instanceof OteaError && error.code === 'not_found' && !roleTakesBoard(role))
       return rolePrompt(role, asked ?? defaultLang(), facts);
     throw error;
@@ -1830,7 +1830,7 @@ function projectRolePrompt(
 const promptCommand: Command = {
   name: 'prompt',
   summary:
-    "Print what to paste into an agent's chat: start (a new project: set up, connect, read the project, interview you to understand what you need, one question at a time, tell you plainly whether a template fits, fits with changes, needs a board of its own or Otea is not a good fit, and draft its boards), join (one more agent working the boards there are, named from the project now) or design (one more board); without one, start until the project has boards of its own, then join. Or --role secretary (the chat you talk to: it answers you shortly, turns requests into items on boards, keeps workers and a refiner running, never doing an item itself), --role worker --board <name> [--as <name>] (what the secretary gives each worker, or you paste into a new chat; without --as it tells the worker to pick a name with otea whoami) or --role refiner [--as <name>] (turns the Inbox's rough notes into items). --lang en|es (default: the project's language, set when it was made; with no project yet, the one you use: the desk's, else this computer's, else English)",
+    "Print what to paste into an agent's chat: start (a new project: set up, connect, read the project, interview you to understand what you need, one question at a time, tell you plainly whether a template fits, fits with changes, needs a board of its own or Otea is not a good fit, and draft its boards), join (one more agent working the boards there are, named from the project now) or design (one more board); without one, start until the project has boards of its own, then join. Or --role assistant (the chat you talk to: it answers you shortly, turns requests into items on boards, keeps workers and a refiner running, never doing an item itself), --role worker --board <name> [--as <name>] (what the assistant gives each worker, or you paste into a new chat; without --as it tells the worker to pick a name with otea whoami) or --role refiner [--as <name>] (turns the Inbox's rough notes into items). --lang en|es (default: the project's language, set when it was made; with no project yet, the one you use: the desk's, else this computer's, else English)",
   args: ['moment?'],
   options: {
     lang: { placeholder: 'en|es' },
@@ -1859,7 +1859,7 @@ const promptCommand: Command = {
       throw new UsageError('--role worker needs --board <name>: the board it works');
     if (!roleTakesBoard(role) && board !== undefined)
       throw new UsageError(
-        `--role ${role} takes no --board: only a worker works one board (the secretary gives each its own)`,
+        `--role ${role} takes no --board: only a worker works one board (the assistant gives each its own)`,
       );
     // Only a name given with --as fills the text: the session's own (OTEA_AGENT) is the printer's,
     // never the worker's.
@@ -1940,7 +1940,7 @@ function withTopicsReminder(project: Project, actor: Actor, output: Output): Out
 // rule is in the guide, and in the whole next.
 function topicLines(project: Project, agent: string, brief = false): string[] {
   if (!topicsOn(project)) return [];
-  // With a secretary, no agent is told to record topics; a person's note on a topic still waits.
+  // With an assistant, no agent is told to record topics; a person's note on a topic still waits.
   const guided = topicsGuided(project);
   const awaiting = topicsAwaitingText(topicsAwaiting(project, agent));
   if (brief || !guided) return awaiting === undefined ? [] : [awaiting];
@@ -2615,7 +2615,7 @@ const unlink: Command = {
 const relay: Command = {
   name: 'relay',
   summary:
-    'Record a decision the human made in conversation: move the item as the human, via you (human transitions only; human-ui ones stay in the web UI). With a secretary only it relays, with --from-message (their message holding the quote); never an item in their review (say --drop/--send-back asks them)',
+    'Record a decision the human made in conversation: move the item as the human, via you (human transitions only; human-ui ones stay in the web UI). With an assistant only it relays, with --from-message (their message holding the quote); never an item in their review (say --drop/--send-back asks them)',
   args: ['id', 'state'],
   options: {
     quote: { required: true, placeholder: 'what the human said' },
@@ -2772,11 +2772,11 @@ const WAIT_ORPHANED =
 // Lease expiry writes nothing, so a wait for unclaimed items also checks again on this timer.
 const LEASE_RECHECK_MS = 1000;
 
-// The secretary's wait also looks for board work that has stayed unheard for the grace, which no
+// The assistant's wait also looks for board work that has stayed unheard for the grace, which no
 // write announces: it checks again on this timer.
-const SECRETARY_RECHECK_MS = 5000;
+const ASSISTANT_RECHECK_MS = 5000;
 
-// How long a secretary wait that already has its answer waits for the process table, to note the
+// How long an assistant wait that already has its answer waits for the process table, to note the
 // harness session it runs under.
 const HARNESS_READ_MS = 4000;
 
@@ -2811,7 +2811,7 @@ async function listenWhile<T>(
   // On the command line its own process is watched: killed with its session, it leaves its
   // agent counted as gone at once, not a listening window later (P2S-R2-7, P8-R2-7).
   const waiter = input.channel === 'cli' ? { waiter: process.pid } : {};
-  // Under the secretary's name from another session, a wait is no sign of it: it moves no listening.
+  // Under the assistant's name from another session, a wait is no sign of it: it moves no listening.
   const heard =
     input.actor.kind === 'agent' && !isFromAnotherSession(input)
       ? waitBeat(
@@ -2861,7 +2861,7 @@ async function listenWhile<T>(
   });
   if (owner.orphaned() && heardAt) endListening(project.db, me, heardAt);
   // Its session ended with this wait still running: the harness it ran under is gone, for the
-  // secretary and every subagent noted under it, however little Otea trusted it before (D-U5).
+  // assistant and every subagent noted under it, however little Otea trusted it before (D-U5).
   if (owner.orphaned()) {
     const harness = await owner.harness;
     if (harness !== undefined && harness !== process.pid && !processAlive(harness))
@@ -2873,16 +2873,16 @@ async function listenWhile<T>(
   return waited;
 }
 
-// A worker's harness session, noted the way the secretary's is (H2, field study 4): the process
+// A worker's harness session, noted the way the assistant's is (H2, field study 4): the process
 // above the shells that ran its claim or its wait, for as long as it lives. A worker at a long step
 // makes no otea call, and a session that runs is the sign it is there; without it the desk read the
 // item «atascado» and the worker «sin señal» while it worked. Read once per session, by the command
-// that starts the work (claim, next --claim) or by a wait, never by a heartbeat; the secretary's
+// that starts the work (claim, next --claim) or by a wait, never by a heartbeat; the assistant's
 // own waits note theirs. An agent known to run under a noted harness reads no table.
 function workerHarnessUnknown(project: Project, input: Input): boolean {
   if (input.channel !== 'cli' || input.actor.kind !== 'agent') return false;
   const me = input.actor.name;
-  if (secretaryName(project.db) === me) return false;
+  if (assistantName(project.db) === me) return false;
   const harness = selectListenerProcesses(project.db).get(me)?.harness ?? null;
   return harness === null || !processAlive(harness);
 }
@@ -2947,10 +2947,10 @@ async function lookUpWorkerHarness(input: Input, me: string): Promise<void> {
   );
 }
 
-// The secretary's wait (otea wait --secretary): returns for a message from the person, a Bandeja
-// capture, a question escalated to it, or board work nobody listens to (app/secretary.ts). Only the
-// project's secretary waits this way, and the boards do not count it as listening.
-async function waitForSecretary(input: Input): Promise<Output> {
+// The assistant's wait (otea wait --assistant): returns for a message from the person, a Bandeja
+// capture, a question escalated to it, or board work nobody listens to (app/assistant.ts). Only the
+// project's assistant waits this way, and the boards do not count it as listening.
+async function waitForAssistant(input: Input): Promise<Output> {
   const { option } = input;
   if (
     option('turn') !== undefined ||
@@ -2958,30 +2958,30 @@ async function waitForSecretary(input: Input): Promise<Output> {
     input.flag('unclaimed')
   ) {
     throw new UsageError(
-      '--secretary takes no --turn, --collection or --unclaimed: it waits for the person and for the boards nobody listens to',
+      '--assistant takes no --turn, --collection or --unclaimed: it waits for the person and for the boards nobody listens to',
     );
   }
   const timeout = option('timeout');
   const timeoutMs = durationFrom('timeout', timeout);
   const me = input.actor.name;
   // Its harness session is noted as soon as the processes are read: that is the one process that
-  // says the secretary's session ended once no wait of it runs (it works between two waits). Once
+  // says the assistant's session ended once no wait of it runs (it works between two waits). Once
   // noted and still running it is not read again by the waits that follow, which stay as quick as
   // before: only the first wait of a session reads the process table early, and a wake that comes
   // before it is done waits for it a few seconds at most.
   const noting = input.channel === 'cli' && !harnessNoted(input.cwd, me);
   const owner = watchOwner(input.signal, { early: noting });
-  // Sessions that start together under one name: the first to note its harness is the secretary's,
+  // Sessions that start together under one name: the first to note its harness is the assistant's,
   // and the waits of the others end at once with the refusal any other act of theirs would get.
   const lost = new AbortController();
   let lostToAnother = false;
   const options = {
     signal: AbortSignal.any([owner.signal, lost.signal]),
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
-    recheckMs: SECRETARY_RECHECK_MS,
+    recheckMs: ASSISTANT_RECHECK_MS,
   };
   const result = await withAgentWhile(input, async (project) => {
-    requireSecretary(project.db, me);
+    requireAssistant(project.db, me);
     const noted = Promise.all([
       owner.harness,
       owner.harnessKnown,
@@ -3002,35 +3002,35 @@ async function waitForSecretary(input: Input): Promise<Output> {
       }
     });
     // A board the person publishes while it waits joins the catalog before the check reads its items.
-    const secretaryWait = startSecretaryWait();
+    const assistantWait = startAssistantWait();
     const look = () => {
       syncBoardPresets(project);
-      return secretaryWake(project, secretaryWait);
+      return assistantWake(project, assistantWait);
     };
     const waited = await listenWhile(project, input, owner, look, options);
     // A wake in the first seconds comes before the processes are read: it gives them a moment, as
     // the harness noted is what tells its session ended once this process is gone.
     if (noting && !owner.orphaned())
       await Promise.race([noted, delay(HARNESS_READ_MS, undefined, { ref: false })]);
-    if (lostToAnother) throw new OteaError('forbidden', secretaryElsewhere(me));
+    if (lostToAnother) throw new OteaError('forbidden', assistantElsewhere(me));
     if (!('found' in waited)) return waited;
     const wake = waited.found;
     // What waits for the person, counted now: the notice «ready for review» never rests on memory.
     const waits = pendingLine(pendingOf(project, undefined, { blocks: false }));
     return {
-      data: { secretary: me, ...wake },
-      text: [wake.text, ...(waits ? [waits] : []), secretaryWaitAgainLine(me, input.channel)].join(
+      data: { assistant: me, ...wake },
+      text: [wake.text, ...(waits ? [waits] : []), assistantWaitAgainLine(me, input.channel)].join(
         '\n',
       ),
     };
-    // Released however it ends: a refusal (not the secretary) must not wait out the early listing.
+    // Released however it ends: a refusal (not the assistant) must not wait out the early listing.
   }).finally(() => owner.release());
   if ('data' in result) return result;
   if (result.stopped === 'timeout') {
     const within = /^\d+$/.test(timeout ?? '') ? `${timeout}s` : timeout;
     throw new CommandFailure(
       'timeout',
-      `Nothing reached the secretary within ${within}; a timeout is no failure, keep waiting: ${secretaryWaitCommand(me)}`,
+      `Nothing reached the assistant within ${within}; a timeout is no failure, keep waiting: ${assistantWaitCommand(me)}`,
     );
   }
   if (owner.orphaned()) throw new CommandFailure('interrupted', WAIT_ORPHANED);
@@ -3040,18 +3040,18 @@ async function waitForSecretary(input: Input): Promise<Output> {
 const wait: Command = {
   name: 'wait',
   summary:
-    'Wait until an item is on the turn and print it as a list row, at once if one already is; the one waiting longest in its state comes first. A note from the person on an item you hold, or their answer to your question, wakes it too, saying which. --secretary, instead of --turn, is the secretary wait: it wakes for the person, an Inbox note, an escalated question, an item that reached their review or board work nobody hears',
+    'Wait until an item is on the turn and print it as a list row, at once if one already is; the one waiting longest in its state comes first. A note from the person on an item you hold, or their answer to your question, wakes it too, saying which. --assistant, instead of --turn, is the assistant wait: it wakes for the person, an Inbox note, an escalated question, an item that reached their review or board work nobody hears',
   args: [],
   options: {
-    // Required unless --secretary: checked in execute.
+    // Required unless --assistant: checked in execute.
     turn: { choices: ['agent', 'human'] },
     collection: {},
     unclaimed: { flag: true },
-    secretary: { flag: true },
+    assistant: { flag: true },
     timeout: { placeholder: 'duration' },
   },
   execute: async (input) => {
-    if (input.flag('secretary')) return waitForSecretary(input);
+    if (input.flag('assistant')) return waitForAssistant(input);
     const turn = input.required('turn');
     const timeout = input.option('timeout');
     const timeoutMs = durationFrom('timeout', timeout);
@@ -3311,29 +3311,29 @@ const whoami: Command = {
     return withProject(cwd, (project) => {
       const told = nameTold(project, input, harness);
       const name = told.data.given ? input.agent : (told.data.name ?? told.data.suggested);
-      const lines = [...openDraftLines(project, name ?? null), ...secretaryLines(project, name)];
+      const lines = [...openDraftLines(project, name ?? null), ...assistantLines(project, name)];
       return lines.length === 0 ? told : { ...told, text: [told.text, ...lines].join('\n') };
     });
   },
 };
 
-// Who the project's secretary is and where it stands, when it has one: the agent told it is the
-// secretary says how to listen.
-function secretaryLines(project: Project, name: string | undefined | null): string[] {
-  const secretary = secretaryStatus(project.db);
-  if (secretary === undefined) return [];
+// Who the project's assistant is and where it stands, when it has one: the agent told it is the
+// assistant says how to listen.
+function assistantLines(project: Project, name: string | undefined | null): string[] {
+  const assistant = assistantStatus(project.db);
+  if (assistant === undefined) return [];
   const stands =
-    secretary.state === 'offline'
-      ? `offline since ${secretary.since === null ? 'never heard' : timeText(secretary.since)}`
-      : secretary.state;
+    assistant.state === 'offline'
+      ? `offline since ${assistant.since === null ? 'never heard' : timeText(assistant.since)}`
+      : assistant.state;
   // The session the name is bound to: a name alone proves nothing, so it is told which one is it.
-  const bound = secretary.session === undefined ? '' : `, session ${secretary.session}`;
-  if (secretary.name === name) {
+  const bound = assistant.session === undefined ? '' : `, session ${assistant.session}`;
+  if (assistant.name === name) {
     return [
-      `You are this project's secretary (${stands}${bound}). Listen for the person with ${secretaryWaitCommand(name)}; read what they wrote with otea conversation --as ${name}, answer with otea say.`,
+      `You are this project's assistant (${stands}${bound}). Listen for the person with ${assistantWaitCommand(name)}; read what they wrote with otea conversation --as ${name}, answer with otea say.`,
     ];
   }
-  return [`This project's secretary is ${secretary.name} (${stands}${bound}).`];
+  return [`This project's assistant is ${assistant.name} (${stands}${bound}).`];
 }
 
 // A board draft a restart may have cut off (p3-company run 2): Otea kept it, and a new session is
@@ -3461,7 +3461,7 @@ const profileCommandSpec: Command = {
       // The role and the profile are declared together or not at all: a role refused (a project
       // has one), or an option that is wrong, leaves nothing declared.
       transaction(project.db, () => {
-        const roled = role === undefined ? undefined : declareSecretary(project.db, actor.name);
+        const roled = role === undefined ? undefined : declareAssistant(project.db, actor.name);
         // One declaration wins when several sessions declare the same name together: the others
         // are refused here, and the transaction leaves nothing of theirs (session-guard.ts).
         if (roled !== undefined) noteDeclaringHarness(project.db, input, actor.name);
@@ -3484,17 +3484,17 @@ const profileCommandSpec: Command = {
         if (roled === undefined) return out;
         return {
           data: { ...(out.data as object), role: roled.role, replaced: roled.replaced },
-          text: `${out.text}\n${secretaryRoleLine(actor.name, roled.replaced)}`,
+          text: `${out.text}\n${assistantRoleLine(actor.name, roled.replaced)}`,
         };
       }),
     );
   },
 };
 
-// What declaring the role says: the project's secretary, whom it replaced, and how it listens.
-function secretaryRoleLine(agent: string, replaced: string | null) {
+// What declaring the role says: the project's assistant, whom it replaced, and how it listens.
+function assistantRoleLine(agent: string, replaced: string | null) {
   const was = replaced === null ? '' : ` (it replaces ${replaced}, which is gone)`;
-  return `${agent} is this project's secretary${was}. Listen for the person with ${secretaryWaitCommand(agent)}, in the background if you can; the secretary never waits with --turn.`;
+  return `${agent} is this project's assistant${was}. Listen for the person with ${assistantWaitCommand(agent)}, in the background if you can; the assistant never waits with --turn.`;
 }
 
 function profileText(
@@ -3844,7 +3844,7 @@ const update: Command = {
     tell: {
       placeholder: 'text',
       about:
-        'for the secretary: the person changed their mind about an item that is not in their review: the change is made even while a worker holds it, and the worker is told at once (it answers before it hands off)',
+        'for the assistant: the person changed their mind about an item that is not in their review: the change is made even while a worker holds it, and the worker is told at once (it answers before it hands off)',
     },
   },
   execute: async (input) => {
@@ -4473,13 +4473,13 @@ const start: Command = {
       lang === 'es' ? ['Spanish', 'English', 'en'] : ['English', 'Spanish', 'es'];
     const langLine = `Language: ${said} for the boards and the text below (--lang ${otherKey} makes them ${other})`;
     // The way to daily use, first and short, in the project's language: one session is the
-    // secretary, the person talks with it in Talk on the desk, and it keeps the agents at work. It
+    // assistant, the person talks with it in Talk on the desk, and it keeps the agents at work. It
     // comes before the status and before the long text, so it is the first thing read (field
     // study 4: it used to be an English line after forty lines of board design).
     const designed = boards.all.length > 0;
     const pasteText = [
       designed
-        ? 'Or, to connect one agent without a secretary, paste this into its chat (otea prompt prints it again):'
+        ? 'Or, to connect one agent without an assistant, paste this into its chat (otea prompt prints it again):'
         : 'Or, to have your agent design the boards with you, paste this into its chat (otea prompt prints it again):',
       ...prompt.split('\n').map((line) => `  ${line}`),
     ];
@@ -4665,7 +4665,7 @@ function heardBy(
 ) {
   try {
     withProject(cwd, (project) => {
-      // The secretary's name called through a server that is not its noted session is heard as
+      // The assistant's name called through a server that is not its noted session is heard as
       // nothing: it moves no binding, listening or harness (its acts are refused by their processes).
       if (bindsToAnother(project.db, agent, { pid: process.pid, launcher: process.ppid })) return;
       // An agent at work in another project is no one's to hear here (its calls are refused).
@@ -5414,12 +5414,12 @@ const topicClose: Command = {
   },
 };
 
-// The conversation with the person (0.8): the secretary alone reads it and answers. The person
+// The conversation with the person (0.8): the assistant alone reads it and answers. The person
 // writes only from the desk, so no command here ever makes a message of the person's.
 const conversation: Command = {
   name: 'conversation',
   summary:
-    "For the secretary: read the person's new messages (marked read), with some context before; --since <id> reads what follows that message, --limit <n> a page",
+    "For the assistant: read the person's new messages (marked read), with some context before; --since <id> reads what follows that message, --limit <n> a page",
   args: [],
   options: {
     since: { placeholder: 'id' },
@@ -5432,7 +5432,7 @@ const conversation: Command = {
     return withAgent(input, (project) => {
       const from = countFrom('since', since, 0);
       const page = countFrom('limit', limit, 1);
-      const read = readAsSecretary(project, {
+      const read = readAsAssistant(project, {
         agent: actor.name,
         ...(from === undefined ? {} : { since: from }),
         ...(page === undefined ? {} : { limit: page }),
@@ -5462,7 +5462,7 @@ const conversation: Command = {
 const say: Command = {
   name: 'say',
   summary:
-    'For the secretary: tell the person something, short, the conclusion first (- reads stdin). To answer a message: --reply-to <id>, with --request --links <item ids made> or --consultation to classify that turn. Your own news (a review ready, a problem): no --reply-to. A question: 2 to 4 --option answers they tap; with --send-back <id> --note "<note>" the first one sends that item of their review back for them, with the note, when they tap it',
+    'For the assistant: tell the person something, short, the conclusion first (- reads stdin). To answer a message: --reply-to <id>, with --request --links <item ids made> or --consultation to classify that turn. Your own news (a review ready, a problem): no --reply-to. A question: 2 to 4 --option answers they tap; with --send-back <id> --note "<note>" the first one sends that item of their review back for them, with the note, when they tap it',
   args: ['text?'],
   options: {
     file: { multiple: true, placeholder: 'path' },
@@ -5565,7 +5565,7 @@ const say: Command = {
         ...(options.length === 0 ? {} : { options }),
         ...(optionText.length === 0 ? {} : { optionText }),
         ...(recommended === undefined ? {} : { recommended }),
-        // Said under a name Otea could not tie to the secretary's session: the desk marks it.
+        // Said under a name Otea could not tie to the assistant's session: the desk marks it.
         unverified: sessionVerdictOf(input) !== 'bound',
         ...(sendBack === undefined || noteGiven === undefined
           ? {}
@@ -5595,7 +5595,7 @@ const say: Command = {
   },
 };
 
-// What waits for the person, as Otea counts it from the records: for the secretary to say «what
+// What waits for the person, as Otea counts it from the records: for the assistant to say «what
 // waits for you today» and to notice what became theirs, instead of remembering.
 const pending: Command = {
   name: 'pending',
@@ -5610,31 +5610,31 @@ const pending: Command = {
     }),
 };
 
-// An agent tells the secretary what the person must know, to relay it in Talk.
+// An agent tells the assistant what the person must know, to relay it in Talk.
 const escalate: Command = {
   name: 'escalate',
   summary:
-    'Tell the secretary what the person must know and is no question for them (a duplicate, a failed push, a block): it tells them in Talk. A decision is otea ask. About an item or an Inbox note (B-3)',
+    'Tell the assistant what the person must know and is no question for them (a duplicate, a failed push, a block): it tells them in Talk. A decision is otea ask. About an item or an Inbox note (B-3)',
   args: ['id', 'text'],
   options: {},
   execute: (input) => {
     const [id = '', text = ''] = input.args;
     return withAgent(input, (project) => {
-      const sent = escalateToSecretary(project, { agent: input.actor.name, about: id, text });
+      const sent = escalateToAssistant(project, { agent: input.actor.name, about: id, text });
       const told =
-        sent.secretaryState === 'offline'
-          ? `${sent.secretary} is offline: the person will see it directly, in Your turn and in Talk, until it is back.`
-          : `${sent.secretary} tells the person in Talk.`;
+        sent.assistantState === 'offline'
+          ? `${sent.assistant} is offline: the person will see it directly, in Your turn and in Talk, until it is back.`
+          : `${sent.assistant} tells the person in Talk.`;
       const again = sent.already ? ' (It was waiting already: nothing new was sent.)' : '';
       return {
         data: sent,
-        text: `Told ${sent.secretary} about ${sent.about}${again}. ${told} Go on with what you can; ask them yourself (otea ask) only for a decision that is theirs.`,
+        text: `Told ${sent.assistant} about ${sent.about}${again}. ${told} Go on with what you can; ask them yourself (otea ask) only for a decision that is theirs.`,
       };
     });
   },
 };
 
-// The secretary, or the agent that delivered an item, tells the person on the item itself what it
+// The assistant, or the agent that delivered an item, tells the person on the item itself what it
 // thinks of a delivery that waits for their review: it recommends sending it back, or it doubts it.
 // The pages that offer Aprobar say it beside the button. Advice only: nothing moves.
 const advise: Command = {
@@ -5703,7 +5703,7 @@ const BANDEJA_RECHECK_MS = 5000;
 const bandejaTake: Command = {
   name: 'bandeja take',
   summary:
-    'Take an Inbox entry (B-3) to refine it: held 30 minutes (acting on it renews), no other refiner takes it. --next takes the next free one (yours first), --wait waits for it. Only the refiner itself takes a note: the secretary never takes one for it',
+    'Take an Inbox entry (B-3) to refine it: held 30 minutes (acting on it renews), no other refiner takes it. --next takes the next free one (yours first), --wait waits for it. Only the refiner itself takes a note: the assistant never takes one for it',
   args: ['id?'],
   options: {
     next: { flag: true },
@@ -5796,11 +5796,11 @@ const bandejaTake: Command = {
 const bandejaTakeNextCommand = (agent: string): string =>
   `otea bandeja take --next --wait --as ${agent}`;
 
-// The secretary, or the refiner that holds an entry, closes one that needs no item.
+// The assistant, or the refiner that holds an entry, closes one that needs no item.
 const bandejaClose: Command = {
   name: 'bandeja close',
   summary:
-    'Close an Inbox entry (B-3) that needs no item (a duplicate), with the --reason the person reads and may reopen. The secretary, or the refiner holding it',
+    'Close an Inbox entry (B-3) that needs no item (a duplicate), with the --reason the person reads and may reopen. The assistant, or the refiner holding it',
   args: ['id'],
   options: { reason: { required: true } },
   execute: (input) => {

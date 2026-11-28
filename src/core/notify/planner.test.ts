@@ -321,25 +321,25 @@ describe('Planner', () => {
       stuck: true,
       aside: false,
       unheard: true,
-      secretary_reply: true,
-      secretary_offline: true,
+      assistant_reply: true,
+      assistant_offline: true,
       askText: true,
       quiet: null,
       muted: [],
     });
   });
 
-  it('gives the secretary’s notices their own item cooldown, switch and project mute', () => {
+  it('gives the assistant’s notices their own item cooldown, switch and project mute', () => {
     const reply: Signal = {
-      key: 'secretary_reply:7',
-      kind: 'secretary_reply',
+      key: 'assistant_reply:7',
+      kind: 'assistant_reply',
       item: 'hablar:3',
       title: '',
       by: 'sage',
       turn: 3,
       text: 'Listo',
     };
-    const off = { ...prefs, secretary_reply: false };
+    const off = { ...prefs, assistant_reply: false };
     planner.offer([reply], off, T0);
     expect(planner.hasPending()).toBe(false);
     const muted = new Planner(minuteOfDay, 'web');
@@ -347,14 +347,14 @@ describe('Planner', () => {
     expect(muted.hasPending()).toBe(false);
     planner.offer([reply], prefs, T0);
     expect(planner.take(T0 + GATHER_MS, keys([reply]), prefs)).toEqual([
-      { kind: 'secretary_reply', item: 'hablar:3', title: '', by: 'sage', text: 'Listo', turn: 3 },
+      { kind: 'assistant_reply', item: 'hablar:3', title: '', by: 'sage', text: 'Listo', turn: 3 },
     ]);
     // Hiding the text hides the reply's words, not the notice.
     const hidden = new Planner(minuteOfDay);
     const quiet = { ...prefs, askText: false };
     hidden.offer([reply], quiet, T0);
     expect(hidden.take(T0 + GATHER_MS, keys([reply]), quiet)).toEqual([
-      { kind: 'secretary_reply', item: 'hablar:3', title: '', by: 'sage', turn: 3 },
+      { kind: 'assistant_reply', item: 'hablar:3', title: '', by: 'sage', turn: 3 },
     ]);
   });
 

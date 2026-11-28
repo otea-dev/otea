@@ -1,7 +1,7 @@
 import type { Actor } from '../item.ts';
 
 // What an agent tells the person about a delivery that waits for their review (s-real2 D-00b356):
-// the secretary recommends sending it back, or the agent that delivered it doubts it. It is advice
+// the assistant recommends sending it back, or the agent that delivered it doubts it. It is advice
 // and never a block: the pages that offer Aprobar say it beside the button, in plain words, and the
 // person's act stays theirs. It is about one delivery: a new handoff (the item came back and was
 // handed in again) leaves it behind.
@@ -21,10 +21,10 @@ export const MAX_ADVICE_CHARS = 400;
 export type Advice = {
   kind: AdviceKind;
   note: string;
-  // The agent that said it, and whether it is the project's secretary (the desk says «la secretaria»
+  // The agent that said it, and whether it is the project's assistant (the desk says «tu asistente»
   // for it and the agent's own name for any other).
   by: string;
-  secretary: boolean;
+  assistant: boolean;
   at: string;
 };
 
@@ -40,7 +40,7 @@ export function adviceAfterHandoff(events: readonly Event[]): Advice | undefined
     kind: given.data.kind,
     note: String(given.data.note ?? ''),
     by: given.actor.name,
-    secretary: given.data.secretary === true,
+    assistant: given.data.assistant === true,
     at: given.at,
   };
 }

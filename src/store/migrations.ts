@@ -703,6 +703,22 @@ export const MIGRATIONS = [
        WHERE i.id = conversation_links.item_id
          AND i.created_at >= (SELECT m.at FROM conversation_messages m WHERE m.id = conversation_links.message_id));
   `,
+  // The project's assistant was called "the secretary" while 0.8 was built: what was stored under
+  // that word is rewritten, never read through a mapping. The signals' table, the role an agent
+  // declared, who wrote a message and who set a turn's kind, and the role a relayed note records
+  // in its event (the one place a row of the append-only log is rewritten: its trigger is put back).
+  `
+  ALTER TABLE secretary_signals RENAME TO assistant_signals;
+  UPDATE agents SET role = 'assistant' WHERE role = 'secretary';
+  UPDATE conversation_messages SET author = 'assistant' WHERE author = 'secretary';
+  UPDATE conversation_messages SET kind_by = 'assistant' WHERE kind_by = 'secretary';
+
+  DROP TRIGGER events_no_update;
+  UPDATE events SET data = json_set(data, '$.role', 'assistant')
+   WHERE json_valid(data) AND json_extract(data, '$.role') = 'secretary';
+  CREATE TRIGGER events_no_update BEFORE UPDATE ON events
+  BEGIN SELECT RAISE(ABORT, 'events are append-only'); END;
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {

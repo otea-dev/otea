@@ -3,7 +3,7 @@ import { OteaError } from './errors.ts';
 
 // The Bandeja (0.8): the project's inbox of rough notes the person captured from the desk or the
 // phone, a free text with files and no board form. It is not a board: an entry waits for the
-// secretary, is taken by one refiner (the secretary itself, or a subagent it launched), who turns it
+// assistant, is taken by one refiner (the assistant itself, or a subagent it launched), who turns it
 // into a proper item on the right board, or asks the person on the entry what is missing (with
 // options to tap), and ends filed under the item it became. The person captures only through the
 // desk's authenticated routes (app/bandeja.ts); an agent never makes an entry.
@@ -13,11 +13,11 @@ import { OteaError } from './errors.ts';
 export const BANDEJA_LEASE_MS = 30 * 60_000;
 
 // Where an entry stands:
-//   waiting   nobody has it: the secretary is told
+//   waiting   nobody has it: the assistant is told
 //   refining  a refiner holds it (`claimedBy`)
 //   asking    a refiner asked the person something and waits for the answer
 //   filed     it became an item (`item`)
-//   closed    the secretary or its refiner closed it with a reason (`closeReason`); it waits for
+//   closed    the assistant or its refiner closed it with a reason (`closeReason`); it waits for
 //             nobody, and the person may reopen it
 export const BANDEJA_STATES = ['waiting', 'refining', 'asking', 'filed', 'closed'] as const;
 

@@ -14,7 +14,7 @@ const you = { kind: 'human' as const, name: 'fede' };
 const T0 = Date.parse('2026-11-27T09:00:00.000Z');
 const at = (minutes: number) => () => new Date(T0 + minutes * 60_000).toISOString();
 
-// U3 (field study 4, wave 2b): with the secretary unable to launch workers, «open a session and
+// U3 (field study 4, wave 2b): with the assistant unable to launch workers, «open a session and
 // paste text N» is the person's to do, and nothing said so: Te espera, Te toca and `otea pending`
 // read «nothing waits for you» while three items waited for a session only they could open.
 describe('a board with work and nobody on it waits for the person to open a worker', () => {
@@ -43,8 +43,8 @@ describe('a board with work and nobody on it waits for the person to open a work
   });
 
   // U6 (field study 4): «Resúmeme lo que se hizo» was wrong both times (6 done, said none; 12 done,
-  // said 11): the secretary counted from memory. Otea counts what closed in the last day.
-  it('counts what was done in the last day, for the secretary to answer from', () => {
+  // said 11): the assistant counted from memory. Otea counts what closed in the last day.
+  it('counts what was done in the last day, for the assistant to answer from', () => {
     const [first, second] = ids;
     for (const [id, minute] of [
       [first, 2],

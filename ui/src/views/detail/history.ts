@@ -149,12 +149,12 @@ export function historyOf(
             })
           : null,
       ].filter(Boolean);
-      // A note an agent wrote for the person (the secretary's `update --tell`) says so: the person
+      // A note an agent wrote for the person (the assistant's `update --tell`) says so: the person
       // never wrote it.
       const text = !note?.relayedBy
         ? t('notes.h.left')
-        : note.bySecretary
-          ? t('notes.h.leftSecretary')
+        : note.byAssistant
+          ? t('notes.h.leftAssistant')
           : t('notes.h.leftAgent', { agent: note.relayedBy });
       return {
         ...base,

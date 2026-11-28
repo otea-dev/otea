@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { BANDEJA_LEASE_MS } from '../core/bandeja.ts';
+import { assistantWake, declareAssistant, startAssistantWait } from './assistant.ts';
+import { assistantWaiting } from './assistant-waiting.ts';
 import {
   answerBandeja,
   askOnBandeja,
@@ -19,12 +21,10 @@ import {
 import { addCollection } from './collections.ts';
 import { createItem } from './items.ts';
 import type { Project } from './project.ts';
-import { declareSecretary, secretaryWake, startSecretaryWait } from './secretary.ts';
-import { secretaryWaiting } from './secretary-waiting.ts';
 import { memoryContext, projectOf } from './testing.ts';
 
 // The Bandeja when no refiner is there (field study 3, S4/S5): a note taken for a refiner that
-// never shows must come back to the secretary, a duplicate must be closable, and one refiner takes
+// never shows must come back to the assistant, a duplicate must be closable, and one refiner takes
 // the notes in turn instead of one launched per note.
 const T0 = Date.parse('2026-11-26T10:00:00.000Z');
 const clock = (offsetMs: number) => () => new Date(T0 + offsetMs).toISOString();
@@ -38,7 +38,7 @@ describe('the Bandeja without a refiner session', () => {
     root = mkdtempSync(join(tmpdir(), 'otea-bandeja-keep-'));
     project = projectOf(root, memoryContext());
     addCollection(project, { name: 'tasks' });
-    declareSecretary(project.db, 'sol', clock(0));
+    declareAssistant(project.db, 'sol', clock(0));
   });
 
   afterEach(() => {
@@ -47,10 +47,10 @@ describe('the Bandeja without a refiner session', () => {
   });
 
   const capture = (text: string, at = 1000) => captureToBandeja(project, { text }, clock(at)).entry;
-  const wake = (at: number) => secretaryWake(project, startSecretaryWait(clock(at)), clock(at));
+  const wake = (at: number) => assistantWake(project, startAssistantWait(clock(at)), clock(at));
 
   describe('a note the refiner holds', () => {
-    it('is kept for the whole lease by any call of the refiner, and the secretary hears nothing meanwhile', () => {
+    it('is kept for the whole lease by any call of the refiner, and the assistant hears nothing meanwhile', () => {
       capture('an idea');
       takeBandeja(project, { id: 1, agent: 'sol-refiner' }, clock(1000));
 
@@ -62,7 +62,7 @@ describe('the Bandeja without a refiner session', () => {
       expect(wake(MIN + BANDEJA_LEASE_MS - 1)).toBeUndefined();
     });
 
-    it('lets the secretary refine it itself once the lease ran out', () => {
+    it('lets the assistant refine it itself once the lease ran out', () => {
       capture('an idea');
       takeBandeja(project, { id: 1, agent: 'sol-refiner' }, clock(1000));
 
@@ -125,12 +125,12 @@ describe('the Bandeja without a refiner session', () => {
   });
 
   describe('closing a note', () => {
-    it('is the secretary’s or the holder’s, with a reason, and ends the wait', () => {
+    it('is the assistant’s or the holder’s, with a reason, and ends the wait', () => {
       capture('a duplicate of CAM-1');
 
       expect(() =>
         closeBandeja(project, { id: 1, agent: 'lia', reason: 'dup' }, clock(2000)),
-      ).toThrow(/secretary/);
+      ).toThrow(/assistant/);
       expect(() =>
         closeBandeja(project, { id: 1, agent: 'sol', reason: ' ' }, clock(2000)),
       ).toThrow(/reason/);
@@ -147,7 +147,7 @@ describe('the Bandeja without a refiner session', () => {
         closedBy: 'sol',
       });
       expect(wake(3000)).toBeUndefined();
-      expect(secretaryWaiting(project.db).count).toBe(0);
+      expect(assistantWaiting(project.db).count).toBe(0);
       expect(listBandeja(project, {}, clock(3000))).toEqual([]);
       expect(listBandeja(project, { filed: 10 }, clock(3000))).toEqual([
         expect.objectContaining({ ref: 'B-1', state: 'closed' }),
@@ -204,7 +204,7 @@ describe('the Bandeja without a refiner session', () => {
       ).toThrow(/filed already/);
     });
 
-    it('is reopened by the person: it waits for the secretary again', () => {
+    it('is reopened by the person: it waits for the assistant again', () => {
       capture('a duplicate of CAM-1');
       closeBandeja(project, { id: 1, agent: 'sol', reason: 'the same as CAM-1' }, clock(2000));
 

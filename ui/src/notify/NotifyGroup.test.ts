@@ -50,8 +50,8 @@ describe('Preferencias › Avisos', () => {
     const html = render({ view: { ...view, subscribed: true } });
     expect(html.match(/role="switch" aria-checked="true"/g)).toHaveLength(8);
     expect(html).toContain('Mostrar el texto en el aviso');
-    expect(html).toContain('Tu secretario te responde');
-    expect(html).toContain('Tu secretario está desconectado y te esperan mensajes');
+    expect(html).toContain('Tu asistente te responde');
+    expect(html).toContain('Tu asistente está desconectado y te esperan mensajes');
     expect(html.match(/role="switch" aria-checked="false"/g)).toHaveLength(2);
     expect(html).toContain('Te toca');
     expect(html).toContain('una revisión o una aprobación');

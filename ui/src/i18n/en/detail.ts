@@ -836,10 +836,10 @@ export const detail = {
   // Beside every Aprobar on an item in review (ReviewNotices): in the words of someone who does not
   // read code, the technical sentences above one tap away.
   'rvn.diff':
-    'What is attached to this review may not be what goes in. Approving approves the work the agent handed in, not the attached file. Before you approve, look at what the agent delivered, or ask the secretary.',
-  'rvn.advice.sendBack.secretary': 'The secretary recommends sending it back: {note}',
+    'What is attached to this review may not be what goes in. Approving approves the work the agent handed in, not the attached file. Before you approve, look at what the agent delivered, or ask the assistant.',
+  'rvn.advice.sendBack.assistant': 'The assistant recommends sending it back: {note}',
   'rvn.advice.sendBack.agent': '{agent} recommends sending it back: {note}',
-  'rvn.advice.doubt.secretary': 'The secretary has a doubt: {note}',
+  'rvn.advice.doubt.assistant': 'The assistant has a doubt: {note}',
   'rvn.advice.doubt.agent': '{agent} has a doubt: {note}',
   'bi.branch.moved':
     'The branch changed on the remote after the handoff: it is now at {now}. Approving approves only what was handed off, {handed}.',
@@ -969,7 +969,7 @@ export const detail = {
   'notes.allAnswered': { one: 'answered', other: 'all answered' },
   'notes.open': 'unanswered',
   'notes.you': 'you',
-  'notes.relayed.secretary': 'The secretary, for you',
+  'notes.relayed.assistant': 'The assistant, for you',
   'notes.relayed.agent': '{agent}, for you',
   'notes.waiting': '{agent} has not answered yet.',
   'notes.waitingAny': 'The agent has not answered yet.',
@@ -996,7 +996,7 @@ export const detail = {
   'notes.sentAny': 'You left the agent a note on “{title}”.',
   'notes.failed': 'The note was not sent. Try again.',
   'notes.h.left': 'You left it a note',
-  'notes.h.leftSecretary': 'The secretary, for you, left it a note',
+  'notes.h.leftAssistant': 'The assistant, for you, left it a note',
   'notes.h.leftAgent': '{agent}, for you, left it a note',
   'notes.h.on': 'on {file}',
   'notes.h.answered': '{agent} answered at {time}',

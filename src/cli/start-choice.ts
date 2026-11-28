@@ -62,7 +62,7 @@ export function cancelled(
 }
 
 // The first thing otea start says, in the project's language and before any board text: the three
-// steps to a secretary, the way to daily use. `signIn` is a run with --no-open, where the link to
+// steps to an assistant, the way to daily use. `signIn` is a run with --no-open, where the link to
 // the desk is the one printed below and the desk is not open yet.
 export function firstRunLines(lang: Lang, where: { url: string; signIn: boolean }): string[] {
   if (lang === 'es') {
@@ -71,7 +71,7 @@ export function firstRunLines(lang: Lang, where: { url: string; signIn: boolean 
       where.signIn
         ? '  1. Abre el escritorio con el enlace de inicio de sesión de más abajo.'
         : `  1. Abre el escritorio en tu navegador (si no se abrió solo): ${where.url}`,
-      '  2. Entra en Hablar y copia el texto del secretario (o, en la terminal: otea prompt --role secretary).',
+      '  2. Entra en Hablar y copia el texto del asistente (o, en la terminal: otea prompt --role assistant).',
       '  3. Pégalo en una sesión nueva de tu agente. La primera respuesta tarda 1-2 minutos.',
     ];
   }
@@ -80,7 +80,7 @@ export function firstRunLines(lang: Lang, where: { url: string; signIn: boolean 
     where.signIn
       ? '  1. Open the desk with the sign-in link below.'
       : `  1. Open the desk in your browser (if it did not open by itself): ${where.url}`,
-    "  2. Go to Talk and copy the secretary's text (or, in a terminal: otea prompt --role secretary).",
+    "  2. Go to Talk and copy the assistant's text (or, in a terminal: otea prompt --role assistant).",
     '  3. Paste it into a new session of your agent. The first reply takes 1-2 minutes.',
   ];
 }

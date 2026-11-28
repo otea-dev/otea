@@ -56,11 +56,11 @@ export type ItemNote = {
   to?: string;
   anchor?: NoteAnchor;
   answer?: NoteAnswer;
-  // The agent that wrote it for the person (the secretary telling a worker what the person changed,
+  // The agent that wrote it for the person (the assistant telling a worker what the person changed,
   // otea update --tell): the words are the person's change, the hand is the agent's, and no surface
-  // signs it as the person's. `bySecretary` when that agent was the project's secretary.
+  // signs it as the person's. `byAssistant` when that agent was the project's assistant.
   relayedBy?: string;
-  bySecretary?: boolean;
+  byAssistant?: boolean;
   // A comment left while the person reviewed the round: it goes with a send-back, as a note of the
   // round it starts (`for`, that step and round), which the agent answers like any other; when the
   // person approves, it stays a note of the round reviewed, and nobody has to answer it.
@@ -146,7 +146,7 @@ export function notesOf(events: readonly NoteEvent[]): ItemNote[] {
         delivered: deliveredOf(data.delivered),
         ...(typeof data.to === 'string' ? { to: data.to } : {}),
         ...(data.relayed === true
-          ? { relayedBy: actor.name, bySecretary: data.role === 'secretary' }
+          ? { relayedBy: actor.name, byAssistant: data.role === 'assistant' }
           : {}),
         ...(anchor ? { anchor } : {}),
         ...reviewOf(data.review),

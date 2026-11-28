@@ -8,6 +8,7 @@ import { agentDetail } from '../app/agent-detail.ts';
 import { promptFacts, promptKindOf, roleFacts } from '../app/agent-prompts.ts';
 import { landedAhead } from '../app/approval-wait.ts';
 import { askingItems, holderAsksOf } from '../app/asking.ts';
+import { assistantView } from '../app/assistant-waiting.ts';
 import {
   answerBandeja,
   bandejaFileToServe,
@@ -29,7 +30,7 @@ import {
   retractAnswer,
   turnsOfItem,
 } from '../app/conversation.ts';
-import { answerSecretaryTap } from '../app/conversation-act.ts';
+import { answerAssistantTap } from '../app/conversation-act.ts';
 import { deviceByToken, listDevices, touchDevice } from '../app/devices.ts';
 import { dismissOpenEscalation } from '../app/escalate.ts';
 import { listEvents } from '../app/events.ts';
@@ -78,7 +79,6 @@ import { answerQuestion, retractItemAnswer } from '../app/questions.ts';
 import { linkItems, unlinkItems } from '../app/relations.ts';
 import { reopenDropped } from '../app/reopen-dropped.ts';
 import { reassignItem, restartItem, resumeItem, undoRelease } from '../app/restart.ts';
-import { secretaryView } from '../app/secretary-waiting.ts';
 import { setAsideOf } from '../app/set-aside.ts';
 import { stepFactsOf } from '../app/step-facts.ts';
 import {
@@ -200,6 +200,7 @@ import {
   assertSameOrigin,
   assertSignedIn,
   assertWritable,
+  assistantAnswerRequest,
   attachRequest,
   briefRequest,
   captureRequest,
@@ -221,7 +222,6 @@ import {
   pinRequest,
   reassignRequest,
   relinkRequest,
-  secretaryAnswerRequest,
   surfaceOf,
   undoRequest,
   updateRequest,
@@ -251,7 +251,7 @@ export type OteaServer = {
 };
 
 // How often an open desk's server looks at what a process ending or a window running out changes
-// (app/liveness.ts): the secretary's «conectado» is told false within this.
+// (app/liveness.ts): the assistant's «conectado» is told false within this.
 const LIVENESS_EVERY_MS = 2000;
 
 export type ServerOptions = {
@@ -562,7 +562,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
   // What waits for the person, as the last read found it: every open desk asks on each change, so
   // it is worked out again only after this server announces a change (its own writes), another
   // process writes (the database's data version moves), or PENDING_KEPT_MS passes, for what the
-  // clock alone changes (a lease running out, the secretary going quiet). It does not subscribe to
+  // clock alone changes (a lease running out, the assistant going quiet). It does not subscribe to
   // the feed: a listener of its own would keep the feed polling with no desk open.
   let pendingKept: { at: number; version: string; value: Pending } | undefined;
   const feed: ChangeFeed = {
@@ -617,13 +617,13 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
       .get('/collections', (c) => c.json(listShownCollectionViews(project)))
       .get('/presets', (c) => c.json(listPresetViews(project)))
       .get('/agents', (c) => c.json({ agents: listAgents(project.db) }))
-      // The project's secretary: connected, listening or offline since when; null while it has none.
-      .get('/secretary', (c) => c.json({ secretary: secretaryView(project.db) ?? null }))
+      // The project's assistant: connected, listening or offline since when; null while it has none.
+      .get('/assistant', (c) => c.json({ assistant: assistantView(project.db) ?? null }))
       // What waits for the person, computed from the records: items on their turn, the questions
-      // of the Bandeja and of the secretary, the review that holds a board's queue (app/pending.ts).
+      // of the Bandeja and of the assistant, the review that holds a board's queue (app/pending.ts).
       .get('/pending', (c) => {
         const now = Date.now();
-        // A secretary that went quiet, or an agent whose process ended, writes nothing: liveness is
+        // An assistant that went quiet, or an agent whose process ended, writes nothing: liveness is
         // part of the key, so the desk's refetch after that change never reads the old answer.
         const version = `${dataVersion(project.db)}${livenessSignature(project.db)}`;
         if (
@@ -635,7 +635,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
         }
         return c.json(pendingKept.value);
       })
-      // The person sets an escalation aside (Te espera): whether the secretary acted on it or not.
+      // The person sets an escalation aside (Te espera): whether the assistant acted on it or not.
       .post('/escalations/:id/dismiss', (c) => {
         assertWritable(c, auth);
         dismissOpenEscalation(project, messageIdOf(c.req.param('id')));
@@ -649,7 +649,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
         if (kind !== undefined && !isPromptKind(kind))
           throw new InvalidQuery(`kind must be one of ${PROMPT_KINDS.join(', ')}`);
         // A role's text (the canonical way of working): the same one otea prompt --role prints, for
-        // the desk to copy. A worker's board is required; the secretary and the refiner have none.
+        // the desk to copy. A worker's board is required; the assistant and the refiner have none.
         if (role === undefined && (board !== undefined || name !== undefined))
           throw new InvalidQuery(`board and as go with role (${ROLES.join(', ')})`);
         if (role !== undefined) {
@@ -1022,9 +1022,9 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
         feed.notify();
         return c.json(topic);
       })
-      // The conversation with the project's secretary (app/conversation.ts). The person writes only
+      // The conversation with the project's assistant (app/conversation.ts). The person writes only
       // here, signed in, from the UI's own origin: no command or tool of an agent makes a message
-      // of the person's. Reading it marks nothing; the secretary's reading does.
+      // of the person's. Reading it marks nothing; the assistant's reading does.
       .get('/conversation', (c) => {
         const { since, before, limit, search, kind } = c.req.query();
         if (kind !== undefined && !isMessageKind(kind)) {
@@ -1077,7 +1077,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
           return c.json(message, replayed ? 200 : 201);
         },
       )
-      // The person's one-tap correction of what the secretary made of a turn.
+      // The person's one-tap correction of what the assistant made of a turn.
       .post(
         '/conversation/messages/:id/kind',
         // A kind is one word: a few bytes of JSON, so anything large is refused before it is read.
@@ -1090,17 +1090,17 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
           return c.json(message);
         },
       )
-      // The person's tap on a question of the secretary's: their own message, in reply to it.
+      // The person's tap on a question of the assistant's: their own message, in reply to it.
       .post(
         '/conversation/messages/:id/answer',
         // An answer is a few words: far past a message's limit is refused before it is read.
         bodyLimit({ maxSize: MAX_ANSWER_BYTES, onError: answerTooLarge }),
         async (c) => {
           assertWritable(c, auth);
-          const given = await secretaryAnswerRequest(c);
+          const given = await assistantAnswerRequest(c);
           // Sent again under the same key (a phone that never heard back): the first result.
           return replaying(c, project, given, 201, () => {
-            const message = answerSecretaryTap(
+            const message = answerAssistantTap(
               project,
               messageIdOf(c.req.param('id')),
               given,
@@ -1113,7 +1113,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
           });
         },
       )
-      // The person takes back the answer they just gave (Deshacer), before the secretary heard it.
+      // The person takes back the answer they just gave (Deshacer), before the assistant heard it.
       .post('/conversation/messages/:id/unanswer', (c) => {
         assertWritable(c, auth);
         return replaying(c, project, null, 200, () => {
@@ -1184,7 +1184,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
           return entry;
         });
       })
-      // The person reopens a note the secretary or its refiner closed: it waits for the secretary
+      // The person reopens a note the assistant or its refiner closed: it waits for the assistant
       // again.
       .post('/bandeja/:id/reopen', (c) => {
         assertWritable(c, auth);

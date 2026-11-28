@@ -2,13 +2,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { declareAssistant } from '../app/assistant.ts';
 import { askOnBandeja, closeBandeja, fileBandeja, takeBandeja } from '../app/bandeja.ts';
 import { addCollection } from '../app/collections.ts';
 import { pairDevice } from '../app/devices.ts';
-import { escalateToSecretary } from '../app/escalate.ts';
+import { escalateToAssistant } from '../app/escalate.ts';
 import { createItem } from '../app/items.ts';
 import type { Project } from '../app/project.ts';
-import { declareSecretary } from '../app/secretary.ts';
 import { createServer, type OteaServer } from './server.ts';
 import { LOCAL_HOST, memoryProject, SESSION_COOKIE, TOKEN } from './testing.ts';
 
@@ -81,7 +81,7 @@ describe('the Bandeja over the API', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('takes a capture from the desk and from the phone, waiting for the secretary', async () => {
+  it('takes a capture from the desk and from the phone, waiting for the assistant', async () => {
     const desk = await capture('dark mode somewhere');
     expect(desk.status).toBe(201);
     expect(await desk.json()).toMatchObject({ id: 1, ref: 'B-1', state: 'waiting' });
@@ -97,7 +97,7 @@ describe('the Bandeja over the API', () => {
 
   // F4: Te toca counted items only, so a question on a note waited with "Nada espera por ti".
   it('says on /pending that a question on a note waits for the person, until they answer it', async () => {
-    declareSecretary(project.db, 'sol');
+    declareAssistant(project.db, 'sol');
     await capture('the Aprobar button is hidden');
     takeBandeja(project, { id: 1, agent: 'lia' });
     askOnBandeja(project, {
@@ -110,11 +110,11 @@ describe('the Bandeja over the API', () => {
     const pending = (await (await call('/pending')).json()) as {
       count: number;
       entries: { kind: string; ref: string; text: string }[];
-      secretary: { name: string } | null;
+      assistant: { name: string } | null;
     };
     expect(pending.count).toBe(1);
     expect(pending.entries).toMatchObject([{ kind: 'bandeja', ref: 'B-1', text: 'Which screen?' }]);
-    expect(pending.secretary).toMatchObject({ name: 'sol' });
+    expect(pending.assistant).toMatchObject({ name: 'sol' });
 
     await call('/bandeja/1/answer', { method: 'POST', body: { question: 1, option: 1 } });
     expect(((await (await call('/pending')).json()) as { count: number }).count).toBe(0);
@@ -123,7 +123,7 @@ describe('the Bandeja over the API', () => {
   // F4 review round: every open desk reads /pending on each change; what it says is kept until a
   // change is announced (the stream tells every desk), never worked out again for nothing.
   it('keeps /pending until a change is announced', async () => {
-    declareSecretary(project.db, 'sol');
+    declareAssistant(project.db, 'sol');
     await capture('first note');
     takeBandeja(project, { id: 1, agent: 'lia' });
     const count = async () => ((await (await call('/pending')).json()) as { count: number }).count;
@@ -138,11 +138,11 @@ describe('the Bandeja over the API', () => {
     expect(await count()).toBe(1);
   });
 
-  // G1: a secretary that went quiet writes nothing; the kept answer must not hide it for 3 s.
-  it('reads /pending again when the secretary’s liveness changed with no write announced', async () => {
-    declareSecretary(project.db, 'sol');
+  // G1: an assistant that went quiet writes nothing; the kept answer must not hide it for 3 s.
+  it('reads /pending again when the assistant’s liveness changed with no write announced', async () => {
+    declareAssistant(project.db, 'sol');
     const state = async () =>
-      ((await (await call('/pending')).json()) as { secretary: { state: string } }).secretary.state;
+      ((await (await call('/pending')).json()) as { assistant: { state: string } }).assistant.state;
     expect(await state()).not.toBe('offline');
 
     const longAgo = new Date(Date.now() - 45 * 60_000).toISOString();
@@ -155,16 +155,16 @@ describe('the Bandeja over the API', () => {
     expect(await state()).toBe('offline');
   });
 
-  // G1: what an agent flagged to an absent secretary is the person's, who can set it aside.
+  // G1: what an agent flagged to an absent assistant is the person's, who can set it aside.
   it('lets the person dismiss an escalation, once', async () => {
-    declareSecretary(project.db, 'sol');
+    declareAssistant(project.db, 'sol');
     const item = createItem(project, {
       collection: 'tasks',
       title: 'Retry',
       fields: { description: 'D' },
       actor: { kind: 'agent', name: 'kiln' },
     }).id;
-    escalateToSecretary(project, { agent: 'kiln', about: item, text: 'The push failed.' });
+    escalateToAssistant(project, { agent: 'kiln', about: item, text: 'The push failed.' });
     const longAgo = new Date(Date.now() - 45 * 60_000).toISOString();
     project.db
       .prepare(
@@ -180,7 +180,7 @@ describe('the Bandeja over the API', () => {
 
     expect(dismissed.status).toBe(200);
     expect((await read()).entries).toEqual([]);
-    // A second tap (or a race with the secretary's ack) is done with, not an error.
+    // A second tap (or a race with the assistant's ack) is done with, not an error.
     expect((await call(`/escalations/${shown?.signal}/dismiss`, { method: 'POST' })).status).toBe(
       200,
     );
@@ -282,7 +282,7 @@ describe('the Bandeja over the API', () => {
 
   describe('a question on an entry', () => {
     beforeEach(async () => {
-      declareSecretary(project.db, 'sol');
+      declareAssistant(project.db, 'sol');
       await capture('make it better');
       takeBandeja(project, { id: 1, agent: 'lia' });
       askOnBandeja(project, {
@@ -335,7 +335,7 @@ describe('the Bandeja over the API', () => {
       expect((await listed())[0]?.state).toBe('asking');
     });
 
-    // G1: an answer is a few words; megabytes would flood what the refiner and the secretary read.
+    // G1: an answer is a few words; megabytes would flood what the refiner and the assistant read.
     it('refuses an answer far past a message’s size, and a kind correction with a body of megabytes', async () => {
       const huge = 'x'.repeat(2_000_000);
       const answer = await call('/bandeja/1/answer', {
@@ -369,10 +369,10 @@ describe('the Bandeja over the API', () => {
     });
   });
 
-  // Field study 3, S4: the secretary could not close a duplicate; the person sees why and may
+  // Field study 3, S4: the assistant could not close a duplicate; the person sees why and may
   // reopen it, from the desk or their paired phone.
   it('shows a closed entry with its reason, and lets the person reopen it', async () => {
-    declareSecretary(project.db, 'sol');
+    declareAssistant(project.db, 'sol');
     await capture('a duplicate of CAM-1');
     closeBandeja(project, { id: 1, agent: 'sol', reason: 'the same as CAM-1' });
 

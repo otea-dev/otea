@@ -108,10 +108,10 @@ describe('the rail', () => {
     expect(rail()).toMatch(/data-k="toca" data-tip="Te toca">/);
   });
 
-  // F4: a question on a note or the secretary's own waits for you as much as an item does.
-  it('counts in Te toca the questions of the Bandeja and the secretary, beside the items', () => {
+  // F4: a question on a note or the assistant's own waits for you as much as an item does.
+  it('counts in Te toca the questions of the Bandeja and the assistant, beside the items', () => {
     const countOf = (html: string) => /data-k="toca"[\s\S]*?data-v="(\d+)"/.exec(html)?.[1];
-    const ask = (kind: 'bandeja' | 'secretary', ref: string) => ({
+    const ask = (kind: 'bandeja' | 'assistant', ref: string) => ({
       kind,
       ref,
       title: 'x',
@@ -124,10 +124,10 @@ describe('the rail', () => {
         rail({
           pending: {
             count: 2,
-            entries: [ask('bandeja', 'B-1'), ask('secretary', '4')],
+            entries: [ask('bandeja', 'B-1'), ask('assistant', '4')],
             blocks: [],
             queues: [],
-            secretary: null,
+            assistant: null,
           },
         }),
       ),
@@ -143,7 +143,7 @@ describe('the rail', () => {
     expect(html.match(/class="rsel"/g)).toHaveLength(1);
   });
 
-  // Hablar is the first view: the secretary's mark in its colour, then Te toca and Atasco. The old
+  // Hablar is the first view: the assistant's mark in its colour, then Te toca and Atasco. The old
   // Temas row is gone: its consultations live in Hablar's filter.
   it('opens the views with Hablar and its mark, before Te toca and Atasco', () => {
     const html = rail();
@@ -161,7 +161,7 @@ describe('the rail', () => {
       expect(i, w).toBeGreaterThan(at);
       at = i;
     }
-    expect(rowOf(html, 'hablar')).toContain('<span class="mk secretary">se</span>');
+    expect(rowOf(html, 'hablar')).toContain('<span class="mk assistant">as</span>');
     expect(rowOf(html, 'hablar')).toMatch(/<span class="lb"[^>]*>Hablar<\/span>/);
     expect(html).not.toContain('data-k="topics"');
     expect(html).not.toContain('Temas');

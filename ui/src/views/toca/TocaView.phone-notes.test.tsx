@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Pending } from '../../../../src/core/pending.ts';
 import { AppTestProvider } from '../../app/context.tsx';
-import type { SecretaryView } from '../../conversation.ts';
+import type { AssistantView } from '../../conversation.ts';
 import { ago, item, NOW } from '../../derive/fixtures.ts';
 import { setLanguage } from '../../i18n/i18n.ts';
 import { testApp } from '../../shell/test-app.ts';
@@ -10,7 +10,7 @@ import { type Mounted, mount, settle } from '../../test-dom.tsx';
 import { TocaView } from './TocaView.tsx';
 
 // Field study 5 (D2): on a phone, Te toca had the install card lying over its rows, and, with the PC
-// out of reach, a card about the secretary being away: the last it knew, said as if it were now.
+// out of reach, a card about the assistant being away: the last it knew, said as if it were now.
 
 let page: Mounted | undefined;
 
@@ -40,10 +40,10 @@ const waiting: Pending = {
   entries: [],
   blocks: [],
   queues: [],
-  secretary: null,
+  assistant: null,
 };
 
-const away: SecretaryView = {
+const away: AssistantView = {
   name: 'sol',
   state: 'offline',
   since: ago(60),
@@ -59,7 +59,7 @@ async function open(o: Parameters<typeof testApp>[0] = {}) {
         phone: true,
         all: [item({ id: 'CAM-2', title: 'Modo oscuro', turn: 'human' })],
         pending: waiting,
-        secretary: away,
+        assistant: away,
         ...o,
       })}
     >
@@ -84,17 +84,17 @@ describe('Te toca on a phone', () => {
     expect(root.querySelector('.install-banner')).toBeNull();
   });
 
-  it('says the secretary is away while the PC answers', async () => {
+  it('says the assistant is away while the PC answers', async () => {
     const root = await open();
-    expect(root.querySelector('.secoff')?.textContent).toContain('sol está desconectado');
+    expect(root.querySelector('.assistant-off')?.textContent).toContain('sol está desconectado');
   });
 
-  it('says nothing of the secretary without the PC: what it kept may be old, the offline line speaks', async () => {
+  it('says nothing of the assistant without the PC: what it kept may be old, the offline line speaks', async () => {
     const root = await open({ sync: { offline: true, syncedAt: NOW } });
-    expect(root.querySelector('.secoff')).toBeNull();
+    expect(root.querySelector('.assistant-off')).toBeNull();
     // The desk has the room, and keeps its card.
     page?.unmount();
     const desk = await open({ phone: false, sync: { offline: true, syncedAt: NOW } });
-    expect(desk.querySelector('.secoff')).not.toBeNull();
+    expect(desk.querySelector('.assistant-off')).not.toBeNull();
   });
 });

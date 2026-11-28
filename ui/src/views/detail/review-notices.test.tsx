@@ -13,7 +13,7 @@ import { ItemSheet } from './ItemSheet.tsx';
 
 // s-real2 D-13751d, D-00b356 and n6: every page that offers Aprobar on an item in review says, beside
 // it, what the person should know before they approve it: that the attached diff is not what lands,
-// and what the secretary or the delivering agent advised. Said from one source (reviewNotices), in
+// and what the assistant or the delivering agent advised. Said from one source (reviewNotices), in
 // plain words, with the technical detail one tap away; advice never blocks the move.
 
 const seen = vi.hoisted(() => ({ board: null as StudioBoard | null }));
@@ -112,11 +112,11 @@ const branched = (): ItemView => {
 };
 
 const MISMATCH = { mismatch: { diff: ['a.go'], landed: ['a.go', 'b.go'] } };
-const advice = (kind: 'send_back' | 'doubt', secretary = true) => ({
+const advice = (kind: 'send_back' | 'doubt', assistant = true) => ({
   kind,
   note: 'The page never loads the file it adds.',
-  by: secretary ? 'sol' : 'quill',
-  secretary,
+  by: assistant ? 'sol' : 'quill',
+  assistant,
   at: at(13),
 });
 
@@ -247,13 +247,13 @@ describe('the attached diff does not match what lands', () => {
 
     const text = notice(root, 'diff')?.textContent ?? '';
     expect(text).toMatch(/puede no ser lo que entra/i);
-    expect(text).toMatch(/pregúntale a la secretaria/i);
+    expect(text).toMatch(/pregúntale a tu asistente/i);
     // The agent's own file is no longer the jargon the person met.
     expect(text).not.toMatch(/archivo del agente, no el de la rama/i);
   });
 });
 
-describe('what the secretary or the delivering agent advised', () => {
+describe('what the assistant or the delivering agent advised', () => {
   it('is said beside Aprobar on the desk and the phone, and never blocks it', async () => {
     serve();
     for (const phone of [false, true]) {
@@ -263,7 +263,7 @@ describe('what the secretary or the delivering agent advised', () => {
 
       const said = notice(root, 'advice') as HTMLElement;
       expect(said.dataset.kind).toBe('send_back');
-      expect(said.textContent).toMatch(/The secretary recommends sending it back/);
+      expect(said.textContent).toMatch(/The assistant recommends sending it back/);
       expect(said.textContent).toContain('The page never loads the file it adds.');
       const button = approve(root);
       expect(button?.disabled).toBe(false);
@@ -274,7 +274,7 @@ describe('what the secretary or the delivering agent advised', () => {
     }
   });
 
-  it('says a doubt as a doubt, and names an agent that is no secretary by its name', async () => {
+  it('says a doubt as a doubt, and names an agent that is no assistant by its name', async () => {
     serve();
     const { root } = sheet(review({ advice: advice('doubt', false) }), false);
     await vi.waitFor(() => expect(notice(root, 'advice')).not.toBeNull());

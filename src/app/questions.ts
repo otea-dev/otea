@@ -28,6 +28,7 @@ import {
   selectStateEntries,
 } from '../store/queries.ts';
 import { askingItems } from './asking.ts';
+import { assistantName } from './assistant.ts';
 import type { Context } from './context.ts';
 import { dropTraceOf, RETRACT_ANSWER_MS, traceAnswer } from './conversation.ts';
 import { requireItem, requireWritableItem, systemClock } from './items.ts';
@@ -35,7 +36,6 @@ import { assertMayWriteItem, takeItem } from './lease-take.ts';
 import { itemOnBoard, type LiveBoard, liveBoardOf, relayAllowed } from './next.ts';
 import { sessionAlive } from './presence.ts';
 import { assertSaidInHablar, RELAYED_HUMAN } from './relay.ts';
-import { secretaryName } from './secretary.ts';
 import { liftSetAside, SET_ASIDE_LIFTED } from './set-aside.ts';
 
 // An agent's question to the person (core/board/questions.ts): the agent asks while it does a step,
@@ -81,7 +81,7 @@ export type AskInput = {
 
 export type AskResult = { question: ItemQuestion; text: string };
 
-// A question is read by the person, the secretary and the next agent: a few lines, never a wall.
+// A question is read by the person, the assistant and the next agent: a few lines, never a wall.
 export const MAX_QUESTION_CHARS = 2000;
 
 // The board and the step an agent is doing on the item, or the refusal of a question on it.
@@ -230,7 +230,7 @@ export function answerQuestion(ctx: Context, input: PersonAnswer, now = systemCl
 const RETRACT_ITEM_ANSWER_MS = RETRACT_ANSWER_MS;
 
 // The person takes back the tap they just gave on an option of an agent's question: the question
-// waits for them again. The secretary's questions have the same rule (conversation.ts
+// waits for them again. The assistant's questions have the same rule (conversation.ts
 // retractAnswer): only the person, within 30 seconds, only a tapped option (not words, not leaving
 // it to the agent, not an answer an agent noted from the chat), and only while the agent has not
 // acted on it. Both events are dropped from the item's history (`undoes`).
@@ -331,7 +331,7 @@ export type ChatAnswerResult = { question: ItemQuestion; text: string };
 // The answer the person gave in the chat instead of in Otea, put on the question by an agent (otea
 // answer, P4-R2-2): it is the person's, as a relayed decision is, marked as noted by that agent,
 // and hands the turn back as an answer given in Otea does. Only the agent that asked notes it (the
-// person is in its chat), or the secretary with the person's own message from Talk: any other agent
+// person is in its chat), or the assistant with the person's own message from Talk: any other agent
 // would be answering in the person's name (D-816632).
 export function noteChatAnswer(
   ctx: Context,
@@ -365,14 +365,14 @@ export function noteChatAnswer(
     now,
     (open) => {
       if (open.by !== actor.name) {
-        if (secretaryName(ctx.db) !== actor.name)
+        if (assistantName(ctx.db) !== actor.name)
           refuse(
             'forbidden',
             id,
             'not_asker',
-            `Not noted on ${id}: only ${open.by}, who asked it, notes what the person said in its chat; they answer it on the desk or the phone, or tell the secretary in Talk. Never answer for the person.`,
+            `Not noted on ${id}: only ${open.by}, who asked it, notes what the person said in its chat; they answer it on the desk or the phone, or tell the assistant in Talk. Never answer for the person.`,
           );
-        // The secretary notes only words the person wrote in Talk, as a relay does.
+        // The assistant notes only words the person wrote in Talk, as a relay does.
         const from = input.fromMessage === undefined ? {} : { fromMessage: input.fromMessage };
         assertSaidInHablar(ctx, { id, via: actor.name, ...from }, text, now());
       }

@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
 import { fetchRolePrompt, postEscalationDismiss } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
+import { waitingWords } from '../../assistant-waiting.ts';
 import { useCopy } from '../../components/AgentPrompt.tsx';
 import { Ticked } from '../../components/Ticked.tsx';
-import { type SecretaryWaiting, splitQuestion } from '../../conversation.ts';
+import { type AssistantWaiting, splitQuestion } from '../../conversation.ts';
 import { waitedText } from '../../derive/when.ts';
 import { momentLabel } from '../../format.ts';
 import { useRemote } from '../../hooks.ts';
@@ -17,11 +18,10 @@ import {
   type PendingKind,
   type QueueBlock,
 } from '../../pending.ts';
-import { waitingWords } from '../../secretary-waiting.ts';
 import { AwayCopy, AwayHow } from './Away.tsx';
 
 // «Te espera»: everything that waits for you, pinned over the conversation, computed by Otea
-// (GET /api/pending) and never by what the secretary remembers to say. It is an index, never a
+// (GET /api/pending) and never by what the assistant remembers to say. It is an index, never a
 // form: each row is one line that jumps to where the thing is dealt with (a question at the foot of
 // the conversation, an item's page, a turn). A question that sat far up the thread and a review that
 // waited an hour and a half unmentioned are here from the moment they are yours.
@@ -34,7 +34,7 @@ const GROUPS: readonly {
   kinds: readonly PendingKind[];
   key: 'q' | 'e' | 'r' | 's' | 'x' | 'w';
 }[] = [
-  { kinds: ['question', 'bandeja', 'secretary'], key: 'q' },
+  { kinds: ['question', 'bandeja', 'assistant'], key: 'q' },
   { kinds: ['escalation'], key: 'e' },
   { kinds: ['review'], key: 'r' },
   { kinds: ['step'], key: 's' },
@@ -43,7 +43,7 @@ const GROUPS: readonly {
 ];
 
 // What the conversation answers by itself: the questions. The rest is only here (and on Te toca).
-const ANSWERED_BELOW: readonly PendingKind[] = ['question', 'bandeja', 'secretary'];
+const ANSWERED_BELOW: readonly PendingKind[] = ['question', 'bandeja', 'assistant'];
 
 export const opensByDefault = (entries: readonly PendingEntry[]): boolean =>
   entries.some(({ kind }) => !ANSWERED_BELOW.includes(kind));
@@ -69,11 +69,11 @@ export function blockText(block: QueueBlock): string {
   });
 }
 
-// The secretary is away: since when (null: unknown), how many messages wait for it, and its name
+// The assistant is away: since when (null: unknown), how many messages wait for it, and its name
 // (what brings it back is named by it).
 export type AwayState = {
   since: string | null | undefined;
-  waiting: SecretaryWaiting;
+  waiting: AssistantWaiting;
   name: string | undefined;
 };
 
@@ -81,7 +81,7 @@ export type TeEsperaProps = {
   pending: Pending | undefined;
   // Goes to where the thing is dealt with.
   onJump: (entry: PendingEntry) => void;
-  // With the secretary away, the line says so and holds what waits under it: one line, not two.
+  // With the assistant away, the line says so and holds what waits under it: one line, not two.
   away?: AwayState | undefined;
 };
 
@@ -120,7 +120,7 @@ function WorkerCopy({ board }: { board: string }) {
 }
 
 // What waits, one line each: the blocks first, then the first rows, the rest behind «Ver todas».
-// `workerCopy` off: a worker's text is not offered (the secretary is away, and its own text is the
+// `workerCopy` off: a worker's text is not offered (the assistant is away, and its own text is the
 // one to copy: it starts the workers again).
 function TeRows({
   pending,
@@ -158,7 +158,7 @@ function TeRows({
             onClick={() => onJump(entry)}
           >
             <span className="hb-te-ref">
-              {entry.kind === 'secretary'
+              {entry.kind === 'assistant'
                 ? (entry.about ?? '')
                 : entry.kind === 'worker'
                   ? ''
@@ -205,7 +205,7 @@ function TeRows({
 const waits = (pending: Pending | undefined): pending is Pending =>
   pending !== undefined && (pending.count > 0 || pending.blocks.length > 0);
 
-// What waits, each thing once: the secretary's question about an item that waits for them as well
+// What waits, each thing once: the assistant's question about an item that waits for them as well
 // is that item (core/waiting.ts), so «Te espera» counts and lists what Te toca and the rail count.
 function once(pending: Pending | undefined): Pending | undefined {
   return pending && { ...pending, entries: counted(pending.entries) };
@@ -241,8 +241,8 @@ export function TeEspera({ pending: read, onJump, away }: TeEsperaProps) {
   );
 }
 
-// The secretary is away: that and «Te espera» are one quiet line over the lanes, so the
-// conversation keeps the pane (field study 4: a card for the secretary, a card for what waits and a
+// The assistant is away: that and «Te espera» are one quiet line over the lanes, so the
+// conversation keeps the pane (field study 4: a card for the assistant, a card for what waits and a
 // sliver of chat). The line is a dot, one sentence, «Copiar» (the text that brings it back) and the
 // count of what waits for you; a tap opens where it restarts and what waits, one line each.
 function AwayStrip({

@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest';
+import { declareAssistant } from './assistant.ts';
 import { captureToBandeja, takeBandeja } from './bandeja.ts';
 import { addCollection } from './collections.ts';
 import { createItem } from './items.ts';
 import { claimItem } from './leases.ts';
 import { listAgents, noteHarness, seeAgent } from './presence.ts';
-import { declareSecretary } from './secretary.ts';
 import { memoryContext, projectOf } from './testing.ts';
 
 const T0 = Date.parse('2026-11-27T10:00:00.000Z');
 const at = (ms: number) => () => new Date(T0 + ms).toISOString();
 
-// U7/U8 (field study 4): with the secretary's session dead the top bar still said «1 trabajando»:
-// what the secretary holds (an item it made and claimed, a note it refines itself) is never the work
+// U7/U8 (field study 4): with the assistant's session dead the top bar still said «1 trabajando»:
+// what the assistant holds (an item it made and claimed, a note it refines itself) is never the work
 // the person counts, whatever its session or its lease say.
-describe('the secretary is never counted as working', () => {
+describe('the assistant is never counted as working', () => {
   it('reads away or connected, never working, while it holds an item and its harness runs', () => {
     const project = projectOf('/nowhere', memoryContext());
     addCollection(project, { name: 'tasks' });
     seeAgent(project.db, { agent: 'sol', channel: 'cli', call: true }, at(0));
-    declareSecretary(project.db, 'sol', at(0));
+    declareAssistant(project.db, 'sol', at(0));
     createItem(
       project,
       {

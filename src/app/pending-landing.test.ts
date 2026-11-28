@@ -15,7 +15,7 @@ let tick = 0;
 const now = () => new Date(Date.UTC(2026, 10, 27, 9, 0, tick++)).toISOString();
 
 // U1 (field study 4): approved was read as done, and an item that came back because it conflicted
-// said nothing of why. The secretary reads `otea pending`, so it says both.
+// said nothing of why. The assistant reads `otea pending`, so it says both.
 describe('what the queue says of approved and bounced items', () => {
   let ctx: Context;
   let landing: string;

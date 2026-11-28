@@ -19,7 +19,7 @@ function pendingOf(elsewhere: number): Pending {
     title: 'a note',
     since: null,
   }));
-  return { count: elsewhere, entries, blocks: [], queues: [], secretary: null };
+  return { count: elsewhere, entries, blocks: [], queues: [], assistant: null };
 }
 
 function Title({ items, elsewhere }: { items: readonly Item[]; elsewhere: number }) {

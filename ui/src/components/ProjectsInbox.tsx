@@ -272,7 +272,7 @@ export function elsewhereBlocks(project: ProjectOverview): LaneBlock[] {
               <span className="tt">{entry.text ?? entry.title}</span>
             </div>
             <div className="m" data-leaf="">
-              <span className="id">{entry.kind === 'secretary' ? '' : entry.ref}</span>
+              <span className="id">{entry.kind === 'assistant' ? '' : entry.ref}</span>
               <span className="mpt">
                 <span className="sep">·</span>
                 <span className="pid">{project.name}</span>

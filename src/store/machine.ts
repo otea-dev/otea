@@ -6,7 +6,7 @@ import { applyMigrations } from './migrations.ts';
 // local projects the server was asked to serve and the person's preferences. The tables of devices,
 // phone and notify_targets are laid out as a project's used to be, so the use cases in app/ read
 // them the same way.
-const MACHINE_MIGRATIONS = [
+export const MACHINE_MIGRATIONS = [
   `
   CREATE TABLE devices (
     id TEXT PRIMARY KEY,
@@ -52,6 +52,14 @@ const MACHINE_MIGRATIONS = [
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+  `,
+  // The assistant was "the secretary" while 0.8 was built: the two notice switches a device chose
+  // under that word keep their choice under the new one.
+  `
+  UPDATE notify_targets
+     SET prefs = replace(replace(prefs, '"secretary_reply"', '"assistant_reply"'),
+                         '"secretary_offline"', '"assistant_offline"')
+   WHERE prefs LIKE '%"secretary_%';
   `,
 ];
 

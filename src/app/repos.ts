@@ -227,7 +227,7 @@ export function remoteAddedLine(
   // for them on the yes.
   const remote = plainRemote(remoteUrl);
   const question = `You connected this project to ${remote}. Is that the same project the agents have been working on?`;
-  return `${base}. Ask them in plain words, with options to tap, never the command: otea ask ${ask.item} "${question}" --option "Yes, it is the same project" --option "No, it is another copy: do not push there" --recommend 1 --as ${ask.as}. When they say yes, run once in ${top}: ${command}, then push again; when they say no, do not push, and tell the secretary (otea escalate ${ask.item} "<what you found>" --as ${ask.as}).`;
+  return `${base}. Ask them in plain words, with options to tap, never the command: otea ask ${ask.item} "${question}" --option "Yes, it is the same project" --option "No, it is another copy: do not push there" --recommend 1 --as ${ask.as}. When they say yes, run once in ${top}: ${command}, then push again; when they say no, do not push, and tell the assistant (otea escalate ${ask.item} "<what you found>" --as ${ask.as}).`;
 }
 
 // A remote address as a person reads it: host and path, with no scheme, user or password (a token

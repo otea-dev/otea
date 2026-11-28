@@ -842,10 +842,10 @@ export const detail = {
   // Junto a cada Aprobar de un ítem en revisión (ReviewNotices): en palabras de quien no lee código,
   // con las frases técnicas de arriba a un toque.
   'rvn.diff':
-    'Lo que está adjunto a esta revisión puede no ser lo que entra. Aprobar aprueba el trabajo que entregó el agente, no el archivo adjunto. Antes de aprobar, mira lo que entregó el agente o pregúntale a la secretaria.',
-  'rvn.advice.sendBack.secretary': 'La secretaria recomienda devolverlo: {note}',
+    'Lo que está adjunto a esta revisión puede no ser lo que entra. Aprobar aprueba el trabajo que entregó el agente, no el archivo adjunto. Antes de aprobar, mira lo que entregó el agente o pregúntale a tu asistente.',
+  'rvn.advice.sendBack.assistant': 'Tu asistente recomienda devolverlo: {note}',
   'rvn.advice.sendBack.agent': '{agent} recomienda devolverlo: {note}',
-  'rvn.advice.doubt.secretary': 'La secretaria tiene una duda: {note}',
+  'rvn.advice.doubt.assistant': 'Tu asistente tiene una duda: {note}',
   'rvn.advice.doubt.agent': '{agent} tiene una duda: {note}',
   'bi.branch.moved':
     'La rama cambió en el remoto después de la entrega: ahora está en {now}. Aprobar aprueba solo lo entregado, {handed}.',
@@ -975,7 +975,7 @@ export const detail = {
   'notes.allAnswered': { one: 'contestada', other: 'todas contestadas' },
   'notes.open': 'sin respuesta',
   'notes.you': 'tú',
-  'notes.relayed.secretary': 'La secretaria, de tu parte',
+  'notes.relayed.assistant': 'Tu asistente, de tu parte',
   'notes.relayed.agent': '{agent}, de tu parte',
   'notes.waiting': '{agent} todavía no contestó.',
   'notes.waitingAny': 'El agente todavía no contestó.',
@@ -1002,7 +1002,7 @@ export const detail = {
   'notes.sentAny': 'Le dejaste una nota al agente en «{title}».',
   'notes.failed': 'No se envió la nota. Vuelve a intentarlo.',
   'notes.h.left': 'Le dejaste una nota',
-  'notes.h.leftSecretary': 'La secretaria, de tu parte, le dejó una nota',
+  'notes.h.leftAssistant': 'Tu asistente, de tu parte, le dejó una nota',
   'notes.h.leftAgent': '{agent}, de tu parte, le dejó una nota',
   'notes.h.on': 'sobre {file}',
   'notes.h.answered': 'contestó {agent} a las {time}',

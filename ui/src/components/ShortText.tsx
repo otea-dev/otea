@@ -4,7 +4,7 @@ import { t } from '../i18n/i18n.ts';
 import { NoteText } from './NoteText.tsx';
 import { Ticked } from './Ticked.tsx';
 
-// What an agent wrote for the person (a question, a handoff note) set as the secretary's replies
+// What an agent wrote for the person (a question, a handoff note) set as the assistant's replies
 // are: the conclusion in one sentence, the rest in body text, and a rest that runs long folded
 // behind «ver más» (field study 3: both were walls of text on the phone, with paths and commands).
 // The folded rest is not in the page until it is opened.

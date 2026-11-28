@@ -2,8 +2,8 @@
 // same name everywhere (the list's who, the handoff line, History, Details).
 export const AGENT_HUES = 5;
 
-// What the secretary's mark says; the agents' marks never do.
-export const SECRETARY_INITIALS = 'se';
+// What the assistant's mark says; the agents' marks never do.
+export const ASSISTANT_INITIALS = 'as';
 
 // claude-b is cb; a name of one word gives its first two letters.
 export function initialsOf(name: string): string {
@@ -44,9 +44,9 @@ function letterPairs(name: string): string[] {
 export function marksFor(names: readonly string[]): Map<string, Mark> {
   const sorted = [...new Set(names)].sort();
   const marks = new Map<string, Mark>();
-  // «se» is the secretary's own mark (views/hablar/SecretaryMark): no agent takes it, so a chip
-  // that reads «se» is always the secretary.
-  const usedInitials = new Set<string>([SECRETARY_INITIALS]);
+  // «as» is the assistant's own mark (views/hablar/AssistantMark): no agent takes it, so a chip
+  // that reads «as» is always the assistant.
+  const usedInitials = new Set<string>([ASSISTANT_INITIALS]);
   const usedHues = new Set<number>();
   for (const name of sorted) {
     const own = initialsOf(name);

@@ -6,19 +6,19 @@ import type { Surface } from '../core/surface.ts';
 import { isAnswered, selectMessage } from '../store/conversation.ts';
 import { joinTransaction } from '../store/database.ts';
 import {
-  answerSecretaryQuestion,
+  answerAssistantQuestion,
   type GivenAnswer,
   refuseUnverifiedCard,
   type Said,
   type SayInput,
-  sayAsSecretary,
+  sayAsAssistant,
 } from './conversation.ts';
 import { type Clock, getItem, requireItem, systemClock } from './items.ts';
 import { dropItem, itemOnBoard, liveBoardOf, motiveByName, sendBackItem } from './next.ts';
 import type { Project } from './project.ts';
 
-// The cards of the secretary's that carry an action (field study 4, a change of mind on an item
-// already in the person's review): the secretary drafts the note and asks, the person's tap
+// The cards of the assistant's that carry an action (field study 4, a change of mind on an item
+// already in the person's review): the assistant drafts the note and asks, the person's tap
 // performs the send-back as the person, exactly as the desk's Devolver does. Kept apart from
 // app/conversation.ts, which the items' own modules read: this one moves items.
 
@@ -63,7 +63,7 @@ function motiveOf(project: Project, id: string, motive: string | undefined): str
   return board.def.drop.motives.find(({ id: each }) => each === found)?.name ?? '';
 }
 
-// The secretary asks the person to send an item back, or drop it, with a note: the card says what
+// The assistant asks the person to send an item back, or drop it, with a note: the card says what
 // is proposed, and nothing moves until the person taps. Refused for an item that is not in their
 // review now. The card keeps the round it was asked in: it is about that delivery only.
 export function sayWithSendBack(
@@ -72,11 +72,11 @@ export function sayWithSendBack(
   now: Clock = systemClock,
 ): Said {
   const { action, ...rest } = input;
-  if (action === undefined) return sayAsSecretary(project, rest, now);
+  if (action === undefined) return sayAsAssistant(project, rest, now);
   refuseUnverifiedCard(rest.unverified, action.kind);
   const { round, to } = assertInReview(project, action.item);
   const target = action.kind === 'drop' ? motiveOf(project, action.item, action.motive) : to;
-  return sayAsSecretary(project, { ...rest, action: { ...action, round, to: target } }, now);
+  return sayAsAssistant(project, { ...rest, action: { ...action, round, to: target } }, now);
 }
 
 // What a tap on the first option of a card does, as the person, from the surface they tapped on.
@@ -117,12 +117,12 @@ function perform(
   );
 }
 
-// The person's answer to a question of the secretary's. When the question carries an action and the
-// person taps its first option, Otea sends the item back for them (the note the secretary drafted,
+// The person's answer to a question of the assistant's. When the question carries an action and the
+// person taps its first option, Otea sends the item back for them (the note the assistant drafted,
 // or the one they edited) in the same step that records their answer, so an item that moved on
 // since is refused and nothing is recorded. The person is the actor of the send-back, from the
 // surface they tapped on.
-export function answerSecretaryTap(
+export function answerAssistantTap(
   project: Project,
   id: number,
   given: GivenAnswer,
@@ -132,13 +132,13 @@ export function answerSecretaryTap(
 ): Message {
   return joinTransaction(project.db, () => {
     const question = selectMessage(project.db, id);
-    const action = question?.author === 'secretary' ? question.action : null;
+    const action = question?.author === 'assistant' ? question.action : null;
     if (action !== null && given.option === 1 && !isAnswered(project.db, id)) {
       const { round } = assertInReview(project, action.item);
       if (round !== action.round) {
         throw new OteaError(
           'invalid_transition',
-          `${action.item} was sent back and handed in again since this was asked (round ${action.round}, now ${round}): the note was about the earlier delivery. Nothing was ${action.kind === 'drop' ? 'dropped' : 'sent back'}; ask the secretary again or do it from the item`,
+          `${action.item} was sent back and handed in again since this was asked (round ${action.round}, now ${round}): the note was about the earlier delivery. Nothing was ${action.kind === 'drop' ? 'dropped' : 'sent back'}; ask the assistant again or do it from the item`,
         );
       }
       const note = (given.note ?? action.note).trim();
@@ -152,6 +152,6 @@ export function answerSecretaryTap(
       }
       perform(project, action, note, by, now, surface);
     }
-    return answerSecretaryQuestion(project, id, given, now, by);
+    return answerAssistantQuestion(project, id, given, now, by);
   });
 }

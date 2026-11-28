@@ -28,7 +28,7 @@ const pending = (entries: PendingEntry[], over: Partial<Pending> = {}): Pending 
   entries,
   blocks: [],
   queues: [],
-  secretary: null,
+  assistant: null,
   ...over,
 });
 
@@ -39,8 +39,8 @@ const render = (value: Pending | undefined, o: { phone?: boolean; short?: boolea
   );
 
 // F4 (field study 3): a pending question sat far up the thread, off screen on the phone, and a
-// review waited 1.5 h without the secretary mentioning it. «Te espera» is pinned over the thread and
-// computed by Otea, so it never depends on what the secretary remembers to say. F4 review round:
+// review waited 1.5 h without the assistant mentioning it. «Te espera» is pinned over the thread and
+// computed by Otea, so it never depends on what the assistant remembers to say. F4 review round:
 // it is an index, not a second place to answer.
 describe('the «Te espera» strip of Hablar', () => {
   it('lists everything that waits for you, one line each, with how many', () => {
@@ -74,10 +74,10 @@ describe('the «Te espera» strip of Hablar', () => {
     expect(html).toContain('Copy the agent’s text');
   });
 
-  // Field study 6 (D-f2d01b): with the secretary away the strip offered «Copiar» (its text) and,
+  // Field study 6 (D-f2d01b): with the assistant away the strip offered «Copiar» (its text) and,
   // opened, «Copiar el texto del agente» (a worker's) at once: two texts to paste, and the person
-  // could not tell which brought anything back. Away, the one to copy is the secretary's.
-  it('offers one text to copy while the secretary is away: its own, not a worker’s', async () => {
+  // could not tell which brought anything back. Away, the one to copy is the assistant's.
+  it('offers one text to copy while the assistant is away: its own, not a worker’s', async () => {
     const worker: PendingEntry = {
       kind: 'worker',
       ref: 'Documentos',
@@ -112,8 +112,8 @@ describe('the «Te espera» strip of Hablar', () => {
     const labels = [...page.root.querySelectorAll('button')].map(
       (button) => button.getAttribute('aria-label') ?? button.textContent?.trim() ?? '',
     );
-    expect(labels.filter((label) => /^Copy the (secretary|agent)/.test(label))).toEqual([
-      'Copy the secretary text',
+    expect(labels.filter((label) => /^Copy the (assistant|agent)/.test(label))).toEqual([
+      'Copy the assistant text',
     ]);
     // The board with no agent is still said, and still opens: only its second copy is not offered.
     expect(page.root.textContent).toContain('no agent works this board');
@@ -122,9 +122,9 @@ describe('the «Te espera» strip of Hablar', () => {
   });
 
   // D-0fe98a (field study s-real): "¿lo descarto con tu toque?" said nothing of which item.
-  it('names the item a question of the secretary is about, in the id column of its row', () => {
+  it('names the item a question of the assistant is about, in the id column of its row', () => {
     const asked: PendingEntry = {
-      kind: 'secretary',
+      kind: 'assistant',
       ref: '41',
       title: 'Do I drop it with your tap?',
       since: ago(2),
@@ -236,7 +236,7 @@ describe('the «Te espera» strip of Hablar', () => {
   });
 
   // H3 (field study 4, U4, U5, U8): 7 or 8 reviews took half the desk and 40% of the phone, over the
-  // conversation and the secretary's morning summary.
+  // conversation and the assistant's morning summary.
   describe('with many things waiting', () => {
     const many: PendingEntry[] = Array.from({ length: 8 }, (_, n) => ({
       kind: 'review' as const,

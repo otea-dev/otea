@@ -31,7 +31,7 @@ import {
   updateItemFields,
 } from '../api.ts';
 import type { IntakeParent } from '../components/NewItemForm.tsx';
-import type { SecretaryView } from '../conversation.ts';
+import type { AssistantView } from '../conversation.ts';
 import { type Connection, usePhone, useRoute, useShort } from '../hooks.ts';
 import { toast } from '../kit/pop/toast.tsx';
 import { rowOf } from '../lanes/dom.ts';
@@ -83,12 +83,12 @@ export type AppData = {
   presetsRemote: Remote<PresetView[]>;
   studioWrites: number;
   agents: Agent[] | null | undefined;
-  // What waits for the person, as Otea counts it (questions of the Bandeja and of the secretary
+  // What waits for the person, as Otea counts it (questions of the Bandeja and of the assistant
   // beside the items): undefined until the first answer.
   pending?: Pending | undefined;
-  // The secretary's state and what waits for it: the one every screen shows (undefined until read,
+  // The assistant's state and what waits for it: the one every screen shows (undefined until read,
   // null while the project has none).
-  secretary?: SecretaryView | null | undefined;
+  assistant?: AssistantView | null | undefined;
   // The latest 200 project events, merged live.
   feed: FeedEvent[];
   route: Route;
@@ -335,7 +335,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     studioWrites: data.studioWrites,
     agents: data.agents,
     pending: data.pending,
-    secretary: data.secretary,
+    assistant: data.assistant,
     feed: data.feed,
     route,
     phone,

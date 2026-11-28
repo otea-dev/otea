@@ -245,7 +245,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   );
   // While the person reviews it: what is said beside Aprobar, from one source for every page that
   // offers it: the attached diff is not what lands (another tip, P1-R3-1; other files, P1-F2) and
-  // what the secretary or the delivering agent advised (D-00b356).
+  // what the assistant or the delivering agent advised (D-00b356).
   const notices = useReviewNotices(item, strip?.key === 'frozen');
   // And whether this round holds the same files as the one it answers (P5-F2).
   const same = useRoundSame(item.id, strip?.key === 'frozen', item.updatedAt);

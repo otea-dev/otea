@@ -15,6 +15,7 @@ import { type ChildrenSummary, childrenSummary, type RelationRef } from '../core
 import type { Surface } from '../core/surface.ts';
 import { itemMoves } from '../core/views.ts';
 import { type Closing, closesOf, type Turn, turnOf, type Workflow } from '../core/workflow.ts';
+import { selectRoles } from '../store/assistant.ts';
 import { findBoardOfCollection } from '../store/boards.ts';
 import { closeQuestions } from '../store/conversation.ts';
 import { joinTransaction, transaction } from '../store/database.ts';
@@ -40,7 +41,6 @@ import {
   updateItemContent,
   updateItemState,
 } from '../store/queries.ts';
-import { selectRoles } from '../store/secretary.ts';
 import { approvalData } from './approval-wait.ts';
 import { type Asks, askingItems, withAsks } from './asking.ts';
 import { assertPicked, type ChoiceInput, recordChoice } from './choices.ts';
@@ -346,7 +346,7 @@ export type ItemView = ItemWithEvents & {
   archived?: { board: string; id: string };
   // While it waits for the person: its request was rewritten after the delivery was handed in.
   requestChanged?: RequestChanged;
-  // While it waits for the person: what the secretary or the delivering agent said of this delivery
+  // While it waits for the person: what the assistant or the delivering agent said of this delivery
   // (recommends sending it back, or doubts it). Advice, never a block.
   advice?: Advice;
 };
@@ -443,7 +443,7 @@ export type UpdateItemInput = {
   title?: string;
   fields?: FieldValues;
   actor: Actor;
-  // The secretary changes what a worker holds, and tells it in the same act (app/relay-change.ts);
+  // The assistant changes what a worker holds, and tells it in the same act (app/relay-change.ts);
   // nothing else sets this.
   overLease?: true;
 };
@@ -470,8 +470,8 @@ export function assertNotInPersonsReview(
   const position = positionOf(item.state);
   if (isClosed(position) || position.phase !== 'review') return;
   if (changed?.every((key) => board.def.anytime.includes(key))) return;
-  const secretary = selectRoles(ctx.db).get(actor.name) === 'secretary';
-  const way = secretary
+  const assistant = selectRoles(ctx.db).get(actor.name) === 'assistant';
+  const way = assistant
     ? `Ask them in one tap, with a card: otea say "<question>" --send-back ${item.id} --note "<their change, in their words>" --option "<send it back>" --option "<leave it>"`
     : 'Ask them, or let them send it back: the worker changes it then';
   throw new OteaError(
@@ -577,12 +577,12 @@ export function landMove(
     appendEvent(db, { itemId: item.id, type: 'released', actor, at, data: released });
   }
   if (turnOf(workflow, to) === 'none') liftWhenWaitsClose(ctx, item.id, actor, at);
-  // The person's review is news for the secretary, unless the person made the move themselves.
+  // The person's review is news for the assistant, unless the person made the move themselves.
   if (actor.kind === 'agent') {
     signalReview(ctx, item, { to, turn: turnOf(workflow, to), board }, at);
     signalLanded(ctx, item, closesOf(workflow, to), at);
   }
-  // What the person settled by moving the item is no longer asked: the secretary's questions about
+  // What the person settled by moving the item is no longer asked: the assistant's questions about
   // it stop waiting for them (they kept counting in Te espera after the item was sent back). Only
   // the person's own move on the desk or the phone settles anything: a relay, or a terminal, says
   // nothing the person did.

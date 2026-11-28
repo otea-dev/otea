@@ -47,8 +47,8 @@ export type ErrorCode =
   | 'invalid_gate'
   | 'invalid_profile'
   | 'profile_required'
-  // The project already has a secretary that is connected: it is one per project.
-  | 'secretary_taken'
+  // The project already has an assistant that is connected: it is one per project.
+  | 'assistant_taken'
   | 'transport_unavailable'
   // An item of an archived board: read-only until the person restores the board.
   | 'board_archived';

@@ -80,9 +80,9 @@
 .view.narrow .noagents {
   display: none;
 }
-/* the secretary is offline with things waiting for it: on the lanes' reading edge, in warn (not
+/* the assistant is offline with things waiting for it: on the lanes' reading edge, in warn (not
    in your colour: it is the system, not you), with the way to Hablar. Phone too. */
-.secoff {
+.assistant-off {
   margin: 4px 0 18px 72px;
   padding: 14px 18px;
   max-width: 720px;
@@ -94,23 +94,23 @@
   background: var(--sheet);
   box-shadow: 0 0 0 1px color-mix(in oklch, var(--warn) 42%, var(--rule-2));
 }
-.secoff i {
+.assistant-off i {
   width: 7px;
   height: 7px;
   margin-top: 9px;
   border-radius: 50%;
   background: var(--warn);
 }
-.secoff h4 {
+.assistant-off h4 {
   font: 450 18px / 1.25 var(--serif);
   margin: 0;
 }
-.secoff p {
+.assistant-off p {
   font: 400 italic 15px / 1.45 var(--serif);
   color: var(--ink-2);
   margin: 2px 0 0;
 }
-.secoff-go {
+.assistant-off-go {
   display: inline-block;
   margin-top: 8px;
   font: 500 13px / 1.2 var(--sans);
@@ -119,7 +119,7 @@
   text-underline-offset: 3px;
 }
 @media (max-width: 720px) {
-  .secoff {
+  .assistant-off {
     margin: 0 0 14px;
     padding: 12px 14px;
   }

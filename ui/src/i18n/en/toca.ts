@@ -77,9 +77,9 @@ export const toca = {
   'toca.replied': '{agent} answered',
   'toca.round': 'round {n}',
 
-  // What waits for you that is no item: a question on an Inbox note, one of the secretary's
+  // What waits for you that is no item: a question on an Inbox note, one of the assistant's
   'toca.off.bandeja': 'Inbox note',
-  'toca.off.secretary': 'secretary',
+  'toca.off.assistant': 'assistant',
   'toca.off.inHablar': 'in Talk',
   'toca.off.report': 'Notice',
   'toca.act.report': 'Read',
@@ -87,7 +87,7 @@ export const toca = {
   'toca.act.worker': 'Open a session',
   'toca.sub.reports': '{agent} reports',
 
-  // The secretary is offline with things waiting for it
+  // The assistant is offline with things waiting for it
   'toca.secOff.title': '{name} is offline',
   'toca.secOff.waiting': '{what} waiting for it.',
   'toca.secOff.go': 'Open Talk to bring it back',

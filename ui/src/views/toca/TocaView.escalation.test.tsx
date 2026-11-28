@@ -33,7 +33,7 @@ const pending: Pending = {
   entries: [report],
   blocks: [],
   queues: [],
-  secretary: null,
+  assistant: null,
 };
 
 describe('Te toca, a report about an item that is also yours to review', () => {

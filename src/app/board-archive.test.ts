@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { creatures } from '../core/board/testing.ts';
 import { findBoard, listVersions } from '../store/boards.ts';
 import { findCollection, listCollections, selectEvents } from '../store/queries.ts';
+import { declareAssistant } from './assistant.ts';
 import {
   bandejaOfItem,
   captureToBandeja,
@@ -34,7 +35,7 @@ import {
   attachmentToServe,
   listConversation,
   postPersonMessage,
-  sayAsSecretary,
+  sayAsAssistant,
   turnsOfItem,
 } from './conversation.ts';
 import { evidenceFile } from './evidence.ts';
@@ -44,7 +45,6 @@ import { liveBoards, nextFor } from './next.ts';
 import { leaveNote } from './notes.ts';
 import type { Project } from './project.ts';
 import { linkItems } from './relations.ts';
-import { declareSecretary } from './secretary.ts';
 import { memoryContext, projectOf } from './testing.ts';
 import { addTopic, answerTopic, convertTopic, linkTopic, requireTopic } from './topics.ts';
 
@@ -325,7 +325,7 @@ describe('deleteBoardForever', () => {
   });
 
   it('keeps a file the conversation holds by hash, and lets the conversation go on without the deleted items', () => {
-    declareSecretary(project.db, 'sol', now);
+    declareAssistant(project.db, 'sol', now);
     const board = criaturas();
     const id = add('Ciervo');
     const kept = add('Rosa');
@@ -335,7 +335,7 @@ describe('deleteBoardForever', () => {
       { text: 'a deer and a rose', files: [{ filename: 'deer.txt', bytes }] },
       now,
     );
-    sayAsSecretary(
+    sayAsAssistant(
       project,
       { agent: 'sol', text: 'Made both.', replyTo: message.id, kind: 'request', links: [id, kept] },
       now,

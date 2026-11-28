@@ -14,6 +14,7 @@ import type { FeedEvent } from './activity.ts';
 import { handedNote, type TocaContext, tocaSection } from './derive/toca.ts';
 import { handedAsMerge } from './merge-round.ts';
 import { clamp, sstep } from './motion/curves.ts';
+import { roundOf } from './rounds.ts';
 import type { Evidence, Item, ItemView, Move } from './types.ts';
 import { heldForDraft, otherMoves, planMoves } from './views/detail/moves.ts';
 
@@ -255,22 +256,6 @@ export function triDecide(s: TriState, kind: TriKind, to = ''): TriState {
   return { ...s, q };
 }
 
-// The round the item is in off a board: one more for every time you sent it back with notes (on a
-// board the server sends the step engine's round with the item).
-export function roundOf(id: string, feed: readonly FeedEvent[]): number {
-  return (
-    1 +
-    feed.filter(
-      (e) =>
-        e.itemId === id &&
-        e.type === 'transitioned' &&
-        e.actor.kind === 'human' &&
-        typeof e.data.reason === 'string' &&
-        e.data.reason.trim() !== '',
-    ).length
-  );
-}
-
 // What a card says under its title: who hands it to you, in which round, and what it said.
 // With the item's own history read (view), the handoff is read there: the feed may not reach it,
 // and a board keeps the handoff's words as its note.
@@ -288,7 +273,7 @@ export function cardWords(
   return {
     agent: handed?.agent ?? null,
     say: handed?.note ?? '',
-    round: item.round ?? roundOf(item.id, feed),
+    round: roundOf(item, feed),
     // A round that only merges main into approved work: nobody sent anything back (D-9b5288).
     ...(view && handed && handedAsMerge(view.events, view.state) ? { merge: true as const } : {}),
   };

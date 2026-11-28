@@ -4,6 +4,7 @@ import { cambios, creatures, errores } from '../../src/core/board/testing.ts';
 import { agent, ago, item, moved, NOW, officialType, you } from './derive/fixtures.ts';
 import { setLanguage } from './i18n/i18n.ts';
 import { approvalWaitWords } from './refusals.ts';
+import { roundOf } from './rounds.ts';
 import {
   approvalGate,
   cardFigures,
@@ -25,7 +26,6 @@ import {
   releaseDirection,
   resist,
   roundEvidence,
-  roundOf,
   stampShift,
   swipeThreshold,
   throwFade,
@@ -348,7 +348,7 @@ describe('triageQueue', () => {
 
 describe('roundOf', () => {
   it('is the first round until you send the item back with notes', () => {
-    expect(roundOf('A', [])).toBe(1);
+    expect(roundOf(item({ id: 'A' }), [])).toBe(1);
   });
 
   it('adds a round for every time you sent it back with notes', () => {
@@ -359,7 +359,7 @@ describe('roundOf', () => {
       moved('B', 'fixing', you, { reason: 'no es este' }),
       moved('A', 'verify', you),
     ];
-    expect(roundOf('A', feed)).toBe(3);
+    expect(roundOf(item({ id: 'A' }), feed)).toBe(3);
   });
 });
 

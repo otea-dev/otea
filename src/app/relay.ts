@@ -9,6 +9,7 @@ import { closesOf, stateLabel, transitionsBetween, type Workflow } from '../core
 import { selectMessage } from '../store/conversation.ts';
 import { transaction } from '../store/database.ts';
 import { type EventRecord, type ItemRecord, selectEvents } from '../store/queries.ts';
+import { assistantName } from './assistant.ts';
 import { typeOfItem } from './collections.ts';
 import type { Context } from './context.ts';
 import { type Item, landMove, requireWritableItem, systemClock } from './items.ts';
@@ -22,7 +23,6 @@ import {
   roundWorkersOf,
 } from './next.ts';
 import { assertMayEnter } from './relations.ts';
-import { secretaryName } from './secretary.ts';
 
 // The human a relayed decision belongs to: the same actor the web UI records.
 export const RELAYED_HUMAN: Actor = { kind: 'human', name: 'human' };
@@ -38,7 +38,7 @@ export type RelayInput = {
   reason?: string;
   // On a board with motives, the motive of a relayed discard, by its name (any case) or its id.
   motive?: string;
-  // The message of the person's in Hablar the quote comes from. A project with a secretary takes a
+  // The message of the person's in Hablar the quote comes from. A project with an assistant takes a
   // relay only from it and only with this message, which must contain the quote.
   fromMessage?: number;
 };
@@ -47,9 +47,9 @@ export type RelayInput = {
 // two sentences apart.
 const plainWords = (text: string) => text.toLocaleLowerCase().replace(/\s+/g, ' ').trim();
 
-// What a relay stands on once the project has a secretary (field study 4, U8: any process could drop
-// an item with a sentence nobody said): the secretary, with the person's own message, which says
-// what is quoted. Returns the message. Without a secretary there is no conversation to check
+// What a relay stands on once the project has an assistant (field study 4, U8: any process could drop
+// an item with a sentence nobody said): the assistant, with the person's own message, which says
+// what is quoted. Returns the message. Without an assistant there is no conversation to check
 // against and a relay is the agent's word, as it was.
 export function assertSaidInHablar(
   ctx: Context,
@@ -57,12 +57,12 @@ export function assertSaidInHablar(
   quote: string,
   at: string,
 ): number | undefined {
-  const secretary = secretaryName(ctx.db);
-  if (secretary === undefined) return undefined;
-  if (input.via !== secretary) {
+  const assistant = assistantName(ctx.db);
+  if (assistant === undefined) return undefined;
+  if (input.via !== assistant) {
     throw new OteaError(
       'forbidden',
-      `Not relayed: only the secretary (${secretary}) relays what the person said, and only words they wrote in Talk.${input.via} asks them instead: otea ask ${input.id} "<your question>"`,
+      `Not relayed: only the assistant (${assistant}) relays what the person said, and only words they wrote in Talk.${input.via} asks them instead: otea ask ${input.id} "<your question>"`,
     );
   }
   const refer = `relay it with --from-message <id of the person's message in Talk (otea conversation shows them)> and --quote words that message contains`;
@@ -79,7 +79,7 @@ export function assertSaidInHablar(
       `Not relayed: message ${message.id} is not the person's: ${refer}`,
     );
   }
-  // What they typed, not what they tapped: a tap on a card's option is the secretary's own words.
+  // What they typed, not what they tapped: a tap on a card's option is the assistant's own words.
   if (message.choice !== null) {
     throw new OteaError(
       'quote_required',
@@ -117,7 +117,7 @@ function assertMessageUnused(ctx: Context, item: ItemRecord, message: number): v
   }
 }
 
-// What a relay may never do, with a secretary or without one (adversarial review of S): drop,
+// What a relay may never do, with an assistant or without one (adversarial review of S): drop,
 // finish or approve. Words an agent says the person said cannot do what is the person's alone or
 // cannot be taken back; the person taps a card (otea say --drop) or decides on the desk.
 function assertNotDestructive(
@@ -134,12 +134,12 @@ function assertNotDestructive(
   if (!closes && !approving) return;
   throw new OteaError(
     'forbidden',
-    `Not relayed: ${closes ? 'dropping or finishing' : 'approving'} ${item.id} is the person's alone, by their own tap, never by words relayed through an agent. Ask them: otea ask ${item.id} "<your question>"${closes ? ' (the secretary offers a card with otea say --drop)' : ''}, or they decide it on the desk or the phone.`,
+    `Not relayed: ${closes ? 'dropping or finishing' : 'approving'} ${item.id} is the person's alone, by their own tap, never by words relayed through an agent. Ask them: otea ask ${item.id} "<your question>"${closes ? ' (the assistant offers a card with otea say --drop)' : ''}, or they decide it on the desk or the phone.`,
   );
 }
 
 // An item that waits for the person's review leaves it by their own tap (the desk's Devolver,
-// Descartar, Aprobar, or a card of the secretary's they tap), never by words an agent relays.
+// Descartar, Aprobar, or a card of the assistant's they tap), never by words an agent relays.
 function assertNotInReview(ctx: Context, item: ItemRecord): void {
   const board = liveBoardOf(ctx, item.collection);
   const position = positionOf(item.state);

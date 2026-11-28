@@ -2,13 +2,13 @@ import { ADVICE, type AdviceKind, MAX_ADVICE_CHARS } from '../core/board/advice.
 import { OteaError } from '../core/errors.ts';
 import { plainLine } from '../core/quote.ts';
 import { appendEvent } from '../store/queries.ts';
+import { assistantName } from './assistant.ts';
 import { assertInReview } from './conversation-act.ts';
 import { type Clock, systemClock } from './items.ts';
 import type { Project } from './project.ts';
-import { secretaryName } from './secretary.ts';
 
 // An agent tells the person, on the item itself, what it thinks of a delivery that waits for their
-// review (s-real2 D-00b356): the secretary recommends sending it back, or the agent that delivered it
+// review (s-real2 D-00b356): the assistant recommends sending it back, or the agent that delivered it
 // doubts it. The pages that offer Aprobar say it beside the button. It is advice: it moves nothing,
 // blocks nothing, and the person's act stays theirs. Refused for an item that is not in their
 // review now; the latest advice stands, and a new handoff leaves it behind.
@@ -23,13 +23,13 @@ export function adviseOnItem(project: Project, input: AdviseInput, now: Clock = 
     );
   }
   assertInReview(project, input.id);
-  const secretary = secretaryName(project.db) === input.agent;
+  const assistant = assistantName(project.db) === input.agent;
   appendEvent(project.db, {
     itemId: input.id,
     type: ADVICE,
     actor: { kind: 'agent', name: input.agent },
     at: now(),
-    data: { kind: input.kind, note, secretary },
+    data: { kind: input.kind, note, assistant },
   });
-  return { id: input.id, kind: input.kind, note, secretary };
+  return { id: input.id, kind: input.kind, note, assistant };
 }

@@ -35,7 +35,7 @@ export const HTTP_STATUS: Readonly<Record<ErrorCode, ContentfulStatusCode>> = {
   invalid_gate: 400,
   invalid_profile: 400,
   profile_required: 400,
-  secretary_taken: 409,
+  assistant_taken: 409,
   self_relation: 400,
   parent_exists: 409,
   parent_type: 409,

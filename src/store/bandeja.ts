@@ -252,7 +252,7 @@ export function holdEntry(
   return Number(db.prepare(sql).run({ id, agent, at, until }).changes) === 1;
 }
 
-// How many entries wait for the secretary at `at` (nobody holds them, none is filed, no question
+// How many entries wait for the assistant at `at` (nobody holds them, none is filed, no question
 // waits for the person), and since when the oldest does.
 export function countWaitingEntries(
   db: DatabaseSync,

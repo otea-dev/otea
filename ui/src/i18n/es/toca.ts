@@ -83,9 +83,9 @@ export const toca = {
   'toca.replied': '{agent} contestó',
   'toca.round': 'ronda {n}',
 
-  // Lo que te espera y no es un ítem: una pregunta en una nota de la Bandeja, una del secretario
+  // Lo que te espera y no es un ítem: una pregunta en una nota de la Bandeja, una del asistente
   'toca.off.bandeja': 'Nota de la Bandeja',
-  'toca.off.secretary': 'secretario',
+  'toca.off.assistant': 'asistente',
   'toca.off.inHablar': 'en Hablar',
   'toca.off.report': 'Aviso',
   'toca.act.report': 'Leer',
@@ -93,7 +93,7 @@ export const toca = {
   'toca.act.worker': 'Abre una sesión',
   'toca.sub.reports': '{agent} avisa',
 
-  // El secretario está desconectado y le esperan cosas
+  // El asistente está desconectado y le esperan cosas
   'toca.secOff.title': '{name} está desconectado',
   'toca.secOff.waiting': 'Lo espera: {what}.',
   'toca.secOff.go': 'Abrir Hablar para traerlo de vuelta',

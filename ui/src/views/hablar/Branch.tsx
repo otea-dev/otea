@@ -12,7 +12,7 @@ import { C } from '../../motion/curves.ts';
 import { reduced } from '../../motion/reduced.ts';
 import type { Item } from '../../types.ts';
 
-// What a request produced, hanging from the secretary's reply: a branch of chips, each an item
+// What a request produced, hanging from the assistant's reply: a branch of chips, each an item
 // with its node as it looks now (working, queued, waiting for you, done), and the questions of
 // agents that wait for your answer, answered in place.
 
@@ -148,10 +148,10 @@ export function AskBody({
   options: readonly string[];
   recommended: number | undefined;
   gone?: boolean;
-  // Only the buttons: the question is the words just above (the secretary's own question).
+  // Only the buttons: the question is the words just above (the assistant's own question).
   bare?: boolean;
   // The question sends an item back for you when you tap its first option, with this note: the card
-  // shows the note, lets you edit it, and never leaves the decision to the secretary.
+  // shows the note, lets you edit it, and never leaves the decision to the assistant.
   action?: { kind: 'send_back' | 'drop'; item: string; note: string; to: string };
   // The numbers (from 1) of the options that need your own words: tapping one opens the text box
   // instead of answering at once.
@@ -159,7 +159,7 @@ export function AskBody({
   // The answer to an option that needs words goes as one text (the option, a dash, your words): an
   // item's question and a note's have no field for what you add to an option.
   joined?: boolean;
-  // Takes the answer back (Deshacer), while the secretary has not heard it: the question asks again.
+  // Takes the answer back (Deshacer), while the assistant has not heard it: the question asks again.
   retract?: () => Promise<void>;
   send: (given: AnswerWords) => Promise<void>;
 }) {
@@ -315,7 +315,7 @@ export function AskBody({
                   onClick={() =>
                     picked !== null
                       ? answer(
-                          // The secretary's question takes the option and what you add apart; an
+                          // The assistant's question takes the option and what you add apart; an
                           // item's or a note's takes them as one text.
                           joined
                             ? { text: `${options[picked - 1] ?? ''} — ${free.trim()}` }

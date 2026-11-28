@@ -17,8 +17,8 @@ describe('the role texts on what is data and what is secret', () => {
       });
     }
 
-    it(`the secretary (${lang}) says a say is read before the wait, and where a question about an item goes`, () => {
-      const text = rolePrompt('secretary', lang, { name: 'sol' });
+    it(`the assistant (${lang}) says a say is read before the wait, and where a question about an item goes`, () => {
+      const text = rolePrompt('assistant', lang, { name: 'sol' });
 
       expect(text).toContain('otea say');
       expect(text).toMatch(lang === 'es' ? /nunca encadenes/ : /never chain/);

@@ -8,6 +8,7 @@ import type { FeedEvent } from '../../activity.ts';
 import { agent, ago, inMinutes, item, moved, NOW, officialType } from '../../derive/fixtures.ts';
 import { setLanguage } from '../../i18n/i18n.ts';
 import { stateWordIn } from '../../preset-words.ts';
+import { roundOf } from '../../rounds.ts';
 import type { CollectionView, Item, TypeView } from '../../types.ts';
 import {
   applyFilters,
@@ -29,7 +30,6 @@ import {
   pasosColumns,
   phoneChips,
   phonePrefs,
-  roundOf,
   rowWords,
   signalOf,
   sortBoard,
@@ -534,9 +534,9 @@ describe('what a board row says', () => {
       moved('A', 'verify', agent('mender'), { reason: 'fixed' }),
       moved('A', 'fixing', { kind: 'human', name: 'you' }, { reason: 'not yet', from: 'verify' }),
     ];
-    expect(roundOf(item({ id: 'A' }), feed, bug)).toBe(3);
-    expect(roundOf(item({ id: 'B' }), feed, bug)).toBe(1);
-    expect(roundOf({ ...item({ id: 'A' }), round: 1 }, feed, bug)).toBe(1);
+    expect(roundOf(item({ id: 'A' }), feed)).toBe(3);
+    expect(roundOf(item({ id: 'B' }), feed)).toBe(1);
+    expect(roundOf({ ...item({ id: 'A' }), round: 1 }, feed)).toBe(1);
   });
 
   it('shows the first enum field that is off its default', () => {

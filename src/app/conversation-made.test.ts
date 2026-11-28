@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { declareAssistant } from './assistant.ts';
 import { addCollection } from './collections.ts';
-import { linkMessageToItem, postPersonMessage, sayAsSecretary } from './conversation.ts';
+import { linkMessageToItem, postPersonMessage, sayAsAssistant } from './conversation.ts';
 import { createItem } from './items.ts';
 import type { Project } from './project.ts';
-import { declareSecretary } from './secretary.ts';
 import { memoryContext, projectOf } from './testing.ts';
 
 const T0 = Date.parse('2026-11-26T10:00:00.000Z');
 const clock = (offsetMs: number) => () => new Date(T0 + offsetMs).toISOString();
 
 // D-274c07 (final study): «Lo que salió» showed the person's code requests as «hecho» because the
-// secretary had linked each of them to the one item that was done (PED-1, the board's sketch). A
+// assistant had linked each of them to the one item that was done (PED-1, the board's sketch). A
 // link says whether the item was made from the turn (`made`) or only mentioned by it, so the card
 // reads «hecho» for what was made and done, and «sin ítem» for a request nothing was made from.
 describe('the items a turn made, and those it only mentions', () => {
@@ -19,7 +19,7 @@ describe('the items a turn made, and those it only mentions', () => {
   beforeEach(() => {
     project = projectOf('/nowhere', memoryContext());
     addCollection(project, { name: 'tasks' });
-    declareSecretary(project.db, 'sol', clock(0));
+    declareAssistant(project.db, 'sol', clock(0));
   });
   afterEach(() => project.db.close());
 
@@ -51,17 +51,17 @@ describe('the items a turn made, and those it only mentions', () => {
     expect(turn(request.id)).toEqual([{ item: made, made: 1 }]);
   });
 
-  it('marks an item the secretary only mentions as not made, and one made after the turn as made', () => {
+  it('marks an item the assistant only mentions as not made, and one made after the turn as made', () => {
     const before = item('Sketch the board', 500);
     const request = asked('add POST /products', 1000);
     const after = item('POST /products', 3000);
 
-    sayAsSecretary(
+    sayAsAssistant(
       project,
       { agent: 'sol', text: 'Noted.', replyTo: request.id, kind: 'request', links: [before] },
       clock(2000),
     );
-    sayAsSecretary(
+    sayAsAssistant(
       project,
       { agent: 'sol', text: 'Made it.', replyTo: request.id, kind: 'request', links: [after] },
       clock(4000),
@@ -77,7 +77,7 @@ describe('the items a turn made, and those it only mentions', () => {
     const before = item('Sketch the board', 500);
     const request = asked('add POST /products', 1000);
     const after = item('POST /products', 3000);
-    sayAsSecretary(
+    sayAsAssistant(
       project,
       {
         agent: 'sol',
@@ -89,7 +89,7 @@ describe('the items a turn made, and those it only mentions', () => {
       clock(4000),
     );
 
-    const said = sayAsSecretary(
+    const said = sayAsAssistant(
       project,
       { agent: 'sol', text: 'Again.', replyTo: request.id },
       clock(5000),

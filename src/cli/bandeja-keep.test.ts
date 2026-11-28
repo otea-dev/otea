@@ -20,7 +20,7 @@ describe('the Bandeja: closing, and one refiner taking the next note', () => {
 
   beforeEach(async () => {
     ({ repo, otea } = seeded.fresh());
-    await otea('profile', '--role', 'secretary', '--as', 'sol');
+    await otea('profile', '--role', 'assistant', '--as', 'sol');
   });
 
   afterEach(() => repo.remove());
@@ -39,7 +39,7 @@ describe('the Bandeja: closing, and one refiner taking the next note', () => {
   const entries = () => inProject((project) => listBandeja(project, { filed: 10 }));
 
   describe('close', () => {
-    it('closes a duplicate with its reason, which the secretary’s wait and the list then leave alone', async () => {
+    it('closes a duplicate with its reason, which the assistant’s wait and the list then leave alone', async () => {
       capture('the Aprobar button again');
 
       const closed = await otea(
@@ -59,13 +59,13 @@ describe('the Bandeja: closing, and one refiner taking the next note', () => {
         closedBy: 'sol',
         closeReason: 'the same as CAM-1',
       });
-      expect((await otea('wait', '--secretary', '--as', 'sol', '--timeout', '1')).code).toBe(13);
+      expect((await otea('wait', '--assistant', '--as', 'sol', '--timeout', '1')).code).toBe(13);
       const all = await otea('bandeja', '--all', '--as', 'lia');
       expect(all.out).toContain('closed by sol: the same as CAM-1');
       expect((await otea('bandeja', '--as', 'lia')).out).toContain('The Inbox is empty');
     });
 
-    it('wants a reason, and is the secretary’s or the holder’s', async () => {
+    it('wants a reason, and is the assistant’s or the holder’s', async () => {
       capture('a note');
 
       const bare = await otea('bandeja', 'close', 'B-1', '--as', 'sol');
@@ -74,7 +74,7 @@ describe('the Bandeja: closing, and one refiner taking the next note', () => {
 
       const stranger = await otea('bandeja', 'close', 'B-1', '--reason', 'no', '--as', 'lia');
       expect(stranger.code).toBe(7);
-      expect(stranger.err).toContain("Only the project's secretary");
+      expect(stranger.err).toContain("Only the project's assistant");
 
       await otea('bandeja', 'take', 'B-1', '--as', 'lia');
       const holder = await otea('bandeja', 'close', 'B-1', '--reason', 'not a task', '--as', 'lia');
@@ -82,13 +82,13 @@ describe('the Bandeja: closing, and one refiner taking the next note', () => {
       expect(entries()[0]).toMatchObject({ state: 'closed', claimedBy: null });
     });
 
-    it('is reopened by the person, and the secretary hears of it again', async () => {
+    it('is reopened by the person, and the assistant hears of it again', async () => {
       capture('a note');
       await otea('bandeja', 'close', 'B-1', '--reason', 'dup', '--as', 'sol');
 
       inProject((project) => reopenBandeja(project, { id: 1 }));
 
-      const woke = JSON.parse((await otea('wait', '--secretary', '--as', 'sol', '--json')).out);
+      const woke = JSON.parse((await otea('wait', '--assistant', '--as', 'sol', '--json')).out);
       expect(woke).toMatchObject({ kind: 'bandeja_item', ref: 'B-1' });
     });
 
@@ -131,7 +131,7 @@ describe('the Bandeja: closing, and one refiner taking the next note', () => {
 
     // The desk counts only workers as the ones an item waits for: a refiner waiting on the Bandeja
     // is neither a listener on the boards nor a worker connected.
-    it('marks the agent that takes the next note as the refiner, and never overrides the secretary', async () => {
+    it('marks the agent that takes the next note as the refiner, and never overrides the assistant', async () => {
       const roleOf = (name: string) =>
         inProject((project) => listAgents(project.db).find((agent) => agent.name === name)?.role);
       capture('first');
@@ -141,7 +141,7 @@ describe('the Bandeja: closing, and one refiner taking the next note', () => {
       await otea('bandeja', 'take', '--next', '--as', 'sol');
 
       expect(roleOf('lia')).toBe('refiner');
-      expect(roleOf('sol')).toBe('secretary');
+      expect(roleOf('sol')).toBe('assistant');
       expect(roleOf('max')).toBeNull();
       // A waiting refiner is no listener on the boards.
       await otea('bandeja', 'take', '--next', '--wait', '--timeout', '1', '--as', 'max');

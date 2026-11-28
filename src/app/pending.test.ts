@@ -6,10 +6,11 @@ import { sequenceIds } from '../core/board/ids.ts';
 import { instantiate, requireTemplate } from '../core/board/templates.ts';
 import { creatures } from '../core/board/testing.ts';
 import { appendEvent, updateItemState } from '../store/queries.ts';
+import { declareAssistant } from './assistant.ts';
 import { answerBandeja, askOnBandeja, captureToBandeja, takeBandeja } from './bandeja.ts';
 import { createBoard, publishBoard, saveDraft } from './boards.ts';
 import { addCollection } from './collections.ts';
-import { answerSecretaryQuestion, postPersonMessage, sayAsSecretary } from './conversation.ts';
+import { answerAssistantQuestion, postPersonMessage, sayAsAssistant } from './conversation.ts';
 import { createItem } from './items.ts';
 import { claimItem } from './leases.ts';
 import { landWaitOf } from './next.ts';
@@ -17,7 +18,6 @@ import { pendingOf, pendingText } from './pending.ts';
 import { seeAgent } from './presence.ts';
 import type { Project } from './project.ts';
 import { askQuestion } from './questions.ts';
-import { declareSecretary } from './secretary.ts';
 import { memoryContext, projectOf, publishAs, REVIEWS } from './testing.ts';
 
 const T0 = Date.parse('2026-11-26T10:00:00.000Z');
@@ -27,7 +27,7 @@ const you = { kind: 'human' as const, name: 'fede' };
 const agent = (name: string) => ({ kind: 'agent' as const, name });
 
 // F4 (field study 3): four personas waited 15 to 40 minutes on a question of the Bandeja that Te
-// toca never counted, and the secretary's «what waits for me» left a review out because it came
+// toca never counted, and the assistant's «what waits for me» left a review out because it came
 // from its memory. Otea says what waits for the person, from the records.
 describe('what waits for the person', () => {
   let root: string;
@@ -37,7 +37,7 @@ describe('what waits for the person', () => {
     root = mkdtempSync(join(tmpdir(), 'otea-pending-'));
     project = projectOf(root, memoryContext(REVIEWS));
     addCollection(project, { name: 'reviews', preset: 'reviews' });
-    declareSecretary(project.db, 'sol', clock(0));
+    declareAssistant(project.db, 'sol', clock(0));
   });
 
   afterEach(() => {
@@ -85,13 +85,13 @@ describe('what waits for the person', () => {
     expect(pendingOf(project, clock(3 * MIN)).count).toBe(0);
   });
 
-  it('counts a question of the secretary with options until the person answers it', () => {
+  it('counts a question of the assistant with options until the person answers it', () => {
     const wrote = postPersonMessage(
       project,
       { text: 'should the idea of the boss wait?' },
       clock(1000),
     ).message;
-    const said = sayAsSecretary(
+    const said = sayAsAssistant(
       project,
       {
         agent: 'sol',
@@ -106,7 +106,7 @@ describe('what waits for the person', () => {
     const pending = pendingOf(project, clock(MIN));
     expect(pending.entries).toEqual([
       expect.objectContaining({
-        kind: 'secretary',
+        kind: 'assistant',
         ref: String(said.id),
         by: 'sol',
         text: 'What do I do with it?',
@@ -116,30 +116,30 @@ describe('what waits for the person', () => {
       }),
     ]);
 
-    answerSecretaryQuestion(project, said.id, { option: 1 }, clock(2 * MIN));
+    answerAssistantQuestion(project, said.id, { option: 1 }, clock(2 * MIN));
     expect(pendingOf(project, clock(3 * MIN)).count).toBe(0);
   });
 
   // D-0fe98a (field study s-real): "¿lo descarto con tu toque?" in «Te toca ahora» did not say which
-  // item. A question of the secretary's about an item names it, in the data and in the text the
-  // secretary reads back.
-  it('names the item a question of the secretary is about', () => {
+  // item. A question of the assistant's about an item names it, in the data and in the text the
+  // assistant reads back.
+  it('names the item a question of the assistant is about', () => {
     const own = createItem(
       project,
       { collection: 'reviews', title: 'CSS review', actor: agent('kiln') },
       clock(500),
     ).id;
-    const linked = sayAsSecretary(
+    const linked = sayAsAssistant(
       project,
       { agent: 'sol', text: 'Do I drop it?', links: [own], options: ['Drop it', 'No'] },
       clock(1000),
     ).message;
-    const mentioned = sayAsSecretary(
+    const mentioned = sayAsAssistant(
       project,
       { agent: 'sol', text: `Is ${own} ready to go?`, options: ['Yes', 'No'] },
       clock(2000),
     ).message;
-    const general = sayAsSecretary(
+    const general = sayAsAssistant(
       project,
       { agent: 'sol', text: 'Which day suits you?', options: ['Mon', 'Tue'] },
       clock(3000),
@@ -315,31 +315,31 @@ describe('what waits for the person', () => {
   });
 
   // F3 left a question open until a message replies to it: the person's own words in reply close it.
-  it('closes a question of the secretary the person answers in their own words', () => {
+  it('closes a question of the assistant the person answers in their own words', () => {
     const wrote = postPersonMessage(project, { text: 'idea?' }, clock(1000)).message;
-    const said = sayAsSecretary(
+    const said = sayAsAssistant(
       project,
       { agent: 'sol', text: 'Write it down?', replyTo: wrote.id, options: ['Yes', 'No'] },
       clock(2000),
     ).message;
     expect(pendingOf(project, clock(MIN)).count).toBe(1);
 
-    answerSecretaryQuestion(project, said.id, { text: 'Not now, maybe next week' }, clock(2 * MIN));
+    answerAssistantQuestion(project, said.id, { text: 'Not now, maybe next week' }, clock(2 * MIN));
 
     expect(pendingOf(project, clock(3 * MIN)).count).toBe(0);
   });
 
-  it('says the secretary is offline and how many things wait for it', () => {
+  it('says the assistant is offline and how many things wait for it', () => {
     postPersonMessage(project, { text: 'hello?' }, clock(1000));
     const pending = pendingOf(project, clock(90 * MIN));
-    expect(pending.secretary).toMatchObject({
+    expect(pending.assistant).toMatchObject({
       name: 'sol',
       state: 'offline',
       waiting: { count: 1 },
     });
   });
 
-  it('reads as plain text for the secretary: what waits and how long', () => {
+  it('reads as plain text for the assistant: what waits and how long', () => {
     const id = note('a note', 1000);
     takeBandeja(project, { id, agent: 'lia' }, clock(2000));
     askOnBandeja(
@@ -364,9 +364,9 @@ describe('what waits for the person', () => {
     expect(pendingText(pendingOf(project, clock(MIN)))).toContain('Nothing waits for the person');
   });
 
-  // U4 (field study 4): with approved work waiting behind the only worker, the secretary started no
+  // U4 (field study 4): with approved work waiting behind the only worker, the assistant started no
   // second one until asked. Otea says how many wait for an agent on each board, who works it and how
-  // many the board takes, so the secretary reads it instead of guessing.
+  // many the board takes, so the assistant reads it instead of guessing.
   describe('the queue of each board for a worker', () => {
     let tick = 0;
     const now = () => new Date(Date.UTC(2026, 10, 19, 9, 0, tick++)).toISOString();

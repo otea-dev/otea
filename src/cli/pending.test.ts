@@ -6,10 +6,10 @@ import { createMcpServer } from '../mcp/server.ts';
 import { COMMANDS } from './commands.ts';
 import { type Cli, declareProfiles, presetCollection, seedOnce, type TempRepo } from './testing.ts';
 
-// F4 (field study 3): what waits for the person is Otea's to say, not the secretary's memory
+// F4 (field study 3): what waits for the person is Otea's to say, not the assistant's memory
 // (`otea pending`), and a worker or a refiner that has something the person must know says it to
-// the secretary (`otea escalate`), who relays it in Hablar.
-describe('what waits for the person, from the secretary', () => {
+// the assistant (`otea escalate`), who relays it in Hablar.
+describe('what waits for the person, from the assistant', () => {
   let repo: TempRepo;
   let otea: Cli;
 
@@ -20,7 +20,7 @@ describe('what waits for the person, from the secretary', () => {
 
   beforeEach(async () => {
     ({ repo, otea } = seeded.fresh());
-    await otea('profile', '--role', 'secretary', '--as', 'sol');
+    await otea('profile', '--role', 'assistant', '--as', 'sol');
   });
 
   afterEach(() => repo.remove());
@@ -75,7 +75,7 @@ describe('what waits for the person, from the secretary', () => {
       });
     });
 
-    it('lists a review, so the secretary does not tell it from memory', async () => {
+    it('lists a review, so the assistant does not tell it from memory', async () => {
       const id = await item('Dark mode');
       await otea('claim', id, '--as', 'worker');
       await otea('handoff', id, '--as', 'worker');
@@ -92,11 +92,11 @@ describe('what waits for the person, from the secretary', () => {
       expect(out).toContain('Nothing waits for the person');
     });
 
-    it('ends the secretary’s wait and its reading with how many wait, so a notice never rests on memory', async () => {
+    it('ends the assistant’s wait and its reading with how many wait, so a notice never rests on memory', async () => {
       await noteWithQuestion('a note', 'Which screen?');
       inProject((project) => captureToBandeja(project, { text: 'another' }));
 
-      const woke = await otea('wait', '--secretary', '--as', 'sol');
+      const woke = await otea('wait', '--assistant', '--as', 'sol');
       expect(woke.out).toContain('1 thing waits for the person (otea pending');
     });
 
@@ -121,7 +121,7 @@ describe('what waits for the person, from the secretary', () => {
     });
   });
 
-  // D-00b356 (s-real2): the secretary said in Hablar it recommended sending an item back, and the
+  // D-00b356 (s-real2): the assistant said in Hablar it recommended sending an item back, and the
   // item's page, where the person approved, said nothing. `otea advise` records it on the item.
   describe('otea advise', () => {
     it('records a recommendation on an item in review, which show reads back', async () => {
@@ -144,12 +144,12 @@ describe('what waits for the person, from the secretary', () => {
         kind: 'send_back',
         note: 'The page never loads the file it adds.',
         by: 'sol',
-        secretary: true,
+        assistant: true,
       });
       const doubted = await otea('advise', id, 'I could not run it.', '--doubt', '--as', 'worker');
       expect(doubted.code).toBe(0);
       const again = JSON.parse((await otea('show', id, '--as', 'sol', '--json')).out);
-      expect(again.advice).toMatchObject({ kind: 'doubt', by: 'worker', secretary: false });
+      expect(again.advice).toMatchObject({ kind: 'doubt', by: 'worker', assistant: false });
     });
 
     it('is refused on an item that waits for no review, and is a tool of MCP', async () => {
@@ -174,7 +174,7 @@ describe('what waits for the person, from the secretary', () => {
   });
 
   describe('otea escalate', () => {
-    it('wakes the secretary with what a worker says, naming the item and the worker', async () => {
+    it('wakes the assistant with what a worker says, naming the item and the worker', async () => {
       const id = await item();
 
       const said = await otea(
@@ -187,16 +187,16 @@ describe('what waits for the person, from the secretary', () => {
       expect(said.code).toBe(0);
       expect(said.out).toContain('Told sol');
 
-      const woke = JSON.parse((await otea('wait', '--secretary', '--as', 'sol', '--json')).out);
+      const woke = JSON.parse((await otea('wait', '--assistant', '--as', 'sol', '--json')).out);
       expect(woke).toMatchObject({ kind: 'escalation', ref: id });
       expect(woke.text).toContain('worker');
       expect(woke.text).toContain('I pushed change/CHA-5-v2 by mistake');
       expect(woke.text).toContain('otea say');
     });
 
-    // F4 review round: an away secretary relays nothing; the person reads it in Te toca and Te
+    // F4 review round: an away assistant relays nothing; the person reads it in Te toca and Te
     // espera, and the worker is told so.
-    it('tells the worker the person sees it directly when the secretary is offline', async () => {
+    it('tells the worker the person sees it directly when the assistant is offline', async () => {
       const id = await item();
       const longAgo = new Date(Date.now() - 45 * 60_000).toISOString();
       inProject((project) =>
@@ -223,11 +223,11 @@ describe('what waits for the person, from the secretary', () => {
       const said = await otea('escalate', 'B-1', 'It is the same as CAM-1.', '--as', 'lia');
 
       expect(said.code).toBe(0);
-      const woke = JSON.parse((await otea('wait', '--secretary', '--as', 'sol', '--json')).out);
+      const woke = JSON.parse((await otea('wait', '--assistant', '--as', 'sol', '--json')).out);
       expect(woke).toMatchObject({ kind: 'escalation', ref: 'B-1' });
     });
 
-    it('says what to do instead when the project has no secretary', async () => {
+    it('says what to do instead when the project has no assistant', async () => {
       repo.remove();
       ({ repo, otea } = seeded.fresh());
       const id = await item('x');
@@ -235,11 +235,11 @@ describe('what waits for the person, from the secretary', () => {
       const { code, err } = await otea('escalate', id, 'a problem', '--as', 'worker');
 
       expect(code).not.toBe(0);
-      expect(err).toContain('no secretary');
+      expect(err).toContain('no assistant');
       expect(err).toContain('otea ask');
     });
 
-    it('is not for the secretary, who speaks with say', async () => {
+    it('is not for the assistant, who speaks with say', async () => {
       const id = await item();
 
       const { code, err } = await otea('escalate', id, 'x', '--as', 'sol');
@@ -255,7 +255,7 @@ describe('what waits for the person, from the secretary', () => {
       const id = await item();
       const empty = await otea('escalate', id, '   ', '--as', 'worker');
       expect(empty.code).toBe(2);
-      expect(empty.err).toContain('say what the secretary should know');
+      expect(empty.err).toContain('say what the assistant should know');
     });
   });
 });

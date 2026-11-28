@@ -172,7 +172,7 @@ export type ReaderDecide = {
   // What waits for the second press, said where the person is: a refusal-weight line, never a hold.
   warn?: string | undefined;
   // What the person should know before Aprobar (the attached diff is not what lands, what the
-  // secretary advised), the same lines the page says beside the button: advice, never a hold.
+  // assistant advised), the same lines the page says beside the button: advice, never a hold.
   notices?: readonly string[] | undefined;
 };
 

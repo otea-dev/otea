@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { BANDEJA_LEASE_MS, isBandejaRef } from '../core/bandeja.ts';
+import { assistantWake, declareAssistant, startAssistantWait } from './assistant.ts';
+import { assistantWaiting } from './assistant-waiting.ts';
 import {
   answerBandeja,
   askOnBandeja,
@@ -22,8 +24,6 @@ import { addCollection } from './collections.ts';
 import { listConversation, postPersonMessage } from './conversation.ts';
 import { createItem } from './items.ts';
 import type { Project } from './project.ts';
-import { declareSecretary, secretaryWake, startSecretaryWait } from './secretary.ts';
-import { secretaryWaiting } from './secretary-waiting.ts';
 import { memoryContext, projectOf } from './testing.ts';
 
 const T0 = Date.parse('2026-11-26T10:00:00.000Z');
@@ -40,7 +40,7 @@ describe('the Bandeja', () => {
     root = mkdtempSync(join(tmpdir(), 'otea-bandeja-'));
     project = projectOf(root, memoryContext());
     addCollection(project, { name: 'tasks' });
-    declareSecretary(project.db, 'sol', clock(0));
+    declareAssistant(project.db, 'sol', clock(0));
   });
 
   afterEach(() => {
@@ -54,10 +54,10 @@ describe('the Bandeja', () => {
     extra: Partial<Parameters<typeof captureToBandeja>[1]> = {},
   ) => captureToBandeja(project, { text, ...extra }, clock(at)).entry;
 
-  const wake = (at: number) => secretaryWake(project, startSecretaryWait(clock(at)), clock(at));
+  const wake = (at: number) => assistantWake(project, startAssistantWait(clock(at)), clock(at));
 
   describe('a capture', () => {
-    it('waits for the secretary, from the entries’ own state, until a refiner takes it', () => {
+    it('waits for the assistant, from the entries’ own state, until a refiner takes it', () => {
       const entry = capture('the Aprobar button is hidden on the phone');
       expect(entry).toMatchObject({ ref: 'B-1', state: 'waiting', by: 'human', item: null });
 
@@ -71,7 +71,7 @@ describe('the Bandeja', () => {
       expect(wake(5000)).toBeUndefined();
     });
 
-    it('wakes the secretary again when the refiner that took it never acted and its lease ran out', () => {
+    it('wakes the assistant again when the refiner that took it never acted and its lease ran out', () => {
       capture('an idea');
       takeBandeja(project, { id: 1, agent: 'lia' }, clock(1000));
       expect(wake(1000 + BANDEJA_LEASE_MS - 1)).toBeUndefined();
@@ -146,13 +146,13 @@ describe('the Bandeja', () => {
     });
   });
 
-  describe('while the secretary is away', () => {
+  describe('while the assistant is away', () => {
     it('counts the captures nobody took among what waits for it, beside the person’s messages', () => {
       // Real time: the notifier asks at the moment it looks.
       const first = captureToBandeja(project, { text: 'one' }).entry;
       captureToBandeja(project, { text: 'two' });
       postPersonMessage(project, { text: 'hello' });
-      expect(secretaryWaiting(project.db)).toEqual({
+      expect(assistantWaiting(project.db)).toEqual({
         count: 3,
         since: expect.any(String),
         messages: 1,
@@ -160,17 +160,17 @@ describe('the Bandeja', () => {
         reports: 0,
       });
       // The oldest of what waits.
-      expect(secretaryWaiting(project.db).since).toBe(first.at);
+      expect(assistantWaiting(project.db).since).toBe(first.at);
 
-      // A refiner holds one: the secretary has nothing to do with it.
+      // A refiner holds one: the assistant has nothing to do with it.
       takeBandeja(project, { id: 1, agent: 'lia' });
-      expect(secretaryWaiting(project.db).count).toBe(2);
+      expect(assistantWaiting(project.db).count).toBe(2);
 
-      // Asked and unanswered: the person's turn. Answered: the secretary's again.
+      // Asked and unanswered: the person's turn. Answered: the assistant's again.
       askOnBandeja(project, { id: 1, agent: 'lia', text: 'Which?', options: ['a', 'b'] });
-      expect(secretaryWaiting(project.db).count).toBe(2);
+      expect(assistantWaiting(project.db).count).toBe(2);
       answerBandeja(project, { id: 1, option: 1 });
-      expect(secretaryWaiting(project.db).count).toBe(3);
+      expect(assistantWaiting(project.db).count).toBe(3);
 
       takeBandeja(project, { id: 1, agent: 'lia' });
       fileBandeja(project, {
@@ -183,7 +183,7 @@ describe('the Bandeja', () => {
           actor: { kind: 'agent', name: 'lia' },
         }).id,
       });
-      expect(secretaryWaiting(project.db).count).toBe(2);
+      expect(assistantWaiting(project.db).count).toBe(2);
     });
   });
 
@@ -348,14 +348,14 @@ describe('the Bandeja', () => {
         recommended: 2,
       });
       expect(entry).toMatchObject({ state: 'asking', claimedBy: null, asking: { question: 1 } });
-      // Nothing for the secretary to do until the person answers; nobody may take it meanwhile.
+      // Nothing for the assistant to do until the person answers; nobody may take it meanwhile.
       expect(wake(3000)).toBeUndefined();
       expect(() => takeBandeja(project, { id: 1, agent: 'max' }, clock(3000))).toThrow(
         /waits for the person's answer/,
       );
     });
 
-    it('records a tapped option, hands the entry back and wakes the secretary with the answer', () => {
+    it('records a tapped option, hands the entry back and wakes the assistant with the answer', () => {
       ask();
 
       const answered = answerBandeja(project, { id: 1, question: 1, option: 2 }, clock(5000));
@@ -448,7 +448,7 @@ describe('the Bandeja', () => {
       ).toThrow(/give 2 to 4 options/);
     });
 
-    // G1: what a refiner writes is read by the secretary and the person: bounded, and quoted as data.
+    // G1: what a refiner writes is read by the assistant and the person: bounded, and quoted as data.
     it('bounds a question and a close reason, and shows both quoted on one line', () => {
       capture('an idea');
       takeBandeja(project, { id: 1, agent: 'lia' }, clock(1000));

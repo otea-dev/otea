@@ -36,18 +36,18 @@ import { C } from '../../motion/curves.ts';
 import { reduced } from '../../motion/reduced.ts';
 import type { Item } from '../../types.ts';
 import { noteTime } from '../detail/notes.ts';
+import { AssistantMark } from './AssistantMark.tsx';
 import { Attachments } from './Attachments.tsx';
 import { BandejaAsk } from './Bandeja.tsx';
 import { AskBody, AskCard, Branch } from './Branch.tsx';
 import { Plain } from './Plain.tsx';
-import { SecretaryMark } from './SecretaryMark.tsx';
 
-// The conversation on the two lanes: the secretary's on the left (a ring in its own colour), yours
-// on the right (a blue disc). Each turn is what you said, what the secretary answered and, for a
+// The conversation on the two lanes: the assistant's on the left (a ring in its own colour), yours
+// on the right (a blue disc). Each turn is what you said, what the assistant answered and, for a
 // request, the branch of items that came out of it. The lanes draw with ink when the view opens, a
-// new message unfolds from its node, and the secretary's lane carries light while it thinks.
+// new message unfolds from its node, and the assistant's lane carries light while it thinks.
 
-const X_SEC = 16.5;
+const X_ASSISTANT = 16.5;
 const X_YOU = 40.5;
 // The lanes' names stand over the thread (HablarView: «sec» and «tú» stay in sight as it scrolls),
 // so the lanes start at the top of the thread.
@@ -88,10 +88,10 @@ function unfold(body: HTMLElement | null, node: Element | null) {
   );
 }
 
-function SecNode({ busy }: { busy: boolean }) {
+function AssistantNode({ busy }: { busy: boolean }) {
   return (
     <svg
-      className="nd secretary"
+      className="nd assistant"
       width="24"
       height="24"
       viewBox="-12 -12 24 24"
@@ -101,7 +101,7 @@ function SecNode({ busy }: { busy: boolean }) {
       <circle className="ko" r="6" />
       <g className="lk">
         <circle className="trk" r="8.2" fill="none" strokeWidth="1.25" />
-        <circle r="4.4" fill="var(--ground)" stroke="var(--sec)" strokeWidth="1.5" />
+        <circle r="4.4" fill="var(--ground)" stroke="var(--assistant)" strokeWidth="1.5" />
         <circle
           className="orb"
           r="8.2"
@@ -116,7 +116,7 @@ function SecNode({ busy }: { busy: boolean }) {
 }
 
 type RowProps = {
-  lane: 'secretary' | 'you';
+  lane: 'assistant' | 'you';
   // The body's identity: a new one is a new body (a thinking row becoming the reply).
   bodyKey: string;
   fresh: boolean;
@@ -166,9 +166,9 @@ function Row({
     <div
       ref={row}
       className={['hb-row', lane, className].filter(Boolean).join(' ')}
-      style={{ '--x': `${lane === 'secretary' ? X_SEC : X_YOU}px` } as CSSProperties}
+      style={{ '--x': `${lane === 'assistant' ? X_ASSISTANT : X_YOU}px` } as CSSProperties}
     >
-      {lane === 'secretary' ? <SecNode busy={busy} /> : <NodeGlyph look="yours" />}
+      {lane === 'assistant' ? <AssistantNode busy={busy} /> : <NodeGlyph look="yours" />}
       <Body key={bodyKey} fresh={fresh}>
         {children}
       </Body>
@@ -352,8 +352,8 @@ function Chose({ message, now, asked }: { message: Message; now: number; asked: 
   );
 }
 
-// The secretary's reply: a one-line conclusion in the voice's serif and, under it, the rest; a long
-// rest folds behind «ver más» (the secretary's rule is a line, then at most 3 short ones: FOLD_LINES
+// The assistant's reply: a one-line conclusion in the voice's serif and, under it, the rest; a long
+// rest folds behind «ver más» (the assistant's rule is a line, then at most 3 short ones: FOLD_LINES
 // and FOLD_CHARS in conversation.ts guard for when it is longer).
 function Reply({
   message,
@@ -379,12 +379,12 @@ function Reply({
   return (
     <>
       <div className="hb-who">
-        <SecretaryMark />
+        <AssistantMark />
         <span className="hb-name">
-          {message.author === 'secretary' ? t('hablar.secretary') : message.by}
+          {message.author === 'assistant' ? t('hablar.assistant') : message.by}
         </span>
         <time dateTime={message.at}>{noteTime(message.at, now)}</time>
-        {message.author === 'secretary' && message.unverified ? (
+        {message.author === 'assistant' && message.unverified ? (
           <button
             type="button"
             className="hb-unverified"
@@ -461,7 +461,7 @@ function Prose({ text }: { text: string }) {
   );
 }
 
-// A text for another session to read, as the secretary pasted it: its caption, the text in a box
+// A text for another session to read, as the assistant pasted it: its caption, the text in a box
 // that scrolls on its own, and a button that copies all of it.
 function PasteBlock({ block }: { block: TextBlock }) {
   const [copied, copy] = useCopy(block.text);
@@ -483,12 +483,12 @@ function PasteBlock({ block }: { block: TextBlock }) {
   );
 }
 
-// How long the secretary may hold a message it read before the desk says it has not answered: a
+// How long the assistant may hold a message it read before the desk says it has not answered: a
 // session that is stuck, or that ended the way a closed laptop does, would otherwise read «pensando…»
 // for as long as the person watched (field study 4: ten minutes).
 export const SILENT_AFTER_MS = 4 * 60_000;
 
-// When the secretary took the turn's last message of the person's: heard, else read, else said.
+// When the assistant took the turn's last message of the person's: heard, else read, else said.
 function thinkingSince(turns: readonly Turn[], root: number): string {
   const last = turns.find((turn) => turn.root === root)?.messages.at(-1);
   return last?.heardAt ?? last?.readAt ?? last?.at ?? new Date(0).toISOString();
@@ -501,15 +501,15 @@ function Thinking({
 }: {
   since: string;
   now: number;
-  // The secretary is in its wait: it holds nothing, so it is never «pensando…».
+  // The assistant is in its wait: it holds nothing, so it is never «pensando…».
   listening: boolean;
 }) {
   const silent = listening || now - Date.parse(since) >= SILENT_AFTER_MS;
   return (
     <>
       <div className="hb-who">
-        <SecretaryMark />
-        <span className="hb-name">{t('hablar.secretary')}</span>
+        <AssistantMark />
+        <span className="hb-name">{t('hablar.assistant')}</span>
       </div>
       {silent ? (
         <div className="hb-thinking hb-silent" role="status">
@@ -542,7 +542,7 @@ type EntryProps = {
 
 // One message of the thread, where it was said. The turn it belongs to only lends it what it
 // shares: the kind label (always on the person's own first message: it is what they said that the
-// kind sorts, never what the secretary answered) and the branch of items that came out of it
+// kind sorts, never what the assistant answered) and the branch of items that came out of it
 // (under that first reply).
 function Entry({
   row,
@@ -576,7 +576,7 @@ function Entry({
     const chips = row.head ? branchOf(turn, items, now) : [];
     body = (
       <Row
-        lane="secretary"
+        lane="assistant"
         bodyKey={`r${message.id}`}
         fresh={fresh(`r${message.id}`)}
         className={chips.length > 0 ? 'has-branch' : undefined}
@@ -618,8 +618,8 @@ function Entry({
   const who =
     message.author === 'person'
       ? t('mark.you')
-      : message.author === 'secretary'
-        ? t('hablar.secretary')
+      : message.author === 'assistant'
+        ? t('hablar.assistant')
         : message.by;
   const heading = `hb-h-${message.id}`;
   return (
@@ -657,7 +657,7 @@ function useGeometry(list: RefObject<HTMLElement | null>): Geometry {
     const next: Geometry = {
       H: el.offsetHeight,
       you: centre([...youNodes].at(-1)),
-      sec: centre(el.querySelector('.nd.secretary[data-busy]') ?? undefined),
+      sec: centre(el.querySelector('.nd.assistant[data-busy]') ?? undefined),
     };
     setGeometry((was) => (sameGeometry(was, next) ? was : next));
   }, [list]);
@@ -672,10 +672,10 @@ function useGeometry(list: RefObject<HTMLElement | null>): Geometry {
   return geometry;
 }
 
-// The secretary's own light on its lane, as the agents' (30 px each way and a small halo), in its
+// The assistant's own light on its lane, as the agents' (30 px each way and a small halo), in its
 // colour.
-function secLight(y: number): string {
-  return `<g class="gl" transform="translate(${X_SEC} ${y})"><rect x="-2" y="-30" width="4" height="60" fill="url(#gS)" style="filter:blur(2.4px);opacity:var(--glow-lit)"/><rect x="-.75" y="-30" width="1.5" height="60" fill="url(#gS)"/><circle r="10" opacity=".26" style="filter:blur(4.5px)"/><circle r="6.5" opacity=".32" style="filter:blur(2px)"/></g>`;
+function assistantLight(y: number): string {
+  return `<g class="gl" transform="translate(${X_ASSISTANT} ${y})"><rect x="-2" y="-30" width="4" height="60" fill="url(#gS)" style="filter:blur(2.4px);opacity:var(--glow-lit)"/><rect x="-.75" y="-30" width="1.5" height="60" fill="url(#gS)"/><circle r="10" opacity=".26" style="filter:blur(4.5px)"/><circle r="6.5" opacity=".32" style="filter:blur(2px)"/></g>`;
 }
 
 function LaneInk({ geometry }: { geometry: Geometry }) {
@@ -703,7 +703,7 @@ function LaneInk({ geometry }: { geometry: Geometry }) {
       <g className="lines">
         <path
           className="ln lag"
-          d={`M${X_SEC} ${HEAD}V${H}`}
+          d={`M${X_ASSISTANT} ${HEAD}V${H}`}
           fill="none"
           stroke="var(--lane)"
           strokeWidth="1"
@@ -720,7 +720,7 @@ function LaneInk({ geometry }: { geometry: Geometry }) {
         <g
           className="secs"
           // biome-ignore lint/security/noDangerouslySetInnerHtml: the light's markup, built from numbers
-          dangerouslySetInnerHTML={{ __html: sec === null ? '' : secLight(sec) }}
+          dangerouslySetInnerHTML={{ __html: sec === null ? '' : assistantLight(sec) }}
         />
         <g
           className="halos"
@@ -737,17 +737,17 @@ export type TurnsProps = {
   // The thread, message by message, in the order it was said.
   rows: readonly RowOf[];
   thinking: number | undefined;
-  // The secretary is in its wait: a message it read and did not answer is not being thought about.
-  secretaryListening?: boolean;
+  // The assistant is in its wait: a message it read and did not answer is not being thought about.
+  assistantListening?: boolean;
   items: ReadonlyMap<string, Item>;
   // The turn a link asked for, to find: it shows lit for a moment.
   found: number | undefined;
   onKind: (turn: Turn, kind: MessageKind) => void;
   // Goes to the turn a message answers.
   onGo: (root: number) => void;
-  // The person's tap on a question of the secretary's.
+  // The person's tap on a question of the assistant's.
   onAnswer: (message: Message, given: AnswerWords) => Promise<void>;
-  // Deshacer after such a tap, while the secretary has not heard it.
+  // Deshacer after such a tap, while the assistant has not heard it.
   onRetract: (message: Message) => Promise<void>;
   // The notes of the Bandeja a refiner asked you about: their questions stand at the foot as an
   // agent's question on an item does, and are answered there. Read again once one is.
@@ -766,7 +766,7 @@ export function Turns({
   turns,
   rows,
   thinking,
-  secretaryListening = false,
+  assistantListening = false,
   items,
   found,
   onKind,
@@ -841,11 +841,11 @@ export function Turns({
       })}
       {thinking === undefined ? null : (
         <section className="hb-turn" data-k="thinking">
-          <Row lane="secretary" bodyKey={`t${thinking}`} fresh={fresh(`t${thinking}`)} busy>
+          <Row lane="assistant" bodyKey={`t${thinking}`} fresh={fresh(`t${thinking}`)} busy>
             <Thinking
               since={thinkingSince(turns, thinking)}
               now={app.now}
-              listening={secretaryListening}
+              listening={assistantListening}
             />
           </Row>
         </section>
@@ -855,7 +855,7 @@ export function Turns({
           {asked.map(({ item, leaving }) => (
             <Row
               key={`a${item.id}`}
-              lane="secretary"
+              lane="assistant"
               bodyKey={`a${item.id}`}
               fresh={fresh(`a${item.id}`)}
               leaving={leaving}
@@ -872,7 +872,7 @@ export function Turns({
           {noteAsks.map((entry) => (
             <Row
               key={`n${entry.ref}`}
-              lane="secretary"
+              lane="assistant"
               bodyKey={`n${entry.ref}`}
               fresh={fresh(`n${entry.ref}`)}
             >

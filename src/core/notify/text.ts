@@ -53,8 +53,8 @@ const WORDS = {
     stuck: (by: string) => `Se atascó · ${by} no responde`,
     aside: (by: string) => `${by} lo dejó para después`,
     unheard: () => 'Hay trabajo y ningún agente conectado',
-    secretary_reply: (by: string) => `${by || 'Tu secretario'} te respondió`,
-    secretary_offline: () => 'Tu secretario está desconectado',
+    assistant_reply: (by: string) => `${by || 'Tu asistente'} te respondió`,
+    assistant_offline: () => 'Tu asistente está desconectado',
     replyBody: 'Abre Hablar para leerlo',
     offlineBody: (n: number) =>
       n === 1 ? 'Tu mensaje espera respuesta' : `Tus ${n} mensajes esperan respuesta`,
@@ -70,13 +70,13 @@ const WORDS = {
         n === 1
           ? '1 cosa espera y no hay ningún agente conectado'
           : `${n} cosas esperan y no hay ningún agente conectado`,
-      secretary_reply: (n: number) => `${n} respuestas de tu secretario`,
-      secretary_offline: () => 'Tu secretario está desconectado',
+      assistant_reply: (n: number) => `${n} respuestas de tu asistente`,
+      assistant_offline: () => 'Tu asistente está desconectado',
       mixed: (n: number) => (n === 1 ? '1 cosa te espera' : `${n} cosas te esperan`),
     },
-    // The secretary's replies in a burst, named apart from what waits.
+    // The assistant's replies in a burst, named apart from what waits.
     alsoReplies: (n: number) =>
-      n === 1 ? ' y una respuesta de tu secretario' : ` y ${n} respuestas de tu secretario`,
+      n === 1 ? ' y una respuesta de tu asistente' : ` y ${n} respuestas de tu asistente`,
     in: (title: string, project: string) => `${title} en ${project}`,
   },
   en: {
@@ -86,8 +86,8 @@ const WORDS = {
     stuck: (by: string) => `Stuck · ${by} went quiet`,
     aside: (by: string) => `${by} set it aside for later`,
     unheard: () => 'Work is waiting and no agent is connected',
-    secretary_reply: (by: string) => `${by || 'Your secretary'} replied`,
-    secretary_offline: () => 'Your secretary is offline',
+    assistant_reply: (by: string) => `${by || 'Your assistant'} replied`,
+    assistant_offline: () => 'Your assistant is offline',
     replyBody: 'Open Talk to read it',
     offlineBody: (n: number) =>
       n === 1 ? 'Your message awaits a reply' : `Your ${n} messages await a reply`,
@@ -102,12 +102,12 @@ const WORDS = {
         n === 1
           ? '1 thing waits and no agent is connected'
           : `${n} things wait and no agent is connected`,
-      secretary_reply: (n: number) => `${n} replies from your secretary`,
-      secretary_offline: () => 'Your secretary is offline',
+      assistant_reply: (n: number) => `${n} replies from your assistant`,
+      assistant_offline: () => 'Your assistant is offline',
       mixed: (n: number) => (n === 1 ? '1 thing waits for you' : `${n} things wait for you`),
     },
     alsoReplies: (n: number) =>
-      n === 1 ? ' and a reply from your secretary' : ` and ${n} replies from your secretary`,
+      n === 1 ? ' and a reply from your assistant' : ` and ${n} replies from your assistant`,
     in: (title: string, project: string) => `${title} in ${project}`,
   },
 } as const satisfies Record<
@@ -138,8 +138,8 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
       .join('-');
   if (notice.kind === 'group') {
     // A mixed burst says how many things wait for the person (what `otea pending` counts), not how
-    // many notices it gathers; the secretary's replies are named apart, never counted as waiting.
-    const replies = notice.items.filter(({ kind }) => kind === 'secretary_reply').length;
+    // many notices it gathers; the assistant's replies are named apart, never counted as waiting.
+    const replies = notice.items.filter(({ kind }) => kind === 'assistant_reply').length;
     const title =
       notice.of === 'mixed' && replies > 0 && replies < notice.items.length
         ? words.group.mixed(notice.waiting ?? notice.count - replies) + words.alsoReplies(replies)
@@ -148,7 +148,7 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
           );
     return {
       title: project ? words.in(title, project.name) : title,
-      // Items with no title of their own are the secretary talking: Hablar is named once.
+      // Items with no title of their own are the assistant talking: Hablar is named once.
       body: short([...new Set(notice.items.map(({ title }) => title || words.hablar))].join(' · ')),
       tag: project ? `otea-group-${project.id}` : 'otea-group',
       url: '/#/',
@@ -156,20 +156,20 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
     };
   }
   const by = notice.by ?? '';
-  // What the secretary says is not an item's: Hablar opens, at the turn it answered.
-  if (notice.kind === 'secretary_reply') {
+  // What the assistant says is not an item's: Hablar opens, at the turn it answered.
+  if (notice.kind === 'assistant_reply') {
     const line = clean(notice.text);
     return {
-      title: words.secretary_reply(by),
+      title: words.assistant_reply(by),
       body: line ? short(line, MAX_QUESTION) : words.replyBody,
       tag: tagOf('otea-hablar-reply', notice.turn),
       url: hablarUrl(notice.turn),
       item: null,
     };
   }
-  if (notice.kind === 'secretary_offline') {
+  if (notice.kind === 'assistant_offline') {
     return {
-      title: words.secretary_offline(),
+      title: words.assistant_offline(),
       body: words.offlineBody(notice.count ?? 0),
       tag: tagOf('otea-hablar-offline'),
       url: hablarUrl(),
@@ -177,7 +177,7 @@ export function noticeText(notice: Notice, lang: NoticeLang, project?: NoticePro
     };
   }
   const said = notice.kind === 'turn' ? words.turn : words[notice.kind](by);
-  // The secretary's own question with options (told as an item's is): Hablar opens at its turn.
+  // The assistant's own question with options (told as an item's is): Hablar opens at its turn.
   if (notice.kind === 'ask' && notice.item.startsWith('hablar:')) {
     const question = clean(notice.text);
     return {

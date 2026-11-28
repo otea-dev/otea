@@ -40,10 +40,10 @@ const tab = async (from: Element, shift = false) => {
   return event.defaultPrevented;
 };
 
-// D-774400 (field study s-real): the release note and the test steps the secretary sent as .md files
+// D-774400 (field study s-real): the release note and the test steps the assistant sent as .md files
 // only offered «Descargar», and a person on the desk could not read them. A Markdown file opens in
 // a reader on the page, formatted; the download stays one tap away.
-describe('a Markdown file the secretary sent', () => {
+describe('a Markdown file the assistant sent', () => {
   const note = {
     id: 9,
     name: 'nota-de-version.md',

@@ -2,12 +2,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { declareAssistant } from '../app/assistant.ts';
 import { askOnBandeja, closeBandeja, takeBandeja } from '../app/bandeja.ts';
 import { addCollection } from '../app/collections.ts';
-import { sayAsSecretary } from '../app/conversation.ts';
+import { sayAsAssistant } from '../app/conversation.ts';
 import { listItems } from '../app/items.ts';
 import type { Project } from '../app/project.ts';
-import { declareSecretary } from '../app/secretary.ts';
 import { createServer, type OteaServer } from './server.ts';
 import { LOCAL_HOST, memoryProject, SESSION_COOKIE, TOKEN } from './testing.ts';
 
@@ -49,7 +49,7 @@ describe('a write sent again under the same Idempotency-Key', () => {
     project = { ...memoryProject(), dataDir: join(root, '.otea') };
     addCollection(project, { name: 'tasks' });
     server = createServer(project, { token: TOKEN });
-    declareSecretary(project.db, 'sol');
+    declareAssistant(project.db, 'sol');
   });
 
   afterEach(() => {
@@ -58,8 +58,8 @@ describe('a write sent again under the same Idempotency-Key', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('gives a tap on the secretary’s question the first result, and records one answer', async () => {
-    const id = sayAsSecretary(project, {
+  it('gives a tap on the assistant’s question the first result, and records one answer', async () => {
+    const id = sayAsAssistant(project, {
       agent: 'sol',
       text: 'Note it or leave it?',
       options: ['Note it', 'Leave it'],
@@ -80,7 +80,7 @@ describe('a write sent again under the same Idempotency-Key', () => {
   });
 
   it('refuses the same key for another answer', async () => {
-    const id = sayAsSecretary(project, {
+    const id = sayAsAssistant(project, {
       agent: 'sol',
       text: 'Note it or leave it?',
       options: ['Note it', 'Leave it'],
@@ -94,7 +94,7 @@ describe('a write sent again under the same Idempotency-Key', () => {
   });
 
   it('gives an undo the first result when it is sent again', async () => {
-    const id = sayAsSecretary(project, {
+    const id = sayAsAssistant(project, {
       agent: 'sol',
       text: 'Note it or leave it?',
       options: ['Note it', 'Leave it'],

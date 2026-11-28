@@ -255,7 +255,7 @@ export const phone = {
   'offline.nothingSaved': 'this phone has nothing saved from this project yet',
   'offline.noData': 'no data',
   // What can be done without the computer: read; what is captured (New, a note) waits in the
-  // queue. A message to the secretary is not captured: Talk writes again once the PC is back.
+  // queue. A message to the assistant is not captured: Talk writes again once the PC is back.
   'offline.readQueue': 'read-only · what you capture waits in the queue',
   'offline.retry': 'Retry',
   'offline.synced': 'last synced {time}',
@@ -306,13 +306,13 @@ export const phone = {
   'notify.aside': 'An agent set something aside for later',
   'notify.askText': 'Show the text in the notice',
   'notify.askTextHint':
-    'the question or the secretary’s reply; a lock screen shows it to anyone who looks',
-  'notify.secretaryReply': 'Your secretary replies',
-  'notify.secretaryReplyHint': 'in Talk',
-  'notify.secretaryOffline': 'Your secretary is offline and messages wait for it',
-  'notify.secretaryOfflineHint': 'after 10 minutes waiting; one notice per disconnection',
-  'notify.short.secretary_reply': 'secretary replies',
-  'notify.short.secretary_offline': 'secretary offline',
+    'the question or the assistant’s reply; a lock screen shows it to anyone who looks',
+  'notify.assistantReply': 'Your assistant replies',
+  'notify.assistantReplyHint': 'in Talk',
+  'notify.assistantOffline': 'Your assistant is offline and messages wait for it',
+  'notify.assistantOfflineHint': 'after 10 minutes waiting; one notice per disconnection',
+  'notify.short.assistant_reply': 'assistant replies',
+  'notify.short.assistant_offline': 'assistant offline',
   'notify.unheard': 'Work is waiting and no agent is connected',
   'notify.unheardHint': 'no agent waits or is at work',
   'notify.projects': 'projects',

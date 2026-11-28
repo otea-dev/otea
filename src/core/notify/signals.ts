@@ -8,8 +8,8 @@
 // - aside: an agent set the item aside for later (otea release --later);
 // - unheard: the item waits for an agent and none is listening or at work (the desk's «nadie está
 //   escuchando», core/agent-status.ts itemUnheard);
-// - secretary_reply: the secretary answered the person in Hablar (secretarySignalsOf);
-// - secretary_offline: the secretary is offline and the person's messages have waited long.
+// - assistant_reply: the assistant answered the person in Hablar (assistantSignalsOf);
+// - assistant_offline: the assistant is offline and the person's messages have waited long.
 
 import { isStuck } from '../waiting.ts';
 
@@ -20,8 +20,8 @@ export const NOTIFY_KINDS = [
   'stuck',
   'aside',
   'unheard',
-  'secretary_reply',
-  'secretary_offline',
+  'assistant_reply',
+  'assistant_offline',
 ] as const;
 
 export type NotifyKind = (typeof NOTIFY_KINDS)[number];
@@ -55,7 +55,7 @@ export type Signal = {
   // The question, for an ask, and the options it offers to pick.
   text?: string;
   options?: string[];
-  // secretary_reply: the turn in Hablar the notice opens. secretary_offline: how many messages wait.
+  // assistant_reply: the turn in Hablar the notice opens. assistant_offline: how many messages wait.
   turn?: number;
   count?: number;
   // `item` is a Bandeja note (B-3), not an item: a 0.7 board named B has items B-1 too, so the id
@@ -63,35 +63,35 @@ export type Signal = {
   bandeja?: true;
 };
 
-// How long the person's messages must wait for an offline secretary before it is told.
-export const SECRETARY_WAIT_MS = 10 * 60_000;
+// How long the person's messages must wait for an offline assistant before it is told.
+export const ASSISTANT_WAIT_MS = 10 * 60_000;
 
-// How long after it was said a secretary's reply may still be told: a reply held back by the
+// How long after it was said an assistant's reply may still be told: a reply held back by the
 // spacing or an item's cooldown goes if it still holds, but never hours later.
 export const REPLY_WINDOW_MS = 15 * 60_000;
 
-// What the secretary and the conversation say, as the notifier reads it.
-export type SecretaryFacts = {
+// What the assistant and the conversation say, as the notifier reads it.
+export type AssistantFacts = {
   name: string;
   state: 'listening' | 'connected' | 'offline';
   // When it was last heard, while offline.
   since: string | null;
-  // The secretary's replies to the person from the last REPLY_WINDOW_MS: `turn` is the person's
+  // The assistant's replies to the person from the last REPLY_WINDOW_MS: `turn` is the person's
   // message that began the turn, `text` the reply's first line.
   replies: { id: number; turn: number; by: string; text: string }[];
   // Its questions with options to tap that the person has not answered: an agent's question, told
   // as an item's is (not its plain notices, nor the replies above). `turn` is the turn they sit in.
   questions?: { id: number; turn: number; by: string; text: string; options: string[] }[];
-  // What waits for the secretary unattended: the person's messages not read yet (and, with the
+  // What waits for the assistant unattended: the person's messages not read yet (and, with the
   // Bandeja, the captures not taken), and the oldest one's time.
   waiting: { count: number; since: string | null };
 };
 
-export function secretarySignalsOf(facts: SecretaryFacts | undefined, now: number): Signal[] {
+export function assistantSignalsOf(facts: AssistantFacts | undefined, now: number): Signal[] {
   if (!facts) return [];
   const out: Signal[] = facts.replies.map(({ id, turn, by, text }) => ({
-    key: `secretary_reply:${id}`,
-    kind: 'secretary_reply',
+    key: `assistant_reply:${id}`,
+    kind: 'assistant_reply',
     item: `hablar:${turn}`,
     title: '',
     by,
@@ -100,7 +100,7 @@ export function secretarySignalsOf(facts: SecretaryFacts | undefined, now: numbe
   }));
   for (const { id, turn, by, text, options } of facts.questions ?? []) {
     out.push({
-      key: `secretary_ask:${id}`,
+      key: `assistant_ask:${id}`,
       kind: 'ask',
       item: `hablar:${turn}`,
       title: '',
@@ -117,11 +117,11 @@ export function secretarySignalsOf(facts: SecretaryFacts | undefined, now: numbe
     facts.state === 'offline' &&
     waiting.count > 0 &&
     waiting.since !== null &&
-    now - Date.parse(waiting.since) >= SECRETARY_WAIT_MS
+    now - Date.parse(waiting.since) >= ASSISTANT_WAIT_MS
   ) {
     out.push({
-      key: `secretary_offline:${facts.name}:${facts.since ?? ''}`,
-      kind: 'secretary_offline',
+      key: `assistant_offline:${facts.name}:${facts.since ?? ''}`,
+      kind: 'assistant_offline',
       item: 'hablar:offline',
       title: '',
       by: facts.name,

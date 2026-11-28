@@ -1,16 +1,16 @@
 import { createECDH, randomBytes } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { declareAssistant } from '../app/assistant.ts';
 import { answerBandeja, askOnBandeja, captureToBandeja, takeBandeja } from '../app/bandeja.ts';
 import { BETWEEN_ITEMS_MS } from '../app/board-workers.ts';
 import { addCollection } from '../app/collections.ts';
-import { postPersonMessage, readAsSecretary, sayAsSecretary } from '../app/conversation.ts';
+import { postPersonMessage, readAsAssistant, sayAsAssistant } from '../app/conversation.ts';
 import { createItem, moveItem } from '../app/items.ts';
 import { claimItem, releaseItem } from '../app/leases.ts';
 import { listTargets } from '../app/notify-targets.ts';
 import { choosePhoneTransport } from '../app/phone.ts';
 import { listAgents, seeAgent, waitBeat } from '../app/presence.ts';
 import type { Project } from '../app/project.ts';
-import { declareSecretary } from '../app/secretary.ts';
 import { fakeTailscale, TAILNET_HOST } from '../app/tailscale-testing.ts';
 import { LISTEN_WINDOW_MS } from '../core/agent-status.ts';
 import type { Actor } from '../core/item.ts';
@@ -161,8 +161,8 @@ describe('notifications on the server', () => {
           stuck: true,
           aside: false,
           unheard: true,
-          secretary_reply: true,
-          secretary_offline: true,
+          assistant_reply: true,
+          assistant_offline: true,
           askText: true,
           quiet: null,
           muted: [],
@@ -625,16 +625,16 @@ describe('notifications on the server', () => {
       });
     });
 
-    describe('the secretary', () => {
+    describe('the assistant', () => {
       const stamp = () => new Date(clock).toISOString();
       const hear = () => seeAgent(project.db, { agent: 'sage', channel: 'cli' }, stamp);
       const person = (text: string) => postPersonMessage(project, { text }, stamp).message;
       const say = (text: string, replyTo: number) =>
-        sayAsSecretary(project, { agent: 'sage', text, replyTo }, stamp).message;
-      // The first look of a server that watches is its starting point: the secretary is there
+        sayAsAssistant(project, { agent: 'sage', text, replyTo }, stamp).message;
+      // The first look of a server that watches is its starting point: the assistant is there
       // before the phone looks, and what follows is news.
       const watching = async () => {
-        declareSecretary(project.db, 'sage', stamp);
+        declareAssistant(project.db, 'sage', stamp);
         hear();
         await pass(1000);
       };
@@ -664,16 +664,16 @@ describe('notifications on the server', () => {
         expect(sent).toHaveLength(1);
       });
 
-      // G1 (SPEC decision 7: an agent's question pushes): the secretary asking with options to tap
+      // G1 (SPEC decision 7: an agent's question pushes): the assistant asking with options to tap
       // is a question the person must answer; its news and plain notices are not pushed.
       it('tells a question of its own with options, once, opening Hablar at it; its plain notices stay quiet', async () => {
         await watching();
-        sayAsSecretary(project, { agent: 'sage', text: 'CAM-12 is ready for review.' }, stamp);
+        sayAsAssistant(project, { agent: 'sage', text: 'CAM-12 is ready for review.' }, stamp);
         await pass(1000);
         await pass(GATHER_MS);
         expect(sent).toEqual([]);
 
-        const asked = sayAsSecretary(
+        const asked = sayAsAssistant(
           project,
           { agent: 'sage', text: 'Ship it today?', options: ['Yes', 'Wait'] },
           stamp,
@@ -716,7 +716,7 @@ describe('notifications on the server', () => {
       it('says nothing of a reply to a phone that turned replies off', async () => {
         const { cookie } = await pair();
         await subscribe(cookie, 2);
-        await choose(cookie, { secretary_reply: false });
+        await choose(cookie, { assistant_reply: false });
         await watching();
         say('Listo', person('hola').id);
         await pass(1000);
@@ -725,7 +725,7 @@ describe('notifications on the server', () => {
       });
 
       // Field study 7: «5 cosas te esperan» while `otea pending` said 3.
-      it('counts a mixed burst as pending does: what waits, with the secretary’s replies named apart', async () => {
+      it('counts a mixed burst as pending does: what waits, with the assistant’s replies named apart', async () => {
         await watching();
         toReview(first);
         toReview(newTask('Two'));
@@ -736,7 +736,7 @@ describe('notifications on the server', () => {
         await pass(GATHER_MS);
         expect(sent).toHaveLength(1);
         expect(sent[0]?.payload.title).toBe(
-          '3 cosas te esperan y 2 respuestas de tu secretario en memory',
+          '3 cosas te esperan y 2 respuestas de tu asistente en memory',
         );
       });
 
@@ -811,7 +811,7 @@ describe('notifications on the server', () => {
           expect(sent).toEqual([
             expect.objectContaining({
               payload: {
-                title: 'memory · Tu secretario está desconectado',
+                title: 'memory · Tu asistente está desconectado',
                 body: 'Tus 2 mensajes esperan respuesta',
                 tag: 'otea-hablar-offline-memory-aaaaaa',
                 url: '/p/memory-aaaaaa/#/hablar',
@@ -824,7 +824,7 @@ describe('notifications on the server', () => {
           expect(sent).toHaveLength(1);
         });
 
-        it('tells nothing while the secretary is connected, however long they wait', async () => {
+        it('tells nothing while the assistant is connected, however long they wait', async () => {
           await watching();
           person('uno');
           for (let i = 0; i < 6; i++) {
@@ -855,7 +855,7 @@ describe('notifications on the server', () => {
           expect(sent).toHaveLength(1);
           // It returns and reads what waited.
           hear();
-          readAsSecretary(project, { agent: 'sage' }, stamp);
+          readAsAssistant(project, { agent: 'sage' }, stamp);
           await pass(1000);
           person('dos');
           await pass(OFFLINE_AFTER_MS);
@@ -867,7 +867,7 @@ describe('notifications on the server', () => {
         it('says nothing to a phone that turned it off', async () => {
           const { cookie } = await pair();
           await subscribe(cookie, 2);
-          await choose(cookie, { secretary_offline: false });
+          await choose(cookie, { assistant_offline: false });
           await watching();
           person('uno');
           await pass(OFFLINE_AFTER_MS);
@@ -911,9 +911,9 @@ describe('notifications on the server', () => {
         expect(sent).toEqual([]);
       });
 
-      it('still tells while only the secretary waits: it is no listener on the boards', async () => {
+      it('still tells while only the assistant waits: it is no listener on the boards', async () => {
         const stamp = () => new Date(clock).toISOString();
-        declareSecretary(project.db, 'sage', stamp);
+        declareAssistant(project.db, 'sage', stamp);
         waitBeat(project.db, { agent: 'sage', channel: 'cli', waiter: process.pid }, stamp).run();
         expect(listAgents(project.db, stamp).find(({ name }) => name === 'sage')).toMatchObject({
           attending: true,
@@ -947,7 +947,7 @@ describe('notifications on the server', () => {
         expect(sent).toEqual([]);
       });
 
-      // F2 (field study 3): the worker the secretary launched was busy on one item, the rest of the
+      // F2 (field study 3): the worker the assistant launched was busy on one item, the rest of the
       // queue was told as «nobody is listening», and a second worker was launched. A worker at work
       // on the board comes to the next item when its step ends: that is no silence to tell.
       it('says nothing of an item while an agent works another one of the board', async () => {

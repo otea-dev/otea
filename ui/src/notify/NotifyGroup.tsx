@@ -38,11 +38,11 @@ const KINDS: {
   { kind: 'replied', label: 'notify.replied' },
   { kind: 'stuck', label: 'notify.stuck', hint: 'notify.stuckHint' },
   { kind: 'unheard', label: 'notify.unheard', hint: 'notify.unheardHint' },
-  { kind: 'secretary_reply', label: 'notify.secretaryReply', hint: 'notify.secretaryReplyHint' },
+  { kind: 'assistant_reply', label: 'notify.assistantReply', hint: 'notify.assistantReplyHint' },
   {
-    kind: 'secretary_offline',
-    label: 'notify.secretaryOffline',
-    hint: 'notify.secretaryOfflineHint',
+    kind: 'assistant_offline',
+    label: 'notify.assistantOffline',
+    hint: 'notify.assistantOfflineHint',
   },
   { kind: 'aside', label: 'notify.aside' },
 ];

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type NoteEvent, notesOf } from '../core/board/notes.ts';
 import { creatures } from '../core/board/testing.ts';
 import { insertEvidence, selectEvents } from '../store/queries.ts';
+import { declareAssistant } from './assistant.ts';
 import { addCollection } from './collections.ts';
 import { createItem, getItem, updateItem } from './items.ts';
 import { claimItem } from './leases.ts';
@@ -10,7 +11,6 @@ import { agentNotes, noteWaiting } from './notes.ts';
 import { waitBeat } from './presence.ts';
 import type { Project } from './project.ts';
 import { updateAndTell } from './relay-change.ts';
-import { declareSecretary } from './secretary.ts';
 import { memoryContext, projectOf, publishAs } from './testing.ts';
 
 const you = { kind: 'human' as const, name: 'human' };
@@ -21,10 +21,10 @@ let tick = 0;
 const now = () => new Date(T0 + 1000 * ++tick).toISOString();
 
 // U1 and U4 (field study 4): a change of mind about an item not yet in review reached the item (or a
-// worker already on it) only when the secretary got round to it, behind the newer messages. The
-// secretary reshapes the item itself and the worker on it is told at once, in the same answer it
+// worker already on it) only when the assistant got round to it, behind the newer messages. The
+// assistant reshapes the item itself and the worker on it is told at once, in the same answer it
 // reads its notes in; the worker answers before it hands off.
-describe('the secretary reshapes an item and tells the worker on it', () => {
+describe('the assistant reshapes an item and tells the worker on it', () => {
   let project: Project;
   let id: string;
 
@@ -37,7 +37,7 @@ describe('the secretary reshapes an item and tells the worker on it', () => {
       { collection: 'Criaturas', title: 'Rana', fields: { fdesc: 'Lenta' }, actor: you },
       now,
     ).id;
-    declareSecretary(project.db, 'sol', now);
+    declareAssistant(project.db, 'sol', now);
   });
 
   afterEach(() => project.db.close());
@@ -62,8 +62,8 @@ describe('the secretary reshapes an item and tells the worker on it', () => {
   });
 
   // D-eb906c (s-real2): the item page read every note as the person's and signed this one «you».
-  // The thread says whose hands wrote it: the secretary, relaying the person.
-  it('leaves the note as the secretary’s, never as the person’s', () => {
+  // The thread says whose hands wrote it: the assistant, relaying the person.
+  it('leaves the note as the assistant’s, never as the person’s', () => {
     claimItem(project, { id, actor: quill }, now);
     updateAndTell(
       project,
@@ -75,7 +75,7 @@ describe('the secretary reshapes an item and tells the worker on it', () => {
     expect(note).toMatchObject({
       text: 'The person wants it quick.',
       relayedBy: 'sol',
-      bySecretary: true,
+      byAssistant: true,
     });
   });
 
@@ -116,8 +116,8 @@ describe('the secretary reshapes an item and tells the worker on it', () => {
     expect(getItem(project, plain).fields.description).toBe('Now');
   });
 
-  // The lease is the one check the secretary goes over: another agent whose lease ran out but whose
-  // session runs still owns the item, and the secretary writes no more over it than anyone.
+  // The lease is the one check the assistant goes over: another agent whose lease ran out but whose
+  // session runs still owns the item, and the assistant writes no more over it than anyone.
   it('still refuses what the other write checks refuse: an item whose holder runs', () => {
     const at = (offset: number) => () => new Date(T0 + offset).toISOString();
     claimItem(project, { id, actor: quill }, at(0));
@@ -137,7 +137,7 @@ describe('the secretary reshapes an item and tells the worker on it', () => {
     expect(getItem(project, id).fields.fdesc).toBe('Lenta');
   });
 
-  it('is the secretary’s alone', () => {
+  it('is the assistant’s alone', () => {
     claimItem(project, { id, actor: quill }, now);
 
     expect(() =>
@@ -146,7 +146,7 @@ describe('the secretary reshapes an item and tells the worker on it', () => {
         { id, fields: { fdesc: 'x' }, tell: 'x', actor: { kind: 'agent', name: 'luna' } },
         now,
       ),
-    ).toThrow(/not this project's secretary/);
+    ).toThrow(/not this project's assistant/);
     expect(getItem(project, id).fields.fdesc).toBe('Lenta');
   });
 

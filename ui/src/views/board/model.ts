@@ -545,26 +545,6 @@ export function boardEntries(
 
 // ---- what a row says ----
 
-// The round an item is in: on a board, the engine's (the server sends it); else one, plus every
-// time you sent it back to an agent with your notes.
-export function roundOf(
-  item: Item,
-  feed: readonly FeedEvent[],
-  type: TypeView | undefined,
-): number {
-  if (item.round !== undefined) return item.round;
-  const agentStates = new Set(
-    (type?.states ?? []).filter((s) => s.turn === 'agent').map((s) => s.name),
-  );
-  let n = 1;
-  for (const e of feed) {
-    if (e.itemId !== item.id || e.type !== 'transitioned' || e.actor.kind !== 'human') continue;
-    const reason = typeof e.data.reason === 'string' ? e.data.reason.trim() : '';
-    if (reason && agentStates.has(String(e.data.to))) n += 1;
-  }
-  return n;
-}
-
 // What the row shows besides the step (the board's row, Acomodar): each value placed there, in
 // words, the severity left to its bars. Empty values say nothing.
 export function rowWords(item: Item, collection: CollectionView): string[] {

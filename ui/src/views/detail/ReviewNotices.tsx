@@ -4,7 +4,7 @@ import { noticeIdOf, type ReviewNotice } from './review-notices.ts';
 
 // What the person should know before Aprobar, said beside it in plain words (review-notices.ts): the
 // attached diff is not what lands (the warn outline, with the technical sentences folded one tap
-// away) and what the secretary or the delivering agent advised (the neutral outline: advice, never a
+// away) and what the assistant or the delivering agent advised (the neutral outline: advice, never a
 // block). Drawn the same on the desk's page, the phone's page and the Triage card.
 export function ReviewNotices({
   item,

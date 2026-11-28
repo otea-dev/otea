@@ -2,21 +2,21 @@ import {
   counted,
   OFF_ITEM,
   type Pending,
+  type PendingAssistant,
   type PendingEntry,
   type PendingKind,
-  type PendingSecretary,
   type QueueBlock,
 } from '../../src/core/pending.ts';
 import { countedOff, waitsForPerson } from '../../src/core/waiting.ts';
-import type { SecretaryView } from './conversation.ts';
+import type { AssistantView } from './conversation.ts';
 import { hablarHash, type ViewRoute } from './selection.ts';
 import type { Item } from './types.ts';
 
 // What waits for the person, as Otea counts it (src/app/pending.ts, GET /api/pending): Te toca adds
-// what is no item to its lists (a question on a Bandeja note, a question of the secretary), Hablar
+// what is no item to its lists (a question on a Bandeja note, a question of the assistant), Hablar
 // pins the whole of it, and the board says what holds its queue.
 
-export type { Pending, PendingEntry, PendingKind, PendingSecretary, QueueBlock };
+export type { Pending, PendingAssistant, PendingEntry, PendingKind, QueueBlock };
 export { counted };
 
 // What the screens read to count: the items as the desk holds them live, the time, and what Otea
@@ -29,14 +29,21 @@ export type Waiting = {
   pending?: Pending | null | undefined;
 };
 
-// What waits for the person that no list of items holds: the Bandeja's and the secretary's
+// What waits for the person that no list of items holds: the Bandeja's and the assistant's
 // questions, what agents escalated, a board nobody works. Te toca shows each under its own heading
-// and counts them with the rest. A question of the secretary's about an item that waits for them on
+// and counts them with the rest. A question of the assistant's about an item that waits for them on
 // its own is that item, not another thing: it is left out here (core/waiting.ts isCovered).
 export function offItemEntries({ pending, all, now }: Waiting): PendingEntry[] {
   const off = (pending?.entries ?? []).filter(({ kind }) => OFF_ITEM.includes(kind));
   const theirs = all.filter((item) => waitsForPerson(item, now)).map(({ id }) => id);
   return countedOff(off, new Set(theirs));
+}
+
+// How many notes of the Bandeja wait for the person's answer: the number on «Lo que salió». It is
+// read from the same pending the rest of the desk counts with, never from the Bandeja's own list,
+// which is another read and may be a tick behind or ahead (docs/internal/shown-facts.md, fact 21).
+export function bandejaAsking(pending: Pending | null | undefined): number {
+  return (pending?.entries ?? []).filter(({ kind }) => kind === 'bandeja').length;
 }
 
 // How many of them, for the number of Your turn.
@@ -60,11 +67,11 @@ export function oldestOffItem(waiting: Waiting): string | null {
   return times.sort()[0] ?? null;
 }
 
-// Where an entry that is no item is answered: the Bandeja note, or the turn of the secretary's
+// Where an entry that is no item is answered: the Bandeja note, or the turn of the assistant's
 // question, in Hablar.
 export function entryRoute(entry: PendingEntry): ViewRoute {
   if (entry.kind === 'bandeja') return { view: 'hablar', bandeja: entry.ref };
-  if (entry.kind === 'secretary' && entry.turn !== undefined) {
+  if (entry.kind === 'assistant' && entry.turn !== undefined) {
     return { view: 'hablar', turn: entry.turn };
   }
   return { view: 'hablar' };
@@ -79,7 +86,7 @@ export function entryHash(entry: PendingEntry): string {
 // report). A report names the item it is about, which may be a row of its own: its key never is the
 // item's.
 export const rowKeyOf = (entry: PendingEntry): string =>
-  entry.kind === 'secretary'
+  entry.kind === 'assistant'
     ? `msg:${entry.ref}`
     : entry.kind === 'escalation'
       ? `esc:${entry.ref}:${entry.signal ?? ''}`
@@ -87,9 +94,9 @@ export const rowKeyOf = (entry: PendingEntry): string =>
         ? `worker:${entry.ref}`
         : entry.ref;
 
-// The secretary shown offline with something waiting for it: Te toca says so, with a way to Hablar.
+// The assistant shown offline with something waiting for it: Te toca says so, with a way to Hablar.
 export function offlineWithWaiting(
-  secretary: SecretaryView | null | undefined,
-): SecretaryView | null {
-  return secretary?.state === 'offline' && secretary.waiting.count > 0 ? secretary : null;
+  assistant: AssistantView | null | undefined,
+): AssistantView | null {
+  return assistant?.state === 'offline' && assistant.waiting.count > 0 ? assistant : null;
 }

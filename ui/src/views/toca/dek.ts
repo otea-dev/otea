@@ -29,7 +29,7 @@ export function oldestWaiting(items: readonly Item[], now: number): number {
 
 export type TocaDek = { lead: string; handed: { before: string; n: string; after: string } };
 
-// What waits for you that is no item (a question on a Bandeja note, one of the secretary's): how
+// What waits for you that is no item (a question on a Bandeja note, one of the assistant's): how
 // many, and since when the oldest.
 export type OffItem = { count: number; since: string | null };
 

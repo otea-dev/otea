@@ -20,7 +20,7 @@ import { Thumb } from './IntakeFiles.tsx';
 
 // The quick capture, free text (Nuevo ítem, «Nota rápida»): what you want written down, and files
 // (pictures, screenshots, documents) with the limits an item's files have. No board, no form: it
-// lands in the project's Bandeja, where the secretary has it refined into an item and asks you what
+// lands in the project's Bandeja, where the assistant has it refined into an item and asks you what
 // is missing. The send carries an Idempotency-Key kept until it lands, so a phone that never heard
 // back sends it again and it is one entry. What was typed stays when the send fails.
 
@@ -241,7 +241,7 @@ export function NoteCapture({
         value={text}
         disabled={!canWrite}
         aria-label={t('bandeja.note')}
-        placeholder={t(app.secretary === null ? 'bandeja.placeholderAlone' : 'bandeja.placeholder')}
+        placeholder={t(app.assistant === null ? 'bandeja.placeholderAlone' : 'bandeja.placeholder')}
         enterKeyHint="enter"
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => {
@@ -319,7 +319,7 @@ export function NoteCapture({
         <p className="bn-hint">
           {app.sync.offline && queueAvailable()
             ? t('bandeja.queues')
-            : app.secretary === null
+            : app.assistant === null
               ? t('bandeja.landsAlone')
               : t('bandeja.lands')}
         </p>

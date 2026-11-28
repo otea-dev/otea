@@ -14,7 +14,7 @@ const isMarkdown = (file: MessageFile): boolean =>
   fileViewOf({ filename: file.name, contentType: file.contentType }) === 'markdown' &&
   file.size <= MAX_READ_BYTES;
 
-// The words of a Markdown file the secretary sent (a release note, steps to try something), once
+// The words of a Markdown file the assistant sent (a release note, steps to try something), once
 // read; `failed` when it cannot be, and the download is still there.
 function useFileText(file: MessageFile | null): string | 'loading' | 'failed' {
   const [state, setState] = useState<string | 'loading' | 'failed'>('loading');

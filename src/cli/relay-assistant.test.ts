@@ -13,7 +13,7 @@ import { type Cli, cliAt, declareProfiles, type TempRepo, tempGitRepo } from './
 
 // U8 (field study 4): `otea relay CAM-5 Dropped --quote "tiralo, no va" --reason ... --as intruso`
 // dropped an item that waited for the person's review, with words nobody said, and the desk
-// showed «Descartado: lo pidió Rafa». With a secretary, a relay is the secretary's, with the
+// showed «Descartado: lo pidió Rafa». With an assistant, a relay is the assistant's, with the
 // person's own message in Hablar; an item in their review leaves it by their tap on a card.
 describe('relay attacks, through the command line and MCP', () => {
   let repo: TempRepo;
@@ -40,7 +40,7 @@ describe('relay attacks, through the command line and MCP', () => {
     await owner('init', '--template', 'none');
     await owner('board', 'add', 'Cambios', '--template', 'changes');
     declareProfiles(repo.dir, 'sol', 'intruso');
-    await owner('profile', '--role', 'secretary', '--as', 'sol');
+    await owner('profile', '--role', 'assistant', '--as', 'sol');
     await sol('create', '--collection', 'Cambios', '--title', 'Regar', '--field', 'Qué quiero=x');
     const project = openProject(repo.dir);
     try {
@@ -71,11 +71,11 @@ describe('relay attacks, through the command line and MCP', () => {
     );
 
     expect(code).toBe(7);
-    expect(err).toContain('only the secretary');
+    expect(err).toContain('only the assistant');
     expect(await stateOfCam()).toBe(inReview);
   });
 
-  it('refuses the secretary with no message of the person, or one that does not say it', async () => {
+  it('refuses the assistant with no message of the person, or one that does not say it', async () => {
     const said = person('dejalo, me gusta');
 
     const none = await sol('relay', 'CAM-1', 'Hacerlo', '--quote', 'dejalo ya', '--reason', 'x');
@@ -117,7 +117,7 @@ describe('relay attacks, through the command line and MCP', () => {
     expect(await stateOfCam()).toBe(inReview);
   });
 
-  // The secretary's session as a known harness leaves it: the process that runs these commands.
+  // The assistant's session as a known harness leaves it: the process that runs these commands.
   const boundToThisSession = async () => {
     // In-process the commands run under the harness above this worker: the one the guard resolves.
     const table = await listProcesses(AbortSignal.timeout(20_000));
@@ -181,7 +181,7 @@ describe('relay attacks, through the command line and MCP', () => {
       })) as { isError?: boolean; content: { text: string }[] };
 
       expect(result.isError).toBe(true);
-      expect(result.content[0]?.text).toContain('only the secretary');
+      expect(result.content[0]?.text).toContain('only the assistant');
     } finally {
       await client.close();
     }

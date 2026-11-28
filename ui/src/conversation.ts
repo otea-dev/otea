@@ -1,3 +1,4 @@
+import type { AssistantStatus, AssistantView, AssistantWaiting } from '../../src/core/assistant.ts';
 import {
   type FromMessage,
   type Message,
@@ -5,24 +6,23 @@ import {
   type MessageKind,
   messageSnippet,
 } from '../../src/core/conversation.ts';
-import type { SecretaryStatus, SecretaryView, SecretaryWaiting } from '../../src/core/secretary.ts';
 import { activeLease } from './active-lease.ts';
 import type { Look } from './lanes/looks.ts';
 import { lookOf } from './lanes/looks.ts';
 import type { Item } from './types.ts';
 
-// Hablar on the page (src/app/conversation.ts): the project's one conversation with its secretary
+// Hablar on the page (src/app/conversation.ts): the project's one conversation with its assistant
 // worked into turns, and what a turn produced worked into what the view draws: the thinking state,
 // the folded reply, the branch of items, the cards of «Lo que salió».
 
 export type {
+  AssistantStatus,
+  AssistantView,
+  AssistantWaiting,
   FromMessage,
   Message,
   MessageFile,
   MessageKind,
-  SecretaryStatus,
-  SecretaryView,
-  SecretaryWaiting,
 };
 export { messageSnippet };
 
@@ -32,13 +32,13 @@ export function quotedSnippet(text: string, max: number): string {
   return messageSnippet(text.replaceAll('`', ''), max);
 }
 
-// What GET /api/conversation answers: the messages in order. The secretary and what waits for it
-// come with it (the same object GET /api/secretary gives), but the desk never reads them here: it
-// reads them once, as `app.secretary`, so no screen shows a state another one has moved past.
+// What GET /api/conversation answers: the messages in order. The assistant and what waits for it
+// come with it (the same object GET /api/assistant gives), but the desk never reads them here: it
+// reads them once, as `app.assistant`, so no screen shows a state another one has moved past.
 export type ConversationView = {
   messages: Message[];
   more: boolean;
-  secretary: SecretaryStatus | null;
+  assistant: AssistantStatus | null;
   waiting: { count: number; since: string | null };
 };
 
@@ -51,10 +51,10 @@ export type Turn = {
   root: number;
   messages: Message[];
   person: Message[];
-  // The secretary's (and an agent's) messages, in order.
+  // The assistant's (and an agent's) messages, in order.
   replies: Message[];
   kind: MessageKind | null;
-  // Who set the kind: a kind the person set (a correction) stays whatever the secretary says.
+  // Who set the kind: a kind the person set (a correction) stays whatever the assistant says.
   kindBy: Message['kindBy'];
   // The items (and board drafts) it produced.
   links: string[];
@@ -64,7 +64,7 @@ export type Turn = {
   topic: string | null;
   at: string;
   // The last message is the person's: still on its way (pending), or heard or read and not answered
-  // yet (reading, the secretary holds the turn).
+  // yet (reading, the assistant holds the turn).
   waits: 'pending' | 'reading' | null;
 };
 
@@ -97,9 +97,9 @@ export function turnsOf(messages: readonly Message[]): Turn[] {
     if (!first || !last) continue;
     const person = group.filter((m) => m.author === 'person');
     // A trace of an answer given to an agent's question is read at once and asks nothing of the
-    // secretary; any other message of the person's is heard, then read, then answered.
+    // assistant; any other message of the person's is heard, then read, then answered.
     const heard = last.delivery !== 'pending' || last.heardAt !== null;
-    // Items made from the turn are an answer as much as words: the secretary's wait counts it so
+    // Items made from the turn are an answer as much as words: the assistant's wait counts it so
     // too (selectOwed), and the desk never says «no ha respondido» under it (field study 5, V4).
     const made = group.some((m) => m.links.length > 0);
     const waits =
@@ -114,7 +114,7 @@ export function turnsOf(messages: readonly Message[]): Turn[] {
       person,
       replies: group.filter((m) => m.author !== 'person'),
       // The turn's kind and links are shown on each of its messages; one that was read before
-      // the secretary classified the turn still has none.
+      // the assistant classified the turn still has none.
       kind: group.findLast((m) => m.kind !== null)?.kind ?? null,
       kindBy: group.findLast((m) => m.kind !== null)?.kindBy ?? null,
       links: [...new Set(group.flatMap((m) => m.links))],
@@ -127,29 +127,29 @@ export function turnsOf(messages: readonly Message[]): Turn[] {
   return turns.sort((a, b) => a.root - b.root);
 }
 
-// The turn the secretary holds now: it read the person's words and has not answered yet. While it
+// The turn the assistant holds now: it read the person's words and has not answered yet. While it
 // is offline nothing is thinking: the banner says it is away.
 export function thinkingRoot(
   turns: readonly Turn[],
-  secretary: SecretaryStatus | null,
+  assistant: AssistantStatus | null,
   now: number = Date.now(),
 ): number | undefined {
-  if (!secretary || secretary.state === 'offline') return undefined;
+  if (!assistant || assistant.state === 'offline') return undefined;
   const turn = turns.findLast((each) => each.waits === 'reading');
-  if (turn === undefined || secretary.state !== 'listening') return turn?.root;
-  // A secretary in its wait holds nothing: the wait brings back a message read and not answered
+  if (turn === undefined || assistant.state !== 'listening') return turn?.root;
+  // An assistant in its wait holds nothing: the wait brings back a message read and not answered
   // within seconds (U6, field study 4). If it is still here after that, nobody holds it.
   const last = turn.messages.at(-1);
   const since = Date.parse(last?.heardAt ?? last?.readAt ?? last?.at ?? '');
   return Number.isNaN(since) || now - since >= LISTENING_QUIET_MS ? turn.root : undefined;
 }
 
-// How long a message may stay read and unanswered while the secretary listens before the desk says
+// How long a message may stay read and unanswered while the assistant listens before the desk says
 // it has not answered (its wait brings the message back well within it).
 export const LISTENING_QUIET_MS = 20_000;
 
 // How much of a reply shows before «ver más»: the first line (the conclusion), then at most this
-// many short lines. It is the secretary's own rule (its text, `otea prompt --role secretary`: one
+// many short lines. It is the assistant's own rule (its text, `otea prompt --role assistant`: one
 // line, then at most 3 short lines, anything longer as a file or on the item); the page folds a
 // reply that breaks it. A line is short up to about 80 characters, so the rest is 240 at most.
 // Blank lines between paragraphs are not lines.
@@ -247,11 +247,11 @@ export function splitQuestion(text: string): Reply {
   return { lead: question, rest: context, folds: context !== '' };
 }
 
-// A text to copy inside a message: what the secretary pastes for another session to read (the
-// text of a worker or a refiner, when its harness cannot launch subagents). The secretary sets
-// each in a fenced block under its number (the secretary text says so); the page draws it apart,
+// A text to copy inside a message: what the assistant pastes for another session to read (the
+// text of a worker or a refiner, when its harness cannot launch subagents). The assistant sets
+// each in a fenced block under its number (the assistant text says so); the page draws it apart,
 // with the line above as its caption and a button that copies it, and never folds it.
-// `number` is the secretary's own (the «2.» of «2. Refinador:»), `caption` the words after it.
+// `number` is the assistant's own (the «2.» of «2. Refinador:»), `caption` the words after it.
 export type TextBlock = { number: number; caption: string; text: string };
 
 // Where a fenced block opens and closes in a list of lines: the fence is three backticks or more,
@@ -269,7 +269,7 @@ function fenceAt(lines: readonly string[], at: number): { end: number; inner: st
 // The numbered line of words above a block of text to paste: «1. Trabajador de Cambios: …».
 const NUMBERED = /^\s*(\d+)[.)]\s*(.*)$/;
 
-// Only a fenced block under a numbered line is a text to paste (the secretary's rule for the
+// Only a fenced block under a numbered line is a text to paste (the assistant's rule for the
 // sessions it asks the person to open); any other fence is a code block of an ordinary reply and
 // stays in its words.
 export function blocksOf(text: string): { rest: string; blocks: TextBlock[] } {
@@ -406,7 +406,7 @@ export function gluePunctuation(pieces: readonly Piece[]): Glued[] {
   return out.filter((piece) => piece.kind !== 'text' || piece.text !== '');
 }
 
-// The words of a message and, between backticks, the code the secretary wrote: `otea pending` is
+// The words of a message and, between backticks, the code the assistant wrote: `otea pending` is
 // drawn as code, not with its marks. A backtick with no mate stays a backtick.
 export function codeSpans(text: string): { code: boolean; text: string }[] {
   const parts: { code: boolean; text: string }[] = [];
@@ -495,7 +495,7 @@ export function chipOf(id: string, items: ReadonlyMap<string, Item>, now: number
   };
 }
 
-// The branch of a turn: its links as chips, in the order the secretary linked them.
+// The branch of a turn: its links as chips, in the order the assistant linked them.
 export function branchOf(turn: Turn, items: ReadonlyMap<string, Item>, now: number): Chip[] {
   return turn.links.map((id) => {
     const chip = chipOf(id, items, now);
@@ -530,7 +530,7 @@ export type Filter = 'all' | 'request' | 'consultation';
 // A card of «Lo que salió»: a request with its items, or a consultation with its answer.
 export type Card = {
   root: number;
-  // Null: the secretary answered the turn and never said what it is; one tap on the card sets it.
+  // Null: the assistant answered the turn and never said what it is; one tap on the card sets it.
   kind: MessageKind | null;
   title: string;
   at: string;
@@ -541,17 +541,17 @@ export type Card = {
   asks: boolean;
   // A request's outcome; null for the rest.
   outcome: Outcome | null;
-  // A request you set yourself that nothing came out of yet: the secretary is taking it.
+  // A request you set yourself that nothing came out of yet: the assistant is taking it.
   taking: boolean;
   // A consultation (you corrected it from a request) whose items are still open: the card says
-  // they are waiting for the secretary to set them aside.
+  // they are waiting for the assistant to set them aside.
   leftover: boolean;
 };
 
 const isOpenLook = (look: Look): boolean => look !== 'done' && look !== 'dropped';
 
 export function titleOf(turn: Turn): string {
-  // A turn the secretary began with a question: it is titled by that question, not by the person's
+  // A turn the assistant began with a question: it is titled by that question, not by the person's
   // tap on one of its options («Sí, encárgalo»).
   const root = turn.messages[0];
   if (root && root.author !== 'person' && root.options.length > 0) {
@@ -561,9 +561,9 @@ export function titleOf(turn: Turn): string {
   return first ? quotedSnippet(first.text, 90) : '';
 }
 
-// A turn the person began and the secretary answered, and never classified: ordinary talk it did
+// A turn the person began and the assistant answered, and never classified: ordinary talk it did
 // not mark, or a request it forgot to. A turn still on its way (unanswered), a trace of a tap, one
-// a secretary's question began and a side topic's record are not this.
+// an assistant's question began and a side topic's record are not this.
 function isUnclassified(turn: Turn): boolean {
   const root = turn.messages[0];
   return (
@@ -595,7 +595,7 @@ function unclassifiedCard(turn: Turn, items: ReadonlyMap<string, Item>, now: num
 // The cards, newest first: every turn that is a request or a consultation and, for a request, has
 // produced something (a request with nothing linked yet is still being worked out), unless it is
 // one the person made themselves by correcting a consultation: that one stays in sight, saying the
-// secretary is taking it.
+// assistant is taking it.
 export function cardsOf(
   turns: readonly Turn[],
   items: ReadonlyMap<string, Item>,
@@ -628,7 +628,7 @@ export function cardsOf(
       outcome: kind === 'request' && !taking ? outcomeOf(turn, items, now) : null,
       taking,
       // Only after the person's own correction: items that stay open when they turn a request into
-      // a consultation. A consultation the secretary sorted that way has nothing «left over».
+      // a consultation. A consultation the assistant sorted that way has nothing «left over».
       leftover:
         kind === 'consultation' &&
         turn.kindBy === 'person' &&
@@ -652,7 +652,7 @@ export type Row =
       // The older message it answers, when it is not the one right above it.
       answers: Message | null;
       // A question with options to tap: open until the person has replied to it.
-      // `closed`: the secretary withdrew it, or what it asked was settled some other way.
+      // `closed`: the assistant withdrew it, or what it asked was settled some other way.
       question: 'open' | 'answered' | 'closed' | null;
     }
   // What the person chose or answered: their own row.
@@ -735,7 +735,7 @@ export function turnAt(
   return topic === undefined ? undefined : turns.find((each) => each.topic === topic);
 }
 
-// Whether the secretary is away, and since when: what the banner says.
-export function awayOf(secretary: SecretaryStatus | null): { since: string | null } | null {
-  return secretary?.state === 'offline' ? { since: secretary.since } : null;
+// Whether the assistant is away, and since when: what the banner says.
+export function awayOf(assistant: AssistantStatus | null): { since: string | null } | null {
+  return assistant?.state === 'offline' ? { since: assistant.since } : null;
 }

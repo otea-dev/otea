@@ -2,14 +2,14 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { declareAssistant } from '../app/assistant.ts';
 import { addCollection } from '../app/collections.ts';
-import { readAsSecretary, sayAsSecretary } from '../app/conversation.ts';
+import { readAsAssistant, sayAsAssistant } from '../app/conversation.ts';
 import { sayWithSendBack } from '../app/conversation-act.ts';
 import { pairDevice } from '../app/devices.ts';
 import { createItem, getItem } from '../app/items.ts';
 import { handoffItem } from '../app/next.ts';
 import type { Project } from '../app/project.ts';
-import { declareSecretary } from '../app/secretary.ts';
 import { publishAs } from '../app/testing.ts';
 import { creatures } from '../core/board/testing.ts';
 import { insertEvidence, selectEvents } from '../store/queries.ts';
@@ -18,7 +18,7 @@ import { LOCAL_HOST, memoryProject, SESSION_COOKIE, TOKEN } from './testing.ts';
 
 // The conversation over the API: the person writes only from the desk (or their paired phone),
 // signed in and from the page's own origin; the desk reads the messages with their kinds, links,
-// files and delivery state, beside the secretary's status.
+// files and delivery state, beside the assistant's status.
 
 const DESK = '192.168.1.24';
 const PHONE = '192.168.1.50';
@@ -65,7 +65,7 @@ describe('the conversation over the API', () => {
   type Listed = {
     messages: (Sent & { author: string; kind: string | null; links: string[]; text: string })[];
     more: boolean;
-    secretary: { name: string; state: string } | null;
+    assistant: { name: string; state: string } | null;
     waiting: { count: number };
   };
 
@@ -86,9 +86,9 @@ describe('the conversation over the API', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('takes the person’s message from the desk, pending, and lists it beside the secretary’s state', async () => {
-    expect((await listed()).secretary).toBeNull();
-    declareSecretary(project.db, 'sol');
+  it('takes the person’s message from the desk, pending, and lists it beside the assistant’s state', async () => {
+    expect((await listed()).assistant).toBeNull();
+    declareAssistant(project.db, 'sol');
 
     const sent = await post('the Aprobar button is hidden on the phone');
     expect(sent.status).toBe(201);
@@ -104,16 +104,16 @@ describe('the conversation over the API', () => {
         links: [],
       }),
     ]);
-    expect(now.secretary).toMatchObject({ name: 'sol' });
+    expect(now.assistant).toMatchObject({ name: 'sol' });
     expect(now.waiting).toMatchObject({ count: 1 });
 
-    // The secretary reads it: the desk sees it read, and the secretary's answer after it.
-    readAsSecretary(project, { agent: 'sol' });
-    sayAsSecretary(project, { agent: 'sol', text: 'On it.', replyTo: 1 });
+    // The assistant reads it: the desk sees it read, and the assistant's answer after it.
+    readAsAssistant(project, { agent: 'sol' });
+    sayAsAssistant(project, { agent: 'sol', text: 'On it.', replyTo: 1 });
     const after = await listed();
     expect(after.messages.map(({ author, delivery }) => [author, delivery])).toEqual([
       ['person', 'read'],
-      ['secretary', null],
+      ['assistant', null],
     ]);
     expect(after.waiting.count).toBe(0);
   });
@@ -248,7 +248,7 @@ describe('the conversation over the API', () => {
 
   describe('the person’s correction', () => {
     beforeEach(async () => {
-      declareSecretary(project.db, 'sol');
+      declareAssistant(project.db, 'sol');
       await post('add dark mode');
       const dark = createItem(project, {
         collection: 'tasks',
@@ -256,7 +256,7 @@ describe('the conversation over the API', () => {
         fields: { description: 'Now' },
         actor: { kind: 'agent', name: 'sol' },
       }).id;
-      sayAsSecretary(project, {
+      sayAsAssistant(project, {
         agent: 'sol',
         text: `Filed ${dark}.`,
         replyTo: 1,
@@ -312,7 +312,7 @@ describe('the conversation over the API', () => {
 
     it('lists the turns by kind and by words', async () => {
       await post('why is the lease 15 minutes?');
-      sayAsSecretary(project, {
+      sayAsAssistant(project, {
         agent: 'sol',
         text: 'It covers a build.',
         replyTo: 3,
@@ -326,10 +326,10 @@ describe('the conversation over the API', () => {
     });
   });
 
-  describe('a question of the secretary with options', () => {
+  describe('a question of the assistant with options', () => {
     const asked = () => {
-      declareSecretary(project.db, 'sol');
-      return sayAsSecretary(project, {
+      declareAssistant(project.db, 'sol');
+      return sayAsAssistant(project, {
         agent: 'sol',
         text: 'Note it or leave it?',
         options: ['Note it', 'Leave it'],
@@ -362,7 +362,7 @@ describe('the conversation over the API', () => {
       expect((await listed()).messages).toHaveLength(2);
     });
 
-    it('takes the person’s own words, or the decision left to the secretary, and refuses what is no answer', async () => {
+    it('takes the person’s own words, or the decision left to the assistant, and refuses what is no answer', async () => {
       const id = asked();
 
       expect((await tap(id, { option: 3 })).status).toBe(422);
@@ -387,9 +387,9 @@ describe('the conversation over the API', () => {
       expect((await listed()).messages).toHaveLength(1);
     });
 
-    it('refuses to correct the kind of the secretary’s own notice', async () => {
-      declareSecretary(project.db, 'sol');
-      const notice = sayAsSecretary(project, { agent: 'sol', text: 'FYI.' }).message.id;
+    it('refuses to correct the kind of the assistant’s own notice', async () => {
+      declareAssistant(project.db, 'sol');
+      const notice = sayAsAssistant(project, { agent: 'sol', text: 'FYI.' }).message.id;
 
       const refused = await call(`/conversation/messages/${notice}/kind`, {
         method: 'POST',
@@ -452,7 +452,7 @@ describe('the conversation over the API', () => {
         channel: 'cli',
       });
       handoffItem(project, { id: item, actor: quill, channel: 'cli' });
-      declareSecretary(project.db, 'sol');
+      declareAssistant(project.db, 'sol');
     });
 
     const card = () =>
@@ -539,7 +539,7 @@ describe('the conversation over the API', () => {
   });
 
   it('tells the item which turn it came from', async () => {
-    declareSecretary(project.db, 'sol');
+    declareAssistant(project.db, 'sol');
     await post('add dark mode');
     const dark = createItem(project, {
       collection: 'tasks',
@@ -553,7 +553,7 @@ describe('the conversation over the API', () => {
       fields: { description: 'Now' },
       actor: { kind: 'agent', name: 'sol' },
     }).id;
-    sayAsSecretary(project, { agent: 'sol', text: 'Filed.', replyTo: 1, links: [dark] });
+    sayAsAssistant(project, { agent: 'sol', text: 'Filed.', replyTo: 1, links: [dark] });
 
     const item = (await (await call(`/items/${dark}`)).json()) as { fromMessages?: unknown[] };
     expect(item.fromMessages).toEqual([

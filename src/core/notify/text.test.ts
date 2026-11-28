@@ -125,8 +125,8 @@ describe('noticeText', () => {
   });
 
   // Field study 7: «5 cosas te esperan» while `otea pending` said 3. A mixed burst counts what
-  // waits for the person (the number `pending` gives), and names the secretary's replies apart.
-  it('counts what waits in a mixed burst as pending does, and names secretary replies apart', () => {
+  // waits for the person (the number `pending` gives), and names the assistant's replies apart.
+  it('counts what waits in a mixed burst as pending does, and names assistant replies apart', () => {
     const mixed: Notice = {
       kind: 'group',
       count: 5,
@@ -136,15 +136,13 @@ describe('noticeText', () => {
         { item: 'A-1', title: 'One', kind: 'turn' },
         { item: 'A-2', title: 'Two', kind: 'ask' },
         { item: 'A-3', title: 'Three', kind: 'stuck' },
-        { item: 'hablar:1', title: '', kind: 'secretary_reply' },
-        { item: 'hablar:2', title: '', kind: 'secretary_reply' },
+        { item: 'hablar:1', title: '', kind: 'assistant_reply' },
+        { item: 'hablar:2', title: '', kind: 'assistant_reply' },
       ],
     };
-    expect(noticeText(mixed, 'es').title).toBe(
-      '3 cosas te esperan y 2 respuestas de tu secretario',
-    );
+    expect(noticeText(mixed, 'es').title).toBe('3 cosas te esperan y 2 respuestas de tu asistente');
     expect(noticeText(mixed, 'en', { id: 'p', name: 'tienda' }).title).toBe(
-      '3 things wait for you and 2 replies from your secretary in tienda',
+      '3 things wait for you and 2 replies from your assistant in tienda',
     );
     const one: Notice = {
       ...mixed,
@@ -152,16 +150,16 @@ describe('noticeText', () => {
       waiting: 1,
       items: [
         { item: 'A-1', title: 'One', kind: 'turn' },
-        { item: 'hablar:1', title: '', kind: 'secretary_reply' },
+        { item: 'hablar:1', title: '', kind: 'assistant_reply' },
       ],
     };
-    expect(noticeText(one, 'es').title).toBe('1 cosa te espera y una respuesta de tu secretario');
+    expect(noticeText(one, 'es').title).toBe('1 cosa te espera y una respuesta de tu asistente');
     expect(noticeText(one, 'en').title).toBe(
-      '1 thing waits for you and a reply from your secretary',
+      '1 thing waits for you and a reply from your assistant',
     );
   });
 
-  it('without a count from pending, a mixed burst counts its notices except the secretary replies', () => {
+  it('without a count from pending, a mixed burst counts its notices except the assistant replies', () => {
     const mixed: Notice = {
       kind: 'group',
       count: 4,
@@ -169,23 +167,21 @@ describe('noticeText', () => {
       items: [
         { item: 'A-1', title: 'One', kind: 'turn' },
         { item: 'A-2', title: 'Two', kind: 'ask' },
-        { item: 'hablar:1', title: '', kind: 'secretary_reply' },
-        { item: 'hablar:2', title: '', kind: 'secretary_reply' },
+        { item: 'hablar:1', title: '', kind: 'assistant_reply' },
+        { item: 'hablar:2', title: '', kind: 'assistant_reply' },
       ],
     };
-    expect(noticeText(mixed, 'es').title).toBe(
-      '2 cosas te esperan y 2 respuestas de tu secretario',
-    );
+    expect(noticeText(mixed, 'es').title).toBe('2 cosas te esperan y 2 respuestas de tu asistente');
   });
 
-  it('names Hablar once when a burst is the secretary talking, not once per message', () => {
+  it('names Hablar once when a burst is the assistant talking, not once per message', () => {
     const group: Notice = {
       kind: 'group',
       count: 2,
-      of: 'secretary_reply',
+      of: 'assistant_reply',
       items: [
-        { item: 'hablar:1', title: '', kind: 'secretary_reply' },
-        { item: 'hablar:2', title: '', kind: 'secretary_reply' },
+        { item: 'hablar:1', title: '', kind: 'assistant_reply' },
+        { item: 'hablar:2', title: '', kind: 'assistant_reply' },
       ],
     };
     expect(noticeText(group, 'es').body).toBe('Hablar');
@@ -221,7 +217,7 @@ describe('noticeText', () => {
     const tagOf = (notice: Notice, project: { id: string; name: string }) =>
       noticeText(notice, 'en', project).tag;
     const reply = (turn: number): Notice => ({
-      kind: 'secretary_reply',
+      kind: 'assistant_reply',
       item: `hablar:${turn}`,
       title: '',
       by: 'sage',
@@ -229,7 +225,7 @@ describe('noticeText', () => {
       text: 'ok',
     });
     const offline: Notice = {
-      kind: 'secretary_offline',
+      kind: 'assistant_offline',
       item: 'hablar:offline',
       title: '',
       count: 1,
@@ -247,9 +243,9 @@ describe('noticeText', () => {
     });
   });
 
-  describe('the secretary', () => {
+  describe('the assistant', () => {
     const reply: Notice = {
-      kind: 'secretary_reply',
+      kind: 'assistant_reply',
       item: 'hablar:4',
       title: '',
       by: 'sage',
@@ -273,15 +269,15 @@ describe('noticeText', () => {
       expect(noticeText(bare as Notice, 'es').body).toBe('Abre Hablar para leerlo');
     });
 
-    it('counts what waits for an offline secretary, in both languages', () => {
+    it('counts what waits for an offline assistant, in both languages', () => {
       const offline: Notice = {
-        kind: 'secretary_offline',
+        kind: 'assistant_offline',
         item: 'hablar:offline',
         title: '',
         count: 3,
       };
       expect(noticeText(offline, 'es')).toMatchObject({
-        title: 'Tu secretario está desconectado',
+        title: 'Tu asistente está desconectado',
         body: 'Tus 3 mensajes esperan respuesta',
         url: '/#/hablar',
       });

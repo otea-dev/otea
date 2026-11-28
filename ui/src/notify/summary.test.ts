@@ -17,11 +17,11 @@ describe('notifySummary', () => {
   it('names the kinds on, in the order Preferencias shows them', () => {
     setLanguage('es');
     expect(notifySummary(DEFAULT_PREFS)).toBe(
-      'Avisos: revisiones · preguntas · respuestas · atascos · ningún agente conectado · secretario responde · secretario desconectado',
+      'Avisos: revisiones · preguntas · respuestas · atascos · ningún agente conectado · asistente responde · asistente desconectado',
     );
     setLanguage('en');
     expect(notifySummary({ ...DEFAULT_PREFS, replied: false, aside: true })).toBe(
-      'Notifications: reviews · questions · stuck items · no agent connected · secretary replies · secretary offline · set aside',
+      'Notifications: reviews · questions · stuck items · no agent connected · assistant replies · assistant offline · set aside',
     );
   });
 
@@ -33,8 +33,8 @@ describe('notifySummary', () => {
       replied: false,
       stuck: false,
       unheard: false,
-      secretary_reply: false,
-      secretary_offline: false,
+      assistant_reply: false,
+      assistant_offline: false,
       quiet: { from: '22:00', to: '08:00' },
       muted: ['a', 'b'],
     };
@@ -55,8 +55,8 @@ describe('notifySummary', () => {
       replied: false,
       stuck: false,
       unheard: false,
-      secretary_reply: false,
-      secretary_offline: false,
+      assistant_reply: false,
+      assistant_offline: false,
     };
     expect(notifySummary(none)).toBe('Notifications on, every kind off');
     setLanguage('es');

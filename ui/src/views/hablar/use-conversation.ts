@@ -7,7 +7,7 @@ import { useRemote, useThrottled } from '../../hooks.ts';
 // How many messages one read of the conversation brings: the newest ones, and a page back on ask.
 const PAGE = 100;
 
-// The conversation (and the secretary's state) is read again at most this often as the project
+// The conversation (and the assistant's state) is read again at most this often as the project
 // changes, as the pending list is: a read is a hundred messages, and a busy minute is many events.
 const READ_MS = 1_500;
 

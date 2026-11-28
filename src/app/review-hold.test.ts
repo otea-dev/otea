@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { creatures } from '../core/board/testing.ts';
 import { OteaError } from '../core/errors.ts';
 import { insertEvidence } from '../store/queries.ts';
+import { declareAssistant } from './assistant.ts';
 import { detachEvidence } from './evidence.ts';
 import { createItem, getItem, updateItem } from './items.ts';
 import { approveItem, handoffItem, sendBackItem } from './next.ts';
 import type { Project } from './project.ts';
 import { updateAndTell } from './relay-change.ts';
-import { declareSecretary } from './secretary.ts';
 import { memoryContext, projectOf, publishAs } from './testing.ts';
 
 const you = { kind: 'human' as const, name: 'human' };
@@ -52,7 +52,7 @@ describe('an item that waits for the person’s review is not changed by an agen
       { collection: 'Criaturas', title: 'Rana', fields: { fdesc: 'Lenta' }, actor: you },
       now,
     ).id;
-    declareSecretary(project.db, 'sol', now);
+    declareAssistant(project.db, 'sol', now);
     attach('eart', 'image', 'quill');
     handoffItem(project, { id, actor: agent('quill'), channel: 'cli' }, now);
   });
@@ -97,7 +97,7 @@ describe('an item that waits for the person’s review is not changed by an agen
     expect(getItem(project, id).title).toBe('Rana');
   });
 
-  it('points the secretary to the card that sends it back', () => {
+  it('points the assistant to the card that sends it back', () => {
     const refused = refusal(() =>
       updateItem(project, { id, actor: agent('sol'), fields: { fdesc: 'Rápida' } }, now),
     );
@@ -106,7 +106,7 @@ describe('an item that waits for the person’s review is not changed by an agen
     expect(getItem(project, id).fields.fdesc).toBe('Lenta');
   });
 
-  it('refuses the secretary’s update with a tell as well', () => {
+  it('refuses the assistant’s update with a tell as well', () => {
     const refused = refusal(() =>
       updateAndTell(
         project,

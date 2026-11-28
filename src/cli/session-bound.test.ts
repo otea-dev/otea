@@ -6,10 +6,10 @@ import { fileURLToPath } from 'node:url';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { getDefaultEnvironment, StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { assistantStatus } from '../app/assistant.ts';
 import { listConversation, postPersonMessage } from '../app/conversation.ts';
 import { hearAgent, listAgents, processAlive } from '../app/presence.ts';
 import { openProject } from '../app/project.ts';
-import { secretaryStatus } from '../app/secretary.ts';
 import { createMcpServer } from '../mcp/server.ts';
 import { selectListenerProcesses } from '../store/queries.ts';
 import { COMMANDS } from './commands.ts';
@@ -36,7 +36,7 @@ const MAIN = fileURLToPath(new URL('./main.ts', import.meta.url));
 const SLOW_LISTING_OK = { OTEA_SESSION_READ_MS: '60000' };
 
 // U8 (field study 4): `otea say "..." --as claude-sec` from any other process posted in Hablar
-// labelled SECRETARIO, as the real one. The secretary is bound to the harness session noted for it:
+// labelled ASISTENTE, as the real one. The assistant is bound to the harness session noted for it:
 // while that session runs, an act under its name from another harness is refused; once it is gone a
 // new session takes over. A worker's name likewise cannot act on an item its live session leased.
 describe('an agent name is bound to the harness session noted for it', () => {
@@ -58,7 +58,7 @@ describe('an agent name is bound to the harness session noted for it', () => {
     await owner('init', '--local');
     declareProfiles(repo.dir, sol, quill);
     presetCollection(repo.dir, 'tasks');
-    await owner('profile', '--role', 'secretary', '--as', sol);
+    await owner('profile', '--role', 'assistant', '--as', sol);
     await cliAt(repo.dir, { OTEA_AGENT: quill })(
       'create',
       '--collection',
@@ -169,7 +169,7 @@ describe('an agent name is bound to the harness session noted for it', () => {
     expect(spoken()).toEqual([]);
   }, 120_000);
 
-  it('refuses a secretary act from another session, and lets the bound one speak', async () => {
+  it('refuses an assistant act from another session, and lets the bound one speak', async () => {
     const real = harness('real', 'say', 'Hola.', '--as', sol);
     real.boundTo(sol);
     const stranger = harness('stranger', 'say', 'Aprobé todo.', '--as', sol);
@@ -180,7 +180,7 @@ describe('an agent name is bound to the harness session noted for it', () => {
     expect(refused.code).toBe(7);
     expect(refused.err).toContain('runs in another session');
     expect(said.code, said.err).toBe(0);
-    expect(spoken()).toEqual([['secretary', 'Hola.']]);
+    expect(spoken()).toEqual([['assistant', 'Hola.']]);
   }, 120_000);
 
   // A process nobody started that runs: its launcher exits at once, so no harness resolves from it
@@ -209,9 +209,9 @@ describe('an agent name is bound to the harness session noted for it', () => {
     };
   };
 
-  // Field study 5, V8: an orphan background process posted a `say --drop` card as the real secretary
+  // Field study 5, V8: an orphan background process posted a `say --drop` card as the real assistant
   // (which ran and was bound); the person tapped it and the item was dropped.
-  it('refuses an orphan process speaking as the secretary while the bound session runs', async () => {
+  it('refuses an orphan process speaking as the assistant while the bound session runs', async () => {
     harness('real', 'whoami', '--as', sol).boundTo(sol);
 
     const printed = await orphan('orphan', 'say', 'Aprobé todo.', '--as', sol)();
@@ -220,9 +220,9 @@ describe('an agent name is bound to the harness session noted for it', () => {
     expect(spoken()).toEqual([]);
   }, 120_000);
 
-  // A message Otea cannot tie to the secretary's session is allowed (the bound harness cannot be
+  // A message Otea cannot tie to the assistant's session is allowed (the bound harness cannot be
   // checked) and marked, but it never carries a card the person's tap would perform.
-  it('lets an unverified secretary speak, marked, but never with a card', async () => {
+  it('lets an unverified assistant speak, marked, but never with a card', async () => {
     const project = openProject(repo.dir);
     try {
       project.db
@@ -254,12 +254,12 @@ describe('an agent name is bound to the harness session noted for it', () => {
     expect(plain.code, plain.err).toBe(0);
     expect(card.code).toBe(7);
     expect(card.err).toContain('could not be tied');
-    expect(spoken()).toEqual([['secretary', 'Hola.']]);
+    expect(spoken()).toEqual([['assistant', 'Hola.']]);
   }, 120_000);
 
-  // Field study 4, T1c: `otea pending --as <secretary>` from any session refreshed its last_seen, so a
-  // dead secretary kept reading connected and nobody could take its role while something polled.
-  it('answers a read from another session without keeping the secretary alive', async () => {
+  // Field study 4, T1c: `otea pending --as <assistant>` from any session refreshed its last_seen, so a
+  // dead assistant kept reading connected and nobody could take its role while something polled.
+  it('answers a read from another session without keeping the assistant alive', async () => {
     const lastSeen = () => {
       const project = openProject(repo.dir);
       try {
@@ -293,7 +293,7 @@ describe('an agent name is bound to the harness session noted for it', () => {
     expect(lastSeen()).toBe(longAgo);
   }, 120_000);
 
-  it('lets the bound session read as the secretary and be seen', async () => {
+  it('lets the bound session read as the assistant and be seen', async () => {
     const real = harness('real', 'pending', '--as', sol);
     real.boundTo(sol);
     const longAgo = new Date(Date.now() - 20 * 60_000).toISOString();
@@ -329,10 +329,10 @@ describe('an agent name is bound to the harness session noted for it', () => {
     const next = await harness('next', 'say', 'Estoy de vuelta.', '--as', sol).result();
 
     expect(next.code, next.err).toBe(0);
-    expect(spoken()).toEqual([['secretary', 'Estoy de vuelta.']]);
+    expect(spoken()).toEqual([['assistant', 'Estoy de vuelta.']]);
   }, 120_000);
 
-  it('refuses the secretary’s relay and wait from another session too', async () => {
+  it('refuses the assistant’s relay and wait from another session too', async () => {
     harness('bound', 'whoami', '--as', sol).boundTo(sol);
     const person = openProject(repo.dir);
     try {
@@ -355,18 +355,18 @@ describe('an agent name is bound to the harness session noted for it', () => {
       '--as',
       sol,
     ).result();
-    const wait = await harness('w', 'wait', '--secretary', '--timeout', '1', '--as', sol).result();
+    const wait = await harness('w', 'wait', '--assistant', '--timeout', '1', '--as', sol).result();
 
     expect(relay.err).toContain('runs in another session');
     expect(wait.err).toContain('runs in another session');
   }, 120_000);
 
-  // Field study 4, T1a: four new sessions starting `wait --secretary` under one name at once all kept
+  // Field study 4, T1a: four new sessions starting `wait --assistant` under one name at once all kept
   // waiting, and only the first `say` won. Once one of them is bound, the others' waits end with the
   // refusal, not silently.
-  it('ends the waits of the sessions that lost when four start `wait --secretary` at once', async () => {
+  it('ends the waits of the sessions that lost when four start `wait --assistant` at once', async () => {
     const sessions = ['a', 'b', 'c', 'd'].map((name) =>
-      knownHarness(name, 'wait', '--secretary', '--timeout', '60', '--as', sol),
+      knownHarness(name, 'wait', '--assistant', '--timeout', '60', '--as', sol),
     );
     const finished: { code: number; out: string; err: string }[] = [];
     for (const session of sessions) void session.result().then((result) => finished.push(result));
@@ -386,7 +386,7 @@ describe('an agent name is bound to the harness session noted for it', () => {
     }
   }, 120_000);
 
-  // Field study 4, T1a: a command-line `say` or `wait --secretary` under the name a live MCP session
+  // Field study 4, T1a: a command-line `say` or `wait --assistant` under the name a live MCP session
   // holds was accepted. It is refused as any other session's is.
   it('refuses a command-line say and wait under the name a live MCP session holds', async () => {
     const mcpSession = knownHarness('mcp-session', 'whoami', '--as', sol);
@@ -406,7 +406,7 @@ describe('an agent name is bound to the harness session noted for it', () => {
     const waited = await knownHarness(
       'wait',
       'wait',
-      '--secretary',
+      '--assistant',
       '--timeout',
       '1',
       '--as',
@@ -484,7 +484,7 @@ describe('an agent name is bound to the harness session noted for it', () => {
         content: { text: string }[];
       };
 
-    it('refuses a secretary act under its name from another session, and posts nothing', async () => {
+    it('refuses an assistant act under its name from another session, and posts nothing', async () => {
       harness('real', 'whoami', '--as', sol).boundTo(sol);
 
       await mcp(undefined, async (client) => {
@@ -496,9 +496,9 @@ describe('an agent name is bound to the harness session noted for it', () => {
       expect(spoken()).toEqual([]);
     }, 120_000);
 
-    // Field study 5, V8: one impostor message left every later message of the real secretary
+    // Field study 5, V8: one impostor message left every later message of the real assistant
     // «sin verificar» (the server took the binding), and its end read the real one as disconnected.
-    it('keeps the binding, the harness note and the listening of the real secretary when a server speaks as it', async () => {
+    it('keeps the binding, the harness note and the listening of the real assistant when a server speaks as it', async () => {
       const real = harness('real', 'say', 'Hola de nuevo.', '--as', sol);
       real.boundTo(sol);
       const state = () => {
@@ -560,7 +560,7 @@ describe('an agent name is bound to the harness session noted for it', () => {
       expect(state().messages).toEqual([false]);
     }, 120_000);
 
-    it('verifies the secretary’s own MCP session: its message carries no unverified mark', async () => {
+    it('verifies the assistant’s own MCP session: its message carries no unverified mark', async () => {
       const project = openProject(repo.dir);
       try {
         // The MCP server of this process heard the name, as `otea mcp` does at the first call.
@@ -622,10 +622,10 @@ describe('an agent name is bound to the harness session noted for it', () => {
   });
 });
 
-// Adversarial review of S: an impersonator's first `wait` took the role before the real secretary
+// Adversarial review of S: an impersonator's first `wait` took the role before the real assistant
 // had waited once. The declaration notes the harness, and a later wait from another live harness
 // neither takes the role nor overwrites it.
-describe('the secretary’s declaration notes its harness', () => {
+describe('the assistant’s declaration notes its harness', () => {
   let repo: TempRepo;
   let scratch: string;
   const children: ChildProcess[] = [];
@@ -688,14 +688,14 @@ describe('the secretary’s declaration notes its harness', () => {
     }
   };
 
-  it('binds the secretary to the session that declared it, and a later wait of another is refused', async () => {
+  it('binds the assistant to the session that declared it, and a later wait of another is refused', async () => {
     const owner = cliAt(repo.dir);
     await owner('init', '--local');
     const real = harnessRunning(
       'real',
       'profile',
       '--role',
-      'secretary',
+      'assistant',
       '--model',
       'm',
       '--effort',
@@ -712,7 +712,7 @@ describe('the secretary’s declaration notes its harness', () => {
     const intruder = harnessRunning(
       'intruder',
       'wait',
-      '--secretary',
+      '--assistant',
       '--timeout',
       '1',
       '--as',
@@ -725,11 +725,11 @@ describe('the secretary’s declaration notes its harness', () => {
     expect(notedFor('solo')).toBe(real.pid);
   }, 120_000);
 
-  // S2, P2 (final red-team run): four sessions declaring `profile --role secretary` under one new
-  // name at once all answered success, and it was unclear which was the secretary. One declaration
+  // S2, P2 (final red-team run): four sessions declaring `profile --role assistant` under one new
+  // name at once all answered success, and it was unclear which was the assistant. One declaration
   // wins, as one session wins a wait (noteHarness): the others are refused, nothing of theirs kept,
-  // and the project says which session is the secretary.
-  it('lets one of four sessions that declare the secretary at once win, and says which', async () => {
+  // and the project says which session is the assistant.
+  it('lets one of four sessions that declare the assistant at once win, and says which', async () => {
     const owner = cliAt(repo.dir);
     await owner('init', '--local');
     const sessions = ['a', 'b', 'c', 'd'].map((name) =>
@@ -737,7 +737,7 @@ describe('the secretary’s declaration notes its harness', () => {
         name,
         'profile',
         '--role',
-        'secretary',
+        'assistant',
         '--model',
         'm',
         '--effort',
@@ -762,7 +762,7 @@ describe('the secretary’s declaration notes its harness', () => {
     expect(status.out).toContain(`session ${winner}`);
     const project = openProject(repo.dir);
     try {
-      expect(secretaryStatus(project.db)?.session).toBe(winner);
+      expect(assistantStatus(project.db)?.session).toBe(winner);
     } finally {
       project.db.close();
     }

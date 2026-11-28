@@ -1,19 +1,19 @@
 import type { DatabaseSync } from 'node:sqlite';
+import type { AssistantView, AssistantWaiting } from '../core/assistant.ts';
 import { messageSnippet } from '../core/conversation.ts';
-import { REPLY_WINDOW_MS, type SecretaryFacts } from '../core/notify/signals.ts';
-import type { SecretaryView, SecretaryWaiting } from '../core/secretary.ts';
+import { type AssistantFacts, REPLY_WINDOW_MS } from '../core/notify/signals.ts';
+import { selectOpenEscalations } from '../store/assistant.ts';
 import { countPending, selectOpenQuestions, selectRepliesSince } from '../store/conversation.ts';
-import { selectOpenEscalations } from '../store/secretary.ts';
+import { assistantStatus } from './assistant.ts';
 import { type Clock, systemClock } from './items.ts';
-import { secretaryStatus } from './secretary.ts';
 
-// What the notifier needs to know of the secretary (notifications, 0.8): its state, what it said
+// What the notifier needs to know of the assistant (notifications, 0.8): its state, what it said
 // to the person lately and what has waited for it unattended.
 
 export type Waiting = { count: number; since: string | null };
 
-// What else waits for the secretary besides the person's messages: the Bandeja registers its
-// captures not taken yet here, so an offline secretary with only captures waiting is told too.
+// What else waits for the assistant besides the person's messages: the Bandeja registers its
+// captures not taken yet here, so an offline assistant with only captures waiting is told too.
 export type WaitingSource = (db: DatabaseSync) => Waiting;
 
 const sources: WaitingSource[] = [];
@@ -26,14 +26,14 @@ export function addWaitingSource(source: WaitingSource): () => void {
   };
 }
 
-// What agents escalated and the secretary has not acted on waits for it as well: an absent
-// secretary is told («te esperan N»), and the person sees the escalations themselves.
+// What agents escalated and the assistant has not acted on waits for it as well: an absent
+// assistant is told («te esperan N»), and the person sees the escalations themselves.
 function escalated(db: DatabaseSync): Waiting {
   const open = selectOpenEscalations(db);
   return { count: open.length, since: open[0]?.at ?? null };
 }
 
-export function secretaryWaiting(db: DatabaseSync): SecretaryWaiting {
+export function assistantWaiting(db: DatabaseSync): AssistantWaiting {
   const messages = countPending(db);
   const reports = escalated(db);
   const notes = sources.map((source) => source(db));
@@ -51,23 +51,23 @@ export function secretaryWaiting(db: DatabaseSync): SecretaryWaiting {
   };
 }
 
-// The secretary as the desk, the conversation and `otea pending` show it: its status and what waits
+// The assistant as the desk, the conversation and `otea pending` show it: its status and what waits
 // for it, one answer for all of them. Undefined while the project has none.
-export function secretaryView(
+export function assistantView(
   db: DatabaseSync,
   now: Clock = systemClock,
-  agents?: Parameters<typeof secretaryStatus>[3],
-): SecretaryView | undefined {
-  const status = secretaryStatus(db, now, undefined, agents);
-  return status ? { ...status, waiting: secretaryWaiting(db) } : undefined;
+  agents?: Parameters<typeof assistantStatus>[3],
+): AssistantView | undefined {
+  const status = assistantStatus(db, now, undefined, agents);
+  return status ? { ...status, waiting: assistantWaiting(db) } : undefined;
 }
 
-// Undefined while the project has no secretary.
-export function secretaryFacts(
+// Undefined while the project has no assistant.
+export function assistantFacts(
   db: DatabaseSync,
   now: Clock = systemClock,
-): SecretaryFacts | undefined {
-  const status = secretaryStatus(db, now);
+): AssistantFacts | undefined {
+  const status = assistantStatus(db, now);
   if (!status) return undefined;
   const from = new Date(Date.parse(now()) - REPLY_WINDOW_MS).toISOString();
   return {
@@ -89,6 +89,6 @@ export function secretaryFacts(
       text: messageSnippet(text, 140),
       options,
     })),
-    waiting: secretaryWaiting(db),
+    waiting: assistantWaiting(db),
   };
 }

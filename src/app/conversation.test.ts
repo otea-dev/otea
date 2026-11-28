@@ -4,6 +4,7 @@ import { basename, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MAX_EVIDENCE_BYTES } from '../core/evidence.ts';
 import { selectEvidence } from '../store/queries.ts';
+import { assistantWake, declareAssistant, startAssistantWait } from './assistant.ts';
 import { addCollection } from './collections.ts';
 import {
   attachmentPaths,
@@ -15,14 +16,13 @@ import {
   listConsultations,
   listConversation,
   postPersonMessage,
-  readAsSecretary,
-  sayAsSecretary,
+  readAsAssistant,
+  sayAsAssistant,
   turnsOfItem,
 } from './conversation.ts';
 import { createItem, moveItem } from './items.ts';
 import { claimItem } from './leases.ts';
 import type { Project } from './project.ts';
-import { declareSecretary, secretaryWake, startSecretaryWait } from './secretary.ts';
 import { memoryContext, projectOf } from './testing.ts';
 import { addTopic, answerTopic } from './topics.ts';
 
@@ -39,7 +39,7 @@ describe('the conversation', () => {
     root = mkdtempSync(join(tmpdir(), 'otea-conversation-'));
     project = projectOf(root, memoryContext());
     addCollection(project, { name: 'tasks' });
-    declareSecretary(project.db, 'sol', clock(0));
+    declareAssistant(project.db, 'sol', clock(0));
   });
 
   afterEach(() => {
@@ -61,54 +61,54 @@ describe('the conversation', () => {
       actor: { kind: 'agent', name: 'sol' },
     }).id;
 
-  describe('from the person to the secretary', () => {
-    // F2 (field study 3): the secretary answers from the text the wake gave it, without running
+  describe('from the person to the assistant', () => {
+    // F2 (field study 3): the assistant answers from the text the wake gave it, without running
     // `otea conversation`, and its next wait returned the same message again, several times.
-    it('does not wake the secretary again for a message it answered, read or not', () => {
+    it('does not wake the assistant again for a message it answered, read or not', () => {
       const first = post('is Tailscale or the relay better?', 1000);
       const second = post('and the Aprobar button?', 1500);
 
-      sayAsSecretary(project, { agent: 'sol', text: 'Tailscale.', replyTo: first.id }, clock(2000));
+      sayAsAssistant(project, { agent: 'sol', text: 'Tailscale.', replyTo: first.id }, clock(2000));
 
-      const wake = secretaryWake(project, startSecretaryWait(clock(3000)), clock(3000));
+      const wake = assistantWake(project, startAssistantWait(clock(3000)), clock(3000));
       // Only the one it did not answer comes back.
       expect(wake).toMatchObject({ kind: 'person_message', ref: String(second.id) });
 
       const answer = { agent: 'sol', text: 'Visible now.', replyTo: second.id };
-      sayAsSecretary(project, answer, clock(4000));
-      expect(secretaryWake(project, startSecretaryWait(clock(5000)), clock(5000))).toBeUndefined();
+      sayAsAssistant(project, answer, clock(4000));
+      expect(assistantWake(project, startAssistantWait(clock(5000)), clock(5000))).toBeUndefined();
     });
 
-    it('is pending, wakes the secretary from its own state, and stops waking once read', () => {
+    it('is pending, wakes the assistant from its own state, and stops waking once read', () => {
       const sent = post('the Aprobar button is hidden on the phone');
       expect(sent).toMatchObject({ author: 'person', delivery: 'pending', readAt: null });
 
-      const wait = startSecretaryWait(clock(2000));
-      const woke = secretaryWake(project, wait, clock(2000));
+      const wait = startAssistantWait(clock(2000));
+      const woke = assistantWake(project, wait, clock(2000));
       expect(woke).toMatchObject({ kind: 'person_message', ref: String(sent.id) });
       expect(woke?.text).toContain('Aprobar button is hidden');
       // Not taken like a signal: every look finds it until it is read.
-      expect(secretaryWake(project, startSecretaryWait(clock(3000)), clock(3000))?.ref).toBe(
+      expect(assistantWake(project, startAssistantWait(clock(3000)), clock(3000))?.ref).toBe(
         String(sent.id),
       );
 
-      const read = readAsSecretary(project, { agent: 'sol' }, clock(4000));
+      const read = readAsAssistant(project, { agent: 'sol' }, clock(4000));
       expect(read.fresh).toEqual([sent.id]);
       expect(read.messages.map(({ id, delivery }) => [id, delivery])).toEqual([[sent.id, 'read']]);
       // Read is not answered (app/owed.test.ts): a wait that begins after the read brings it back as
-      // already read, until the secretary replies; the wait running while it was read does not.
-      expect(secretaryWake(project, wait, clock(5000))).toBeUndefined();
-      expect(secretaryWake(project, startSecretaryWait(clock(5000)), clock(5000))).toMatchObject({
+      // already read, until the assistant replies; the wait running while it was read does not.
+      expect(assistantWake(project, wait, clock(5000))).toBeUndefined();
+      expect(assistantWake(project, startAssistantWait(clock(5000)), clock(5000))).toMatchObject({
         ref: String(sent.id),
       });
 
-      const said = sayAsSecretary(
+      const said = sayAsAssistant(
         project,
         { agent: 'sol', text: 'On it.', replyTo: sent.id },
         clock(6000),
       );
       expect(said.message).toMatchObject({
-        author: 'secretary',
+        author: 'assistant',
         by: 'sol',
         replyTo: sent.id,
         delivery: null,
@@ -122,18 +122,18 @@ describe('the conversation', () => {
     it('names how many more wait, and a look that stops short leaves the rest pending', () => {
       for (let n = 1; n <= 3; n += 1) post(`message ${n}`, n * 1000);
 
-      const first = readAsSecretary(project, { agent: 'sol', limit: 2 }, clock(9000));
+      const first = readAsAssistant(project, { agent: 'sol', limit: 2 }, clock(9000));
       expect(first.fresh).toEqual([1, 2]);
       expect(first.more).toBe(true);
-      expect(secretaryWake(project, startSecretaryWait(clock(9500)), clock(9500))?.ref).toBe('3');
+      expect(assistantWake(project, startAssistantWait(clock(9500)), clock(9500))?.ref).toBe('3');
       expect(listConversation(project, {}, clock(9500)).waiting).toMatchObject({ count: 1 });
 
-      const second = readAsSecretary(project, { agent: 'sol', limit: 2 }, clock(10000));
+      const second = readAsAssistant(project, { agent: 'sol', limit: 2 }, clock(10000));
       expect(second.fresh).toEqual([3]);
       // The talk before the first unread message comes along, so the answer has its context.
       expect(second.messages.map(({ id }) => id)).toEqual([1, 2, 3]);
       // All three are read and none answered: a later wait brings the oldest back as already read.
-      expect(secretaryWake(project, startSecretaryWait(clock(11000)), clock(11000))).toMatchObject({
+      expect(assistantWake(project, startAssistantWait(clock(11000)), clock(11000))).toMatchObject({
         ref: '1',
       });
       expect(listConversation(project, {}, clock(11000)).waiting).toMatchObject({ count: 0 });
@@ -214,7 +214,7 @@ describe('the conversation', () => {
       const { path } = attachmentToServe(project, String(file?.id));
       expect(readFileSync(path).equals(PNG)).toBe(true);
 
-      readAsSecretary(project, { agent: 'sol' }, clock(2000));
+      readAsAssistant(project, { agent: 'sol' }, clock(2000));
       const read = listConversation(project).messages[0];
       const paths = attachmentPaths(project, read as NonNullable<typeof read>);
       expect(readFileSync(paths.get(file?.id ?? 0) ?? '').equals(PNG)).toBe(true);
@@ -230,8 +230,8 @@ describe('the conversation', () => {
       );
     });
 
-    it('go with the secretary’s message too, within the evidence limit', () => {
-      const said = sayAsSecretary(
+    it('go with the assistant’s message too, within the evidence limit', () => {
+      const said = sayAsAssistant(
         project,
         {
           agent: 'sol',
@@ -272,7 +272,7 @@ describe('the conversation', () => {
         'a*b?.txt',
         `${long.slice(0, 200 - 4 - 1)}….png`,
       ]);
-      const read = readAsSecretary(project, { agent: 'sol' }, clock(2000));
+      const read = readAsAssistant(project, { agent: 'sol' }, clock(2000));
       expect(read.problems.size).toBe(0);
       const opened = sent.attachments.map(({ id }) => basename(read.paths.get(id) ?? ''));
       expect(opened.slice(0, 5)).toEqual(['_CON.txt', '_nul', 'file', 'report', 'a_b_.txt']);
@@ -293,7 +293,7 @@ describe('the conversation', () => {
       const [gone, fine] = sent.attachments;
       rmSync(attachmentToServe(project, String(gone?.id)).path);
 
-      const read = readAsSecretary(project, { agent: 'sol' }, clock(2000));
+      const read = readAsAssistant(project, { agent: 'sol' }, clock(2000));
 
       expect(read.fresh).toEqual([sent.id]);
       expect(listConversation(project).messages[0]?.delivery).toBe('read');
@@ -312,7 +312,7 @@ describe('the conversation', () => {
       // Where the files go is taken by a file: the disk refuses.
       writeFileSync(join(project.dataDir, 'files'), 'in the way');
 
-      const read = readAsSecretary(project, { agent: 'sol' }, clock(2000));
+      const read = readAsAssistant(project, { agent: 'sol' }, clock(2000));
 
       expect(read.fresh).toEqual([sent.id]);
       expect(read.problems.size).toBe(1);
@@ -329,24 +329,24 @@ describe('the conversation', () => {
   });
 
   describe('who may say', () => {
-    it('only the project’s secretary: another agent is forbidden, and so is anyone while it has none', () => {
+    it('only the project’s assistant: another agent is forbidden, and so is anyone while it has none', () => {
       const sent = post('hello');
 
       expect(() =>
-        sayAsSecretary(project, { agent: 'luna', text: 'hi', replyTo: sent.id }, clock(2000)),
-      ).toThrow(/luna is not this project's secretary \(sol is\)/);
-      expect(() => readAsSecretary(project, { agent: 'luna' }, clock(2000))).toThrow(
-        /Only the secretary reads/,
+        sayAsAssistant(project, { agent: 'luna', text: 'hi', replyTo: sent.id }, clock(2000)),
+      ).toThrow(/luna is not this project's assistant \(sol is\)/);
+      expect(() => readAsAssistant(project, { agent: 'luna' }, clock(2000))).toThrow(
+        /Only the assistant reads/,
       );
-      // What it could not read stays pending for the secretary.
+      // What it could not read stays pending for the assistant.
       expect(listConversation(project).waiting.count).toBe(1);
       expect(listConversation(project).messages).toHaveLength(1);
     });
 
-    it('is refused while the project has no secretary', () => {
+    it('is refused while the project has no assistant', () => {
       project.db.prepare("UPDATE agents SET role = NULL WHERE name = 'sol'").run();
 
-      expect(() => sayAsSecretary(project, { agent: 'sol', text: 'hi' })).toThrow(/has none yet/);
+      expect(() => sayAsAssistant(project, { agent: 'sol', text: 'hi' })).toThrow(/has none yet/);
     });
   });
 
@@ -356,7 +356,7 @@ describe('the conversation', () => {
       const fix = item('Show the Aprobar button on the phone');
       const test = item('Test it on a phone');
 
-      const said = sayAsSecretary(
+      const said = sayAsAssistant(
         project,
         {
           agent: 'sol',
@@ -389,10 +389,10 @@ describe('the conversation', () => {
 
     it('take the person’s latest read message when it says no reply-to, and refuse a link to no item', () => {
       const sent = post('add dark mode');
-      readAsSecretary(project, { agent: 'sol' }, clock(1500));
+      readAsAssistant(project, { agent: 'sol' }, clock(1500));
       const dark = item('Dark mode');
 
-      const said = sayAsSecretary(
+      const said = sayAsAssistant(
         project,
         { agent: 'sol', text: 'Filed.', kind: 'request', links: [dark] },
         clock(2000),
@@ -400,7 +400,7 @@ describe('the conversation', () => {
       expect(said.message).toMatchObject({ replyTo: sent.id, kind: 'request', links: [dark] });
 
       expect(() =>
-        sayAsSecretary(
+        sayAsAssistant(
           project,
           { agent: 'sol', text: 'x', replyTo: sent.id, links: ['TASKS-99'] },
           clock(3000),
@@ -411,22 +411,22 @@ describe('the conversation', () => {
 
     it('refuse to guess the turn while a later message of the person is not read yet', () => {
       const first = post('add dark mode', 1000);
-      readAsSecretary(project, { agent: 'sol' }, clock(1500));
+      readAsAssistant(project, { agent: 'sol' }, clock(1500));
       post('and make the font bigger', 2000);
       const dark = item('Dark mode');
 
       expect(() =>
-        sayAsSecretary(
+        sayAsAssistant(
           project,
           { agent: 'sol', text: 'Filed.', kind: 'request', links: [dark] },
           clock(3000),
         ),
       ).toThrow(/1 of the person's messages are not read yet.*--reply-to/);
       expect(() =>
-        sayAsSecretary(project, { agent: 'sol', text: 'Q.', kind: 'consultation' }, clock(3000)),
+        sayAsAssistant(project, { agent: 'sol', text: 'Q.', kind: 'consultation' }, clock(3000)),
       ).toThrow(/--reply-to/);
       // Naming the turn is never a guess.
-      const said = sayAsSecretary(
+      const said = sayAsAssistant(
         project,
         { agent: 'sol', text: 'Filed.', links: [dark], replyTo: first.id },
         clock(3000),
@@ -438,20 +438,20 @@ describe('the conversation', () => {
     it('refuse to guess between several read turns not classified yet', () => {
       post('one', 1000);
       post('two', 2000);
-      readAsSecretary(project, { agent: 'sol' }, clock(2500));
+      readAsAssistant(project, { agent: 'sol' }, clock(2500));
 
       expect(() =>
-        sayAsSecretary(project, { agent: 'sol', text: 'x', kind: 'request' }, clock(3000)),
+        sayAsAssistant(project, { agent: 'sol', text: 'x', kind: 'request' }, clock(3000)),
       ).toThrow(/2 read messages are not classified.*--reply-to/);
 
-      sayAsSecretary(
+      sayAsAssistant(
         project,
         { agent: 'sol', text: 'x', kind: 'consultation', replyTo: 1 },
         clock(3100),
       );
       // One turn left unclassified: no doubt which.
       expect(
-        sayAsSecretary(project, { agent: 'sol', text: 'y', kind: 'request' }, clock(3200)).message
+        sayAsAssistant(project, { agent: 'sol', text: 'y', kind: 'request' }, clock(3200)).message
           .replyTo,
       ).toBe(2);
     });
@@ -466,7 +466,7 @@ describe('the conversation', () => {
       answerTopic(project, { id: 'TEM-1', summary: 'MIT.', actor: agent }, clock(2000));
 
       expect(() =>
-        sayAsSecretary(project, { agent: 'sol', text: 'x', kind: 'request' }, clock(3000)),
+        sayAsAssistant(project, { agent: 'sol', text: 'x', kind: 'request' }, clock(3000)),
       ).toThrow(/no message of the person to classify/);
 
       // And a real message of the person is the target, whatever the topics came after.
@@ -476,9 +476,9 @@ describe('the conversation', () => {
         { question: 'And the font?', actor: { kind: 'human', name: 'human' } },
         clock(5000),
       );
-      readAsSecretary(project, { agent: 'sol' }, clock(5500));
+      readAsAssistant(project, { agent: 'sol' }, clock(5500));
       expect(
-        sayAsSecretary(project, { agent: 'sol', text: 'Filed.', kind: 'request' }, clock(6000))
+        sayAsAssistant(project, { agent: 'sol', text: 'Filed.', kind: 'request' }, clock(6000))
           .message.replyTo,
       ).toBe(sent.id);
     });
@@ -491,7 +491,7 @@ describe('the conversation', () => {
 
       expect(linked).toMatchObject({ kind: 'request', links: [dark] });
       expect(() => linkMessageToItem(project, 'luna', sent.id, dark, clock(3000))).toThrow(
-        /Only the secretary/,
+        /Only the assistant/,
       );
     });
 
@@ -525,7 +525,7 @@ describe('the conversation', () => {
         const first = item('One');
         const second = item('Two');
 
-        sayAsSecretary(
+        sayAsAssistant(
           project,
           { agent: 'sol', text: 'Made both.', replyTo: sent.id, links: [first, second] },
           clock(2000),
@@ -550,7 +550,7 @@ describe('the conversation', () => {
           clock(1500),
         );
 
-        const said = sayAsSecretary(
+        const said = sayAsAssistant(
           project,
           { agent: 'sol', text: 'Made it.', replyTo: sent.id, links: [done] },
           clock(2000),
@@ -567,7 +567,7 @@ describe('the conversation', () => {
     it('say nothing of a kind when it is plain talk', () => {
       const sent = post('thanks');
 
-      const said = sayAsSecretary(
+      const said = sayAsAssistant(
         project,
         { agent: 'sol', text: 'You are welcome.', replyTo: sent.id },
         clock(2000),
@@ -581,7 +581,7 @@ describe('the conversation', () => {
   describe('consultations', () => {
     it('keep the question and the answer, searchable, apart from the requests', () => {
       const q = post('why is the lease 15 minutes?', 1000);
-      const a = sayAsSecretary(
+      const a = sayAsAssistant(
         project,
         {
           agent: 'sol',
@@ -592,7 +592,7 @@ describe('the conversation', () => {
         clock(2000),
       );
       const other = post('add dark mode', 3000);
-      sayAsSecretary(
+      sayAsAssistant(
         project,
         {
           agent: 'sol',
@@ -626,8 +626,8 @@ describe('the conversation', () => {
         { text: 'Should the dark theme use a mode switch?' },
         clock(5000),
       ).message;
-      readAsSecretary(project, { agent: 'sol' }, clock(5100));
-      const answer = sayAsSecretary(
+      readAsAssistant(project, { agent: 'sol' }, clock(5100));
+      const answer = sayAsAssistant(
         project,
         { agent: 'sol', text: 'Yes, one toggle.', replyTo: asked.id, kind: 'consultation' },
         clock(5200),
@@ -683,9 +683,9 @@ describe('the conversation', () => {
         ['agent', 'kiln', 'MIT, for its simplicity.', topic.id],
       ]);
       expect(kept[1]?.replyTo).toBe(kept[0]?.id);
-      // A topic is a record, not a message waiting for the secretary.
+      // A topic is a record, not a message waiting for the assistant.
       expect(listConversation(project).waiting.count).toBe(0);
-      expect(secretaryWake(project, startSecretaryWait(clock(3000)), clock(3000))).toBeUndefined();
+      expect(assistantWake(project, startAssistantWait(clock(3000)), clock(3000))).toBeUndefined();
 
       // The answer given again replaces the text kept, not a second message.
       answerTopic(
@@ -701,9 +701,9 @@ describe('the conversation', () => {
   });
 
   describe('the person’s correction', () => {
-    it('changes the kind of the whole turn, and the secretary’s later say does not undo it', () => {
+    it('changes the kind of the whole turn, and the assistant’s later say does not undo it', () => {
       const sent = post('what do you think of dark mode?');
-      sayAsSecretary(
+      sayAsAssistant(
         project,
         {
           agent: 'sol',
@@ -722,7 +722,7 @@ describe('the conversation', () => {
         'consultation',
       ]);
 
-      const again = sayAsSecretary(
+      const again = sayAsAssistant(
         project,
         { agent: 'sol', text: 'Still a request to me.', replyTo: sent.id, kind: 'request' },
         clock(3000),
@@ -734,7 +734,7 @@ describe('the conversation', () => {
 
     it('works from either message of the turn, and refuses a message that is not there', () => {
       const sent = post('a question');
-      const said = sayAsSecretary(
+      const said = sayAsAssistant(
         project,
         { agent: 'sol', text: 'an answer', replyTo: sent.id },
         clock(2000),
@@ -753,7 +753,7 @@ describe('the conversation', () => {
   describe('order and paging', () => {
     beforeEach(() => {
       for (let n = 1; n <= 7; n += 1) {
-        if (n % 3 === 0) sayAsSecretary(project, { agent: 'sol', text: `m${n}` }, clock(n * 1000));
+        if (n % 3 === 0) sayAsAssistant(project, { agent: 'sol', text: `m${n}` }, clock(n * 1000));
         else post(`m${n}`, n * 1000);
       }
     });

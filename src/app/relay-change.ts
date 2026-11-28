@@ -3,11 +3,11 @@ import { OteaError } from '../core/errors.ts';
 import type { FieldValues } from '../core/fields.ts';
 import type { Actor } from '../core/item.ts';
 import { joinTransaction } from '../store/database.ts';
+import { requireAssistant } from './assistant.ts';
 import { getItem, type Item, systemClock, updateItem } from './items.ts';
 import { liveBoardOf } from './next.ts';
 import { agentStepOf, relayChange } from './notes.ts';
 import type { Project } from './project.ts';
-import { requireSecretary } from './secretary.ts';
 
 export type UpdateAndTell = {
   id: string;
@@ -18,7 +18,7 @@ export type UpdateAndTell = {
   actor: Actor;
 };
 
-// The person changed their mind about an item that is not in their review yet: the secretary
+// The person changed their mind about an item that is not in their review yet: the assistant
 // reshapes it and the worker on it hears at once (a note it answers before it hands off, waking its
 // wait and printed by its next calls), instead of the change waiting behind the newer messages.
 // One act: a change that cannot be told is not made. An item in the person's review is theirs: it is
@@ -28,7 +28,7 @@ export function updateAndTell(
   input: UpdateAndTell,
   now: () => string = systemClock,
 ): Item {
-  requireSecretary(project.db, input.actor.name, 'tells a worker what the person changed');
+  requireAssistant(project.db, input.actor.name, 'tells a worker what the person changed');
   return joinTransaction(project.db, () => {
     const item = getItem(project, input.id);
     const at = positionOf(item.state);
@@ -56,7 +56,7 @@ export function updateAndTell(
       : item;
     relayChange(
       project,
-      { id: input.id, text: input.tell, actor: input.actor, channel: 'cli', role: 'secretary' },
+      { id: input.id, text: input.tell, actor: input.actor, channel: 'cli', role: 'assistant' },
       now,
     );
     return changed;

@@ -38,7 +38,7 @@ export function agentsAcross(projects: readonly ProjectOverview[]): AcrossAgent[
 }
 
 // How many things wait for you in a project: its items on your turn, and what asks you that is no
-// item (a question on a note, the secretary's, what agents escalated while it is away).
+// item (a question on a note, the assistant's, what agents escalated while it is away).
 export const waitingIn = (project: Pick<ProjectOverview, 'waiting' | 'asking'>): number =>
   project.waiting.length + (project.asking?.length ?? 0);
 

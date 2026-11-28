@@ -557,9 +557,9 @@ export type ChosenAnswer = { question: number } & (
   | { delegate: true }
 );
 
-// What the person gives a question of the secretary's: the same, with no question number (the
+// What the person gives a question of the assistant's: the same, with no question number (the
 // question is the message the route names).
-const SecretaryAnswerBody = z.union([
+const AssistantAnswerBody = z.union([
   z.object({ text: z.string() }).strict(),
   z
     .object({
@@ -573,9 +573,9 @@ const SecretaryAnswerBody = z.union([
   z.object({ delegate: z.literal(true) }).strict(),
 ]);
 
-export async function secretaryAnswerRequest(c: Context): Promise<GivenAnswer> {
+export async function assistantAnswerRequest(c: Context): Promise<GivenAnswer> {
   const raw: unknown = await c.req.json().catch(() => undefined);
-  const parsed = SecretaryAnswerBody.safeParse(raw);
+  const parsed = AssistantAnswerBody.safeParse(raw);
   if (!parsed.success)
     throw new RejectedRequest(
       400,

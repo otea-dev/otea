@@ -17,7 +17,7 @@ import { Icon } from '../../kit/index.ts';
 import { toast } from '../../kit/pop/toast.tsx';
 import { useClearAbove } from './clear-above.ts';
 
-// Where you write to your secretary: the words, files to attach (picked, pasted or dropped, the
+// Where you write to your assistant: the words, files to attach (picked, pasted or dropped, the
 // way a new item takes them), three suggestions to start from, and Enviar. Dictation is the
 // keyboard's own. The send carries an Idempotency-Key kept until it lands, so a send that was
 // repeated (a phone that never heard back) is one message.

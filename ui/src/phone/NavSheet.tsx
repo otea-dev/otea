@@ -1,16 +1,16 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useApp } from '../app/context.tsx';
-import type { SecretaryStatus } from '../conversation.ts';
+import type { AssistantStatus } from '../conversation.ts';
 import { t } from '../i18n/i18n.ts';
 import { Count } from '../kit/Count.tsx';
 import { Icon } from '../kit/Icon.tsx';
 import { Buddy } from '../kit/Marks.tsx';
 import { waitingCount } from '../pending.ts';
 import type { Route, ViewRoute } from '../selection.ts';
-import { RowIcon, SecretaryDot } from '../shell/Rail.tsx';
+import { AssistantDot, RowIcon } from '../shell/Rail.tsx';
 import { type BoardEntry, boardEntries } from '../shell/rail-model.ts';
 import { shellUi } from '../shell/shell-ui.ts';
-import { SecretaryMark } from '../views/hablar/SecretaryMark.tsx';
+import { AssistantMark } from '../views/hablar/AssistantMark.tsx';
 import { BottomSheet } from './BottomSheet.tsx';
 import { navSheet, useNavSheet } from './nav.ts';
 
@@ -39,8 +39,8 @@ export function navOn(route: Route): string | null {
 export type NavBodyProps = {
   route: Route;
   toca: number;
-  // The secretary's state, for the dot on Hablar's row.
-  secretary?: SecretaryStatus | null | undefined;
+  // The assistant's state, for the dot on Hablar's row.
+  assistant?: AssistantStatus | null | undefined;
   boards: BoardEntry[];
   onGo: (to: ViewRoute) => void;
   onPrefs: () => void;
@@ -72,7 +72,7 @@ function Row({ i, on = false, icon, label, pair, className, onPress }: RowProps)
   );
 }
 
-export function NavBody({ route, toca, secretary, boards, onGo, onPrefs }: NavBodyProps) {
+export function NavBody({ route, toca, assistant, boards, onGo, onPrefs }: NavBodyProps) {
   const on = navOn(route);
   let i = 0;
   return (
@@ -81,9 +81,9 @@ export function NavBody({ route, toca, secretary, boards, onGo, onPrefs }: NavBo
         <Row
           i={i++}
           on={on === 'hablar'}
-          icon={<SecretaryMark />}
+          icon={<AssistantMark />}
           label={t('hablar.nav')}
-          pair={<SecretaryDot status={secretary} />}
+          pair={<AssistantDot status={assistant} />}
           onPress={() => onGo({ view: 'hablar' })}
         />
         <Row
@@ -141,7 +141,7 @@ export function NavSheet() {
   const [now, setNow] = useState(false);
   const phone = app.phone;
   const view = navOn(app.route) ?? app.route.view;
-  const secretary = app.secretary;
+  const assistant = app.assistant;
 
   // Off the phone there is no sheet to keep open.
   useEffect(() => {
@@ -175,7 +175,7 @@ export function NavSheet() {
       <NavBody
         route={app.route}
         toca={waitingCount(app)}
-        secretary={secretary}
+        assistant={assistant}
         boards={boardEntries(app.collections, app.all, app.now)}
         onGo={(to) => {
           closeNow();

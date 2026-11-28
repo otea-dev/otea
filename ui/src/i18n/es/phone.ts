@@ -260,7 +260,7 @@ export const phone = {
   'offline.nothingSaved': 'este teléfono todavía no guardó nada de este proyecto',
   'offline.noData': 'sin datos',
   // What can be done without the computer: read; what is captured (Nuevo, a note) waits in the
-  // queue. A message to the secretary is not captured: Hablar writes again once the PC is back.
+  // queue. A message to the assistant is not captured: Hablar writes again once the PC is back.
   'offline.readQueue': 'solo lectura · lo que captures queda en cola',
   'offline.retry': 'Reintentar',
   'offline.synced': 'última sincronización {time}',
@@ -312,13 +312,13 @@ export const phone = {
   'notify.aside': 'Un agente dejó algo para después',
   'notify.askText': 'Mostrar el texto en el aviso',
   'notify.askTextHint':
-    'la pregunta o la respuesta del secretario; la pantalla bloqueada lo enseña a quien la mire',
-  'notify.secretaryReply': 'Tu secretario te responde',
-  'notify.secretaryReplyHint': 'en Hablar',
-  'notify.secretaryOffline': 'Tu secretario está desconectado y te esperan mensajes',
-  'notify.secretaryOfflineHint': 'tras 10 minutos esperando; un aviso por desconexión',
-  'notify.short.secretary_reply': 'secretario responde',
-  'notify.short.secretary_offline': 'secretario desconectado',
+    'la pregunta o la respuesta del asistente; la pantalla bloqueada lo enseña a quien la mire',
+  'notify.assistantReply': 'Tu asistente te responde',
+  'notify.assistantReplyHint': 'en Hablar',
+  'notify.assistantOffline': 'Tu asistente está desconectado y te esperan mensajes',
+  'notify.assistantOfflineHint': 'tras 10 minutos esperando; un aviso por desconexión',
+  'notify.short.assistant_reply': 'asistente responde',
+  'notify.short.assistant_offline': 'asistente desconectado',
   'notify.unheard': 'Hay trabajo esperando y ningún agente conectado',
   'notify.unheardHint': 'ningún agente espera ni trabaja',
   'notify.projects': 'proyectos',

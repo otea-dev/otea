@@ -183,7 +183,7 @@ describe('approving an item that overlaps one still to land', () => {
     expect(nextFor(dropped.ctx, 'quill', { claim: true }, now).text).not.toContain('landed first');
   });
 
-  it('is said in `otea pending` and the secretary reads no bounce in it', () => {
+  it('is said in `otea pending` and the assistant reads no bounce in it', () => {
     const { ctx, inReview, approve, lands, takeBack } = board();
     const first = inReview('first', ['src/shared.ts']);
     const second = inReview('second', ['src/shared.ts']);

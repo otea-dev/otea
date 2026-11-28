@@ -13,7 +13,7 @@ import type { NotifyKind, Signal } from './signals.ts';
 export type QuietHours = { from: string; to: string };
 
 export type NotifyPrefs = Record<NotifyKind, boolean> & {
-  // Whether the words of what is told go in its notice (a question, the secretary's reply), which
+  // Whether the words of what is told go in its notice (a question, the assistant's reply), which
   // a lock screen shows to anyone.
   askText: boolean;
   quiet: QuietHours | null;
@@ -30,8 +30,8 @@ export const DEFAULT_PREFS: NotifyPrefs = {
   stuck: true,
   aside: false,
   unheard: true,
-  secretary_reply: true,
-  secretary_offline: true,
+  assistant_reply: true,
+  assistant_offline: true,
   askText: true,
   quiet: null,
   muted: [],
@@ -53,7 +53,7 @@ export type ItemNotice = {
   text?: string;
   // A question's options, said after its text when they fit.
   options?: string[];
-  // The turn of Hablar a secretary reply opens; how many messages wait for an offline secretary.
+  // The turn of Hablar an assistant reply opens; how many messages wait for an offline assistant.
   turn?: number;
   count?: number;
   // `item` is a Bandeja note (B-3), not an item.
@@ -68,7 +68,7 @@ export type GroupNotice = {
   items: { item: string; title: string; kind: NotifyKind; bandeja?: true }[];
   // How many things wait for the person now, as `otea pending` counts them: a mixed burst says it
   // instead of its own count of notices (the server fills it in; text.ts falls back to the notices
-  // other than the secretary's replies).
+  // other than the assistant's replies).
   waiting?: number;
 };
 
@@ -110,9 +110,9 @@ const RANK: Record<NotifyKind, number> = {
   ask: 0,
   turn: 1,
   stuck: 2,
-  secretary_offline: 3,
+  assistant_offline: 3,
   unheard: 4,
-  secretary_reply: 5,
+  assistant_reply: 5,
   replied: 6,
   aside: 7,
 };

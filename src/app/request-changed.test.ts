@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { creatures } from '../core/board/testing.ts';
 import { insertEvidence } from '../store/queries.ts';
+import { assistantWake, declareAssistant, startAssistantWait } from './assistant.ts';
 import { createItem, showItem, updateItem } from './items.ts';
 import { handoffItem, sendBackItem } from './next.ts';
 import type { Project } from './project.ts';
-import { declareSecretary, secretaryWake, startSecretaryWait } from './secretary.ts';
 import { memoryContext, projectOf, publishAs } from './testing.ts';
 
 const you = { kind: 'human' as const, name: 'human' };
@@ -38,7 +38,7 @@ describe('a request that changed after its delivery was handed in', () => {
     handoffItem(project, { id, actor: quill, channel: 'cli', ...(note ? { note } : {}) }, now);
   };
   // Once the delivery waits for the person's review only they change the request, on the desk
-  // (S2: an agent's update is refused, review-hold.test.ts); before it, the secretary may.
+  // (S2: an agent's update is refused, review-hold.test.ts); before it, the assistant may.
   const rewrite = (title: string, desc: string, actor = you) =>
     updateItem(project, { id, actor, title, fields: { fdesc: desc } }, now);
   const shown = () => showItem(project, id, { actor: you, channel: 'ui' }, now);
@@ -52,7 +52,7 @@ describe('a request that changed after its delivery was handed in', () => {
       { collection: 'Criaturas', title: 'Rana', fields: { fdesc: 'Lenta' }, actor: you },
       now,
     ).id;
-    declareSecretary(project.db, 'sol', now);
+    declareAssistant(project.db, 'sol', now);
   });
 
   afterEach(() => project.db.close());
@@ -107,11 +107,11 @@ describe('a request that changed after its delivery was handed in', () => {
     });
   });
 
-  it('tells the secretary in the wake for the delivery', () => {
+  it('tells the assistant in the wake for the delivery', () => {
     deliver();
     rewrite('Sapo', 'Rápido');
 
-    const woke = secretaryWake(project, startSecretaryWait(now), now);
+    const woke = assistantWake(project, startAssistantWait(now), now);
 
     expect(woke).toMatchObject({ kind: 'ready_for_review', ref: id });
     expect(woke?.text).toMatch(/request changed after/i);

@@ -1,12 +1,12 @@
 import type { DatabaseSync } from 'node:sqlite';
-import type { AgentRole, SecretarySignalKind } from '../core/secretary.ts';
+import type { AgentRole, AssistantSignalKind } from '../core/assistant.ts';
 
-// The secretary's rows: the role an agent declared (agents.role), the signals that wake it
-// (secretary_signals) and the stretches a board has gone unheard (unheard_stretches).
+// The assistant's rows: the role an agent declared (agents.role), the signals that wake it
+// (assistant_signals) and the stretches a board has gone unheard (unheard_stretches).
 //
-// A signal or a stretch is *returned* by a wait (taken_at / told_at), and *acked* once the secretary
+// A signal or a stretch is *returned* by a wait (taken_at / told_at), and *acked* once the assistant
 // acted: a command that acts, not one that only looks (ackReturned). Until then a later wait
-// returns it again (app/secretary.ts), so a response lost with a killed wait is never lost.
+// returns it again (app/assistant.ts), so a response lost with a killed wait is never lost.
 
 // Gives an agent a role, or takes it back (null). The agent is noted as seen `at` when it was not
 // known yet (otea connect --as names an agent before its first session).
@@ -32,7 +32,7 @@ export function selectRoles(db: DatabaseSync): Map<string, AgentRole> {
 
 export type SignalRecord = {
   id: number;
-  kind: SecretarySignalKind;
+  kind: AssistantSignalKind;
   ref: string | null;
   text: string | null;
   at: string;
@@ -43,58 +43,58 @@ export type SignalRecord = {
 
 export function insertSignal(
   db: DatabaseSync,
-  signal: { kind: SecretarySignalKind; ref?: string | undefined; text?: string | undefined },
+  signal: { kind: AssistantSignalKind; ref?: string | undefined; text?: string | undefined },
   at: string,
 ): number {
   const sql =
-    'INSERT INTO secretary_signals (kind, ref, text, at) VALUES (:kind, :ref, :text, :at)';
+    'INSERT INTO assistant_signals (kind, ref, text, at) VALUES (:kind, :ref, :text, :at)';
   const result = db
     .prepare(sql)
     .run({ kind: signal.kind, ref: signal.ref ?? null, text: signal.text ?? null, at });
   return Number(result.lastInsertRowid);
 }
 
-// The signals not acked yet, oldest first: new ones, and those a wait returned that the secretary
+// The signals not acked yet, oldest first: new ones, and those a wait returned that the assistant
 // has not acted on.
 export function selectOpenSignals(db: DatabaseSync): SignalRecord[] {
   const sql = `SELECT id, kind, ref, text, at, taken_at AS takenAt, deliveries
-    FROM secretary_signals WHERE acked_at IS NULL ORDER BY id`;
+    FROM assistant_signals WHERE acked_at IS NULL ORDER BY id`;
   return db.prepare(sql).all() as SignalRecord[];
 }
 
-// What agents escalated that the secretary has not acted on yet, oldest first.
+// What agents escalated that the assistant has not acted on yet, oldest first.
 export type EscalationRecord = {
   id: number;
   ref: string | null;
   text: string;
   at: string;
-  // How many waits returned it to the secretary.
+  // How many waits returned it to the assistant.
   deliveries: number;
 };
 
 export function selectOpenEscalations(db: DatabaseSync): EscalationRecord[] {
-  const sql = `SELECT id, ref, COALESCE(text, '') AS text, at, deliveries FROM secretary_signals
+  const sql = `SELECT id, ref, COALESCE(text, '') AS text, at, deliveries FROM assistant_signals
     WHERE kind = 'escalation' AND acked_at IS NULL ORDER BY id`;
   return db.prepare(sql).all() as EscalationRecord[];
 }
 
-// The person sets an escalation aside: it is done with, whether the secretary acted or not. True
+// The person sets an escalation aside: it is done with, whether the assistant acted or not. True
 // when it was open.
 export function dismissEscalation(db: DatabaseSync, id: number, at: string): boolean {
-  const sql = `UPDATE secretary_signals SET acked_at = :at
+  const sql = `UPDATE assistant_signals SET acked_at = :at
     WHERE id = :id AND kind = 'escalation' AND acked_at IS NULL`;
   return Number(db.prepare(sql).run({ id, at }).changes) === 1;
 }
 
 // Whether a signal of that number is an escalation, open or done with.
 export function escalationExists(db: DatabaseSync, id: number): boolean {
-  const sql = "SELECT 1 AS found FROM secretary_signals WHERE id = :id AND kind = 'escalation'";
+  const sql = "SELECT 1 AS found FROM assistant_signals WHERE id = :id AND kind = 'escalation'";
   return db.prepare(sql).get({ id }) !== undefined;
 }
 
 // What was acked before `before` is no record anyone reads: it goes.
-export function pruneSecretary(db: DatabaseSync, before: string): void {
-  db.prepare('DELETE FROM secretary_signals WHERE acked_at IS NOT NULL AND acked_at < :before').run(
+export function pruneAssistant(db: DatabaseSync, before: string): void {
+  db.prepare('DELETE FROM assistant_signals WHERE acked_at IS NOT NULL AND acked_at < :before').run(
     {
       before,
     },
@@ -105,29 +105,29 @@ export function pruneSecretary(db: DatabaseSync, before: string): void {
 }
 
 export function countPendingSignals(db: DatabaseSync): number {
-  const sql = 'SELECT COUNT(*) AS n FROM secretary_signals WHERE acked_at IS NULL';
+  const sql = 'SELECT COUNT(*) AS n FROM assistant_signals WHERE acked_at IS NULL';
   return Number((db.prepare(sql).get() as { n: number }).n);
 }
 
 // Returns the signal to one wait, atomically: only if nobody returned it since `was` (the taken_at
 // the caller read), so two waits at once never both get it. True when this call took it.
 export function takeSignal(db: DatabaseSync, id: number, was: string | null, at: string): boolean {
-  const sql = `UPDATE secretary_signals SET taken_at = :at, deliveries = deliveries + 1
+  const sql = `UPDATE assistant_signals SET taken_at = :at, deliveries = deliveries + 1
     WHERE id = :id AND acked_at IS NULL AND taken_at IS :was`;
   return Number(db.prepare(sql).run({ id, was, at }).changes) === 1;
 }
 
-// A signal returned twice and still not acted on is let go: the secretary saw it.
+// A signal returned twice and still not acted on is let go: the assistant saw it.
 export function dropSignal(db: DatabaseSync, id: number, at: string): void {
-  db.prepare('UPDATE secretary_signals SET acked_at = :at WHERE id = :id').run({ id, at });
+  db.prepare('UPDATE assistant_signals SET acked_at = :at WHERE id = :id').run({ id, at });
 }
 
-// The secretary acted: every nudge returned to it so far is acked, and of the escalations only
+// The assistant acted: every nudge returned to it so far is acked, and of the escalations only
 // those the act is about (`refs`, the items or notes it names): an escalation whose wait output sat
 // unread survives an act on something else.
 export function ackReturned(db: DatabaseSync, at: string, refs: readonly string[] = []): void {
   db.prepare(
-    `UPDATE secretary_signals SET acked_at = :at
+    `UPDATE assistant_signals SET acked_at = :at
       WHERE taken_at IS NOT NULL AND acked_at IS NULL
         AND (kind <> 'escalation'
           OR lower(ref) IN (SELECT lower(value) FROM json_each(:refs)))`,
@@ -141,7 +141,7 @@ export type StretchRecord = {
   // When the stretch began (ms), and when a look last found it unheard (ms).
   since: number;
   seenAt: number;
-  // When a wait last returned it (null: not yet), how many times, and whether the secretary acked.
+  // When a wait last returned it (null: not yet), how many times, and whether the assistant acked.
   toldAt: string | null;
   tells: number;
   acked: boolean;
@@ -208,10 +208,10 @@ export function dropStretch(db: DatabaseSync, key: string, at: string): void {
 }
 
 // A listener on the boards appeared: nothing is unheard any more, and no stretch goes on. Not for
-// the secretary, which is no listener (app/presence.ts waitBeat).
+// the assistant, which is no listener (app/presence.ts waitBeat).
 export function clearStretchesFor(db: DatabaseSync, agent: string): void {
   db.prepare(
     `DELETE FROM unheard_stretches
-     WHERE NOT EXISTS (SELECT 1 FROM agents WHERE name = :agent AND role = 'secretary')`,
+     WHERE NOT EXISTS (SELECT 1 FROM agents WHERE name = :agent AND role = 'assistant')`,
   ).run({ agent });
 }

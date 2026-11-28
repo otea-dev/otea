@@ -16,7 +16,7 @@ import { noteTime } from '../detail/notes.ts';
 import { AskBody } from './Branch.tsx';
 
 // The Bandeja, beside «Lo que salió»: what you captured as a rough note and where each note stands:
-// waiting for the secretary, being refined by an agent, asking you something (with its options to
+// waiting for the assistant, being refined by an agent, asking you something (with its options to
 // tap, there), or filed as the item it became (a link to it). You look for what came out of what
 // you said here, so it lives here and not in a list of its own; a question to you shows first.
 

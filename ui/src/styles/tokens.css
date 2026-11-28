@@ -58,9 +58,9 @@
   --tint: oklch(0.5 0.2 266 / 0.1);
   --on-you: oklch(0.99 0.005 266);
   --warn: oklch(0.55 0.17 30);
-  /* the secretary's colour (Hablar): a violet only the secretary wears, its mark, its ring and its
+  /* the assistant's colour (Hablar): a violet only the assistant wears, its mark, its ring and its
      light; deep enough in light to read as text, soft in dark */
-  --sec: oklch(0.5 0.16 305);
+  --assistant: oklch(0.5 0.16 305);
   --closed: oklch(0.64 0.01 266);
   --fig: oklch(0.965 0.006 268);
   --fig-line: oklch(0.82 0.011 268);
@@ -107,7 +107,7 @@
     --tint: oklch(0.69 0.165 268 / 0.14);
     --on-you: oklch(0.17 0.03 266);
     --warn: oklch(0.71 0.15 36);
-    --sec: oklch(0.8 0.11 305);
+    --assistant: oklch(0.8 0.11 305);
     --closed: oklch(0.52 0.012 266);
     --fig: oklch(0.205 0.013 266);
     --fig-line: oklch(0.42 0.015 266);
@@ -153,7 +153,7 @@
   --tint: oklch(0.69 0.165 268 / 0.14);
   --on-you: oklch(0.17 0.03 266);
   --warn: oklch(0.71 0.15 36);
-  --sec: oklch(0.8 0.11 305);
+  --assistant: oklch(0.8 0.11 305);
   --closed: oklch(0.52 0.012 266);
   --fig: oklch(0.205 0.013 266);
   --fig-line: oklch(0.42 0.015 266);

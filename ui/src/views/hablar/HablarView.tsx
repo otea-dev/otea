@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   type AnswerWords,
-  answerSecretaryQuestion,
+  answerAssistantQuestion,
   correctTurn,
   fetchRolePrompt,
-  unanswerSecretaryQuestion,
+  unanswerAssistantQuestion,
 } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
-import { askingCount } from '../../bandeja.ts';
+import { NOTHING_WAITING } from '../../assistant-waiting.ts';
 import { useCopy } from '../../components/AgentPrompt.tsx';
 import { CopyCommand, CopyGlyph } from '../../components/CopyCommand.tsx';
 import {
@@ -30,21 +30,21 @@ import { F, lerp } from '../../motion/curves.ts';
 import { drive } from '../../motion/drive.ts';
 import { reduced } from '../../motion/reduced.ts';
 import type { PendingEntry } from '../../pending.ts';
-import { NOTHING_WAITING } from '../../secretary-waiting.ts';
+import { bandejaAsking } from '../../pending.ts';
 import { useMedia } from '../../shell/use-media.ts';
 import type { Item } from '../../types.ts';
+import { AssistantMark } from './AssistantMark.tsx';
 import { CopiedSay } from './Away.tsx';
 import { useBandeja } from './Bandeja.tsx';
 import { Composer } from './Composer.tsx';
-import { SecretaryMark } from './SecretaryMark.tsx';
 import { Side } from './Side.tsx';
 import { TeEspera } from './TeEspera.tsx';
 import { Turns } from './Turns.tsx';
 import { useConversation } from './use-conversation.ts';
 
-// Hablar (#/hablar): the conversation with the project's secretary on the two lanes, its composer
+// Hablar (#/hablar): the conversation with the project's assistant on the two lanes, its composer
 // below, «Lo que salió» beside it (a column from 1240 px, a tab before that), and a line when the
-// secretary is away. The person writes here; the secretary answers from its own session.
+// assistant is away. The person writes here; the assistant answers from its own session.
 
 const NEAR_BOTTOM = 160;
 
@@ -103,20 +103,20 @@ function scrollBox(box: HTMLElement, top: number | 'foot') {
   });
 }
 
-// The project has no secretary: what to ask of an agent, and the one command it runs. It stays in
+// The project has no assistant: what to ask of an agent, and the one command it runs. It stays in
 // sight above the conversation, whatever has been written, since nothing answers until there is one.
-function NoSecretary() {
+function NoAssistant() {
   const app = useApp();
   // The text is read before the tap, so the copy is the tap's own (a browser lends the clipboard
   // to a click, not to what a request answers later).
-  const load = useCallback((signal: AbortSignal) => fetchRolePrompt('secretary', {}, signal), []);
+  const load = useCallback((signal: AbortSignal) => fetchRolePrompt('assistant', {}, signal), []);
   const prompt = useRemote(load, app.version, 'live');
   const text = prompt.status === 'ready' ? prompt.value.prompt : '';
   const [copied, copy] = useCopy(text);
   return (
     <div className="hb-nosec" data-enter="fade">
       <div className="hb-nohead">
-        <SecretaryMark />
+        <AssistantMark />
         <h2 className="hb-h">{t('hablar.none.title')}</h2>
       </div>
       <p>{t('hablar.none.text')}</p>
@@ -131,7 +131,7 @@ function NoSecretary() {
       </Button>
       <CopiedSay copied={copied} />
       <p className="hb-or">{t('hablar.none.orRun')}</p>
-      <CopyCommand command="otea prompt --role secretary" />
+      <CopyCommand command="otea prompt --role assistant" />
       <p className="hb-after">{t('hablar.none.after')}</p>
     </div>
   );
@@ -150,8 +150,9 @@ export function HablarView({
   const app = useApp();
   const convo = useConversation();
   const notes = useBandeja();
-  // What needs you in the Bandeja counts beside what came out: a question waits for your tap.
-  const asking = askingCount(notes.entries ?? []);
+  // What needs you in the Bandeja counts beside what came out: a question waits for your tap. The
+  // number is pending's, the one the rest of the desk counts with.
+  const asking = bandejaAsking(app.pending);
   const [tab, setTab] = useState<'chat' | 'out'>(bandeja === undefined ? 'chat' : 'out');
   // Where a question is answered: at the foot of the conversation, whenever it shows (always from
   // 1240 px, on the phone's Conversación tab). The list of what came out then only says where each
@@ -173,26 +174,26 @@ export function HablarView({
   const scroller = useRef<HTMLDivElement>(null);
   const near = useRef(true);
   const messages = convo.status === 'ready' ? convo.messages : undefined;
-  // The secretary as every screen shows it (app.secretary): read once, never again from here.
-  const secretary = app.secretary ?? null;
+  // The assistant as every screen shows it (app.assistant): read once, never again from here.
+  const assistant = app.assistant ?? null;
   const items = useMemo(
     () => new Map<string, Item>(app.all.map((item) => [item.id, item])),
     [app.all],
   );
   const turns = useMemo(() => turnsOf(messages ?? []), [messages]);
   const rows = useMemo(() => rowsOf(messages ?? [], turns), [messages, turns]);
-  const thinking = thinkingRoot(turns, secretary, app.now);
+  const thinking = thinkingRoot(turns, assistant, app.now);
   const cards = useMemo(
     () => cardsOf(turns, items, app.now, filter),
     [turns, items, app.now, filter],
   );
   const counts = useMemo(() => cardCounts(turns, items, app.now), [turns, items, app.now]);
-  // On the phone, without the PC, what shows of the secretary is the last the phone kept, and it may
+  // On the phone, without the PC, what shows of the assistant is the last the phone kept, and it may
   // say «conectado» or «desconectado» for a PC nobody can reach: the offline line says it all, and
-  // the secretary's state and its away strip wait for the next answer. (The desk has room for both
+  // the assistant's state and its away strip wait for the next answer. (The desk has room for both
   // lines and keeps them.)
   const offline = app.sync.offline && app.phone;
-  const away = offline ? null : awayOf(secretary);
+  const away = offline ? null : awayOf(assistant);
 
   // A link to a Bandeja note (a notice): the tab that holds it shows, the note scrolls into view and
   // lights for a moment, once its entries are read.
@@ -262,7 +263,7 @@ export function HablarView({
 
   // What «Te espera» points at: the question where it is answered, else the item, else the note.
   const jump = (entry: PendingEntry) => {
-    if (entry.kind === 'secretary' && entry.turn !== undefined) return goTo(entry.turn);
+    if (entry.kind === 'assistant' && entry.turn !== undefined) return goTo(entry.turn);
     // A board nobody works is named by the board, which is no item: its page lists what waits.
     if (entry.kind === 'worker') return app.go({ view: 'board', board: entry.ref });
     if (entry.kind === 'question' || entry.kind === 'bandeja') {
@@ -337,7 +338,7 @@ export function HablarView({
   // The newest message stays in sight as it arrives, unless the person scrolled up to read.
   const last = messages?.at(-1)?.id;
   const lastSeen = useRef<number | undefined>(undefined);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when a message arrives or the secretary starts thinking
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when a message arrives or the assistant starts thinking
   useLayoutEffect(() => {
     const box = scroller.current;
     // The first read of the conversation is placed at its foot at once (the lanes draw there).
@@ -397,7 +398,7 @@ export function HablarView({
     correctTurn(each.root, kind).then(
       () => {
         convo.reload();
-        // What the tap did, and the way back: the secretary is woken by it.
+        // What the tap did, and the way back: the assistant is woken by it.
         if (!quiet) {
           toast({
             msg: t('hablar.kind.done', { kind: t(`hablar.kind.${kind}`) }),
@@ -416,34 +417,34 @@ export function HablarView({
     );
   };
 
-  // A tap on a question of the secretary's goes back to it as your own message; the page reads the
+  // A tap on a question of the assistant's goes back to it as your own message; the page reads the
   // conversation again so what you chose is in the thread at once.
   const onAnswer = (message: Message, given: AnswerWords) =>
-    answerSecretaryQuestion(message.id, given).then(() => {
+    answerAssistantQuestion(message.id, given).then(() => {
       near.current = true;
       if (convo.status === 'ready') convo.reload();
     });
   // Deshacer: the answer goes, and the question asks again.
   const onRetract = (message: Message) =>
-    unanswerSecretaryQuestion(message.id).then(() => {
+    unanswerAssistantQuestion(message.id).then(() => {
       if (convo.status === 'ready') convo.reload();
     });
 
   const name = app.project?.name ?? '';
-  const none = convo.status === 'ready' && app.secretary === null;
-  const status = !offline && secretary && secretary.state !== 'offline' ? secretary : null;
+  const none = convo.status === 'ready' && app.assistant === null;
+  const status = !offline && assistant && assistant.state !== 'offline' ? assistant : null;
   return (
     <div className="hb" data-tab={tab} data-empty={turns.length === 0 || undefined}>
       <section className="hb-main">
-        {/* The secretary going away and coming back, said once and politely when it changes (the
+        {/* The assistant going away and coming back, said once and politely when it changes (the
             line under the title shows it to the eye; this is what a reader hears). Listening and
-            working are both «connected»: the secretary's rhythm is not news. */}
+            working are both «connected»: the assistant's rhythm is not news. */}
         <p className="visually-hidden" role="status">
-          {secretary
+          {assistant
             ? t(
-                secretary.state === 'offline' ? 'hablar.status.offline' : 'hablar.status.connected',
+                assistant.state === 'offline' ? 'hablar.status.offline' : 'hablar.status.connected',
                 {
-                  name: secretary.name,
+                  name: assistant.name,
                 },
               )
             : ''}
@@ -506,7 +507,7 @@ export function HablarView({
             {t('hablar.out.count', { count: counts.all + asking })}
           </button>
         </div>
-        {none ? <NoSecretary /> : null}
+        {none ? <NoAssistant /> : null}
         <TeEspera
           pending={app.pending}
           onJump={jump}
@@ -514,8 +515,8 @@ export function HablarView({
             away
               ? {
                   since: away.since,
-                  waiting: secretary?.waiting ?? NOTHING_WAITING,
-                  name: secretary?.name,
+                  waiting: assistant?.waiting ?? NOTHING_WAITING,
+                  name: assistant?.name,
                 }
               : undefined
           }
@@ -556,7 +557,7 @@ export function HablarView({
                     turns={turns}
                     rows={rows}
                     thinking={thinking}
-                    secretaryListening={secretary?.state === 'listening'}
+                    assistantListening={assistant?.state === 'listening'}
                     items={items}
                     found={found}
                     onKind={onKind}
