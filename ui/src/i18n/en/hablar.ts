@@ -186,6 +186,7 @@ export const hablar = {
   'bandeja.note': 'Note for the Inbox',
   'bandeja.placeholder':
     'Jot down whatever comes to mind, as it is. Your secretary tidies it up and asks what is missing.',
+  'bandeja.placeholderAlone': 'Jot down whatever comes to mind, as it is.',
   'bandeja.attach': 'Attach',
   'bandeja.save': 'Save note',
   'bandeja.saving': 'Saving…',
@@ -197,6 +198,8 @@ export const hablar = {
   'bandeja.queues':
     'Your computer is not answering: the note waits in the queue and goes when it is back.',
   'bandeja.lands': 'It lands in this project’s Inbox; your secretary turns it into an item.',
+  'bandeja.landsAlone':
+    'It lands in this project’s Inbox. There is no secretary yet: a refiner will pick it up when one is running.',
   'bandeja.failed': 'Not saved ({message}). Try again.',
   'bandeja.title': 'Inbox',
   'bandeja.dek': 'What you jotted down, and how it is going',

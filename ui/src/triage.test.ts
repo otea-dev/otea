@@ -37,6 +37,7 @@ import {
   triDecide,
   triNext,
   triPile,
+  triPlace,
   triReturn,
   triStart,
   triSync,
@@ -266,6 +267,31 @@ describe('the pass (triStart, triSync, triDecide)', () => {
     expect(s.q).toEqual(['B', 'C', 'A']);
     expect(triCurrent(s)).toBe('B');
     expect(s.decided).toBe(0);
+  });
+
+  // D-c059c9: the counter stayed on «1 of 4» after Después, though the card on top was another.
+  it('the counter moves on with Later: it names the card on top in the order they came', () => {
+    let s = triStart(['A', 'B', 'C', 'D']);
+    expect(triPlace(s)).toEqual({ at: 1, n: 4 });
+    s = triDecide(s, 'later');
+    expect(triPlace(s)).toEqual({ at: 2, n: 4 });
+    s = triDecide(s, 'later');
+    expect(triPlace(s)).toEqual({ at: 3, n: 4 });
+    s = triDecide(s, 'approve');
+    expect(triPlace(s)).toEqual({ at: 4, n: 4 });
+    s = triDecide(s, 'approve');
+    expect(triCurrent(s)).toBe('A');
+    expect(triPlace(s)).toEqual({ at: 1, n: 4 });
+  });
+
+  it('the counter counts a review that joined, and forgets one that left', () => {
+    let s = triSync(triStart(['A', 'B']), ['A', 'B', 'C']);
+    expect(triPlace(s)).toEqual({ at: 1, n: 3 });
+    s = triDecide(s, 'later');
+    expect(triPlace(s)).toEqual({ at: 2, n: 3 });
+    s = triSync(s, ['A', 'C']);
+    expect(triCurrent(s)).toBe('C');
+    expect(triPlace(s)).toEqual({ at: 2, n: 2 });
   });
 
   it('Later on the last card shows it again', () => {

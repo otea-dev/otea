@@ -241,7 +241,9 @@ export function NoteCapture({
         value={text}
         disabled={!canWrite}
         aria-label={t('bandeja.note')}
-        placeholder={t('bandeja.placeholder')}
+        placeholder={t(
+          app.pending?.secretary === null ? 'bandeja.placeholderAlone' : 'bandeja.placeholder',
+        )}
         enterKeyHint="enter"
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => {
@@ -317,7 +319,11 @@ export function NoteCapture({
         </p>
       ) : (
         <p className="bn-hint">
-          {app.sync.offline && queueAvailable() ? t('bandeja.queues') : t('bandeja.lands')}
+          {app.sync.offline && queueAvailable()
+            ? t('bandeja.queues')
+            : app.pending?.secretary === null
+              ? t('bandeja.landsAlone')
+              : t('bandeja.lands')}
         </p>
       )}
     </form>

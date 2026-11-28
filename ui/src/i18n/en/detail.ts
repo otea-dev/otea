@@ -672,6 +672,7 @@ export const detail = {
   'sheet.toast.done': 'You marked “{title}” done. On to {state}.',
   'sheet.toast.sentBack': 'You sent “{title}” back to {state}, with your notes.',
   'sheet.toast.answered': 'You answered “{title}”.',
+  'sheet.toast.answeredWith': 'You answered “{title}”: {said}.',
   'sheet.toast.closed': 'You closed “{title}”: {state}.',
   'sheet.toast.discarded': 'You discarded “{title}”: {state}.',
   'sheet.toast.moved': 'You moved “{title}” to {state}.',

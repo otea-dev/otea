@@ -18,6 +18,7 @@ import { listOf, t, tx } from '../i18n/i18n.ts';
 import { useEscape } from '../kit/escape.ts';
 import { Button, Count, StepPill } from '../kit/index.ts';
 import { toast } from '../kit/pop/toast.tsx';
+import { SEND_KEYS, sendsOnCtrlEnter } from '../kit/send-keys.ts';
 import { type Look, lookOf } from '../lanes/looks.ts';
 import { NodeGlyph } from '../lanes/NodeGlyph.tsx';
 import { anim } from '../motion/anim.ts';
@@ -53,6 +54,7 @@ import {
   triDecide,
   triNext,
   triPile,
+  triPlace,
   triReturn,
   triStart,
   triSync,
@@ -208,7 +210,7 @@ export function Delivered({ round }: { round: RoundShown }) {
 
 // The notes that go back with Devolver…: unrolled from under the moves, the same gesture mirrored
 // to close (mock:4023-4024).
-function Notes({
+export function Notes({
   open,
   onSend,
   onCancel,
@@ -274,7 +276,11 @@ function Notes({
         value={text}
         placeholder={t('triage.notesPlaceholder')}
         aria-label={t('triage.notes')}
+        aria-keyshortcuts={SEND_KEYS}
         onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (text.trim() !== '') sendsOnCtrlEnter(e, () => onSend(text.trim()));
+        }}
       />
       <div className="nbtns">
         <Button
@@ -1010,8 +1016,7 @@ export function Triage() {
     });
   };
 
-  const at = s.i + 1;
-  const n = s.q.length;
+  const { at, n } = triPlace(s);
   const behind = Math.max(0, Math.min(2, n - s.i - 1));
   const card = (id: string, under: boolean) => {
     const shown = frozen.current.get(id) ?? shownOf(id);

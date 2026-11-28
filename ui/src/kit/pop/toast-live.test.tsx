@@ -64,6 +64,73 @@ describe('a notice for a screen reader', () => {
   });
 });
 
+// Field study s-final (D-befe9d): while the Deshacer toast is up, the key everyone presses to undo
+// does the undoing; a text box keeps its own Ctrl+Z.
+describe('Ctrl+Z while a toast offers Deshacer', () => {
+  const press = (target: EventTarget, init: KeyboardEventInit = {}) => {
+    const e = new KeyboardEvent('keydown', {
+      key: 'z',
+      code: 'KeyZ',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    });
+    target.dispatchEvent(e);
+    return e;
+  };
+
+  it('undoes the move once and closes the toast', async () => {
+    const undo = vi.fn();
+    const page = mount(<ToastHost />);
+    toast({ msg: 'Aprobaste IDE-4', undo });
+    await settle();
+    const e = press(document.body);
+    expect(undo).toHaveBeenCalledTimes(1);
+    expect(e.defaultPrevented).toBe(true);
+    press(document.body);
+    expect(undo).toHaveBeenCalledTimes(1);
+    page.unmount();
+  });
+
+  it('answers to Cmd+Z too, and not to Shift or Alt with it', async () => {
+    const undo = vi.fn();
+    const page = mount(<ToastHost />);
+    toast({ msg: 'Aprobaste IDE-4', undo });
+    await settle();
+    press(document.body, { ctrlKey: true, shiftKey: true });
+    press(document.body, { ctrlKey: true, altKey: true });
+    expect(undo).not.toHaveBeenCalled();
+    press(document.body, { ctrlKey: false, metaKey: true });
+    expect(undo).toHaveBeenCalledTimes(1);
+    page.unmount();
+  });
+
+  it('leaves the text box its own undo', async () => {
+    const undo = vi.fn();
+    const page = mount(
+      <>
+        <textarea id="note" />
+        <ToastHost />
+      </>,
+    );
+    toast({ msg: 'Aprobaste IDE-4', undo });
+    await settle();
+    const e = press(document.getElementById('note') as HTMLElement);
+    expect(undo).not.toHaveBeenCalled();
+    expect(e.defaultPrevented).toBe(false);
+    page.unmount();
+  });
+
+  it('does nothing for a toast with no move to undo', async () => {
+    const page = mount(<ToastHost />);
+    toast({ msg: 'Anotado en la Bandeja' });
+    await settle();
+    expect(press(document.body).defaultPrevented).toBe(false);
+    page.unmount();
+  });
+});
+
 describe('reaching the toast by the keys', () => {
   const alt = (init: KeyboardEventInit = {}) =>
     document.dispatchEvent(

@@ -22,6 +22,8 @@ import { useClearAbove } from './clear-above.ts';
 // repeated (a phone that never heard back) is one message.
 
 const MAX_HEIGHT = 168;
+// A suggestion tapped again inside this is the same tap.
+const CHIP_AGAIN_MS = 700;
 
 function newKey(): string {
   return (
@@ -43,6 +45,7 @@ export function Composer({ onSent }: { onSent: () => void }) {
   const field = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const box = useRef<HTMLFieldSetElement>(null);
+  const lastChip = useRef<{ key: string; at: number }>({ key: '', at: 0 });
   useClearAbove(box);
   // The key of the send in flight or the last one that failed: the same words and files send again
   // under it; any change makes a new send.
@@ -75,6 +78,26 @@ export function Composer({ onSent }: { onSent: () => void }) {
     if (files.length === 0) return;
     setDrafts((was) => withFiles(was, files, 'single', draftKey));
   };
+
+  // «/» takes the person to the box from anywhere on the page that is no box of its own (D-7bb68e):
+  // the thread above it has links and cards, and the way there by Tab was twenty stops.
+  useEffect(() => {
+    const press = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+      const on = e.target;
+      if (
+        on instanceof HTMLElement &&
+        (on.isContentEditable || on.matches('input, textarea, select'))
+      )
+        return;
+      const el = field.current;
+      if (!el || el.disabled) return;
+      e.preventDefault();
+      el.focus();
+    };
+    document.addEventListener('keydown', press);
+    return () => document.removeEventListener('keydown', press);
+  }, []);
 
   const send = () => {
     if (!ready) return;
@@ -155,6 +178,12 @@ export function Composer({ onSent }: { onSent: () => void }) {
               className="hb-sugg"
               disabled={!canWrite}
               onClick={() => {
+                // A double tap (a finger that lands twice) is one tap: the same chip again within
+                // a moment adds nothing (D-d251b3).
+                const now = Date.now();
+                if (lastChip.current.key === key && now - lastChip.current.at < CHIP_AGAIN_MS)
+                  return;
+                lastChip.current = { key, at: now };
                 // Added to what you were writing, never over it.
                 setText((was) => (was.trim() === '' ? t(key) : `${was.trimEnd()} ${t(key)}`));
                 field.current?.focus();
@@ -210,6 +239,9 @@ export function Composer({ onSent }: { onSent: () => void }) {
           onChange={(event) => {
             add([...(event.target.files ?? [])]);
             event.target.value = '';
+            // The dialog gave the focus back to nothing: the box, where the words go next (on a
+            // touch device it would raise the keyboard).
+            if (!touch()) field.current?.focus();
           }}
         />
         <textarea

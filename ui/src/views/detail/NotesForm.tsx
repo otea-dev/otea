@@ -1,6 +1,7 @@
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { t } from '../../i18n/i18n.ts';
 import { Button, useEscape } from '../../kit/index.ts';
+import { SEND_KEYS, sendsOnCtrlEnter } from '../../kit/send-keys.ts';
 import { Choreo, part } from '../../motion/choreo.ts';
 import { draftStore, dropDraft, keepDraft, readDraft } from './note-draft.ts';
 
@@ -147,6 +148,11 @@ export function NotesForm({
   useEscape(open, 'notes', onCancel);
 
   const who = agent ?? '';
+  const canSend = !!text.trim() || optional !== undefined;
+  const submit = () => {
+    if (draft) dropDraft(draftStore(), draft);
+    onSend(text.trim());
+  };
   return (
     <div className="notes" ref={el}>
       <i className="nline" />
@@ -170,18 +176,15 @@ export function NotesForm({
             rows={3}
             aria-label={words?.aria ?? t('sheet.notes.aria', { agent: who })}
             value={text}
+            aria-keyshortcuts={SEND_KEYS}
             onChange={(e) => write(e.target.value)}
+            onKeyDown={(e) => {
+              if (canSend) sendsOnCtrlEnter(e, submit);
+            }}
           />
           {extra}
           <div className="nbtns" data-i>
-            <Button
-              variant="primary"
-              disabled={!text.trim() && optional === undefined}
-              onClick={() => {
-                if (draft) dropDraft(draftStore(), draft);
-                onSend(text.trim());
-              }}
-            >
+            <Button variant="primary" disabled={!canSend} onClick={submit}>
               {words?.send ?? t('sheet.notes.send')}
             </Button>
             <Button variant="quiet" onClick={onCancel}>

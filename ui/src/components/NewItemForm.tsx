@@ -439,10 +439,10 @@ export function NewItemForm({ board, parent, onCancel, onCreated }: NewItemFormP
     onScreen: app.route.view === 'board' ? app.route.board : undefined,
     builtins: new Set(summaries.flatMap((b) => (b.builtin && b.collection ? [b.collection] : []))),
   });
-  // Two ways in: a note in your own words that lands in the Bandeja (the phone's default), or the
-  // board's form. A child of an item, or a board asked for, is the form's.
+  // Two ways in: a note in your own words that lands in the Bandeja (the first, on the phone and the
+  // desk, D-37e7ce), or the board's form. A child of an item, or a board asked for, is the form's.
   const [mode, setMode] = useState<'note' | 'board'>(
-    app.phone && parent === undefined && board === undefined ? 'note' : 'board',
+    parent === undefined && board === undefined ? 'note' : 'board',
   );
   const canNote = parent === undefined;
   // Once the note has been shown it is kept while the board's form is looked at, so what was typed

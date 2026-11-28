@@ -61,11 +61,17 @@ export const moreOf = (cells: number): number => Math.max(0, cells - DETAILS_SHO
 export const shortTitle = (title: string): string =>
   title.length > 45 ? `${title.slice(0, 44).trimEnd()}…` : title;
 
+const shortSaid = (text: string): string => {
+  const one = text.replace(/\s+/g, ' ').trim();
+  return one.length > 70 ? `${one.slice(0, 69).trimEnd()}…` : one;
+};
+
 // The toast a move leaves: what you did and where the item goes.
 export function toastOf(
   kind: MoveKind | 'answer' | 'close' | 'deliver',
   title: string,
   state: string,
+  said?: string,
 ): string {
   const p = { title: shortTitle(title), state };
   switch (kind) {
@@ -78,7 +84,10 @@ export function toastOf(
     case 'sendback':
       return t('sheet.toast.sentBack', p);
     case 'answer':
-      return t('sheet.toast.answered', { title: p.title });
+      // What was chosen or written, cut short (D-3cf576): the notice is the confirmation.
+      return said
+        ? t('sheet.toast.answeredWith', { title: p.title, said: shortSaid(said) })
+        : t('sheet.toast.answered', { title: p.title });
     case 'discard':
       return t('sheet.toast.discarded', p);
     case 'close':

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setLanguage } from '../../i18n/i18n.ts';
 import { buttonNamed, type Mounted, mount, press, typeInto } from '../../test-dom.tsx';
@@ -51,6 +52,29 @@ describe('the notes form', () => {
 
     await typeInto(box(), '');
     expect(send()?.disabled).toBe(true);
+  });
+
+  // D-33d880: a person on the keys sent the notes of a send-back without leaving the box.
+  it('sends on Ctrl+Enter or Cmd+Enter, never on Enter alone, never with nothing written', async () => {
+    const onSend = vi.fn();
+    const { box } = form(onSend);
+    const key = async (init: KeyboardEventInit) => {
+      await act(async () => {
+        box()?.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...init }),
+        );
+      });
+    };
+    await key({ ctrlKey: true });
+    expect(onSend).not.toHaveBeenCalled();
+
+    await typeInto(box(), '  Falta el borde.  ');
+    await key({});
+    expect(onSend).not.toHaveBeenCalled();
+    await key({ ctrlKey: true });
+    expect(onSend).toHaveBeenCalledWith('Falta el borde.');
+    await key({ metaKey: true });
+    expect(onSend).toHaveBeenCalledTimes(2);
   });
 
   it('lets a send-back go with no words when the review’s comments carry it (P4-7)', async () => {

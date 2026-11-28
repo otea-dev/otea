@@ -20,6 +20,7 @@ import { offItemCount } from '../pending.ts';
 import { studioHash, type ViewRoute } from '../selection.ts';
 import { SecretaryMark } from '../views/hablar/SecretaryMark.tsx';
 import { useSecretary } from '../views/hablar/use-conversation.ts';
+import { focusContentSoon, livePlace } from './focus-content.ts';
 import { PrefsButton } from './Preferences.tsx';
 import { type BoardIcon, boardEntries, foldClip, type RailKey, railKey } from './rail-model.ts';
 import { useMedia } from './use-media.ts';
@@ -95,7 +96,13 @@ function Row({ k, on, icon, label, to, pair, pairTip, badge, plus, say, hint, ap
         className="ngo"
         aria-current={on ? 'page' : undefined}
         aria-describedby={hint ? hintId : undefined}
-        onClick={go}
+        // Enter or Space on a row (a click with no pointer, detail 0) takes the focus to the page
+        // chosen, past the rest of the rail and Preferencias (D-ab7560).
+        onClick={(e) => {
+          const heading = livePlace('.main h1');
+          go();
+          if (e.detail === 0) focusContentSoon(heading);
+        }}
       >
         <span className="visually-hidden">{say ? `${label}, ${say}` : label}</span>
       </button>

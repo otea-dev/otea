@@ -678,6 +678,7 @@ export const detail = {
   'sheet.toast.done': 'Marcaste hecho «{title}». Pasa a {state}.',
   'sheet.toast.sentBack': 'Devolviste «{title}» a {state}, con tus notas.',
   'sheet.toast.answered': 'Respondiste «{title}».',
+  'sheet.toast.answeredWith': 'Respondiste «{title}»: {said}.',
   'sheet.toast.closed': 'Cerraste «{title}»: {state}.',
   'sheet.toast.discarded': 'Descartaste «{title}»: {state}.',
   'sheet.toast.moved': 'Moviste «{title}» a {state}.',

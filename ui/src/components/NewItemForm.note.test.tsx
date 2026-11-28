@@ -53,15 +53,16 @@ const modes = (root: HTMLElement) => [
 ];
 
 describe('Nuevo ítem', () => {
-  it('starts on the board’s form on the desk, and a tap writes a note instead, which lands in the Bandeja', async () => {
+  // D-37e7ce: the quick note hid behind a board's form on the desk, and a person who only wanted to
+  // jot something down had to find the switch. It is the first and the chosen way, on the desk too.
+  it('starts on the quick note on the desk, which lands in the Bandeja, and a tap writes with a board instead', async () => {
     const onCancel = vi.fn();
     const root = await open(false, { onCancel, onCreated: vi.fn() });
 
     expect(modes(root).map((button) => button.textContent)).toEqual(['Nota rápida', 'Con tablero']);
-    expect(modes(root)[1]?.classList.contains('on')).toBe(true);
-    expect(root.querySelector('.bn-text')).toBeNull();
+    expect(modes(root)[0]?.classList.contains('on')).toBe(true);
+    expect(root.querySelector('.bn-text')).not.toBeNull();
 
-    await press(modes(root)[0]);
     await typeInto(root.querySelector('.bn-text'), 'agregar modo oscuro');
     await press(root.querySelector('.bn-save'));
 
@@ -74,7 +75,6 @@ describe('Nuevo ítem', () => {
   it('keeps the note that was typed while the board’s form is looked at', async () => {
     const root = await open(false, { onCancel: vi.fn(), onCreated: vi.fn() });
 
-    await press(modes(root)[0]);
     await typeInto(root.querySelector('.bn-text'), 'una idea a medias');
     await press(modes(root)[1]);
     await press(modes(root)[0]);
@@ -82,10 +82,15 @@ describe('Nuevo ítem', () => {
     expect(root.querySelector<HTMLTextAreaElement>('.bn-text')?.value).toBe('una idea a medias');
   });
 
-  it('starts on the note on the phone, unless a board or a parent asked for the form', async () => {
+  it('starts on the note on the phone and the desk, unless a board or a parent asked for the form', async () => {
     const root = await open(true, { onCancel: vi.fn(), onCreated: vi.fn() });
     expect(modes(root)[0]?.classList.contains('on')).toBe(true);
     expect(root.querySelector('.bn-text')).not.toBeNull();
+    page?.unmount();
+
+    const desk = await open(false, { board: 'Pedidos', onCancel: vi.fn(), onCreated: vi.fn() });
+    expect(modes(desk)[1]?.classList.contains('on')).toBe(true);
+    expect(desk.querySelector('.bn-text')).toBeNull();
     page?.unmount();
 
     const board = await open(true, { board: 'Pedidos', onCancel: vi.fn(), onCreated: vi.fn() });

@@ -63,6 +63,15 @@ export const reachesToast = (
   e: Pick<KeyboardEvent, 'code' | 'altKey' | 'shiftKey' | 'ctrlKey' | 'metaKey'>,
 ): boolean => e.code === 'KeyZ' && e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey;
 
+// The ordinary undo key: Ctrl+Z, or Cmd+Z, with no Shift (redo) and no Alt.
+export const undoesToast = (
+  e: Pick<KeyboardEvent, 'key' | 'altKey' | 'shiftKey' | 'ctrlKey' | 'metaKey'>,
+): boolean => e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey;
+
+const inTextBox = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement &&
+  (target.isContentEditable || target.matches('input, textarea, select'));
+
 // A mouse resting on the toast holds it up; a finger never does: a tap fires mouseenter with no
 // mouseleave after it, and the toast stayed over Triage's buttons for minutes (P7-4).
 export const holdsOn = (pointerType: string): boolean => pointerType === 'mouse';
@@ -214,6 +223,24 @@ export function ToastHost() {
     document.addEventListener('keydown', reach);
     return () => document.removeEventListener('keydown', reach);
   }, []);
+
+  // Ctrl+Z (Cmd+Z) undoes the move while its toast stands (D-befe9d). A text box keeps its own undo.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: close reads refs only
+  useEffect(() => {
+    if (!undo || !mounted) return;
+    let spent = false;
+    const press = (e: KeyboardEvent) => {
+      if (spent || !undoesToast(e) || inTextBox(e.target)) return;
+      spent = true;
+      e.preventDefault();
+      const f = undo;
+      setUndo(undefined);
+      close();
+      f();
+    };
+    document.addEventListener('keydown', press);
+    return () => document.removeEventListener('keydown', press);
+  }, [undo, mounted]);
 
   useLayoutEffect(() => {
     const node = el.current;

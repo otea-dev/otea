@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppTestProvider } from '../app/context.tsx';
 import { item } from '../derive/fixtures.ts';
@@ -94,5 +95,32 @@ describe('the rail for a screen reader', () => {
     expect(toca.getAttribute('aria-current')).toBe('page');
     await press(root.querySelector('.nrow[data-k="hablar"] button'));
     expect(go).toHaveBeenCalledWith({ view: 'hablar' });
+  });
+
+  // D-ab7560: Enter on a row left the focus there, nine Tabs from the first review.
+  it('takes the focus to the page chosen with the keys, and leaves a pointer where it is', async () => {
+    vi.stubGlobal('requestAnimationFrame', (run: () => void) => {
+      run();
+      return 0;
+    });
+    const main = document.createElement('main');
+    main.className = 'main';
+    main.innerHTML = '<div class="view"><h1>Te toca</h1></div>';
+    document.body.append(main);
+    try {
+      const root = await open();
+      const hablar = root.querySelector('.nrow[data-k="hablar"] button') as HTMLElement;
+      await act(async () => {
+        hablar.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+      });
+      expect(document.activeElement).toBe(document.body);
+
+      await act(async () => {
+        hablar.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+      });
+      expect(document.activeElement).toBe(main.querySelector('h1'));
+    } finally {
+      main.remove();
+    }
   });
 });

@@ -5,6 +5,7 @@ export const shell = {
   'skip.label': 'Skip to',
   'skip.content': 'Skip to the content',
   'skip.compose': 'Skip to the message box',
+  'skip.answer': 'Skip to the open question',
   'skip.review': 'Skip to the next review',
   // The topbar: the project, the mark and the agents connected to this project
   'shell.projects': 'projects',

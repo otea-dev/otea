@@ -186,6 +186,7 @@ export const hablar = {
   'bandeja.note': 'Nota para la Bandeja',
   'bandeja.placeholder':
     'Anota lo que se te ocurra, tal cual. Tu secretario lo ordena y te pregunta lo que falte.',
+  'bandeja.placeholderAlone': 'Anota lo que se te ocurra, tal cual.',
   'bandeja.attach': 'Adjuntar',
   'bandeja.save': 'Anotar',
   'bandeja.saving': 'Anotando…',
@@ -196,6 +197,8 @@ export const hablar = {
   'bandeja.queued': 'En cola para la Bandeja · se enviará cuando tu equipo responda',
   'bandeja.queues': 'Tu equipo no responde: la nota queda en cola y se envía cuando vuelva.',
   'bandeja.lands': 'Cae en la Bandeja de este proyecto; tu secretario lo convierte en ítem.',
+  'bandeja.landsAlone':
+    'Cae en la Bandeja de este proyecto. Todavía no hay secretario: un refinador la tomará cuando haya uno en marcha.',
   'bandeja.failed': 'No se anotó ({message}). Inténtalo de nuevo.',
   'bandeja.title': 'Bandeja',
   'bandeja.dek': 'Lo que anotaste y cómo va',

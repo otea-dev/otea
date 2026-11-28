@@ -173,7 +173,7 @@
   position: absolute;
   right: -5px;
   bottom: -4px;
-  font: 500 8.5px / 1 var(--mono);
+  font: 500 11px / 1 var(--mono);
   font-style: normal;
   color: var(--ink-2);
   background: var(--ground);
@@ -260,7 +260,7 @@
   border-radius: 8px;
   background: var(--you);
   color: var(--on-you);
-  font: 500 9.5px / 15px var(--mono);
+  font: 500 11px / 15px var(--mono);
   font-style: normal;
   text-align: center;
   opacity: 0;
@@ -364,7 +364,7 @@
 }
 .rail-leaf-tag {
   grid-area: tag;
-  font: 400 10.5px / 1 var(--mono);
+  font: 400 11px / 1 var(--mono);
   color: var(--ink-3);
   padding: 2px 4px;
   border-radius: 3px;

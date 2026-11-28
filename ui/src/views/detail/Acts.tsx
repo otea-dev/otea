@@ -424,7 +424,13 @@ export function Acts({
     };
     const answerWith = (given: AnswerWords) => {
       if (!item.asks) return;
-      const message = toastOf('answer', item.title, '');
+      const said =
+        'option' in given
+          ? (offered[given.option - 1] ?? '')
+          : 'delegate' in given
+            ? t('sheet.qa.delegate')
+            : given.text;
+      const message = toastOf('answer', item.title, '', said);
       app
         .answer(item.id, { ...given, question: item.asks.question }, message)
         .then(() => dropDraft(draftStore(), answerKey), refusedBy);
@@ -509,7 +515,12 @@ export function Acts({
                 // that asked is answered by sending it back with it.
                 if (item.asks) return answerWith({ text: answer });
                 const sent = back
-                  ? app.move(item.id, back.move.to, answer, toastOf('answer', item.title, ''))
+                  ? app.move(
+                      item.id,
+                      back.move.to,
+                      answer,
+                      toastOf('answer', item.title, '', answer),
+                    )
                   : Promise.reject(new Error('no way to answer'));
                 sent.then(() => dropDraft(draftStore(), answerKey), refusedBy);
               }}

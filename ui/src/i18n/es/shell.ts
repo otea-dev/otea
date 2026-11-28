@@ -7,6 +7,7 @@ export const shell = {
   'skip.label': 'Saltar a',
   'skip.content': 'Ir al contenido',
   'skip.compose': 'Ir al cuadro de mensaje',
+  'skip.answer': 'Ir a la pregunta',
   'skip.review': 'Ir a la siguiente revisión',
   // La barra: el proyecto, la marca y los agentes conectados a este proyecto
   'shell.projects': 'proyectos',

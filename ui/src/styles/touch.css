@@ -1,0 +1,64 @@
+/* Touch (field study s-final: D-5d1947, D-46fe30, D-d251b3). Last in the cascade on purpose: it
+   only raises sizes the sheets before it drew for a pointer. On a phone, or any screen the finger
+   is the pointer of, a control that decides or opens something is 44 px tall at least, and two
+   controls that do different things stand 8 px apart or more, so a tremor lands on one of them. */
+
+/* Anywhere: the answers an agent offers, and the chips of a thread, never closer than 8 px. */
+.opts.stack {
+  gap: 10px;
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  /* Hablar: the suggestions, the tabs, the strip of what waits, a file's X, a message's «ver más». */
+  .hb-sugg,
+  .hb-tabs button,
+  .hb-chip,
+  .hb-te-head {
+    min-height: 44px;
+  }
+  .hb-sugg {
+    padding-block: 10px;
+  }
+  .hb-dx {
+    width: 44px;
+    height: 44px;
+  }
+  .st-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin-top: 0;
+    padding: 0 2px;
+  }
+
+  /* Te toca: Triaje, at the head of the reviews. */
+  .sact {
+    min-height: 44px;
+    margin-bottom: 2px;
+  }
+
+  /* The item: the options of a question, the folds, the link back to the thread. */
+  .opts .opt {
+    min-height: 44px;
+  }
+  .opts.stack .opt {
+    min-height: 48px;
+  }
+  .tech > summary,
+  .sheet summary,
+  .p-page summary {
+    min-height: 44px;
+  }
+  /* The reader: a file's fold is a control; the next-file arrow stands clear of the sheet's close. */
+  .ev-diff-head {
+    min-height: 44px;
+  }
+  .p-read .ev-reader-bar {
+    padding-top: 8px;
+  }
+  .hb-from a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}

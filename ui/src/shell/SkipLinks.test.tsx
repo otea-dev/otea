@@ -47,6 +47,31 @@ describe('the skip links', () => {
     expect(document.activeElement).toBe(document.querySelector('.hb-composer textarea'));
   });
 
+  // D-7bb68e: the options of a question open in the thread took twenty Shift+Tab from the box.
+  it('in Hablar jump to the open question’s options, only while one waits to be answered', async () => {
+    view(
+      '<main class="main"><h1>Hablar</h1><fieldset class="hb-ask" data-answered=""><button class="hb-opt" disabled>vieja</button></fieldset><fieldset class="hb-ask"><button class="hb-opt" id="opt">Sí</button></fieldset><form class="hb-composer"><textarea></textarea></form></main>',
+    );
+    const found = links({ view: 'hablar' });
+    await Promise.resolve();
+    expect(found.map((b) => b.textContent)).toEqual([
+      'Ir al contenido',
+      'Ir a la pregunta',
+      'Ir al cuadro de mensaje',
+    ]);
+    await press(found[1]);
+    expect(document.activeElement?.id).toBe('opt');
+  });
+
+  it('offers no jump to a question that was answered', async () => {
+    view(
+      '<main class="main"><h1>Hablar</h1><fieldset class="hb-ask" data-answered=""><button class="hb-opt">vieja</button></fieldset><form class="hb-composer"><textarea></textarea></form></main>',
+    );
+    const found = links({ view: 'hablar' });
+    await Promise.resolve();
+    expect(found.map((b) => b.textContent)).toEqual(['Ir al contenido', 'Ir al cuadro de mensaje']);
+  });
+
   it('in Te toca jump to the next review, when there is one', async () => {
     view(
       '<main class="main"><h1>Te toca</h1><div class="row" data-sec="preguntas" tabindex="0"></div><div class="row" data-sec="revisiones" tabindex="0" id="rev"></div></main>',

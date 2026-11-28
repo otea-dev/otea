@@ -27,6 +27,7 @@ import { blindPartsOf, diffOrigin } from '../../evidence.ts';
 import { t, tx } from '../../i18n/i18n.ts';
 import { AgentMark, Button, Icon, StepPill } from '../../kit/index.ts';
 import { itemOpened } from '../../kit/pop/toast.tsx';
+import { SEND_KEYS, sendsOnCtrlEnter } from '../../kit/send-keys.ts';
 import type { Look } from '../../lanes/looks.ts';
 import { handsToAgent, hearing } from '../../listening.ts';
 import { OfflineBar } from '../../offline/OfflineBar.tsx';
@@ -1248,7 +1249,9 @@ export function PhoneItem(p: PhoneItemProps) {
             aria-label={t('notes.form.aria', { agent: leave.to ?? t('notes.anyAgent') })}
             placeholder={t('notes.form.placeholder')}
             value={noteText}
+            aria-keyshortcuts={SEND_KEYS}
             onChange={(e) => setNoteText(e.target.value)}
+            onKeyDown={(e) => sendsOnCtrlEnter(e, sendNote)}
           />
           {leave.pieces.length ? (
             <div className="nt-pstrip" data-i="">
@@ -1369,7 +1372,9 @@ export function PhoneItem(p: PhoneItemProps) {
           aria-label={t('phone.sb.note')}
           placeholder={bare ? t('notes.review.optional') : t('phone.sb.placeholder')}
           value={text}
+          aria-keyshortcuts={SEND_KEYS}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => sendsOnCtrlEnter(e, send)}
         />
         <div className="p-sb-acts" data-i="">
           <Button variant="quiet" onClick={() => setAsking((a) => (a ? { ...a, open: false } : a))}>

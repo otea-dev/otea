@@ -11,7 +11,7 @@
 .nav .ic .mk.secretary {
   width: 20px;
   height: 16px;
-  font-size: 9.5px;
+  font-size: 11px;
   border-radius: 5px;
 }
 .sec-dot {
@@ -74,7 +74,7 @@
 .hb-tabs {
   display: none;
   flex: none;
-  gap: 4px;
+  gap: 8px;
   padding: 2px 0 10px;
 }
 .hb-tabs button {
@@ -600,13 +600,13 @@
   flex-wrap: wrap;
   gap: 0 7px;
   min-height: 22px;
-  font: 600 10px / 22px var(--sans);
+  font: 600 11px / 22px var(--sans);
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
 .hb-who time {
-  font: 400 10.5px / 22px var(--mono);
+  font: 400 11px / 22px var(--mono);
   letter-spacing: 0;
   text-transform: none;
 }
@@ -615,7 +615,7 @@
   text-transform: none;
 }
 .hb-pend {
-  font: 400 10.5px / 22px var(--mono);
+  font: 400 11px / 22px var(--mono);
   letter-spacing: 0;
   text-transform: none;
   color: var(--ink-3);
@@ -823,7 +823,7 @@
   padding: 0 6px;
   height: 18px;
   border-radius: 5px;
-  font: 600 9.5px / 18px var(--sans);
+  font: 600 11px / 18px var(--sans);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   background: var(--you-wash);
@@ -891,7 +891,7 @@ button.hb-kind:hover svg {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
   max-width: 560px;
   margin: 10px 0 2px 6px;
 }
@@ -1095,7 +1095,7 @@ button.hb-chip:hover {
 .hb-opts {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 10px;
 }
 .hb-opt {
   display: flex;
@@ -1124,7 +1124,7 @@ button.hb-chip:hover {
 }
 .hb-rec {
   flex: none;
-  font: 500 10.5px / 1.2 var(--sans);
+  font: 500 11px / 1.2 var(--sans);
   color: var(--you-ink);
   white-space: nowrap;
 }
@@ -1224,7 +1224,7 @@ button.hb-chip:hover {
   height: 30px;
   border-radius: 6px;
   background: var(--well);
-  font: 500 10px / 1 var(--mono);
+  font: 500 11px / 1 var(--mono);
   text-transform: uppercase;
   color: var(--ink-2);
 }
@@ -1236,7 +1236,7 @@ button.hb-chip:hover {
 }
 .hb-sz {
   flex: none;
-  font: 400 10.5px / 1 var(--mono);
+  font: 400 11px / 1 var(--mono);
   color: var(--ink-3);
 }
 .dialog.hb-big img {
@@ -1281,7 +1281,7 @@ button.hb-chip:hover {
   list-style: none;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 .hb-sugg {
   position: relative;
@@ -1408,7 +1408,7 @@ button.hb-chip:hover {
   max-width: 180px;
 }
 .hb-dname small {
-  font: 400 10.5px / 1.2 var(--mono);
+  font: 400 11px / 1.2 var(--mono);
   color: var(--ink-3);
 }
 .hb-dx {
@@ -1585,7 +1585,7 @@ button.hb-chip:hover {
 }
 .hb-filter button small {
   margin-left: 6px;
-  font: 500 10.5px / 1 var(--mono);
+  font: 500 11px / 1 var(--mono);
   opacity: 0.65;
 }
 .hb-none {
@@ -1618,7 +1618,7 @@ button.hb-chip:hover {
   gap: 8px;
 }
 .hb-meta time {
-  font: 400 10.5px / 1 var(--mono);
+  font: 400 11px / 1 var(--mono);
   color: var(--ink-3);
 }
 .hb-ct {
@@ -1687,7 +1687,7 @@ button.hb-kid:hover {
 }
 .hb-kid .hb-id {
   color: var(--ink-3);
-  font-size: 10.5px;
+  font-size: 11px;
 }
 .hb-kid .hb-id {
   flex: none;
@@ -1704,7 +1704,7 @@ button.hb-kid:hover {
 .hb-kid .hb-kst {
   flex: none;
   margin-left: auto;
-  font: 500 10.5px / 1.2 var(--sans);
+  font: 500 11px / 1.2 var(--sans);
   color: var(--ink-3);
 }
 .hb-kid svg {

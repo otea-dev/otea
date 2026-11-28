@@ -182,7 +182,8 @@ export function Route({ id, steps, words, ci, lane, look, dips, phone = false }:
     g.xs,
     steps.map((s, i) => (words[i] ?? s.name).toLocaleUpperCase()),
     g.ci,
-    small ? 7.4 : 7.9,
+    // A capital at the labels' 11 px, with their tracking (sheet.css .rlab).
+    small ? 8.4 : 8.9,
   );
   const future = futureD(g);
   return (
