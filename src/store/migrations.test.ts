@@ -60,7 +60,7 @@ describe('migrate', () => {
         'bandeja_questions',
       ]),
     );
-    expect(userVersion(db)).toBe(55);
+    expect(userVersion(db)).toBe(56);
   });
 
   // Cold review G2: what answers a message, and the notes and turns of an item by its id, were
@@ -87,7 +87,7 @@ describe('migrate', () => {
     migrate(db);
     migrate(db);
 
-    expect(userVersion(db)).toBe(55);
+    expect(userVersion(db)).toBe(56);
   });
 
   // The desk and the agents' commands open a project the moment an upgrade lands: one that read the
@@ -117,7 +117,7 @@ describe('migrate', () => {
       });
 
       expect(() => migrate(slow)).not.toThrow();
-      expect(userVersion(second)).toBe(55);
+      expect(userVersion(second)).toBe(56);
     } finally {
       first.close();
       second.close();
@@ -449,6 +449,35 @@ describe('migrate', () => {
       db.exec("UPDATE boards SET archived_at = 't' WHERE id = 'b1'");
 
       expect(() => db.exec("UPDATE events SET type = 'edited'")).toThrow(/append-only/);
+    });
+  });
+
+  // D-274c07: the links a turn already had read as the new rule does: made when the item was
+  // created after the turn began, only mentioned otherwise.
+  describe('from version 55, with links between turns and items', () => {
+    it('marks as made the items created after their turn began, and no other', () => {
+      migrate(db, 55);
+      db.exec(`
+        INSERT INTO collections (name, prefix, preset, preset_version, next_seq)
+        VALUES ('tasks', 'TASKS', 'tasks', 1, 3);
+        INSERT INTO items (id, collection, seq, title, fields, preset_version, state, created_at,
+          updated_at, created_by_kind, created_by_name)
+        VALUES ('TASKS-1', 'tasks', 1, 'old', '{}', 1, 'todo', '2026-11-26T09:00:00Z', 't', 'human', 'ana'),
+               ('TASKS-2', 'tasks', 2, 'new', '{}', 1, 'todo', '2026-11-26T11:00:00Z', 't', 'human', 'ana');
+        INSERT INTO conversation_messages (id, author, author_name, text, at, root)
+        VALUES (1, 'person', 'ana', 'add it', '2026-11-26T10:00:00Z', 1);
+        INSERT INTO conversation_links (message_id, item_id, at)
+        VALUES (1, 'TASKS-1', 't'), (1, 'TASKS-2', 't');
+      `);
+
+      migrate(db);
+
+      expect(
+        db.prepare('SELECT item_id, made FROM conversation_links ORDER BY item_id').all(),
+      ).toEqual([
+        { item_id: 'TASKS-1', made: 0 },
+        { item_id: 'TASKS-2', made: 1 },
+      ]);
     });
   });
 });

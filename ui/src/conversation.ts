@@ -49,6 +49,8 @@ export type Turn = {
   kindBy: Message['kindBy'];
   // The items (and board drafts) it produced.
   links: string[];
+  // Those of them made from the turn: the others are only mentioned by it.
+  made: string[];
   // The side topic this turn is the record of (TEM-3), when it is.
   topic: string | null;
   at: string;
@@ -107,6 +109,7 @@ export function turnsOf(messages: readonly Message[]): Turn[] {
       kind: group.findLast((m) => m.kind !== null)?.kind ?? null,
       kindBy: group.findLast((m) => m.kind !== null)?.kindBy ?? null,
       links: [...new Set(group.flatMap((m) => m.links))],
+      made: [...new Set(group.flatMap((m) => m.made))],
       topic: group.find((m) => m.topic !== null)?.topic ?? null,
       at: first.at,
       waits,
@@ -426,6 +429,9 @@ export type Chip = {
   asks: boolean;
   // The items an approved item waits for, or merges main after: the word names them.
   first?: string;
+  // The turn only mentions this item, it did not make it: its state is the item's, not the
+  // request's progress, and the chip says «mencionado» instead of it (D-274c07).
+  mention?: true;
 };
 
 export type StateWord =
@@ -442,6 +448,7 @@ export type StateWord =
   | 'hablar.st.dropped'
   | 'hablar.st.yours'
   | 'hablar.st.asks'
+  | 'hablar.st.mentioned'
   | 'hablar.st.draft';
 
 export function chipOf(id: string, items: ReadonlyMap<string, Item>, now: number): Chip {
@@ -481,7 +488,24 @@ export function chipOf(id: string, items: ReadonlyMap<string, Item>, now: number
 
 // The branch of a turn: its links as chips, in the order the secretary linked them.
 export function branchOf(turn: Turn, items: ReadonlyMap<string, Item>, now: number): Chip[] {
-  return turn.links.map((id) => chipOf(id, items, now));
+  return turn.links.map((id) => {
+    const chip = chipOf(id, items, now);
+    // An item the turn only mentions is no progress of it: «mencionado», unless it asks you something.
+    return chip.look === null || turn.made.includes(id) || chip.asks
+      ? chip
+      : { ...chip, state: 'hablar.st.mentioned' as const, mention: true as const };
+  });
+}
+
+// What a request came to (D-274c07): done only when every item made from it is done, «sin ítem»
+// while nothing was made from it, else nothing to say (its items say how they stand). A consultation
+// has none.
+export type Outcome = 'done' | 'none' | 'open';
+
+export function outcomeOf(turn: Turn, items: ReadonlyMap<string, Item>, now: number): Outcome {
+  const made = turn.made.map((id) => chipOf(id, items, now));
+  if (made.length === 0) return 'none';
+  return made.every((chip) => chip.look === 'done') ? 'done' : 'open';
 }
 
 // The questions of agents (otea ask) that wait for the person on items this turn produced.
@@ -506,6 +530,8 @@ export type Card = {
   chips: Chip[];
   // Some item of it asks you something: «te pregunta».
   asks: boolean;
+  // A request's outcome; null for the rest.
+  outcome: Outcome | null;
   // A request you set yourself that nothing came out of yet: the secretary is taking it.
   taking: boolean;
   // A consultation (you corrected it from a request) whose items are still open: the card says
@@ -551,6 +577,7 @@ function unclassifiedCard(turn: Turn, items: ReadonlyMap<string, Item>, now: num
     answer: reply ? quotedSnippet(reply.text, 140) : null,
     chips: branchOf(turn, items, now),
     asks: false,
+    outcome: null,
     taking: false,
     leftover: false,
   };
@@ -588,6 +615,8 @@ export function cardsOf(
       answer: kind === 'consultation' && reply ? quotedSnippet(reply.text, 140) : null,
       chips,
       asks: chips.some((chip) => chip.asks),
+      // A request that is being taken (nothing linked yet) says so; its outcome is for the others.
+      outcome: kind === 'request' && !taking ? outcomeOf(turn, items, now) : null,
       taking,
       // Only after the person's own correction: items that stay open when they turn a request into
       // a consultation. A consultation the secretary sorted that way has nothing «left over».

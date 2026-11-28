@@ -284,8 +284,27 @@ function classify(project: Project, root: number, kind: MessageKind): boolean {
   return true;
 }
 
-function linkItems(project: Project, root: number, items: readonly string[], at: string): string[] {
-  for (const id of items) insertLink(project.db, root, requireItem(project.db, id).id, at);
+// `made`: the items were made from the turn (create --from-message). Otherwise an item counts as
+// made when it was created after the turn began, as the secretary does when it makes the item and
+// then says so; an older one is only mentioned (D-274c07).
+function linkItems(
+  project: Project,
+  root: number,
+  items: readonly string[],
+  at: string,
+  made = false,
+): string[] {
+  const began = selectMessage(project.db, root)?.at;
+  for (const id of items) {
+    const item = requireItem(project.db, id);
+    insertLink(
+      project.db,
+      root,
+      item.id,
+      at,
+      made || (began !== undefined && item.createdAt >= began),
+    );
+  }
   return carryFiles(project, root, items, at);
 }
 
@@ -537,7 +556,7 @@ export function linkMessageToItem(
 ): Message & { warnings: string[] } {
   const message = requireLinkableMessage(project, agent, messageId);
   return joinTransaction(project.db, () => {
-    const warnings = linkItems(project, message.root, [item], now());
+    const warnings = linkItems(project, message.root, [item], now(), true);
     if (selectRootKind(project.db, message.root).kind === null)
       classify(project, message.root, 'request');
     // The questions of this turn stay open: whether the item answers them is for the secretary to

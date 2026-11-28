@@ -81,6 +81,11 @@ function CardView({
         {card.title}
       </button>
       {card.answer ? <p className="hb-ans">{card.answer}</p> : null}
+      {card.outcome === 'done' || card.outcome === 'none' ? (
+        <p className="hb-outcome" data-outcome={card.outcome}>
+          {t(`hablar.outcome.${card.outcome}`)}
+        </p>
+      ) : null}
       {card.taking ? <p className="hb-taking">{t('hablar.out.taking')}</p> : null}
       {card.leftover ? <p className="hb-taking">{t('hablar.out.leftover')}</p> : null}
       {card.kind === null ? (

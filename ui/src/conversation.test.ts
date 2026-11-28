@@ -43,6 +43,8 @@ function say(o: Partial<Message> & { author: Message['author'] }): Message {
     kind: null,
     kindBy: null,
     links: [],
+    // What a turn links is, unless a test says otherwise, what it made.
+    made: o.links ?? [],
     attachments: [],
     delivery: o.author === 'person' ? 'read' : null,
     readAt: null,
@@ -713,6 +715,44 @@ describe('what came out, in cards', () => {
     expect(cards[1]).toMatchObject({ title: 'El botón queda tapado', asks: true });
     expect(cards[1]?.chips.map((chip) => chip.id)).toEqual(['CAM-12', 'CAM-13']);
     expect(cards[0]).toMatchObject({ answer: 'Sí, si cada cliente revisa distinto.' });
+  });
+
+  // D-274c07 (final study): four code requests read «hecho» because the secretary linked them to the
+  // board's sketch (PED-1), which was done, while nothing was made from any of them.
+  describe('the outcome of a request', () => {
+    const request = (links: string[], made: string[]) =>
+      turnsOf([
+        say({ id: 30, author: 'person', text: 'Agrega POST /products', kind: 'request' }),
+        say({ id: 31, author: 'secretary', replyTo: 30, root: 30, kind: 'request', links, made }),
+      ]);
+    const sketch = item({ id: 'PED-1', title: 'Esbozar el tablero', turn: 'none', closes: 'done' });
+    const made = item({ id: 'CAM-20', title: 'POST /products', turn: 'agent' });
+    const madeDone = item({ id: 'CAM-21', title: 'GET /health', turn: 'none', closes: 'done' });
+    const all = byId(sketch, made, madeDone);
+
+    it('is «sin ítem» when nothing was made from it, even if an item it mentions is done', () => {
+      const [card] = cardsOf(request(['PED-1'], []), all, NOW);
+      expect(card?.outcome).toBe('none');
+      // The item it mentions is still shown, as a mention, not as its progress.
+      expect(card?.chips).toMatchObject([{ id: 'PED-1', mention: true }]);
+    });
+
+    it('is done only when every item made from it is done', () => {
+      expect(cardsOf(request(['CAM-21'], ['CAM-21']), all, NOW)[0]?.outcome).toBe('done');
+      expect(
+        cardsOf(request(['CAM-21', 'CAM-20'], ['CAM-21', 'CAM-20']), all, NOW)[0]?.outcome,
+      ).toBe('open');
+      // An item only mentioned, done or not, does not count either way.
+      expect(cardsOf(request(['PED-1', 'CAM-20'], ['CAM-20']), all, NOW)[0]?.outcome).toBe('open');
+    });
+
+    it('says nothing of a consultation', () => {
+      const asked = turnsOf([
+        say({ id: 40, author: 'person', text: '¿Y los reintentos?', kind: 'consultation' }),
+        say({ id: 41, author: 'secretary', replyTo: 40, root: 40, kind: 'consultation' }),
+      ]);
+      expect(cardsOf(asked, all, NOW)[0]?.outcome).toBeNull();
+    });
   });
 
   // U3 (field study 4): a request that came out of the person's tap on the secretary's question was

@@ -691,6 +691,18 @@ export const MIGRATIONS = [
     PRIMARY KEY (scope, key, route)
   );
   `,
+  // A turn's link says whether the item was made from the turn (create --from-message, or an item
+  // created after the turn the secretary links) or only mentioned by it (D-274c07): «Lo que salió»
+  // reads a request done only when what was made from it is. The links that exist read as the same
+  // rule does: made when the item was created after the turn began.
+  `
+  ALTER TABLE conversation_links ADD COLUMN made INTEGER NOT NULL DEFAULT 0;
+  UPDATE conversation_links SET made = 1
+   WHERE EXISTS (
+     SELECT 1 FROM items i
+       WHERE i.id = conversation_links.item_id
+         AND i.created_at >= (SELECT m.at FROM conversation_messages m WHERE m.id = conversation_links.message_id));
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {

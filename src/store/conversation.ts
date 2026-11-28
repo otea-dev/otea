@@ -126,10 +126,19 @@ export function insertAttachment(db: DatabaseSync, messageId: number, file: NewF
   return Number(result.lastInsertRowid);
 }
 
-export function insertLink(db: DatabaseSync, root: number, item: string, at: string): void {
+// Links the turn `root` with an item: `made` when the item was made from the turn, not only
+// mentioned by it. A link made once stays made.
+export function insertLink(
+  db: DatabaseSync,
+  root: number,
+  item: string,
+  at: string,
+  made = false,
+): void {
   db.prepare(
-    'INSERT OR IGNORE INTO conversation_links (message_id, item_id, at) VALUES (?, ?, ?)',
-  ).run(root, item, at);
+    `INSERT INTO conversation_links (message_id, item_id, at, made) VALUES (?, ?, ?, ?)
+     ON CONFLICT (message_id, item_id) DO UPDATE SET made = MAX(made, excluded.made)`,
+  ).run(root, item, at, made ? 1 : 0);
 }
 
 // The message a client already sent under this key, for this device or session, and the digest of
@@ -404,17 +413,24 @@ function filesOf(db: DatabaseSync, ids: readonly number[]): Map<number, MessageF
   return files;
 }
 
-function linksOf(db: DatabaseSync, roots: readonly number[]): Map<number, string[]> {
+function linksOf(
+  db: DatabaseSync,
+  roots: readonly number[],
+): { links: Map<number, string[]>; made: Map<number, string[]> } {
   const links = new Map<number, string[]>();
-  if (roots.length === 0) return links;
+  const made = new Map<number, string[]>();
+  if (roots.length === 0) return { links, made };
   const rows = db
     .prepare(
-      `SELECT message_id AS root, item_id AS item FROM conversation_links
+      `SELECT message_id AS root, item_id AS item, made FROM conversation_links
        WHERE message_id IN (${roots.map(() => '?').join(',')}) ORDER BY rowid`,
     )
-    .all(...roots) as { root: number; item: string }[];
-  for (const { root, item } of rows) links.set(root, [...(links.get(root) ?? []), item]);
-  return links;
+    .all(...roots) as { root: number; item: string; made: number }[];
+  for (const { root, item, made: was } of rows) {
+    links.set(root, [...(links.get(root) ?? []), item]);
+    if (was === 1) made.set(root, [...(made.get(root) ?? []), item]);
+  }
+  return { links, made };
 }
 
 function hydrate(db: DatabaseSync, rows: readonly MessageRow[]): Message[] {
@@ -438,7 +454,7 @@ function hydrate(db: DatabaseSync, rows: readonly MessageRow[]): Message[] {
       }[]
     ).map((row) => [row.id, row]),
   );
-  const links = linksOf(db, roots);
+  const { links, made } = linksOf(db, roots);
   return rows.map((row) => {
     const head = heads.get(row.root);
     return {
@@ -452,6 +468,7 @@ function hydrate(db: DatabaseSync, rows: readonly MessageRow[]): Message[] {
       kind: head?.kind ?? null,
       kindBy: head?.kind_by ?? null,
       links: links.get(row.root) ?? [],
+      made: made.get(row.root) ?? [],
       attachments: attachments.get(row.id) ?? [],
       delivery: row.author === 'person' ? (row.read_at === null ? 'pending' : 'read') : null,
       readAt: row.read_at,

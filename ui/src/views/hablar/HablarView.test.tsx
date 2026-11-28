@@ -32,6 +32,8 @@ function say(o: Partial<Message> & { author: Message['author'] }): Message {
     kind: null,
     kindBy: null,
     links: [],
+    // What a turn links is, unless a test says otherwise, what it made.
+    made: o.links ?? [],
     attachments: [],
     delivery: o.author === 'person' ? 'read' : null,
     readAt: null,

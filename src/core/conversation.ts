@@ -97,6 +97,9 @@ export type Message = {
   kindBy: KindBy | null;
   // The items (and the Pedidos of board drafts) the turn produced.
   links: string[];
+  // Those of `links` that were made from the turn (create --from-message, or created after it began):
+  // the others are only mentioned by it, and say nothing of whether the turn's request is done.
+  made: string[];
   attachments: MessageFile[];
   // The person's messages only (null for the others): pending until the secretary read it.
   delivery: Delivery | null;

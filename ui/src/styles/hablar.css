@@ -1643,6 +1643,15 @@ button.hb-chip:hover {
   font: 400 italic 12.5px / 1.45 var(--serif);
   color: var(--ink-2);
 }
+/* what a request came to: «hecho» once what was made from it is done, «sin ítem» while nothing was */
+.hb-outcome {
+  font: 500 12.5px / 1.45 var(--sans);
+  color: var(--ink-2);
+}
+.hb-outcome[data-outcome="none"] {
+  font-style: italic;
+  color: var(--ink-3);
+}
 /* a card nobody classified: its label is quiet, and two taps say what it is */
 .hb-kind[data-kind="none"] {
   background: var(--well);
