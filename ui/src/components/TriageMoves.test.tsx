@@ -44,7 +44,7 @@ const words: Record<string, string> = {
   dropped: 'Descartado',
 };
 
-const card = (transitions: Move[], more: object = {}) =>
+const card = (transitions: Move[], more: object = {}, phone = true) =>
   renderToStaticMarkup(
     <TriCard
       item={adr}
@@ -53,7 +53,7 @@ const card = (transitions: Move[], more: object = {}) =>
       round={{ figures: [], fields: [], files: [], gate: undefined, pending: false }}
       words={{ agent: 'Mender', say: '', round: 1 }}
       state="Diseñar"
-      phone
+      phone={phone}
       wordOf={(state) => words[state] ?? state}
       register={() => undefined}
       onDecide={() => undefined}
@@ -75,6 +75,16 @@ describe('the moves a Triage card offers', () => {
     );
     // Discarding stays on the item's page, as there.
     expect(html).not.toContain('data-move="dropped"');
+  });
+
+  // Pilot 1 (a2): the only help said to drag the card, and the arrows did nothing. The buttons are
+  // the keyboard's way, and the help says so, where a reader can read it too.
+  it('says on the desk that the buttons decide too, for the keyboard', () => {
+    setLanguage('es');
+    const hint = /<p class="tc-hint"[^>]*>([^<]*)<\/p>/.exec(card([plan, again], {}, false));
+    expect(hint?.[1]).toContain('arrastra la tarjeta');
+    expect(hint?.[1]).toMatch(/Tab.*Aprobar.*Devolver/);
+    expect(hint?.[0]).not.toContain('aria-hidden');
   });
 
   it('offers no other move where the page has none', () => {

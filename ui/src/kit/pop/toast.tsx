@@ -132,6 +132,20 @@ export function ToastHost() {
     setAction(next.action);
     setAt(next.at);
     const showing = mounted && choreo.current?.dir === 1;
+    // The same words said again while they stand are the same notice: it keeps its time running
+    // anew and is not set down a second time, where a screen reader would say it twice.
+    const current = msgs.filter((m) => !m.out).at(-1);
+    if (
+      showing &&
+      current &&
+      typeof next.msg === 'string' &&
+      current.msg === next.msg &&
+      current.id === next.id
+    ) {
+      dwell.current.left = DWELL;
+      arm();
+      return;
+    }
     replaced.current = showing;
     pendingNode.current = !!next.node;
     setMsgs((was) =>

@@ -181,17 +181,23 @@ export function splitReply(text: string): Reply {
   const below = cut < 0 ? '' : trimmed.slice(cut + 1).trim();
   let end = sentenceEnd(first);
   let lead = first.slice(0, end).trim();
-  let mark = '';
+  let skip = 0;
   if (lead.length > LEAD_CHARS) {
-    const space = lead.lastIndexOf(' ', LEAD_CHARS);
-    end = space > 0 ? space : LEAD_CHARS;
-    lead = first.slice(0, end).trim();
-    mark = '…';
+    // Too long for a headline: it ends where its thought turns (the last comma, semicolon, colon or
+    // dash within the budget, past its first words), never cut mid-clause with a mark, which left
+    // the last words falling to the body. With no such turn it stays whole.
+    const budget = lead.slice(0, LEAD_CHARS + 1);
+    const turn = [...budget.matchAll(/[,;:]\s|\s[—–]\s/g)].findLast(({ index }) => index >= 40);
+    if (turn) {
+      end = turn.index;
+      lead = first.slice(0, end).trim();
+      skip = turn[0].length;
+    }
   }
-  const remainder = first.slice(end).trim();
+  const remainder = first.slice(end + skip).trim();
   const rest = [remainder, below].filter((part) => part !== '').join('\n');
   const lines = rest.split(/\r?\n/).filter((line) => line.trim() !== '').length;
-  return { lead: `${lead}${mark}`, rest, folds: lines > FOLD_LINES || rest.length > FOLD_CHARS };
+  return { lead, rest, folds: lines > FOLD_LINES || rest.length > FOLD_CHARS };
 }
 
 // What a question to you leads with: the question itself (its last sentence that ends in «?», from

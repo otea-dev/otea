@@ -614,9 +614,10 @@ export function TriCard({
           {line}
         </p>
       ) : null}
-      {/* The hint names both ways: said only while both are open. */}
+      {/* The hint names both ways: said only while both are open. On the desk it says the keyboard's
+          way too (the buttons), and a reader reads it: the drag is the only way it leaves out. */}
       {ready && forward && back ? (
-        <p className="tc-hint" aria-hidden="true">
+        <p className="tc-hint" {...(phone ? { 'aria-hidden': true } : {})}>
           {phone ? t('triage.swipeHint') : t('triage.dragHint')}
         </p>
       ) : null}

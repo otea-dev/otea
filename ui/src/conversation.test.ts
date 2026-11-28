@@ -421,13 +421,27 @@ describe('a reply folding', () => {
     );
   });
 
-  it('cuts a first sentence that is itself too long at a word, so a headline is never a wall', () => {
+  // Pilot 1 (a2): a headline cut mid-sentence with «…» left its last words falling to the body. A
+  // first sentence that is too long is split where its thought turns, or it stays whole.
+  it('splits a first sentence that is too long where a clause ends, never with an ellipsis', () => {
+    const sentence =
+      'Revisé el cambio de la barra fija en los tres anchos de pantalla que pediste, pero el botón Aprobar sigue quedando tapado cuando el teclado del celular está abierto.';
+    const reply = splitReply(`${sentence} Fin.`);
+    expect(reply.lead).toBe(
+      'Revisé el cambio de la barra fija en los tres anchos de pantalla que pediste',
+    );
+    expect(reply.lead).not.toContain('…');
+    expect(reply.lead.length).toBeLessThanOrEqual(140);
+    // Nothing is lost but the comma it turned on.
+    expect(`${reply.lead}, ${reply.rest}`.replace(/\s+/g, ' ')).toBe(`${sentence} Fin.`);
+  });
+
+  it('keeps a long first sentence whole when no clause ends inside it', () => {
     const wall = `${'palabra '.repeat(40).trim()}. Fin.`;
     const reply = splitReply(wall);
-    expect(reply.lead.length).toBeLessThanOrEqual(141);
-    expect(reply.lead.endsWith('…')).toBe(true);
-    // Nothing is lost: the lead and the rest hold every word.
-    expect(`${reply.lead.slice(0, -1)} ${reply.rest}`.replace(/\s+/g, ' ')).toBe(wall);
+    expect(reply.lead).toBe(`${'palabra '.repeat(40).trim()}.`);
+    expect(reply.lead).not.toContain('…');
+    expect(reply.rest).toBe('Fin.');
   });
 
   it('does not count the blank lines between paragraphs as lines', () => {

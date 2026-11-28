@@ -407,6 +407,19 @@ export function HablarView({
   return (
     <div className="hb" data-tab={tab} data-empty={turns.length === 0 || undefined}>
       <section className="hb-main">
+        {/* The secretary going away and coming back, said once and politely when it changes (the
+            line under the title shows it to the eye; this is what a reader hears). Listening and
+            working are both «connected»: the secretary's rhythm is not news. */}
+        <p className="visually-hidden" role="status">
+          {secretary
+            ? t(
+                secretary.state === 'offline' ? 'hablar.status.offline' : 'hablar.status.connected',
+                {
+                  name: secretary.name,
+                },
+              )
+            : ''}
+        </p>
         <header className="head" data-enter="head">
           <div className="kicker">
             <b>{t('hablar.kicker')}</b> &nbsp;·&nbsp; {name}

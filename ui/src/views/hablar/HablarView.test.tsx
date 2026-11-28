@@ -1936,4 +1936,22 @@ describe('Hablar for assistive technology', () => {
     // What a sighted person reads stays the two words.
     expect(toggles.map((toggle) => text(toggle))).toEqual(['ver más', 'ver más']);
   });
+
+  // The secretary going away and coming back is said, once and politely, by a status the page keeps.
+  it('keeps one polite status that says whether the secretary is there', async () => {
+    const away = await open(
+      conversation({
+        messages: request(),
+        secretary: { name: 'quill', state: 'offline', since: ago(5), pending: 0 },
+      }),
+    );
+    const status = (root: HTMLElement) =>
+      all(root, '.hb-main > [role="status"]').map((el) => text(el));
+    expect(status(away.root)).toEqual(['quill está desconectado']);
+    page?.unmount();
+
+    const back = await open(conversation({ messages: request() }));
+    // Listening and working are both «connected»: only going and coming are news.
+    expect(status(back.root)).toEqual(['quill está conectado']);
+  });
 });

@@ -419,7 +419,8 @@ export const surfaces = {
   'triage.toastApprove': 'You approved “{title}”. It moves to {state}.',
   'triage.toastSend': 'You sent “{title}” back to {state}, with your notes.',
   'triage.swipeHint': 'swipe right to approve · left to send back',
-  'triage.dragHint': 'drag the card: right approves, left sends back',
+  'triage.dragHint':
+    'drag the card (right approves, left sends back) or Tab to Approve or Send back',
   'triage.stampSend': 'Send back',
   'triage.stampTo': 'to {state}',
   'triage.blocked': '{state} waits: {note}',
