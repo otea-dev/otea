@@ -301,6 +301,10 @@ export function DetailHost() {
       for (const a of v.getAnimations()) a.cancel();
     }
     workspace.set({ full: false });
+    // A sheet that was full dimmed the list under it and holds it so until Reducir: closing from
+    // there has no Reducir to give it back (the sheet is gone when the effect for it runs), so the
+    // board came back as dots on a blank page (D-c951c9, D-7f0697).
+    for (const a of curView()?.getAnimations() ?? []) if (a.id === 'dim') a.cancel();
     // Focus left in the sheet (or dropped to the page) goes back to what opened it.
     const active = document.activeElement;
     if (active === document.body || sheetRef.current?.contains(active))
