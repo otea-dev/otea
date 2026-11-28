@@ -1140,7 +1140,7 @@ export function Triage() {
   );
 }
 
-function Done({ decided, onBack }: { decided: number; onBack: () => void }) {
+export function Done({ decided, onBack }: { decided: number; onBack: () => void }) {
   const el = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (decided > 0 && el.current) {
