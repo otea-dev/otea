@@ -278,6 +278,8 @@ export const detail = {
   'evidence.lines': { one: '{count} línea', other: '{count} líneas' },
   'evidence.wrap': 'ajustar',
   'evidence.layout': 'Cómo se ve el diff',
+  'evidence.diff.added': 'añadida',
+  'evidence.diff.removed': 'quitada',
   'evidence.unified': 'unificado',
   'evidence.search': 'Buscar',
   'evidence.searchLog': 'Buscar en el registro',
@@ -304,7 +306,8 @@ export const detail = {
   'notes.pick.line': 'línea {n}',
   'notes.pick.quote': 'la línea elegida',
   'notes.pick.node': 'nodo «{node}»',
-  'notes.pick.hintLine': 'Haz clic en una línea para anclar la nota.',
+  'notes.pick.hintLine':
+    'Haz clic en una línea para anclar la nota, o llega a ella con las flechas y pulsa Intro.',
   'evidence.noteLine': 'Haz clic en una línea para dejarle una nota en el lector.',
   'notes.pick.hintLineTouch': 'Toca una línea para anclar la nota.',
   'notes.pick.hintNode': 'Haz clic en un nodo del diagrama para anclar la nota.',

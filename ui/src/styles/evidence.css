@@ -539,6 +539,13 @@
   background: var(--tint);
 }
 
+/* A line a note can be left on is reached with the keys: its ring stays inside the box, which
+   scrolls and would cut it. */
+.ev-line[tabindex]:focus-visible {
+  outline-offset: -2px;
+  border-radius: 0;
+}
+
 .ev-line[data-kind="add"] {
   --tint: color-mix(in oklch, var(--plus) 14%, transparent);
   color: var(--plus);

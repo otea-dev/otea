@@ -22,6 +22,7 @@ import { DiagramView } from './DiagramView.tsx';
 import { FileMeta } from './FileMeta.tsx';
 import { FileView } from './FileViews.tsx';
 import { ImageCompare, ImageSingle } from './ImageViews.tsx';
+import { keepLineStops, lineStep, lineStops } from './line-keys.ts';
 import { ZOOM_MAX, ZOOM_MIN, zoomIn, zoomOut } from './pdf-view.ts';
 import {
   findPick,
@@ -410,6 +411,14 @@ export function EvidenceReader({
     mark();
     return () => cancelAnimationFrame(frame);
   }, [markedKey, shownId]);
+  // With a note to leave, the lines are reached with the keys: one Tab stop, the arrows between them.
+  const noting = note !== undefined;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: marked anew per file shown
+  useEffect(() => {
+    const root = view.current;
+    if (!root || !noting) return;
+    return keepLineStops(root);
+  }, [noting, shownId]);
   // The picked line or node is lit once its viewer has drawn it (a text is fetched first).
   // biome-ignore lint/correctness/useExhaustiveDependencies: another file shown clears the light
   useEffect(() => {
@@ -628,7 +637,6 @@ export function EvidenceReader({
         </div>
       ) : null}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: a click on a line picks it for the note; the note is also sent without one */}
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: picking is optional, the note goes on the whole file */}
       <div
         ref={view}
         className="ev-reader-view"
@@ -703,6 +711,30 @@ export function EvidenceReader({
                 // What you type next is the note, as after a zone drawn on an image (P5-R3-4):
                 // the focus stayed on the page and the typing was lost. The phone waits for a tap.
                 if (!phone) noteArea.current?.focus({ preventScroll: true });
+              }
+            : undefined
+        }
+        onKeyDown={
+          note
+            ? (e) => {
+                // The lines are stops when a note can be left on one: the arrows move between
+                // them, Enter or Space picks the line that has the focus, as a click does.
+                const line = (e.target as Element).closest<HTMLElement>('.ev-line[tabindex]');
+                const root = view.current;
+                if (!line || !root || e.altKey || e.ctrlKey || e.metaKey) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  const hit = pickAt(line);
+                  if (!hit) return;
+                  e.preventDefault();
+                  setPick({ id: shown.id, pick: hit.pick });
+                  noteArea.current?.focus({ preventScroll: true });
+                  return;
+                }
+                const stops = lineStops(root);
+                const to = lineStep(e.key, stops.indexOf(line), stops.length);
+                if (to === null) return;
+                e.preventDefault();
+                stops[to]?.focus();
               }
             : undefined
         }

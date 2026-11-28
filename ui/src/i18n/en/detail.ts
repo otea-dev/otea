@@ -279,6 +279,8 @@ export const detail = {
   'evidence.lines': { one: '{count} line', other: '{count} lines' },
   'evidence.wrap': 'wrap',
   'evidence.layout': 'How the diff reads',
+  'evidence.diff.added': 'added',
+  'evidence.diff.removed': 'removed',
   'evidence.unified': 'unified',
   'evidence.search': 'Search',
   'evidence.searchLog': 'Search the log',
@@ -305,7 +307,8 @@ export const detail = {
   'notes.pick.line': 'line {n}',
   'notes.pick.quote': 'the line picked',
   'notes.pick.node': 'node “{node}”',
-  'notes.pick.hintLine': 'Click a line to anchor the note to it.',
+  'notes.pick.hintLine':
+    'Click a line to anchor the note to it, or reach it with the arrow keys and press Enter.',
   'evidence.noteLine': 'Click a line to leave a note on it in the reader.',
   'notes.pick.hintLineTouch': 'Tap a line to anchor the note to it.',
   'notes.pick.hintNode': 'Click a diagram node to anchor the note to it.',
