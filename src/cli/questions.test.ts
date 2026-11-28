@@ -126,6 +126,38 @@ describe('an agent asks the person, on the CLI and over MCP', () => {
     expect((await otea('show', 'CRI-1')).out).toContain('Waiting for the person to answer');
   });
 
+  // D-816632: any agent answered a question it did not ask, in the person's name, and the agent
+  // that asked went on with an answer nobody gave. Only the agent that asked notes what the person
+  // told it in its chat; the question stays open for anyone else, on the CLI and over MCP.
+  it('refuses an answer noted by an agent that did not ask the question', async () => {
+    declareProfiles(repo.dir, 'intruso');
+    await otea('ask', 'CRI-1', '¿Caparazón liso o con musgo?');
+
+    const refused = await otea('answer', 'CRI-1', 'Con musgo', '--as', 'intruso');
+    expect(refused.code).toBe(7);
+    expect(refused.err).toContain('asked it');
+    expect((await otea('show', 'CRI-1')).out).toContain('Waiting for the person to answer');
+
+    const server = createMcpServer(COMMANDS, {
+      json: true,
+      cwd: repo.dir,
+      agent: 'intruso',
+      warn: () => {},
+    });
+    const client = new Client({ name: 'test', version: '0' });
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverSide);
+    await client.connect(clientSide);
+    const reply = (await client.callTool({
+      name: 'answer',
+      arguments: { id: 'CRI-1', answer: 'Con musgo' },
+    })) as { isError?: boolean; content: { text: string }[] };
+    expect(reply.isError).toBe(true);
+    expect(reply.content[0]?.text).toContain('asked it');
+    await client.close();
+    expect((await otea('show', 'CRI-1')).out).toContain('Waiting for the person to answer');
+  });
+
   // P4-R2-2: the person answered in the chat, and otea reply could not put it on the question.
   it('notes on the question an answer the person gave in the chat, on the CLI and over MCP', async () => {
     await otea('ask', 'CRI-1', '¿Caparazón liso o con musgo?');

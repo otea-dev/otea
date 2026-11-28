@@ -154,6 +154,7 @@ export type RefusalDetails =
         | 'options'
         | 'option_text'
         | 'no_option'
+        | 'not_asker'
         | 'stale';
     }
   // An option picked with a move refused: by an agent, off a review, with a send-back, on an item

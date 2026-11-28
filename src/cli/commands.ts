@@ -3730,12 +3730,19 @@ const answer: Command = {
   summary:
     "Note on your question (otea ask) the person's answer given in the chat, in their words: it counts as theirs",
   args: ['id', 'answer'],
-  options: {},
+  options: { 'from-message': { placeholder: 'id' } },
   execute: (input) => {
     const [id = '', text = ''] = input.args;
     const { actor, channel } = input;
+    const fromMessage = input.option('from-message');
     return withAgent(input, (project) => {
-      const noted = noteChatAnswer(project, { id, text, actor, channel });
+      const noted = noteChatAnswer(project, {
+        id,
+        text,
+        actor,
+        channel,
+        ...(fromMessage === undefined ? {} : { fromMessage: messageIdOf(fromMessage) }),
+      });
       // It ends with the exact wait: after a chat answer an agent said it waited, running no
       // wait (P3C-R3-9).
       const next = keepWaitingLine(actor.name, channel, { idle: false });

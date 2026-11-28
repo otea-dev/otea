@@ -51,9 +51,9 @@ const plainWords = (text: string) => text.toLocaleLowerCase().replace(/\s+/g, ' 
 // an item with a sentence nobody said): the secretary, with the person's own message, which says
 // what is quoted. Returns the message. Without a secretary there is no conversation to check
 // against and a relay is the agent's word, as it was.
-function assertSaidInHablar(
+export function assertSaidInHablar(
   ctx: Context,
-  input: RelayInput,
+  input: Pick<RelayInput, 'id' | 'via' | 'fromMessage'>,
   quote: string,
   at: string,
 ): number | undefined {

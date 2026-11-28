@@ -7,6 +7,7 @@ import { insertEvidence, selectEvents } from '../store/queries.ts';
 import { askingItem } from './asking.ts';
 import { createBoard, publishBoard, saveDraft } from './boards.ts';
 import type { Context } from './context.ts';
+import { postPersonMessage } from './conversation.ts';
 import { createItem, getItem, listItems, moveItem, showItem } from './items.ts';
 import { claimItem, releaseItem } from './leases.ts';
 import {
@@ -20,7 +21,8 @@ import {
 import { endProcess, endWaiter, seeAgent, waitBeat } from './presence.ts';
 import { answerQuestion, answerWaiting, askQuestion, noteChatAnswer } from './questions.ts';
 import { restartItem } from './restart.ts';
-import { memoryContext } from './testing.ts';
+import { declareSecretary } from './secretary.ts';
+import { memoryContext, projectOf } from './testing.ts';
 import { undoMove } from './undo.ts';
 
 const you = { kind: 'human' as const, name: 'fede' };
@@ -333,17 +335,25 @@ describe('the person answers', () => {
       expect(nextFor(ctx, 'scout', {}, now).item).toBe(item.id);
     });
 
-    it('noted from the chat by another agent, claims the item for nobody: that agent takes it', () => {
+    it('noted by the secretary from Talk, claims the item for nobody: that agent takes it', () => {
       const ctx = memoryContext();
       const item = working(ctx);
       waits(ctx);
       ask(ctx, item.id);
       releaseItem(ctx, { id: item.id, actor: kiln }, now);
       ends(ctx);
+      declareSecretary(ctx.db, 'scout', now);
+      const said = postPersonMessage(projectOf('/nowhere', ctx), { text: 'Con musgo' }, now);
 
       const noted = noteChatAnswer(
         ctx,
-        { id: item.id, text: 'Con musgo', actor: scout, channel: 'cli' },
+        {
+          id: item.id,
+          text: 'Con musgo',
+          actor: scout,
+          channel: 'cli',
+          fromMessage: said.message.id,
+        },
         now,
       );
 
@@ -408,10 +418,63 @@ describe('the person answers', () => {
       waits(ctx);
       ask(ctx, item.id);
       releaseItem(ctx, { id: item.id, actor: kiln }, now);
+      declareSecretary(ctx.db, 'scout', now);
+      const said = postPersonMessage(projectOf('/nowhere', ctx), { text: 'Con musgo' }, now);
 
-      noteChatAnswer(ctx, { id: item.id, text: 'Con musgo', actor: scout, channel: 'cli' }, now);
+      noteChatAnswer(
+        ctx,
+        {
+          id: item.id,
+          text: 'Con musgo',
+          actor: scout,
+          channel: 'cli',
+          fromMessage: said.message.id,
+        },
+        now,
+      );
 
       expect(getItem(ctx, item.id, now).lease?.holder).toBe('kiln');
+    });
+  });
+
+  // D-816632: an unrelated agent answered in the person's name. Only the agent that asked, or the
+  // secretary with words the person wrote in Talk, notes an answer from the chat.
+  describe('who may note an answer from the chat', () => {
+    const asked = () => {
+      const ctx = memoryContext();
+      const item = working(ctx);
+      ask(ctx, item.id);
+      const note = (actor: typeof scout, fromMessage?: number) => () => {
+        const from = fromMessage === undefined ? {} : { fromMessage };
+        const input = { id: item.id, text: 'Con musgo', actor, channel: 'cli' as const, ...from };
+        return noteChatAnswer(ctx, input, now);
+      };
+      return { ctx, item, note };
+    };
+
+    it('refuses an agent that did not ask, and leaves the question open', () => {
+      const { ctx, item, note } = asked();
+      const refused = refusal(note(scout));
+      expect([refused.code, refused.message]).toEqual([
+        'forbidden',
+        expect.stringContaining('who asked it'),
+      ]);
+      expect(getItem(ctx, item.id, now).asks?.by).toBe('kiln');
+    });
+
+    it('refuses the secretary without a message of the person, and with words they did not write', () => {
+      const { ctx, note } = asked();
+      declareSecretary(ctx.db, 'scout', now);
+      expect(refusal(note(scout)).code).toBe('quote_required');
+      const said = postPersonMessage(projectOf('/nowhere', ctx), { text: 'Liso' }, now);
+      expect(refusal(note(scout, said.message.id)).code).toBe('quote_required');
+    });
+
+    it('refuses another agent even when the project has a secretary', () => {
+      const { ctx, note } = asked();
+      declareSecretary(ctx.db, 'sol', now);
+      const said = postPersonMessage(projectOf('/nowhere', ctx), { text: 'Con musgo' }, now);
+      expect(refusal(note(scout, said.message.id)).code).toBe('forbidden');
     });
   });
 

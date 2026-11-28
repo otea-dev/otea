@@ -32,7 +32,8 @@ import { requireItem, requireWritableItem, systemClock } from './items.ts';
 import { assertMayWriteItem, takeItem } from './lease-take.ts';
 import { itemOnBoard, type LiveBoard, liveBoardOf, relayAllowed } from './next.ts';
 import { sessionAlive } from './presence.ts';
-import { RELAYED_HUMAN } from './relay.ts';
+import { assertSaidInHablar, RELAYED_HUMAN } from './relay.ts';
+import { secretaryName } from './secretary.ts';
 import { liftSetAside, SET_ASIDE_LIFTED } from './set-aside.ts';
 
 // An agent's question to the person (core/board/questions.ts): the agent asks while it does a step,
@@ -51,6 +52,7 @@ type Why =
   | 'options'
   | 'option_text'
   | 'no_option'
+  | 'not_asker'
   | 'stale';
 
 function refuse(
@@ -267,10 +269,12 @@ export type ChatAnswerResult = { question: ItemQuestion; text: string };
 
 // The answer the person gave in the chat instead of in Otea, put on the question by an agent (otea
 // answer, P4-R2-2): it is the person's, as a relayed decision is, marked as noted by that agent,
-// and hands the turn back as an answer given in Otea does.
+// and hands the turn back as an answer given in Otea does. Only the agent that asked notes it (the
+// person is in its chat), or the secretary with the person's own message from Talk: any other agent
+// would be answering in the person's name (D-816632).
 export function noteChatAnswer(
   ctx: Context,
-  input: AnswerInput,
+  input: AnswerInput & { fromMessage?: number },
   now = systemClock,
 ): ChatAnswerResult {
   const { id, actor } = input;
@@ -299,6 +303,18 @@ export function noteChatAnswer(
     data,
     now,
     (open) => {
+      if (open.by !== actor.name) {
+        if (secretaryName(ctx.db) !== actor.name)
+          refuse(
+            'forbidden',
+            id,
+            'not_asker',
+            `Not noted on ${id}: only ${open.by}, who asked it, notes what the person said in its chat; they answer it on the desk or the phone, or tell the secretary in Talk. Never answer for the person.`,
+          );
+        // The secretary notes only words the person wrote in Talk, as a relay does.
+        const from = input.fromMessage === undefined ? {} : { fromMessage: input.fromMessage };
+        assertSaidInHablar(ctx, { id, via: actor.name, ...from }, text, now());
+      }
       const option = optionSaid(open, text);
       return option === undefined
         ? { text, data: { mode: 'text' } }

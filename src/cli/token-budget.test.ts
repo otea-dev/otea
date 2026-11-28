@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AGENTS_BLOCK } from '../app/agents.ts';
 import { leaveNote } from '../app/notes.ts';
 import { openProject } from '../app/project.ts';
+import { answerQuestion } from '../app/questions.ts';
 import { createMcpServer } from '../mcp/server.ts';
 import { COMMANDS } from './commands.ts';
 import { type Cli, cliAt, declareProfiles, presetCollection, tempGitRepo } from './testing.ts';
@@ -149,7 +150,9 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // --option-text and --withdraw (measured at 7930).
   // Raised to 7990 for ask's --option-text, the option that promises the person's own words, which
   // opens the text box, and land sync's no-remote words (field study 5; measured at 7987).
-  tools: { mcp: 7990 },
+  // Raised to 8010 for answer's --from-message, the person's message in Talk the secretary notes an
+  // answer from, as relay does (D-816632; measured at 7997).
+  tools: { mcp: 8010 },
   // Otea's agent guide, the server's instructions: in every MCP agent's context from the start, so
   // it buys only what agents keep getting wrong. Measured at 203. Raised to 270 for the line on
   // declaring the profile every agent and subagent must keep current (measured at 246). Raised to
@@ -423,9 +426,14 @@ describe('token budget of a work cycle', () => {
 
   // The person answers the question and leaves a note, off the meter; the note's number.
   const person = async (id: string) => {
-    await ok('answer', id, 'No, keep it short', '--as', 'relay');
     const project = openProject(repo.dir);
     try {
+      answerQuestion(project, {
+        id,
+        text: 'No, keep it short',
+        actor: { kind: 'human', name: 'human' },
+        channel: 'ui',
+      });
       return leaveNote(project, {
         id,
         text: 'Use a friendly tone',
