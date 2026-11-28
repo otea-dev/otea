@@ -756,7 +756,12 @@ class Shell {
   // Derive on every event; the surfaces follow under the throttle.
   private derive(): void {
     const now = Date.now();
-    this.attention = deskAttention(this.snapshot.items, this.snapshot.collections, now);
+    this.attention = deskAttention(
+      this.snapshot.items,
+      this.snapshot.collections,
+      now,
+      this.snapshot.pending,
+    );
     clearTimeout(this.leaseTimer);
     const expiry = nextLeaseExpiry(this.snapshot.items, now);
     if (expiry !== undefined) {

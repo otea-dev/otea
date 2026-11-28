@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchConversation, fetchSecretary } from '../../api.ts';
+import { fetchConversation } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
-import {
-  type ConversationView,
-  type Message,
-  type MessageKind,
-  mergeMessages,
-  type SecretaryStatus,
-} from '../../conversation.ts';
+import { type Message, type MessageKind, mergeMessages } from '../../conversation.ts';
 import { useRemote, useThrottled } from '../../hooks.ts';
 
 // How many messages one read of the conversation brings: the newest ones, and a page back on ask.
@@ -23,8 +17,6 @@ export type ConversationState =
   | {
       status: 'ready';
       messages: Message[];
-      secretary: SecretaryStatus | null;
-      waiting: ConversationView['waiting'];
       // Earlier messages lie before the first one loaded.
       earlier: boolean;
       loadingEarlier: boolean;
@@ -107,8 +99,6 @@ export function useConversation(): ConversationState {
   return {
     status: 'ready',
     messages,
-    secretary: view.secretary,
-    waiting: view.waiting,
     earlier: olderMore ?? view.more,
     loadingEarlier,
     earlierFailed,
@@ -122,12 +112,4 @@ export function useConversation(): ConversationState {
         return next;
       }),
   };
-}
-
-// The project's secretary alone, for the rail: the state its row shows.
-export function useSecretary(): SecretaryStatus | null | undefined {
-  const app = useApp();
-  const load = useCallback((signal: AbortSignal) => fetchSecretary(signal), []);
-  const remote = useRemote(load, useThrottled(app.version, READ_MS), app.connection);
-  return remote.status === 'ready' ? remote.value : undefined;
 }

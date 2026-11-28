@@ -242,7 +242,7 @@ export function NoteCapture({
         disabled={!canWrite}
         aria-label={t('bandeja.note')}
         placeholder={t(
-          app.pending?.secretary === null ? 'bandeja.placeholderAlone' : 'bandeja.placeholder',
+          app.secretary === null ? 'bandeja.placeholderAlone' : 'bandeja.placeholder',
         )}
         enterKeyHint="enter"
         onChange={(event) => setText(event.target.value)}
@@ -321,7 +321,7 @@ export function NoteCapture({
         <p className="bn-hint">
           {app.sync.offline && queueAvailable()
             ? t('bandeja.queues')
-            : app.pending?.secretary === null
+            : app.secretary === null
               ? t('bandeja.landsAlone')
               : t('bandeja.lands')}
         </p>

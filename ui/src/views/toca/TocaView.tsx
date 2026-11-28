@@ -3,6 +3,7 @@ import { activeLease } from '../../active-lease.ts';
 import { typeOfItem, useApp } from '../../app/context.tsx';
 import { EmptyProject } from '../../components/EmptyProject.tsx';
 import { NextStep } from '../../components/NextStep.tsx';
+import type { SecretaryView } from '../../conversation.ts';
 import { t, tx } from '../../i18n/i18n.ts';
 import { Button } from '../../kit/Button.tsx';
 import { Count } from '../../kit/Count.tsx';
@@ -20,9 +21,9 @@ import {
   offItemEntries,
   offlineWithWaiting,
   oldestOffItem,
-  type PendingSecretary,
   rowKeyOf,
 } from '../../pending.ts';
+import { waitingWords } from '../../secretary-waiting.ts';
 import { hablarHash } from '../../selection.ts';
 import type { Item } from '../../types.ts';
 import { AnsweredTopics } from '../topics/AnsweredTopics.tsx';
@@ -103,13 +104,13 @@ function NoAgents({
 // The secretary is offline and things wait for it: Te toca says so (it never reads «nothing waits»
 // while the person's messages and notes sit unread), with how many and the way to Hablar, where
 // the way to bring it back is.
-function SecretaryAway({ secretary }: { secretary: PendingSecretary }) {
+function SecretaryAway({ secretary }: { secretary: SecretaryView }) {
   return (
     <div className="secoff" role="status" data-leaf="">
       <i aria-hidden="true" />
       <div>
         <h4>{t('toca.secOff.title', { name: secretary.name })}</h4>
-        <p>{t('toca.secOff.waiting', { count: secretary.waiting.count })}</p>
+        <p>{t('toca.secOff.waiting', { what: waitingWords(secretary.waiting) })}</p>
         <a className="secoff-go" href={hablarHash()}>
           {t('toca.secOff.go')}
         </a>
@@ -124,7 +125,7 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
   const ctx = { now: app.now, items: app.all, types };
   const today = todayCounts(app.feed, ctx);
   // A row that is no item (a question on a Bandeja note, the secretary's own) opens Hablar.
-  const off = new Map(offItemEntries(app.pending).map((entry) => [rowKeyOf(entry), entry]));
+  const off = new Map(offItemEntries(app).map((entry) => [rowKeyOf(entry), entry]));
   const open = (id: string) => {
     const entry = off.get(id);
     if (entry) return app.go(entryRoute(entry));
@@ -133,7 +134,7 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
   // On the phone without the PC the secretary's state is the last one kept: the offline line says
   // the PC is out of reach, and this card waits for an answer to be true.
   const away =
-    atasco || (app.sync?.offline === true && app.phone) ? null : offlineWithWaiting(app.pending);
+    atasco || (app.sync?.offline === true && app.phone) ? null : offlineWithWaiting(app.secretary);
   // No item on any board (every project has Pedidos, so never no board): the project's own page.
   const empty =
     app.items.status === 'ready' &&
@@ -176,8 +177,8 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
     );
   } else {
     const d = tocaDek(app.all, today.handed, app.now, {
-      count: offItemCount(app.pending),
-      since: oldestOffItem(app.pending),
+      count: offItemCount(app),
+      since: oldestOffItem(app),
     });
     dekKey = d.lead;
     dek = d.lead;

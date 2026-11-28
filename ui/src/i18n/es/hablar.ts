@@ -20,9 +20,13 @@ export const hablar = {
     'Se reinicia en tu equipo, no desde aquí: abre una sesión de tu agente y pégale este texto.',
   'hablar.away.back.desk':
     'Se reinicia en tu equipo: abre una sesión de tu agente y pégale este texto.',
-  'hablar.away.short': {
-    one: 'Tu secretario está desconectado · {count} mensaje espera',
-    other: 'Tu secretario está desconectado · {count} mensajes esperan',
+  'hablar.away.short': 'Tu secretario está desconectado · {what} esperando',
+  // Lo que lo espera, según lo que es cada cosa (la tira de Hablar y la tarjeta de Te toca lo dicen igual).
+  'secretary.waiting.messages': { one: '{count} mensaje', other: '{count} mensajes' },
+  'secretary.waiting.notes': { one: '{count} nota', other: '{count} notas' },
+  'secretary.waiting.reports': {
+    one: '{count} aviso de un agente',
+    other: '{count} avisos de agentes',
   },
   'hablar.away.shortNone': 'Tu secretario está desconectado',
   'hablar.away.cmds': 'O con comandos, en la terminal',

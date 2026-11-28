@@ -98,7 +98,11 @@ describe('the «Te espera» strip of Hablar', () => {
         <TeEspera
           pending={pending([worker])}
           onJump={none}
-          away={{ since: ago(5), waiting: 1, name: 'quill' }}
+          away={{
+            since: ago(5),
+            waiting: { count: 1, since: ago(5), messages: 1, notes: 0, reports: 0 },
+            name: 'quill',
+          }}
         />
       </AppTestProvider>,
     );

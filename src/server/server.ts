@@ -78,7 +78,7 @@ import { answerQuestion, retractItemAnswer } from '../app/questions.ts';
 import { linkItems, unlinkItems } from '../app/relations.ts';
 import { reopenDropped } from '../app/reopen-dropped.ts';
 import { reassignItem, restartItem, resumeItem, undoRelease } from '../app/restart.ts';
-import { secretaryStatus } from '../app/secretary.ts';
+import { secretaryView } from '../app/secretary-waiting.ts';
 import { setAsideOf } from '../app/set-aside.ts';
 import { stepFactsOf } from '../app/step-facts.ts';
 import {
@@ -618,7 +618,7 @@ function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
       .get('/presets', (c) => c.json(listPresetViews(project)))
       .get('/agents', (c) => c.json({ agents: listAgents(project.db) }))
       // The project's secretary: connected, listening or offline since when; null while it has none.
-      .get('/secretary', (c) => c.json({ secretary: secretaryStatus(project.db) ?? null }))
+      .get('/secretary', (c) => c.json({ secretary: secretaryView(project.db) ?? null }))
       // What waits for the person, computed from the records: items on their turn, the questions
       // of the Bandeja and of the secretary, the review that holds a board's queue (app/pending.ts).
       .get('/pending', (c) => {

@@ -352,12 +352,21 @@ export function leftShare(lease: Pick<HeldLease, 'expiresAt' | 'ttlMs'>, now: nu
   return Math.max(0, Math.min(1, left / lease.ttlMs));
 }
 
-// New events after the cursor join the feed; it keeps the newest FEED_SIZE.
+// The most events the feed holds to keep a whole day (a busy one) whole.
+export const FEED_DAY_MAX = 5000;
+
+// New events after the cursor join the feed; it keeps the newest FEED_SIZE, and every event since
+// `today` (the start of the person's day, in ms) too: the day's recap counts them, and a figure of
+// «today» that drops events as the afternoon goes on says less than it said (s-real2, D-a55c6d).
 export function mergeFeed(
   current: readonly FeedEvent[],
   arrived: readonly FeedEvent[],
+  today?: number,
 ): FeedEvent[] {
   const last = current.at(-1)?.id ?? 0;
   const fresh = arrived.filter((event) => event.id > last);
-  return [...current, ...fresh].slice(-FEED_SIZE);
+  const all = [...current, ...fresh];
+  if (today === undefined || all.length <= FEED_SIZE) return all.slice(-FEED_SIZE);
+  const newest = all.length - FEED_SIZE;
+  return all.filter((event, i) => i >= newest || Date.parse(event.at) >= today).slice(-FEED_DAY_MAX);
 }

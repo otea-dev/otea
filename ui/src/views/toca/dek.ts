@@ -1,6 +1,7 @@
 import { isStuck } from '../../derive/toca.ts';
 import { turnSince } from '../../derive/when.ts';
 import { t } from '../../i18n/i18n.ts';
+import { waitingTotal } from '../../pending.ts';
 import type { Item } from '../../types.ts';
 import { numberWord, sinceText, spanText } from './words.ts';
 
@@ -38,7 +39,7 @@ export function tocaDek(
   now: number,
   off: OffItem = { count: 0, since: null },
 ): TocaDek {
-  const waiting = items.filter((it) => waitingSince(it, now) !== null).length + off.count;
+  const waiting = waitingTotal(items, now, off.count);
   const offFor = off.since === null ? 0 : now - Date.parse(off.since);
   const lead = waiting
     ? t('toca.dek.waiting', {

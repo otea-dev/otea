@@ -14,7 +14,7 @@ import type { FeedEvent } from './activity.ts';
 import type { BandejaEntry, BandejaView } from './bandeja.ts';
 import { apiUrl } from './base.ts';
 import type { WrittenBrief } from './brief.ts';
-import type { ConversationView, Message, MessageKind, SecretaryStatus } from './conversation.ts';
+import type { ConversationView, Message, MessageKind, SecretaryView } from './conversation.ts';
 import { type Language, t } from './i18n/i18n.ts';
 import type { NotifyView } from './notify/offer.ts';
 import { noteRead, readOf } from './offline/sync-state.ts';
@@ -681,9 +681,9 @@ export async function fetchConversation(
 
 // The project's secretary as the desk tells it: listening, connected or offline since when; null
 // while the project has none.
-export async function fetchSecretary(signal: AbortSignal): Promise<SecretaryStatus | null> {
+export async function fetchSecretary(signal: AbortSignal): Promise<SecretaryView | null> {
   const body = (await (await get('/api/secretary', signal)).json()) as {
-    secretary: SecretaryStatus | null;
+    secretary: SecretaryView | null;
   };
   return body.secretary;
 }

@@ -1,4 +1,5 @@
 import type { SecretaryState } from './secretary.ts';
+import { isCovered } from './waiting.ts';
 
 // What waits for the person, computed by Otea from the records themselves (F4, field study 3): the
 // desk's Te toca and Hablar's «Te espera» strip show it, and the secretary reads it with `otea
@@ -115,20 +116,29 @@ export type Pending = {
   secretary: PendingSecretary | null;
 };
 
-// The per-kind count, for lines and badges.
-export function pendingCounts(entries: readonly PendingEntry[]): Record<PendingKind, number> {
-  const counts = Object.fromEntries(PENDING_KINDS.map((kind) => [kind, 0])) as Record<
-    PendingKind,
-    number
-  >;
-  for (const { kind } of entries) counts[kind]++;
-  return counts;
-}
-
 // What waits for them that is no item: the Bandeja's and the secretary's questions. The desk adds
 // them to the items on its own turn (Te toca's number).
 export const OFF_ITEM: readonly PendingKind[] = ['bandeja', 'secretary', 'escalation', 'worker'];
 
 export function offItem(entries: readonly PendingEntry[]): PendingEntry[] {
   return entries.filter(({ kind }) => OFF_ITEM.includes(kind));
+}
+
+// The things that wait for them, each once: an entry that is only another way to reach an item
+// already in the list (the secretary's question about it) is not a second thing (isCovered).
+export function counted(entries: readonly PendingEntry[]): PendingEntry[] {
+  const items = new Set(
+    entries.filter(({ kind }) => !OFF_ITEM.includes(kind)).map(({ ref }) => ref),
+  );
+  return entries.filter((entry) => !isCovered(entry, items));
+}
+
+// The per-kind count, for lines and badges: of the things that wait, each once.
+export function pendingCounts(entries: readonly PendingEntry[]): Record<PendingKind, number> {
+  const counts = Object.fromEntries(PENDING_KINDS.map((kind) => [kind, 0])) as Record<
+    PendingKind,
+    number
+  >;
+  for (const { kind } of counted(entries)) counts[kind]++;
+  return counts;
 }

@@ -480,6 +480,30 @@ function FoldLine({ rows, ctx, o }: { rows: Item[]; ctx: TocaContext; o: TocaPho
   );
 }
 
+// A heading of its own for what waits for you that is neither an item nor a question: the reports
+// agents escalated and the boards nobody works. Nothing at all when there are none.
+function offBlocks(key: 'avisos' | 'sinagente', entries: PendingEntry[], now: number): LaneBlock[] {
+  if (entries.length === 0) return [];
+  return [
+    {
+      kind: 'sec',
+      key: `sec:${key}`,
+      title: t(`toca.sec.${key}` as PlainKey),
+      count: entries.length,
+    },
+    ...entries.map(
+      (entry): LaneBlock => ({
+        kind: 'row',
+        key: rowKeyOf(entry),
+        lane: 'you',
+        look: 'yours',
+        sec: key,
+        content: <OffRow entry={entry} now={now} />,
+      }),
+    ),
+  ];
+}
+
 export function tocaBlocks(
   app: TocaApp,
   atasco: boolean,
@@ -504,9 +528,14 @@ export function tocaBlocks(
     const s = tocaSection(it, ctx);
     if (s) by.set(s, [...(by.get(s) ?? []), it]);
   }
-  // What Otea counts that is no item: the questions of the Bandeja and of the secretary. They are
-  // questions for you, so they join that section, beside the items that ask.
-  const off = atasco ? [] : offItemEntries(app.pending);
+  // What Otea counts that is no item: the questions of the Bandeja and of the secretary join the
+  // questions for you, beside the items that ask. An agent's report and a board nobody works are not
+  // questions: each has a heading of its own, so «Preguntas para ti» counts only questions
+  // (s-real2, D-0454fd, D-35c7b8).
+  const off = atasco ? [] : offItemEntries(app);
+  const questions = off.filter(({ kind }) => kind === 'bandeja' || kind === 'secretary');
+  const reports = off.filter(({ kind }) => kind === 'escalation');
+  const noWorker = off.filter(({ kind }) => kind === 'worker');
   const blocks: LaneBlock[] = [];
   const at = (it: Item) => turnSince(it);
   const quiet: TocaSection[] = [];
@@ -518,12 +547,15 @@ export function tocaBlocks(
   for (const sec of TOCA_SECTIONS) {
     if (atasco && sec !== 'atasco') continue;
     if (phone && sec === 'cerrados') continue;
-    const asked = sec === 'preguntas' ? off : [];
+    const asked = sec === 'preguntas' ? questions : [];
     if (phone && YOURS.includes(sec) && !by.get(sec)?.length && asked.length === 0) {
       quiet.push(sec);
       continue;
     }
     if (phone && !YOURS.includes(sec)) quietBlock();
+    if (sec === 'encamino') {
+      blocks.push(...offBlocks('avisos', reports, app.now), ...offBlocks('sinagente', noWorker, app.now));
+    }
     const aged = (by.get(sec) ?? []).sort((a, b) => at(a) - at(b));
     // Your own steps follow the order you fixed on the Matrix, then the rest by age (P4-R3-11).
     const rows =

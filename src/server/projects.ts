@@ -26,6 +26,7 @@ import { hasOteaGitHook, hasOutdatedGitHook, installGitHook } from '../cli/hooks
 import type { AgentStatus } from '../core/agent-status.ts';
 import { OteaError } from '../core/errors.ts';
 import type { PendingEntry } from '../core/pending.ts';
+import { countedOff, waitsForPerson } from '../core/waiting.ts';
 import { stateLabel } from '../core/workflow.ts';
 import type { Storage } from '../store/registry.ts';
 import type { ServedPath, ServedProject } from './hub.ts';
@@ -95,10 +96,9 @@ type Counts = Pick<ProjectOverview, 'waiting' | 'topics' | 'withAgents' | 'agent
   asking: PendingEntry[];
 };
 
-// What waits for you is what Te toca lists: your turn, and the work of an agent that went quiet
-// (its lease ran out), yours to restart or reassign (ONB3-5).
-const yours = (item: Item) =>
-  item.turn === 'human' || (item.turn === 'agent' && !!item.expiredLease);
+// What waits for you is what Te toca lists, by the one rule (core/waiting.ts): your turn, and the
+// work of an agent that went quiet, yours to restart or reassign (ONB3-5).
+const yours = (item: Item) => waitsForPerson(item, Date.now());
 
 export function countsOf(project: Project): Counts {
   const open = listItems(project).filter((item) => item.turn !== 'none');
@@ -109,12 +109,16 @@ export function countsOf(project: Project): Counts {
       .filter((item) => item.turn === 'agent' && item.expiredLease)
       .map((item) => item.expiredLease?.holder),
   );
+  const waiting = open.filter(yours);
   return {
-    waiting: open.filter(yours).map((item) => withIcon(project, item)),
+    waiting: waiting.map((item) => withIcon(project, item)),
     topics: answeredTopics(project),
-    asking: offItemOf(project),
+    asking: countedOff(offItemOf(project), new Set(waiting.map(({ id }) => id))),
     withAgents: open.filter((item) => !yours(item)).length,
+    // The agents there that take items: the secretary and a refiner are agents of their own kind,
+    // never counted as the ones that do the work (the same rule as the desk's pill, ui listening.ts).
     agents: listAgents(project.db)
+      .filter((agent) => agent.role !== 'secretary' && agent.role !== 'refiner')
       .filter((agent) => agent.status !== 'away' || leftStuck.has(agent.name))
       .map((agent) => ({ name: agent.name, status: agent.status, holding: agent.holding.length })),
     open: open.length,

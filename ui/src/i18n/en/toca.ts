@@ -7,6 +7,8 @@ export const toca = {
   'toca.sec.preguntas': 'Questions for you',
   'toca.sec.revisiones': 'Reviews',
   'toca.sec.propios': 'Your own steps',
+  'toca.sec.avisos': 'Reports from agents',
+  'toca.sec.sinagente': 'Boards with no agent',
   'toca.sec.encamino': 'On the way',
   'toca.sec.cerrados': 'Closed',
   'toca.gloss.encamino': 'with agents for now',
@@ -87,10 +89,7 @@ export const toca = {
 
   // The secretary is offline with things waiting for it
   'toca.secOff.title': '{name} is offline',
-  'toca.secOff.waiting': {
-    one: '{count} message is waiting for it.',
-    other: '{count} messages are waiting for it.',
-  },
+  'toca.secOff.waiting': '{what} waiting for it.',
   'toca.secOff.go': 'Open Talk to bring it back',
 
   // After the project's first finished item: what people usually do next (once, then it is gone)

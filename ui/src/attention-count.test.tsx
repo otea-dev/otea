@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { attentionTitle } from './attention.ts';
 import { useAttention } from './hooks.ts';
+import type { Pending } from './pending.ts';
 import { type Mounted, mount } from './test-dom.tsx';
 import type { Item } from './types.ts';
 
@@ -10,8 +11,19 @@ import type { Item } from './types.ts';
 
 const item = (turn: Item['turn']) => ({ turn, lease: null, expiredLease: null }) as unknown as Item;
 
+// `elsewhere` questions on Bandeja notes, as Otea counted them.
+function pendingOf(elsewhere: number): Pending {
+  const entries = Array.from({ length: elsewhere }, (_, i) => ({
+    kind: 'bandeja' as const,
+    ref: `B-${i + 1}`,
+    title: 'a note',
+    since: null,
+  }));
+  return { count: elsewhere, entries, blocks: [], queues: [], secretary: null };
+}
+
 function Title({ items, elsewhere }: { items: readonly Item[]; elsewhere: number }) {
-  return <p>{attentionTitle(useAttention(items, elsewhere), { project: 'repo' })}</p>;
+  return <p>{attentionTitle(useAttention(items, pendingOf(elsewhere)), { project: 'repo' })}</p>;
 }
 
 let page: Mounted | undefined;

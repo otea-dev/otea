@@ -3,14 +3,21 @@ import { fetchRolePrompt, postEscalationDismiss } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
 import { useCopy } from '../../components/AgentPrompt.tsx';
 import { Ticked } from '../../components/Ticked.tsx';
-import { splitQuestion } from '../../conversation.ts';
+import { type SecretaryWaiting, splitQuestion } from '../../conversation.ts';
 import { waitedText } from '../../derive/when.ts';
 import { momentLabel } from '../../format.ts';
 import { useRemote } from '../../hooks.ts';
 import { language, t } from '../../i18n/i18n.ts';
 import { Icon } from '../../kit/Icon.tsx';
 import { toast } from '../../kit/index.ts';
-import type { Pending, PendingEntry, PendingKind, QueueBlock } from '../../pending.ts';
+import {
+  counted,
+  type Pending,
+  type PendingEntry,
+  type PendingKind,
+  type QueueBlock,
+} from '../../pending.ts';
+import { waitingWords } from '../../secretary-waiting.ts';
 import { AwayCopy, AwayHow } from './Away.tsx';
 
 // «Te espera»: everything that waits for you, pinned over the conversation, computed by Otea
@@ -66,7 +73,7 @@ export function blockText(block: QueueBlock): string {
 // (what brings it back is named by it).
 export type AwayState = {
   since: string | null | undefined;
-  waiting: number;
+  waiting: SecretaryWaiting;
   name: string | undefined;
 };
 
@@ -198,8 +205,15 @@ function TeRows({
 const waits = (pending: Pending | undefined): pending is Pending =>
   pending !== undefined && (pending.count > 0 || pending.blocks.length > 0);
 
-export function TeEspera({ pending, onJump, away }: TeEsperaProps) {
+// What waits, each thing once: the secretary's question about an item that waits for them as well
+// is that item (core/waiting.ts), so «Te espera» counts and lists what Te toca and the rail count.
+function once(pending: Pending | undefined): Pending | undefined {
+  return pending && { ...pending, entries: counted(pending.entries) };
+}
+
+export function TeEspera({ pending: read, onJump, away }: TeEsperaProps) {
   const app = useApp();
+  const pending = once(read);
   const short = app.short;
   // What the person chose by tapping the head; until then it opens as the content asks.
   const [chosen, setChosen] = useState<boolean | undefined>();
@@ -244,7 +258,9 @@ function AwayStrip({
   const [open, setOpen] = useState(false);
   const here = waits(pending) ? pending : undefined;
   const sentence =
-    away.waiting > 0 ? t('hablar.away.short', { count: away.waiting }) : t('hablar.away.shortNone');
+    away.waiting.count > 0
+      ? t('hablar.away.short', { what: waitingWords(away.waiting) })
+      : t('hablar.away.shortNone');
   // Since when and that the messages are kept: under the line, which is short on purpose.
   const since = away.since
     ? t('hablar.away', { since: momentLabel(away.since, app.now) })

@@ -17,9 +17,13 @@ export const hablar = {
     'It restarts on your computer, not from here: open a session of your agent and paste this text into it.',
   'hablar.away.back.desk':
     'It restarts on your computer: open a session of your agent and paste this text into it.',
-  'hablar.away.short': {
-    one: 'Your secretary is offline · {count} message waiting',
-    other: 'Your secretary is offline · {count} messages waiting',
+  'hablar.away.short': 'Your secretary is offline · {what} waiting',
+  // What waits for it, by what each is (Hablar's strip and Te toca's card say it the same way).
+  'secretary.waiting.messages': { one: '{count} message', other: '{count} messages' },
+  'secretary.waiting.notes': { one: '{count} note', other: '{count} notes' },
+  'secretary.waiting.reports': {
+    one: '{count} report from an agent',
+    other: '{count} reports from agents',
   },
   'hablar.away.shortNone': 'Your secretary is offline',
   'hablar.away.cmds': 'Or with commands, in the terminal',

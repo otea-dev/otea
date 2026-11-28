@@ -1,4 +1,5 @@
 import {
+  counted,
   OFF_ITEM,
   type Pending,
   type PendingEntry,
@@ -6,27 +7,56 @@ import {
   type PendingSecretary,
   type QueueBlock,
 } from '../../src/core/pending.ts';
+import { countedOff, waitsForPerson } from '../../src/core/waiting.ts';
+import type { SecretaryView } from './conversation.ts';
 import { hablarHash, type ViewRoute } from './selection.ts';
+import type { Item } from './types.ts';
 
 // What waits for the person, as Otea counts it (src/app/pending.ts, GET /api/pending): Te toca adds
 // what is no item to its lists (a question on a Bandeja note, a question of the secretary), Hablar
 // pins the whole of it, and the board says what holds its queue.
 
 export type { Pending, PendingEntry, PendingKind, PendingSecretary, QueueBlock };
+export { counted };
+
+// What the screens read to count: the items as the desk holds them live, the time, and what Otea
+// counted of what is no item (GET /api/pending).
+export type WaitItem = Pick<Item, 'id' | 'turn' | 'lease'> & Partial<Pick<Item, 'expiredLease'>>;
+
+export type Waiting = {
+  all: readonly WaitItem[];
+  now: number;
+  pending?: Pending | null | undefined;
+};
 
 // What waits for the person that no list of items holds: the Bandeja's and the secretary's
-// questions. Te toca shows them with the questions for you and counts them with the rest.
-export function offItemEntries(pending: Pending | null | undefined): PendingEntry[] {
-  return (pending?.entries ?? []).filter(({ kind }) => OFF_ITEM.includes(kind));
+// questions, what agents escalated, a board nobody works. Te toca shows each under its own heading
+// and counts them with the rest. A question of the secretary's about an item that waits for them on
+// its own is that item, not another thing: it is left out here (core/waiting.ts isCovered).
+export function offItemEntries({ pending, all, now }: Waiting): PendingEntry[] {
+  const off = (pending?.entries ?? []).filter(({ kind }) => OFF_ITEM.includes(kind));
+  const theirs = all.filter((item) => waitsForPerson(item, now)).map(({ id }) => id);
+  return countedOff(off, new Set(theirs));
 }
 
 // How many of them, for the number of Your turn.
-export const offItemCount = (pending: Pending | null | undefined): number =>
-  offItemEntries(pending).length;
+export const offItemCount = (waiting: Waiting): number => offItemEntries(waiting).length;
 
-// The oldest of them, for «waiting since».
-export function oldestOffItem(pending: Pending | null | undefined): string | null {
-  const times = offItemEntries(pending).flatMap(({ since }) => (since === null ? [] : [since]));
+// The number of Te toca, the one number every surface shows for what waits for the person: the
+// items on their turn, what got stuck, and what is no item (the rail, the tab bar, the tab's title,
+// the project menu, the dek, the tray).
+export function waitingCount(waiting: Waiting): number {
+  return waitingTotal(waiting.all, waiting.now, offItemCount(waiting));
+}
+
+// The formula, once: the items on their turn or stuck, and what is no item.
+export function waitingTotal(items: readonly WaitItem[], now: number, off: number): number {
+  return items.filter((item) => waitsForPerson(item, now)).length + off;
+}
+
+// The oldest of the entries that are no item, for «waiting since».
+export function oldestOffItem(waiting: Waiting): string | null {
+  const times = offItemEntries(waiting).flatMap(({ since }) => (since === null ? [] : [since]));
   return times.sort()[0] ?? null;
 }
 
@@ -58,7 +88,8 @@ export const rowKeyOf = (entry: PendingEntry): string =>
         : entry.ref;
 
 // The secretary shown offline with something waiting for it: Te toca says so, with a way to Hablar.
-export function offlineWithWaiting(pending: Pending | null | undefined): PendingSecretary | null {
-  const secretary = pending?.secretary;
+export function offlineWithWaiting(
+  secretary: SecretaryView | null | undefined,
+): SecretaryView | null {
   return secretary?.state === 'offline' && secretary.waiting.count > 0 ? secretary : null;
 }

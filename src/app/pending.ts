@@ -5,6 +5,7 @@ import { type Message, messageSnippet } from '../core/conversation.ts';
 import { activeLease } from '../core/lease.ts';
 import {
   type BoardQueue,
+  counted,
   type Pending,
   type PendingDone,
   type PendingEnded,
@@ -15,6 +16,7 @@ import {
 } from '../core/pending.ts';
 import { quoteAgent } from '../core/quote.ts';
 import { timeText } from '../core/time.ts';
+import { isStuck } from '../core/waiting.ts';
 import { selectOpenQuestions } from '../store/conversation.ts';
 import { findItem, selectEvents, selectStateEntries } from '../store/queries.ts';
 import { selectOpenEscalations } from '../store/secretary.ts';
@@ -28,7 +30,7 @@ import { landWaitOf, liveBoardOf, liveBoards } from './next.ts';
 import { scanned } from './overlap.ts';
 import { listAgents, sessionEnded } from './presence.ts';
 import { secretaryStatus } from './secretary.ts';
-import { secretaryWaiting } from './secretary-waiting.ts';
+import { secretaryView } from './secretary-waiting.ts';
 import { stepFactsOf } from './step-facts.ts';
 
 // What waits for the person, read from the records as they stand now (F4): the items on their turn
@@ -158,6 +160,7 @@ function sortEntries(entries: PendingEntry[]): PendingEntry[] {
 function entriesOf(ctx: Context, items: readonly Item[], now: Clock): PendingEntry[] {
   const entered = selectStateEntries(ctx.db);
   const out: PendingEntry[] = [];
+  const nowMs = Date.parse(now());
   for (const item of items) {
     const since = entered.get(item.id) ?? item.createdAt;
     if (item.turn === 'human') {
@@ -176,12 +179,7 @@ function entriesOf(ctx: Context, items: readonly Item[], now: Clock): PendingEnt
       } else {
         out.push({ kind: kindOfTurn(ctx, item), ref: item.id, title: item.title, since });
       }
-    } else if (
-      item.turn === 'agent' &&
-      item.expiredLease &&
-      !item.expiredLease.connected &&
-      !item.lease
-    ) {
+    } else if (isStuck(item, nowMs)) {
       out.push({
         kind: 'stuck',
         ref: item.id,
@@ -391,10 +389,10 @@ export function pendingOf(
     ...entriesOf(ctx, items, now),
     ...workerEntries(ctx, queues, items, now),
   ]);
-  const status = secretaryStatus(ctx.db, now);
+  const status = secretaryView(ctx.db, now);
   const ended = options.blocks === false ? [] : endedOf(ctx, items, now);
   return {
-    count: entries.length,
+    count: counted(entries).length,
     entries,
     blocks:
       options.blocks === false
@@ -408,7 +406,7 @@ export function pendingOf(
           name: status.name,
           state: status.state,
           since: status.since,
-          waiting: secretaryWaiting(ctx.db),
+          waiting: status.waiting,
         }
       : null,
   };
@@ -553,9 +551,20 @@ export function pendingText(pending: Pending, lang: Lang = 'en'): string {
     .filter(([, n]) => n > 0)
     .map(([head, n]) => `${head.toLowerCase()} ${n}`)
     .join(', ');
+  // Your own question about an item that waits for them as well is listed, but it is that item, not
+  // a second thing: the count above leaves it out.
+  const once = new Set(counted(entries));
   const sections = GROUPS.flatMap(({ kinds, head }) => {
     const mine = entries.filter(({ kind }) => kinds.includes(kind));
-    return mine.length === 0 ? [] : [`${head}:`, ...mine.map((entry) => `  ${lineOf(entry)}`)];
+    return mine.length === 0
+      ? []
+      : [
+          `${head}:`,
+          ...mine.map(
+            (entry) =>
+              `  ${lineOf(entry)}${once.has(entry) ? '' : ` (the same thing as ${entry.about}, which waits for them: not counted twice)`}`,
+          ),
+        ];
   });
   const holds = blocks.map(
     ({ first, waitsFor, waiting }) =>

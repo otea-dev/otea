@@ -58,9 +58,16 @@ function worksOnlyElsewhere(
 // person, and the refiner, which turns the Bandeja's notes into items and waits for the next note
 // (neither takes an item, so neither is the one an item waits in the queue for, and neither counts
 // as a listener on the boards: field study 3, S2, and the review of F6).
-function takers(agents: readonly Agent[] | null | undefined): Agent[] {
+//
+// «Agents» is said of these and only these on every surface: the pill and its menu count them, and
+// the notices say «no agent is connected» when none is. The secretary has its own place (the rail's
+// dot, Hablar), so a project with the secretary alone never reads «1 listening» in the pill and «no
+// agent connected» on its items at once (the owner's rule: what is shown must be true).
+export function workersOf(agents: readonly Agent[] | null | undefined): Agent[] {
   return (agents ?? []).filter((a) => a.role !== 'secretary' && a.role !== 'refiner');
 }
+
+const takers = workersOf;
 
 // Whether one agent is at work: the server's status, the one definition the pill, the menu and the
 // queue note share (it holds an item it works on, not one that waits for its own question to be

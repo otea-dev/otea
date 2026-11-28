@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { messageSnippet } from '../core/conversation.ts';
 import { REPLY_WINDOW_MS, type SecretaryFacts } from '../core/notify/signals.ts';
+import type { SecretaryView, SecretaryWaiting } from '../core/secretary.ts';
 import { countPending, selectOpenQuestions, selectRepliesSince } from '../store/conversation.ts';
 import { selectOpenEscalations } from '../store/secretary.ts';
 import { type Clock, systemClock } from './items.ts';
@@ -32,13 +33,33 @@ function escalated(db: DatabaseSync): Waiting {
   return { count: open.length, since: open[0]?.at ?? null };
 }
 
-export function secretaryWaiting(db: DatabaseSync): Waiting {
-  const all = [countPending(db), escalated(db), ...sources.map((source) => source(db))];
+export function secretaryWaiting(db: DatabaseSync): SecretaryWaiting {
+  const messages = countPending(db);
+  const reports = escalated(db);
+  const notes = sources.map((source) => source(db));
+  const all = [messages, reports, ...notes];
   const since = all
     .map((each) => each.since)
     .filter((at): at is string => at !== null)
     .sort()[0];
-  return { count: all.reduce((n, each) => n + each.count, 0), since: since ?? null };
+  return {
+    count: all.reduce((n, each) => n + each.count, 0),
+    since: since ?? null,
+    messages: messages.count,
+    notes: notes.reduce((n, each) => n + each.count, 0),
+    reports: reports.count,
+  };
+}
+
+// The secretary as the desk, the conversation and `otea pending` show it: its status and what waits
+// for it, one answer for all of them. Undefined while the project has none.
+export function secretaryView(
+  db: DatabaseSync,
+  now: Clock = systemClock,
+  agents?: Parameters<typeof secretaryStatus>[3],
+): SecretaryView | undefined {
+  const status = secretaryStatus(db, now, undefined, agents);
+  return status ? { ...status, waiting: secretaryWaiting(db) } : undefined;
 }
 
 // Undefined while the project has no secretary.

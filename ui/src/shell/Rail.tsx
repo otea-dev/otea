@@ -7,7 +7,7 @@ import { useBoards } from '../board-studio/home/boards-store.ts';
 import { freshlyLive } from '../board-studio/home/home-model.ts';
 import { openNewBoard } from '../board-studio/home/studio-dialogs.ts';
 import type { SecretaryStatus } from '../conversation.ts';
-import { stuckCount, tocaCount } from '../derive/toca.ts';
+import { stuckCount } from '../derive/toca.ts';
 import { t } from '../i18n/i18n.ts';
 import { TypeIcon } from '../icons/TypeIcon.tsx';
 import { IconButton } from '../kit/Button.tsx';
@@ -16,10 +16,9 @@ import { Icon } from '../kit/Icon.tsx';
 import { C, F, lerp } from '../motion/curves.ts';
 import { type Drive, drive } from '../motion/drive.ts';
 import { reduced } from '../motion/reduced.ts';
-import { offItemCount } from '../pending.ts';
+import { waitingCount } from '../pending.ts';
 import { studioHash, type ViewRoute } from '../selection.ts';
 import { SecretaryMark } from '../views/hablar/SecretaryMark.tsx';
-import { useSecretary } from '../views/hablar/use-conversation.ts';
 import { focusContentSoon, livePlace } from './focus-content.ts';
 import { PrefsButton } from './Preferences.tsx';
 import { type BoardIcon, boardEntries, foldClip, type RailKey, railKey } from './rail-model.ts';
@@ -237,10 +236,11 @@ export function Rail() {
   const navs = useRef<HTMLDivElement>(null);
   const key = railKey(app.route);
   const { canWrite, canConfigure } = app.session;
-  const yours = tocaCount(app.all, { now: app.now }, offItemCount(app.pending));
+  const yours = waitingCount(app);
   const stuck = stuckCount(app.all, { now: app.now });
-  const boards = boardEntries(app.collections, app.all);
-  const secretary = useSecretary();
+  const boards = boardEntries(app.collections, app.all, app.now);
+  // The secretary as the whole desk shows it, read once (app.secretary), never again by the rail.
+  const secretary = app.secretary;
   const foldLabel = folded ? t('nav.show') : t('nav.hide');
 
   useSelPill(navs, key);

@@ -1,6 +1,7 @@
 import { isClosed, positionOf, waysOf } from '../../../src/core/board/engine.ts';
 import type { BoardDefinition } from '../../../src/core/board/model.ts';
 import { legacyAsks } from '../../../src/core/board/questions.ts';
+import { isStuck, waitsForPerson } from '../../../src/core/waiting.ts';
 import { activeLease } from '../active-lease.ts';
 import type { FeedEvent } from '../activity.ts';
 import { onPublishedBoard } from '../board-studio/home/boards-store.ts';
@@ -56,16 +57,9 @@ export function boardThen(
 // Closed work stays in Cerrados for a week.
 export const CLOSED_FOR = 7 * 24 * 60 * 60_000;
 
-// An agent's lease ran out with nobody releasing it, and nobody took the item again.
-export function isStuck(item: Item, now: number): boolean {
-  // A lapsed lease of an agent that is still connected is no stuck item: it went back to the queue.
-  return (
-    item.turn === 'agent' &&
-    !!item.expiredLease &&
-    !item.expiredLease.connected &&
-    !activeLease(item.lease, now)
-  );
-}
+// An agent's lease ran out with nobody releasing it, and nobody took the item again: the one rule of
+// the server and every screen (src/core/waiting.ts).
+export { isStuck };
 
 export type HandedNote = { agent: string; reason: string; at: string };
 
@@ -144,30 +138,22 @@ export function tocaSection(item: Item, ctx: TocaContext): TocaSection | null {
   return 'revisiones';
 }
 
-// What waits for you: your turn, and what got stuck (the rail, the mark, the title), and what is no
-// item (`extra`: the questions on a Bandeja note and of the secretary, which Otea counts).
-export function tocaCount(
-  items: readonly Item[],
-  ctx: Pick<TocaContext, 'now'>,
-  extra = 0,
-): number {
-  return items.filter((item) => item.turn === 'human' || isStuck(item, ctx.now)).length + extra;
-}
-
 export function stuckCount(items: readonly Item[], ctx: Pick<TocaContext, 'now'>): number {
   return items.filter((item) => isStuck(item, ctx.now)).length;
 }
 
-// A board's pair in the rail: on your turn / open.
+// A board's pair in the rail: what waits for you on it (your turn, or stuck: the same rule as the
+// number of Te toca) / open.
 export function boardCounts(
   items: readonly Item[],
   board: string,
+  now: number,
 ): { yours: number; open: number } {
   let yours = 0;
   let open = 0;
   for (const item of items) {
     if (item.collection !== board) continue;
-    if (item.turn === 'human') yours++;
+    if (waitsForPerson(item, now)) yours++;
     if (item.turn !== 'none') open++;
   }
   return { yours, open };

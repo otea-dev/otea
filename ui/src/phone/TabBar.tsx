@@ -1,10 +1,9 @@
 import type { Ref } from 'react';
 import { useApp } from '../app/context.tsx';
 import { useWorkspace, type Workspace } from '../app/workspace.ts';
-import { tocaCount } from '../derive/toca.ts';
 import { t } from '../i18n/i18n.ts';
 import { Icon } from '../kit/Icon.tsx';
-import { offItemCount } from '../pending.ts';
+import { waitingCount } from '../pending.ts';
 import type { Route } from '../selection.ts';
 import { openCapture } from './capture.ts';
 import { navSheet, useNavSheet } from './nav.ts';
@@ -121,7 +120,7 @@ export function TabBar() {
     <TabBarView
       ref={ref}
       on={tabOn(app.route)}
-      toca={tocaCount(app.all, { now: app.now }, offItemCount(app.pending))}
+      toca={waitingCount(app)}
       panelOpen={open}
       onHablar={() => {
         navSheet.close();

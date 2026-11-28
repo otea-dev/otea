@@ -11,6 +11,8 @@
 // - secretary_reply: the secretary answered the person in Hablar (secretarySignalsOf);
 // - secretary_offline: the secretary is offline and the person's messages have waited long.
 
+import { isStuck } from '../waiting.ts';
+
 export const NOTIFY_KINDS = [
   'turn',
   'ask',
@@ -34,7 +36,7 @@ export type NotifyFacts = {
   turn: 'human' | 'agent' | 'none';
   round?: number;
   lease: Lease | null;
-  expiredLease?: Lease;
+  expiredLease?: Lease & { connected?: true };
   asks?: { question: number; by: string; text?: string; options?: string[] };
   notes?: { replied?: { note: number; by: string; at: string } };
   // Set aside for later by an agent, while nothing lifted it (app/set-aside.ts).
@@ -155,9 +157,6 @@ export function bandejaSignalsOf(asks: readonly BandejaAskFacts[]): Signal[] {
   }));
 }
 
-const active = (lease: Lease | null, now: number) =>
-  lease !== null && Date.parse(lease.expiresAt) > now;
-
 export function signalsOf(items: readonly NotifyFacts[], now: number): Signal[] {
   const out: Signal[] = [];
   for (const facts of items) {
@@ -178,8 +177,9 @@ export function signalsOf(items: readonly NotifyFacts[], now: number): Signal[] 
           : { key: base, kind: 'turn', item, title },
       );
     }
+    // Stuck as the desk counts it (core/waiting.ts): never a push for a lapse the desk calls calm.
     const quiet = facts.expiredLease;
-    if (facts.turn === 'agent' && quiet && !active(facts.lease, now)) {
+    if (quiet && isStuck(facts, now)) {
       out.push({
         key: `stuck:${item}:${quiet.holder}:${quiet.expiresAt}`,
         kind: 'stuck',

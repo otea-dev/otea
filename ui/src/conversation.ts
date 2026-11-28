@@ -5,7 +5,11 @@ import {
   type MessageKind,
   messageSnippet,
 } from '../../src/core/conversation.ts';
-import type { SecretaryStatus } from '../../src/core/secretary.ts';
+import type {
+  SecretaryStatus,
+  SecretaryView,
+  SecretaryWaiting,
+} from '../../src/core/secretary.ts';
 import { activeLease } from './active-lease.ts';
 import type { Look } from './lanes/looks.ts';
 import { lookOf } from './lanes/looks.ts';
@@ -15,7 +19,15 @@ import type { Item } from './types.ts';
 // worked into turns, and what a turn produced worked into what the view draws: the thinking state,
 // the folded reply, the branch of items, the cards of «Lo que salió».
 
-export type { FromMessage, Message, MessageFile, MessageKind, SecretaryStatus };
+export type {
+  FromMessage,
+  Message,
+  MessageFile,
+  MessageKind,
+  SecretaryStatus,
+  SecretaryView,
+  SecretaryWaiting,
+};
 export { messageSnippet };
 
 // A snippet of a message to quote in one line («sobre «…»», a title): the code marks of its backticks
@@ -24,8 +36,9 @@ export function quotedSnippet(text: string, max: number): string {
   return messageSnippet(text.replaceAll('`', ''), max);
 }
 
-// What GET /api/conversation answers: the messages in order, the secretary as M1 tells it, and how
-// many of the person's messages wait for it.
+// What GET /api/conversation answers: the messages in order. The secretary and what waits for it
+// come with it (the same object GET /api/secretary gives), but the desk never reads them here: it
+// reads them once, as `app.secretary`, so no screen shows a state another one has moved past.
 export type ConversationView = {
   messages: Message[];
   more: boolean;

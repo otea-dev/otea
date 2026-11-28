@@ -64,6 +64,7 @@ export function boardIcon(icon: string | null | undefined): BoardIcon {
 export function boardEntries(
   collections: readonly CollectionView[],
   items: readonly Item[],
+  now: number,
 ): BoardEntry[] {
   const letters = iconBadges(collections.map((c) => ({ name: c.name, icon: c.icon ?? undefined })));
   return collections.map((c) => {
@@ -72,7 +73,7 @@ export function boardEntries(
       name: c.name,
       icon: boardIcon(c.icon),
       ...(letter ? { letter } : {}),
-      ...boardCounts(items, c.name),
+      ...boardCounts(items, c.name, now),
     };
   });
 }

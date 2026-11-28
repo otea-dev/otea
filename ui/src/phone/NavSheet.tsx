@@ -1,18 +1,16 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useApp } from '../app/context.tsx';
 import type { SecretaryStatus } from '../conversation.ts';
-import { tocaCount } from '../derive/toca.ts';
 import { t } from '../i18n/i18n.ts';
 import { Count } from '../kit/Count.tsx';
 import { Icon } from '../kit/Icon.tsx';
 import { Buddy } from '../kit/Marks.tsx';
-import { offItemCount } from '../pending.ts';
+import { waitingCount } from '../pending.ts';
 import type { Route, ViewRoute } from '../selection.ts';
 import { RowIcon, SecretaryDot } from '../shell/Rail.tsx';
 import { type BoardEntry, boardEntries } from '../shell/rail-model.ts';
 import { shellUi } from '../shell/shell-ui.ts';
 import { SecretaryMark } from '../views/hablar/SecretaryMark.tsx';
-import { useSecretary } from '../views/hablar/use-conversation.ts';
 import { BottomSheet } from './BottomSheet.tsx';
 import { navSheet, useNavSheet } from './nav.ts';
 
@@ -143,7 +141,7 @@ export function NavSheet() {
   const [now, setNow] = useState(false);
   const phone = app.phone;
   const view = navOn(app.route) ?? app.route.view;
-  const secretary = useSecretary();
+  const secretary = app.secretary;
 
   // Off the phone there is no sheet to keep open.
   useEffect(() => {
@@ -176,9 +174,9 @@ export function NavSheet() {
     >
       <NavBody
         route={app.route}
-        toca={tocaCount(app.all, { now: app.now }, offItemCount(app.pending))}
+        toca={waitingCount(app)}
         secretary={secretary}
-        boards={boardEntries(app.collections, app.all)}
+        boards={boardEntries(app.collections, app.all, app.now)}
         onGo={(to) => {
           closeNow();
           app.go(to);

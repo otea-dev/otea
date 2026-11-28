@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
+import type { DatabaseSync } from 'node:sqlite';
 import type { Performer } from '../core/authority.ts';
 import { checkOptions, DELEGATED } from '../core/board/questions.ts';
 import {
@@ -19,7 +20,7 @@ import { OteaError } from '../core/errors.ts';
 import { evidenceTypeOf, MAX_EVIDENCE_BYTES, MAX_EVIDENCE_MB } from '../core/evidence.ts';
 import type { Actor } from '../core/item.ts';
 import { plainLine, quoteAgent } from '../core/quote.ts';
-import type { SecretaryStatus } from '../core/secretary.ts';
+import type { SecretaryView, SecretaryWaiting } from '../core/secretary.ts';
 import { clockText, timeText } from '../core/time.ts';
 import { selectEntryOfItem } from '../store/bandeja.ts';
 import {
@@ -63,7 +64,8 @@ import {
 } from './evidence.ts';
 import { type Clock, requireItem, requireWritableItem, systemClock } from './items.ts';
 import type { Project } from './project.ts';
-import { addSecretarySource, requireSecretary, secretaryStatus } from './secretary.ts';
+import { addSecretarySource, requireSecretary } from './secretary.ts';
+import { secretaryView } from './secretary-waiting.ts';
 
 // The conversation between the person and the project's secretary (core/conversation.ts).
 //
@@ -749,10 +751,16 @@ export type Conversation = {
   messages: Message[];
   // More messages lie beyond this page (after `since`, before `before`, else earlier than the first).
   more: boolean;
-  // The secretary as M1 tells it, and how many of the person's messages wait for it.
-  secretary: SecretaryStatus | null;
-  waiting: { count: number; since: string | null };
+  // The secretary as M1 tells it, and what waits for it (the same object GET /api/secretary gives).
+  secretary: SecretaryView | null;
+  waiting: SecretaryWaiting;
 };
+
+// With no secretary nothing is read, so only the person's own messages wait.
+function withoutSecretary(db: DatabaseSync): SecretaryWaiting {
+  const messages = countPending(db);
+  return { ...messages, messages: messages.count, notes: 0, reports: 0 };
+}
 
 function limitOf(limit: number | undefined): number {
   if (limit === undefined) return PAGE_SIZE;
@@ -776,11 +784,14 @@ export function listConversation(
   if (look.since !== undefined && look.before !== undefined)
     invalid('Give since or before, not both');
   const { messages, more } = selectMessages(project.db, page);
+  const secretary = secretaryView(project.db, now) ?? null;
+  // What waits for the secretary is one count with the secretary's own state, never a second one:
+  // with none, only the person's messages wait for it.
   return {
     messages,
     more,
-    secretary: secretaryStatus(project.db, now) ?? null,
-    waiting: countPending(project.db),
+    secretary,
+    waiting: secretary?.waiting ?? withoutSecretary(project.db),
   };
 }
 

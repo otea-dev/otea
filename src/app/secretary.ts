@@ -85,8 +85,10 @@ export function declareSecretary(
     const current = secretaryName(db);
     let replaced: string | null = null;
     if (current !== undefined && current !== agent) {
-      const there = listAgents(db, now, processes).find(({ name }) => name === current);
-      if (!secretaryGone(there, Date.parse(now()))) {
+      // The same answer the desk gives («desconectado»): never a second reading of «gone», so the
+      // person is never told to paste the text into a new session that is then refused (s-real2,
+      // D-5645a2).
+      if (secretaryStatus(db, now, processes)?.state !== 'offline') {
         throw new OteaError(
           'secretary_taken',
           `${current} is this project's secretary and is not gone: a project has one. If that is your own earlier session under another name, use ${current}, or wait until its session is gone (it ends with the session, else after ${SECRETARY_HELD_MS / 60_000} minutes without a sign); otherwise ask the person`,

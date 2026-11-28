@@ -30,6 +30,7 @@ import { F, lerp } from '../../motion/curves.ts';
 import { drive } from '../../motion/drive.ts';
 import { reduced } from '../../motion/reduced.ts';
 import type { PendingEntry } from '../../pending.ts';
+import { NOTHING_WAITING } from '../../secretary-waiting.ts';
 import { useMedia } from '../../shell/use-media.ts';
 import type { Item } from '../../types.ts';
 import { CopiedSay } from './Away.tsx';
@@ -172,7 +173,8 @@ export function HablarView({
   const scroller = useRef<HTMLDivElement>(null);
   const near = useRef(true);
   const messages = convo.status === 'ready' ? convo.messages : undefined;
-  const secretary = convo.status === 'ready' ? convo.secretary : null;
+  // The secretary as every screen shows it (app.secretary): read once, never again from here.
+  const secretary = app.secretary ?? null;
   const items = useMemo(
     () => new Map<string, Item>(app.all.map((item) => [item.id, item])),
     [app.all],
@@ -428,7 +430,7 @@ export function HablarView({
     });
 
   const name = app.project?.name ?? '';
-  const none = convo.status === 'ready' && secretary === null;
+  const none = convo.status === 'ready' && app.secretary === null;
   const status = !offline && secretary && secretary.state !== 'offline' ? secretary : null;
   return (
     <div className="hb" data-tab={tab} data-empty={turns.length === 0 || undefined}>
@@ -512,7 +514,7 @@ export function HablarView({
             away
               ? {
                   since: away.since,
-                  waiting: convo.status === 'ready' ? convo.waiting.count : 0,
+                  waiting: secretary?.waiting ?? NOTHING_WAITING,
                   name: secretary?.name,
                 }
               : undefined

@@ -30,6 +30,7 @@ describe('the rail’s boards', () => {
     const icons = boardEntries(
       [board('Errores', 'bug'), board('Mapas', 'mountain'), board('Sueltos', null)],
       [],
+      Date.now(),
     ).map((b) => b.icon);
     expect(icons).toEqual([
       { kind: 'mock', name: 'bug' },

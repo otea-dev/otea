@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { clockOf } from '../activity.ts';
 import { useApp } from '../app/context.tsx';
 import { Prof } from '../components/Prof.tsx';
-import { tocaCount } from '../derive/toca.ts';
 import { agoLabel } from '../format.ts';
 import { t, tx } from '../i18n/i18n.ts';
 import { iconDrawing, TypeIcon } from '../icons/TypeIcon.tsx';
@@ -12,8 +11,9 @@ import { MenuLabel } from '../kit/pop/Menu.tsx';
 import { Pop } from '../kit/pop/Pop.tsx';
 import { lookOf } from '../lanes/looks.ts';
 import { NodeGlyph } from '../lanes/NodeGlyph.tsx';
+import { workersOf } from '../listening.ts';
 import { useSync } from '../offline/sync-state.ts';
-import { offItemCount } from '../pending.ts';
+import { waitingCount } from '../pending.ts';
 import { closeSearch, openSearch, useSearchOpen } from '../phone/search-open.ts';
 import { monogramOf } from '../place-icons.ts';
 import { waitingElsewhere } from '../projects.ts';
@@ -188,7 +188,7 @@ function ProjectPill() {
     ? projectRows(
         project,
         app.projects,
-        tocaCount(app.all, { now: app.now }, offItemCount(app.pending)),
+        waitingCount(app),
         app.phone,
         app.route.view === 'hablar' ? '#/hablar' : undefined,
       )
@@ -577,7 +577,7 @@ function AgentsPill() {
   if (stale && app.agents === undefined) return null;
   const agents = app.agents ?? [];
   // One source for the pill and its menu: the menu's rows.
-  const rows = agentRows(agents, app.all, app.now, app.feed);
+  const rows = agentRows(workersOf(agents), app.all, app.now, app.feed);
   const known = stale ? 'live' : connection;
   const mark = stale ? (agentCounts(rows).live > 0 ? 'idle' : 'none') : pillMark(known, rows);
   const summary = pillSummary(known, rows);
@@ -662,7 +662,7 @@ function SearchButton() {
 
 export function Topbar() {
   const app = useApp();
-  const yours = tocaCount(app.all, { now: app.now }, offItemCount(app.pending)) > 0;
+  const yours = waitingCount(app) > 0;
   const working = app.all.some((it) => lookOf(it, app.now) === 'working');
   return (
     <header className="topbar">

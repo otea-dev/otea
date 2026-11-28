@@ -177,7 +177,13 @@ describe('api', () => {
       emitSecretarySignal(project.db, { kind: 'person_message', ref: 'm-1' }, now);
 
       expect(await (await get('/p/memory-aaaaaa/api/secretary')).json()).toEqual({
-        secretary: { name: 'sol', state: 'listening', since: null, pending: 1 },
+        secretary: {
+          name: 'sol',
+          state: 'listening',
+          since: null,
+          pending: 1,
+          waiting: { count: 0, since: null, messages: 0, notes: 0, reports: 0 },
+        },
       });
       // The agents list carries its role, and it is no listener on the boards.
       const { agents } = (await (await get('/p/memory-aaaaaa/api/agents')).json()) as {
@@ -195,7 +201,13 @@ describe('api', () => {
       seeAgent(project.db, { agent: 'sol', channel: 'cli', harness: CLI_HARNESS }, () => long);
 
       expect(await (await get('/p/memory-aaaaaa/api/secretary')).json()).toEqual({
-        secretary: { name: 'sol', state: 'offline', since: long, pending: 0 },
+        secretary: {
+          name: 'sol',
+          state: 'offline',
+          since: long,
+          pending: 0,
+          waiting: { count: 0, since: null, messages: 0, notes: 0, reports: 0 },
+        },
       });
     });
   });

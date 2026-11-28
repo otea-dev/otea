@@ -9,6 +9,8 @@ export const toca = {
   'toca.sec.preguntas': 'Preguntas para ti',
   'toca.sec.revisiones': 'Revisiones',
   'toca.sec.propios': 'Tus propios pasos',
+  'toca.sec.avisos': 'Avisos de los agentes',
+  'toca.sec.sinagente': 'Tableros sin agente',
   'toca.sec.encamino': 'En camino',
   'toca.sec.cerrados': 'Cerrados',
   'toca.gloss.encamino': 'con los agentes por ahora',
@@ -93,10 +95,7 @@ export const toca = {
 
   // El secretario está desconectado y le esperan cosas
   'toca.secOff.title': '{name} está desconectado',
-  'toca.secOff.waiting': {
-    one: 'Lo espera {count} mensaje.',
-    other: 'Lo esperan {count} mensajes.',
-  },
+  'toca.secOff.waiting': 'Lo espera: {what}.',
   'toca.secOff.go': 'Abrir Hablar para traerlo de vuelta',
 
   // Tras el primer ítem terminado del proyecto: lo que suele venir después (una vez, y se va)

@@ -3,7 +3,7 @@ import { act, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Pending } from '../../../../src/core/pending.ts';
 import { type App, AppTestProvider } from '../../app/context.tsx';
-import type { ConversationView, Message } from '../../conversation.ts';
+import type { ConversationView, Message, SecretaryView } from '../../conversation.ts';
 import { ago, item, NOW } from '../../derive/fixtures.ts';
 import { setLanguage } from '../../i18n/i18n.ts';
 import { seenAtMount } from '../../kit/pop/toast.tsx';
@@ -144,9 +144,17 @@ afterEach(() => {
   setLanguage('en');
 });
 
+// The secretary as the desk holds it (`app.secretary`, one read for every screen): the fixture's
+// state, with its messages waiting counted as the server counts them.
+const secretaryOf = (view: ConversationView): SecretaryView | null =>
+  view.secretary && {
+    ...view.secretary,
+    waiting: { ...view.waiting, messages: view.waiting.count, notes: 0, reports: 0 },
+  };
+
 async function open(view: ConversationView, app: Partial<App> = {}, route = {}) {
   const calls = server(view);
-  const value = testApp({ now: NOW, ...app });
+  const value = testApp({ now: NOW, secretary: secretaryOf(view), ...app });
   page = mount(
     <AppTestProvider value={value}>
       <HablarView {...route} />
@@ -1029,7 +1037,7 @@ describe('the secretary thinking', () => {
       const toggle = q<HTMLButtonElement>(away, '.hb-away-toggle') as HTMLButtonElement;
       expect(q(root, '.hb-te')).toBeNull();
       expect(text(q(away, '.hb-away-full'))).toBe(
-        'Tu secretario está desconectado · 2 mensajes esperan',
+        'Tu secretario está desconectado · 2 mensajes esperando',
       );
       expect(toggle.getAttribute('aria-expanded')).toBe('false');
       expect(buttonNamed(away, 'Copiar')).toBeDefined();
@@ -1377,7 +1385,7 @@ describe('the secretary away, or never there', () => {
       }),
     );
     expect(text(q(root, '.hb-away-full'))).toBe(
-      'Tu secretario está desconectado · 2 mensajes esperan',
+      'Tu secretario está desconectado · 2 mensajes esperando',
     );
     // Since when, and that the messages are kept, once the line is opened.
     await press(q(root, '.hb-away-toggle'));

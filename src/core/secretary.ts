@@ -65,3 +65,18 @@ export type SecretaryStatus = {
   pending: number;
   session?: number;
 };
+
+// What waits for the secretary unattended, counted once (app/secretary-waiting.ts): the person's
+// messages it has not read, the Bandeja's notes nobody took, and what agents escalated to it. `count`
+// is their sum; the words say each part, so «2 messages» is never two of something else.
+export type SecretaryWaiting = {
+  count: number;
+  since: string | null;
+  messages: number;
+  notes: number;
+  reports: number;
+};
+
+// The secretary as every surface shows it: one status and what waits for it, read from one call
+// (GET /api/secretary, and the same object inside the conversation and the pending list).
+export type SecretaryView = SecretaryStatus & { waiting: SecretaryWaiting };

@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Pending } from '../../../../src/core/pending.ts';
 import { AppTestProvider } from '../../app/context.tsx';
+import type { SecretaryView } from '../../conversation.ts';
 import { ago, item, NOW } from '../../derive/fixtures.ts';
 import { setLanguage } from '../../i18n/i18n.ts';
 import { testApp } from '../../shell/test-app.ts';
@@ -39,12 +40,15 @@ const waiting: Pending = {
   entries: [],
   blocks: [],
   queues: [],
-  secretary: {
-    name: 'sol',
-    state: 'offline',
-    since: ago(60),
-    waiting: { count: 1, since: ago(30) },
-  },
+  secretary: null,
+};
+
+const away: SecretaryView = {
+  name: 'sol',
+  state: 'offline',
+  since: ago(60),
+  pending: 0,
+  waiting: { count: 1, since: ago(30), messages: 1, notes: 0, reports: 0 },
 };
 
 async function open(o: Parameters<typeof testApp>[0] = {}) {
@@ -55,6 +59,7 @@ async function open(o: Parameters<typeof testApp>[0] = {}) {
         phone: true,
         all: [item({ id: 'CAM-2', title: 'Modo oscuro', turn: 'human' })],
         pending: waiting,
+        secretary: away,
         ...o,
       })}
     >

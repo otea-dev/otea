@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { Pending, PendingEntry } from '../../../../src/core/pending.ts';
 import { type App, AppTestProvider } from '../../app/context.tsx';
+import type { SecretaryView } from '../../conversation.ts';
 import { item, NOW } from '../../derive/fixtures.ts';
 import type { CollectionView } from '../../types.ts';
 import { TocaView } from './TocaView.tsx';
@@ -128,39 +129,42 @@ describe('Te toca counts what is no item', () => {
 
 describe('Te toca with the secretary offline', () => {
   const working = item({ id: 'ERR-2', turn: 'agent', state: 'fixing' });
-  const offline = (count: number) =>
-    waiting([], {
-      secretary: {
-        name: 'sol',
-        state: 'offline',
-        since: at(50),
-        waiting: { count, since: at(45) },
-      },
-    });
+  const offline = (messages: number, notes = 0): SecretaryView => ({
+    name: 'sol',
+    state: 'offline',
+    since: at(50),
+    pending: 0,
+    waiting: { count: messages + notes, since: at(45), messages, notes, reports: 0 },
+  });
 
   for (const phone of [false, true]) {
     it(`says so with how many things wait for it, and links to Hablar (${phone ? 'phone' : 'desk'})`, () => {
-      const html = render(fake({ all: [working], phone, pending: offline(3) }));
+      const html = render(fake({ all: [working], phone, secretary: offline(3) }));
 
       expect(html).toContain('sol is offline');
-      expect(html).toContain('3 messages are waiting for it');
+      expect(html).toContain('3 messages waiting for it');
       expect(html).toContain('href="#/hablar"');
     });
   }
 
+  // s-real2, D-fbe122: «2 messages are waiting for it» was a note and a report, not messages.
+  it('names what waits for it by what each is, never as messages', () => {
+    const html = render(fake({ all: [working], secretary: offline(1, 2) }));
+    expect(html).toContain('1 message and 2 notes waiting for it');
+  });
+
   it('is silent when it is offline with nothing waiting for it', () => {
-    expect(render(fake({ all: [working], pending: offline(0) }))).not.toContain('is offline');
+    expect(render(fake({ all: [working], secretary: offline(0) }))).not.toContain('is offline');
   });
 
   it('is silent while the secretary is connected', () => {
-    const connected = waiting([], {
-      secretary: {
-        name: 'sol',
-        state: 'connected',
-        since: null,
-        waiting: { count: 2, since: null },
-      },
-    });
-    expect(render(fake({ all: [working], pending: connected }))).not.toContain('is offline');
+    const connected: SecretaryView = {
+      name: 'sol',
+      state: 'connected',
+      since: null,
+      pending: 0,
+      waiting: { count: 2, since: null, messages: 2, notes: 0, reports: 0 },
+    };
+    expect(render(fake({ all: [working], secretary: connected }))).not.toContain('is offline');
   });
 });

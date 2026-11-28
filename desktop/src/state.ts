@@ -1,3 +1,5 @@
+import type { Pending } from '../../src/core/pending.ts';
+import { waitsForPerson } from '../../src/core/waiting.ts';
 import { activeLease } from '../../ui/src/active-lease.ts';
 import {
   type Attention,
@@ -6,6 +8,7 @@ import {
   attentionOf,
   nextLeaseExpiry,
 } from '../../ui/src/attention.ts';
+import { waitingCount } from '../../ui/src/pending.ts';
 import type { Lang } from './copy.ts';
 import type { BadgeLabel } from './marks.ts';
 
@@ -17,6 +20,8 @@ export type DeskItem = {
   turn: 'human' | 'agent' | 'none';
   updatedAt: string;
   lease: { holder: string; expiresAt: string } | null;
+  // A lease that ran out with nobody releasing it (a stuck item waits for the person too).
+  expiredLease?: { holder: string; expiresAt: string; connected?: true };
 };
 
 export type CollectionCount = { name: string; yours: number; working: number };
@@ -37,12 +42,14 @@ export function deskAttention(
   items: readonly DeskItem[],
   collections: readonly string[],
   now: number,
+  // What Otea counts that is no item (GET /api/pending), so the tray says the number the rail says.
+  pending?: Pending,
 ): DeskAttention {
-  const attention = attentionOf(items, now);
+  const attention = { ...attentionOf(items, now), yours: waitingCount({ all: items, now, pending }) };
   const live = (item: DeskItem) => activeLease(item.lease, now);
   const holders = new Set(items.flatMap((item) => live(item)?.holder ?? []));
   const waitingYours = items
-    .filter((item) => item.turn === 'human')
+    .filter((item) => waitsForPerson(item, now))
     .toSorted((a, b) => Date.parse(a.updatedAt) - Date.parse(b.updatedAt))
     .slice(0, WAITING);
   const names = [...new Set([...collections, ...items.map((item) => item.collection)])];
@@ -55,7 +62,7 @@ export function deskAttention(
       const own = items.filter((item) => item.collection === name);
       return {
         name,
-        yours: own.filter((item) => item.turn === 'human').length,
+        yours: own.filter((item) => waitsForPerson(item, now)).length,
         working: own.filter((item) => live(item) !== null).length,
       };
     }),

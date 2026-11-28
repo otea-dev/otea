@@ -28,7 +28,6 @@ import { useKeepLanguage } from './language-sync.ts';
 import { MODULES } from './modules/registry.ts';
 import { useQuestionNotice } from './notify/question-notice.ts';
 import { OfflineBar } from './offline/OfflineBar.tsx';
-import { offItemCount } from './pending.ts';
 import { CaptureSheet } from './phone/CaptureSheet.tsx';
 import { DeskOnly, deskOnlyOf } from './phone/DeskOnly.tsx';
 import { NavSheet } from './phone/NavSheet.tsx';
@@ -126,7 +125,7 @@ function View({ route }: { route: Route }): ReactNode {
 function Shell() {
   const app = useApp();
   const ws = useWorkspace();
-  const { yours, working } = useAttention(app.all, offItemCount(app.pending));
+  const { yours, working } = useAttention(app.all, app.pending);
   const projectName = app.project?.name;
   const phone = app.phone;
   useEffect(
