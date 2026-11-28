@@ -1861,3 +1861,79 @@ describe('reading the conversation again', () => {
     expect(reads.length - first).toBeLessThanOrEqual(1);
   });
 });
+
+// Pilot 1 (a1, a2): Hablar read by a screen reader and driven by the keys alone.
+describe('Hablar for assistive technology', () => {
+  const longReply = [
+    'Listo: lo dejé en tres pasos.',
+    'Primero revisé la barra de abajo.',
+    'Luego medí el botón a 390 px.',
+    'Después probé el modo oscuro.',
+    'Y por último el modo claro.',
+  ].join('\n');
+
+  it('sets each message as an article whose heading says who spoke and when', async () => {
+    const { root } = await open(conversation({ messages: request() }));
+
+    const articles = all(root, 'article.hb-turn');
+    expect(articles).toHaveLength(2);
+    const names = articles.map((article) => {
+      const heading = q(article, 'h2');
+      expect(heading?.id).toBeTruthy();
+      expect(article.getAttribute('aria-labelledby')).toBe(heading?.id);
+      return text(heading);
+    });
+    expect(names[0]).toMatch(/^tú, /);
+    expect(names[1]).toMatch(/^secretario, /);
+  });
+
+  it('tells two questions of the same words apart by the item they are about', async () => {
+    const same = (id: string) =>
+      item({
+        id,
+        title: `Paso ${id}`,
+        turn: 'human',
+        asks: {
+          question: 2,
+          by: 'worker',
+          text: '¿Cómo seguimos?',
+          at: ago(3),
+          options: ['Así', 'Asá'],
+          recommended: undefined,
+        },
+      });
+    const { root } = await open(conversation({ messages: request(['CAM-3', 'CAM-4']) }), {
+      all: [same('CAM-3'), same('CAM-4')],
+    });
+
+    const names = all(root, 'fieldset.hb-ask').map((card) => card.getAttribute('aria-label'));
+    expect(names).toEqual(['¿Cómo seguimos? · CAM-3', '¿Cómo seguimos? · CAM-4']);
+  });
+
+  it('says what each «ver más» opens', async () => {
+    const { root } = await open(
+      conversation({
+        messages: [
+          say({ id: 1, author: 'person' }),
+          say({ id: 2, author: 'secretary', replyTo: 1, root: 1, text: longReply }),
+          say({ id: 3, author: 'person', text: 'otra' }),
+          say({
+            id: 4,
+            author: 'secretary',
+            replyTo: 3,
+            root: 3,
+            text: `Otra respuesta.\n${longReply}`,
+          }),
+        ],
+      }),
+    );
+
+    const toggles = all(root, '.hb-toggle');
+    expect(toggles.map((toggle) => toggle.getAttribute('aria-label'))).toEqual([
+      'ver más: Listo: lo dejé en tres pasos.',
+      'ver más: Otra respuesta.',
+    ]);
+    // What a sighted person reads stays the two words.
+    expect(toggles.map((toggle) => text(toggle))).toEqual(['ver más', 'ver más']);
+  });
+});

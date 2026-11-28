@@ -13,6 +13,12 @@ import { Ticked } from './Ticked.tsx';
 // it is shown from its start, cut to a few lines while it is long.
 const STRUCTURED = /^\s*(?:[#>|`]|[-*+]\s|\d+[.)]\s)/;
 
+// What a «ver más» is of, by the first words of the text.
+const snippet = (text: string): string => {
+  const line = text.trim().split(/\r?\n/, 1)[0] ?? '';
+  return line.length > 60 ? `${line.slice(0, 59).trimEnd()}…` : line;
+};
+
 export function ShortText({
   text,
   markdown = false,
@@ -31,12 +37,14 @@ export function ShortText({
   const [open, setOpen] = useState(false);
   const id = useId();
   // `target`: what the toggle opens is on the page now (a folded rest is not, so nothing is named).
-  const toggle = (shown: boolean, target: boolean) => (
+  const toggle = (shown: boolean, target: boolean, what: string) => (
     <button
       type="button"
       className="st-toggle"
       aria-expanded={open}
       aria-controls={target ? id : undefined}
+      // The words say «ver más»; the name says of what, since a page has many.
+      aria-label={`${shown ? t('hablar.less') : t('hablar.more')}: ${what}`}
       onClick={() => setOpen(!open)}
     >
       {shown ? t('hablar.less') : t('hablar.more')}
@@ -57,7 +65,7 @@ export function ShortText({
             </p>
           )}
         </div>
-        {long ? toggle(open, true) : null}
+        {long ? toggle(open, true, snippet(text)) : null}
       </>
     );
   }
@@ -79,7 +87,7 @@ export function ShortText({
           {draw(reply.rest, 'st-body')}
         </div>
       ) : null}
-      {reply.folds ? toggle(open, showRest) : null}
+      {reply.folds ? toggle(open, showRest, reply.lead || snippet(text)) : null}
     </>
   );
 }

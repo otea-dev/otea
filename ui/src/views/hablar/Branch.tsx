@@ -202,10 +202,11 @@ export function AskBody({
   };
   return (
     // A fieldset is a group: its accessible name is the question the buttons answer, by its first
-    // sentence (the whole of a long one is read in the page, not at every focus).
+    // sentence (the whole of a long one is read in the page, not at every focus), and what it is
+    // about when it is about something: three «¿Cómo seguimos?» are three names.
     <fieldset
       className="hb-ask"
-      aria-label={splitQuestion(text).lead}
+      aria-label={about ? `${splitQuestion(text).lead} · ${about}` : splitQuestion(text).lead}
       data-answered={said !== null ? '' : undefined}
       data-bare={bare ? '' : undefined}
     >

@@ -3,6 +3,11 @@ import type { Catalog } from '../i18n.ts';
 // El área shell del catálogo en español: la barra de arriba, sus menús, el riel, Preferencias y la
 // nota de idioma de la primera vez. Las palabras son las del mock.
 export const shell = {
+  // Las primeras paradas de la página: saltan el riel hasta donde está el trabajo
+  'skip.label': 'Saltar a',
+  'skip.content': 'Ir al contenido',
+  'skip.compose': 'Ir al cuadro de mensaje',
+  'skip.review': 'Ir a la siguiente revisión',
   // La barra: el proyecto, la marca y los agentes conectados a este proyecto
   'shell.projects': 'proyectos',
   'shell.projectsTitle': 'Proyectos',

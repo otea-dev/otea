@@ -549,6 +549,53 @@
   }
 }
 
+/* the first stops of the page: they wait out of sight and come up, as pills of the sheet's own
+   material, over the top bar when the keys reach them (pilot 1: they jump past the rail) */
+.skips {
+  position: fixed;
+  top: 10px;
+  left: 12px;
+  z-index: var(--z-flight);
+  display: flex;
+  gap: 6px;
+  pointer-events: none;
+}
+.skip {
+  position: absolute;
+  inset-inline-start: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.skip:focus-visible {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+  pointer-events: auto;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: var(--sheet);
+  color: var(--ink);
+  font: 500 13px / 1 var(--sans);
+  box-shadow:
+    0 0 0 1px var(--rule-2),
+    0 10px 30px -14px var(--shadow);
+  animation: skip-in var(--t-fade) var(--o-settle);
+}
+@keyframes skip-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+:root[data-motion="reduced"] .skip:focus-visible {
+  animation: none;
+}
+
 /* today's pages (Studio, Settings, the catalog) render inside .main as a view, until restyled */
 .layout {
   display: grid;

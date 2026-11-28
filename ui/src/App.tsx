@@ -36,6 +36,7 @@ import { TabBar } from './phone/TabBar.tsx';
 import type { Route } from './selection.ts';
 import { PreferencesView } from './shell/PreferencesView.tsx';
 import { Rail } from './shell/Rail.tsx';
+import { SkipLinks } from './shell/SkipLinks.tsx';
 import { Topbar } from './shell/Topbar.tsx';
 import { BoardView } from './views/board/BoardView.tsx';
 import { DetailHost } from './views/detail/DetailHost.tsx';
@@ -136,6 +137,7 @@ function Shell() {
   const route = app.route;
   return (
     <>
+      <SkipLinks />
       <LaneDefs />
       <div
         className="app"

@@ -1,6 +1,11 @@
 // The shell area of the English catalog: the topbar, its menus, the rail, Preferences and the
 // first-run language note.
 export const shell = {
+  // The first stops of the page: they jump past the rail to where the work is
+  'skip.label': 'Skip to',
+  'skip.content': 'Skip to the content',
+  'skip.compose': 'Skip to the message box',
+  'skip.review': 'Skip to the next review',
   // The topbar: the project, the mark and the agents connected to this project
   'shell.projects': 'projects',
   'shell.projectsTitle': 'Projects',

@@ -47,7 +47,10 @@ describe("an agent's question", () => {
   // The card is a group named by its question: the name is the conclusion, not the wall.
   it('names the card by the first sentence of the question', () => {
     const html = ask(WALL);
-    expect(html).toContain('aria-label="Para publicar la rama necesito que confirmes algo."');
+    // And by the item it is about, so that three «¿Cómo seguimos?» are three names.
+    expect(html).toContain(
+      'aria-label="Para publicar la rama necesito que confirmes algo. · CAM-1"',
+    );
     expect(html).not.toMatch(/aria-label="[^"]*otea repos add/);
   });
 
@@ -76,7 +79,7 @@ describe("an agent's question", () => {
     expect(shown).toContain('¿La integro en tu copia principal?');
     expect(shown).not.toContain('Aprobaste el arreglo.');
     expect(shown).toContain('see more');
-    expect(html).toContain('aria-label="¿La integro en tu copia principal?"');
+    expect(html).toContain('aria-label="¿La integro en tu copia principal? · CAM-1"');
   });
 
   it('leads with the last question when the context has questions of its own', () => {

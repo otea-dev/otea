@@ -394,6 +394,8 @@ function Reply({
             className="hb-toggle"
             aria-expanded={open}
             aria-controls={id}
+            // The words say «ver más»; the name says of what, since a page has many.
+            aria-label={`${open ? t('hablar.less') : t('hablar.more')}: ${reply.lead}`}
             onClick={() => setOpen(!open)}
           >
             {open ? t('hablar.less') : t('hablar.more')}
@@ -586,15 +588,28 @@ function Entry({
       </Row>
     );
   }
+  // Each message is an article named by who said it and when, so a screen reader can move from one
+  // to the next by heading and says whose words it is on landing.
+  const who =
+    message.author === 'person'
+      ? t('mark.you')
+      : message.author === 'secretary'
+        ? t('hablar.secretary')
+        : message.by;
+  const heading = `hb-h-${message.id}`;
   return (
-    <section
+    <article
       className="hb-turn"
       id={begins ? `hb-turn-${turn.root}` : undefined}
+      aria-labelledby={heading}
       data-k={`m:${message.id}`}
       data-found={found ? '' : undefined}
     >
+      <h2 id={heading} className="visually-hidden">
+        {who}, {noteTime(message.at, now)}
+      </h2>
       {body}
-    </section>
+    </article>
   );
 }
 
