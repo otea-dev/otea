@@ -94,6 +94,10 @@ export const laneD = (xh: number, y: number): string =>
 
 export const trunkD = (xh: number, W: number): string => `M${xh} ${RY.none}H${W}`;
 
+// How wide a name under a dip is drawn, at the route's 12.5 px italic serif (sheet.css .dips text):
+// the width the names are kept apart by.
+export const labelWidth = (label: string): number => label.length * 6.2;
+
 // A round you sent back, at the step it was sent back from.
 export type DipSpec = { at: number; label: string };
 export type Dip = { x: number; d: string; label?: string };

@@ -4,6 +4,7 @@ import {
   dipsOf,
   futureD,
   labelsShown,
+  labelWidth,
   laneD,
   type RouteStep,
   routeGeom,
@@ -97,6 +98,41 @@ describe('the dips under your lane (mock:2645-2654)', () => {
 
   it('skips a dip off the path', () => {
     expect(dipsOf(g, [{ at: -1, label: 'x' }])).toEqual([]);
+  });
+
+  // Field study s-real (D-5cb337): at 360 px two rounds sent back from different steps were named
+  // over each other, and neither could be read. The newest keeps its words, an older one gives way.
+  describe('the round named under each dip', () => {
+    const three: RouteStep[] = [
+      { name: 'aclarar', lane: 'ag' },
+      { name: 'hacer', lane: 'you' },
+      { name: 'hecho', lane: 'none' },
+    ];
+    const sent = [
+      { at: 0, label: 'ronda 1 · devuelta hoy' },
+      { at: 1, label: 'ronda 2 · devuelta hoy' },
+    ];
+    const spans = (w: number) =>
+      dipsOf(routeGeom(three, 1, 'you', w), sent).flatMap((d) =>
+        d.label
+          ? [{ label: d.label, a: d.x - labelWidth(d.label) / 2, b: d.x + labelWidth(d.label) / 2 }]
+          : [],
+      );
+    const touch = (list: ReturnType<typeof spans>) =>
+      list.some((p, i) => list.slice(i + 1).some((q) => p.a < q.b && q.a < p.b));
+
+    it('never lets two names overlap on a narrow route, and the newest keeps its words', () => {
+      const narrow = spans(328);
+      expect(touch(narrow)).toBe(false);
+      expect(narrow.map((p) => p.label)).toContain('ronda 2 · devuelta hoy');
+    });
+
+    it('keeps every name where there is room for them', () => {
+      expect(spans(1000).map((p) => p.label)).toEqual([
+        'ronda 1 · devuelta hoy',
+        'ronda 2 · devuelta hoy',
+      ]);
+    });
   });
 });
 
