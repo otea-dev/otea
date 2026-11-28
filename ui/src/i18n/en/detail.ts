@@ -250,6 +250,10 @@ export const detail = {
   'evidence.gap.optional': '+ {list} (optional, not provided)',
   'evidence.files': '{label}: files',
   'evidence.latest': 'latest',
+  'evidence.branchDiff': 'the branch’s diff',
+  'evidence.agentFile': 'the agent’s file',
+  'evidence.agentFileNote':
+    'This is a file the agent attached, not the branch’s diff: the branch’s own diff is the other file.',
   'evidence.before': 'before',
   'evidence.after': 'after',
   'evidence.noBefore': 'no before yet',

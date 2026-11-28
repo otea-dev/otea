@@ -1,5 +1,12 @@
 import { type ReactNode, useContext, useState } from 'react';
-import { comparePair, emptyText, evidenceOf, latestFirst, moduleTitle } from '../../evidence.ts';
+import {
+  comparePair,
+  diffOrigin,
+  emptyText,
+  evidenceOf,
+  latestFirst,
+  moduleTitle,
+} from '../../evidence.ts';
 import { t } from '../../i18n/i18n.ts';
 import { Button } from '../../kit/index.ts';
 import type { Evidence, LayoutEntry } from '../../types.ts';
@@ -96,7 +103,17 @@ function OneOf({
                 <span className="ev-round">{t('evidence.roundTag', { n: round(entry) ?? 0 })}</span>
               ) : null}
               {entry.filename}
-              {index === 0 ? <span className="ev-latest">{t('evidence.latest')}</span> : null}
+              {diffOrigin(entry, evidence) ? (
+                <span className="ev-latest">
+                  {t(
+                    diffOrigin(entry, evidence) === 'branch'
+                      ? 'evidence.branchDiff'
+                      : 'evidence.agentFile',
+                  )}
+                </span>
+              ) : index === 0 ? (
+                <span className="ev-latest">{t('evidence.latest')}</span>
+              ) : null}
             </Button>
           ))}
           {images ? (
@@ -122,7 +139,14 @@ function OneOf({
           initial="side"
         />
       ) : (
-        children(shown)
+        <>
+          {diffOrigin(shown, evidence) === 'agent' ? (
+            <p className="ev-agent-note t-cap" role="note">
+              {t('evidence.agentFileNote')}
+            </p>
+          ) : null}
+          {children(shown)}
+        </>
       )}
     </div>
   );

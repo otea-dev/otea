@@ -5,7 +5,7 @@ import {
   stepById,
 } from '../../../../src/core/board/model.ts';
 import { evidenceModules } from '../../../../src/core/placement.ts';
-import { latestFirst, pairIn } from '../../evidence.ts';
+import { diffOrigin, latestFirst, pairIn } from '../../evidence.ts';
 import { t } from '../../i18n/i18n.ts';
 import { namePairs, type Round } from '../../rounds.ts';
 import type { Evidence, Layout } from '../../types.ts';
@@ -74,9 +74,11 @@ export function splitEvidence(evidence: readonly Evidence[]): {
   images: Evidence[];
   files: Evidence[];
 } {
+  // The branch's own diff leads the files, the agent's diff file after it (D-492953).
+  const lead = (e: Evidence) => (diffOrigin(e, evidence) === 'branch' ? 0 : 1);
   return {
     images: evidence.filter((e) => e.kind === 'image'),
-    files: evidence.filter((e) => e.kind !== 'image'),
+    files: evidence.filter((e) => e.kind !== 'image').sort((a, b) => lead(a) - lead(b)),
   };
 }
 

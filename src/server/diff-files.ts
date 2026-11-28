@@ -208,9 +208,9 @@ async function landedFiles(
     : { files: [...new Set(out.split('\0').filter(Boolean))].sort(), range };
 }
 
-// The lines the work handed off changes, as `changedLines` has them for an attached diff.
-async function landedLines(cwd: string, { range }: Landed): Promise<string[] | undefined> {
-  const out = await gitPaths(
+// The patch of the work handed off, as git has it whatever the person's config says.
+function landedPatch(cwd: string, { range }: Landed, context: number): Promise<string | undefined> {
+  return gitPaths(
     cwd,
     '-c',
     'core.quotePath=false',
@@ -222,11 +222,45 @@ async function landedLines(cwd: string, { range }: Landed): Promise<string[] | u
     '--no-color',
     '--src-prefix=a/',
     '--dst-prefix=b/',
-    '-U0',
+    `-U${context}`,
     ...range,
   );
+}
+
+// The lines the work handed off changes, as `changedLines` has them for an attached diff.
+async function landedLines(cwd: string, found: Landed): Promise<string[] | undefined> {
+  const out = await landedPatch(cwd, found, 0);
   return out === undefined ? undefined : changedLines(out);
 }
+
+// What the review reads as the diff of an item handed off on a branch (D-492953): git's own diff of
+// the work handed off, over the base as it stood nearest to it, never a file the agent attached.
+// Undefined while the item is in no review, has no branch or no tip recorded, the tip holds no
+// change, or git cannot tell.
+export async function branchDiffOf(
+  project: Project,
+  id: string,
+): Promise<{ text: string; commit: string; branch: string; base: string } | undefined> {
+  const item = getItem(project, id);
+  const board = liveBoardOf(project, item.collection);
+  const guard = board ? guardedBranch(board.def) : undefined;
+  const position = positionOf(item.state);
+  const base = guard?.guard.base;
+  if (!guard || base === undefined || isClosed(position) || position.phase === 'doing')
+    return undefined;
+  const branch = String(item.fields[guard.id] ?? '').trim();
+  if (branch === '') return undefined;
+  const tip = approvedTipOf(project, item.id, branch);
+  if (!tip || tip.unchanged) return undefined;
+  const found = await landedFiles(project, item.id, tip.commit, branch, base);
+  if (found === undefined) return undefined;
+  const text = await landedPatch(project.root, found, 3);
+  return text === undefined || text === '' ? undefined : { text, commit: tip.commit, branch, base };
+}
+
+// Otea's own diff file of an item: kept by Otea at the handoff (app/evidence.ts recordBranchDiff).
+export const isOteaDiff = ({ actor }: { actor: { kind: string; name: string } }): boolean =>
+  actor.kind === 'human' && actor.name === 'otea';
 
 // The latest diff attached to an item in review, when the files it names are not the files the
 // work handed off changes; null while it is not in review, no tip was recorded, no diff is
@@ -243,7 +277,7 @@ export async function diffFilesOff(project: Project, id: string): Promise<DiffFi
   const tip = approvedTipOf(project, item.id, branch);
   if (!tip || tip.unchanged) return null;
   const attached = selectEvidence(project.db, item.id)
-    .filter(({ kind }) => kind === 'diff')
+    .filter((each) => each.kind === 'diff' && !isOteaDiff(each))
     .at(-1);
   if (!attached) return null;
   let text: string;

@@ -62,7 +62,9 @@ export async function diffOffTip(project: Project, id: string): Promise<DiffOffT
   const tip = approvedTipOf(project, item.id, branch);
   if (!tip || tip.unchanged) return null;
   const diff = selectEvidence(project.db, item.id)
-    .filter(({ kind }) => kind === 'diff')
+    .filter(
+      ({ kind, actor }) => kind === 'diff' && !(actor.kind === 'human' && actor.name === 'otea'),
+    )
     .at(-1);
   if (!diff) return null;
   let text: string;

@@ -240,6 +240,19 @@ function pathOf(line: string): string | null {
   return raw.replace(/^[ab]\//, '');
 }
 
+// Whose a diff file is (D-492953): the branch's own, which Otea computes at the handoff and keeps
+// under its own name (no agent can act as it), or one an agent attached. `null` for a file that is
+// no diff, and for an agent's diff while Otea kept none beside it (nothing to tell it from).
+export function diffOrigin(
+  file: Pick<Evidence, 'kind' | 'actor'>,
+  among: readonly Pick<Evidence, 'kind' | 'actor'>[],
+): 'branch' | 'agent' | null {
+  const own = (e: Pick<Evidence, 'actor'>) => e.actor.kind === 'human' && e.actor.name === 'otea';
+  if (file.kind !== 'diff') return null;
+  if (own(file)) return 'branch';
+  return among.some((e) => e.kind === 'diff' && own(e)) ? 'agent' : null;
+}
+
 function emptyFile(): DiffFile {
   return { path: '', meta: [], hunks: [], additions: 0, deletions: 0 };
 }

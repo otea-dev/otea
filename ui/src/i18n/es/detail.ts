@@ -249,6 +249,10 @@ export const detail = {
   'evidence.gap.optional': '+ {list} (opcionales, sin cargar)',
   'evidence.files': '{label}: archivos',
   'evidence.latest': 'último',
+  'evidence.branchDiff': 'el diff de la rama',
+  'evidence.agentFile': 'el archivo del agente',
+  'evidence.agentFileNote':
+    'Este es un archivo que adjuntó el agente, no el diff de la rama: el diff de la rama es el otro archivo.',
   'evidence.before': 'antes',
   'evidence.after': 'después',
   'evidence.noBefore': 'todavía no hay antes',

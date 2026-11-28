@@ -3,6 +3,7 @@ import {
   blindPartsOf,
   byViewport,
   comparePair,
+  diffOrigin,
   emptyText,
   evidenceOf,
   isEvidenceModule,
@@ -425,5 +426,34 @@ describe('the compare divider', () => {
     expect(nudgeSplit(50, 'Home', false)).toBe(0);
     expect(nudgeSplit(50, 'End', false)).toBe(100);
     expect(nudgeSplit(50, 'Enter', false)).toBeUndefined();
+  });
+});
+
+// D-492953: the review's diff is the branch's own, which Otea keeps under its own name; what the
+// agent attached is the agent's file, said so only while Otea kept the branch's beside it.
+describe('whose a diff file is', () => {
+  const agentDiff = evidence('regar.diff', { kind: 'diff' });
+  const branchDiff = evidence('otea-branch-abc1234.diff', {
+    kind: 'diff',
+    actor: { kind: 'human', name: 'otea' },
+  });
+
+  it('is the branch’s for Otea’s file and the agent’s for the other, once Otea kept one', () => {
+    const all = [agentDiff, branchDiff];
+    expect(diffOrigin(branchDiff, all)).toBe('branch');
+    expect(diffOrigin(agentDiff, all)).toBe('agent');
+  });
+
+  it('says nothing of an agent’s diff when Otea kept none, nor of a file that is no diff', () => {
+    expect(diffOrigin(agentDiff, [agentDiff])).toBeNull();
+    expect(diffOrigin(evidence('shot.png'), [agentDiff, branchDiff])).toBeNull();
+  });
+
+  it('is not taken from a person’s own file or an agent that names itself otea', () => {
+    const person = evidence('mine.diff', { kind: 'diff', actor: { kind: 'human', name: 'human' } });
+    const spoof = evidence('x.diff', { kind: 'diff', actor: { kind: 'agent', name: 'otea' } });
+    expect(diffOrigin(person, [person, branchDiff])).toBe('agent');
+    expect(diffOrigin(spoof, [spoof])).toBeNull();
+    expect(diffOrigin(spoof, [spoof, branchDiff])).toBe('agent');
   });
 });

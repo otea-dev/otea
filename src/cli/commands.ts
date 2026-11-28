@@ -71,7 +71,12 @@ import { listDevices, revokeDevice } from '../app/devices.ts';
 import { handInText, openDraftsOf } from '../app/draft-request.ts';
 import { escalateToSecretary } from '../app/escalate.ts';
 import { listEvents } from '../app/events.ts';
-import { attachEvidence, detachEvidence, evidenceReadPath } from '../app/evidence.ts';
+import {
+  attachEvidence,
+  detachEvidence,
+  evidenceReadPath,
+  recordBranchDiff,
+} from '../app/evidence.ts';
 import { type Brings, checkGate, type GateCheck, protectedBases, type Tip } from '../app/gates.ts';
 import { boardGuide, guideIndex, hintFor } from '../app/guide.ts';
 import {
@@ -280,6 +285,7 @@ import { describeRelation, RELATION_KINDS } from '../core/relations.ts';
 import { AGENT_ROLES, ROLE_ABOUT } from '../core/secretary.ts';
 import { timeText } from '../core/time.ts';
 import { TURNS, type Turn } from '../core/workflow.ts';
+import { branchDiffOf } from '../server/diff-files.ts';
 import { DEFAULT_PORT } from '../server/hosts.ts';
 import { machineProjects, type ServedProject } from '../server/hub.ts';
 import { formatCode } from '../server/lan.ts';
@@ -2437,18 +2443,31 @@ function localBehindAfter(cwd: string, id: string): LocalBehind | undefined {
   }
 }
 
+async function keepBranchDiff(cwd: string, id: string): Promise<void> {
+  try {
+    await withProjectWhile(cwd, async (project) => {
+      const diff = await branchDiffOf(project, id);
+      if (diff) recordBranchDiff(project, id, diff);
+    });
+  } catch {
+    // The review still has the files the agent attached.
+  }
+}
+
 const handoffCommand: Command = {
   name: 'handoff',
   summary:
     'Hand off the step you did on an item: refused, saying what is missing, until its handoff is complete; then to its review, or along --way (a step name or Done) with --reason when the step has several. --note is the note of the handoff, kept with the round (required where the step asks for one, and after a send-back); --way an earlier step, with --reason, takes the item back to it for its next round; again in review, --note amends it',
   args: ['id'],
   options: { way: { placeholder: 'step' }, reason: {}, note: {} },
-  execute: (input) => {
+  execute: async (input) => {
     let warning: string | undefined;
     let said: string | undefined;
+    let tipped = false;
     const moved = boardMove(input, (project, move) => {
       refuseEmptyBranch(project, input.cwd, move);
       const handed = handedBranch(project, input.cwd, move);
+      tipped = handed.tip !== undefined && !handed.tip.unchanged;
       // After the branch's own checks, which say first that it was never pushed.
       refuseUnlandedCommit(project, input.cwd, move);
       refuseUnreachedFile(project, move);
@@ -2468,6 +2487,10 @@ const handoffCommand: Command = {
         warning = [warning, `Note: ${mergeOnlyText(move.id, only)}`].filter(Boolean).join('\n');
       return done;
     });
+    // The review reads the branch's own diff, as git computes it from the base to the tip just
+    // recorded, kept as Otea's file of the item beside what the agent attached (D-492953). Never
+    // a reason to fail a handoff that was made.
+    if (tipped) await keepBranchDiff(input.cwd, input.args[0] ?? '');
     // An agent goes on to the next item, and waits when there is none: the reply ends with the
     // exact commands, so it neither stops after one nor says it waits with no wait running
     // (P3C-R3-9).

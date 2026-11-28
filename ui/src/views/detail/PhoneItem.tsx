@@ -23,7 +23,7 @@ import { OptionTrade } from '../../components/OptionsModule.tsx';
 import { ShortText } from '../../components/ShortText.tsx';
 import { Unheard } from '../../components/Unheard.tsx';
 import { agoText } from '../../derive/when.ts';
-import { blindPartsOf } from '../../evidence.ts';
+import { blindPartsOf, diffOrigin } from '../../evidence.ts';
 import { t, tx } from '../../i18n/i18n.ts';
 import { AgentMark, Button, Icon, StepPill } from '../../kit/index.ts';
 import { itemOpened } from '../../kit/pop/toast.tsx';
@@ -313,6 +313,9 @@ function Files({
                 {(e.module === null ? undefined : parts?.get(e.module)) ??
                   t(`evidence.kind.${e.kind}`)}
                 {roleWord(e) ? ` · ${roleWord(e)}` : ''}
+                {diffOrigin(e, files)
+                  ? ` · ${t(diffOrigin(e, files) === 'branch' ? 'evidence.branchDiff' : 'evidence.agentFile')}`
+                  : ''}
               </span>
               {mark(e)}
               <Pin count={noted?.get(e.id)} />
