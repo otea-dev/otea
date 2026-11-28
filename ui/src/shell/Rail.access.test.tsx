@@ -16,6 +16,9 @@ import { testApp } from './test-app.ts';
 let page: Mounted | undefined;
 beforeEach(() => {
   setLanguage('es');
+  // A row chosen with the keys waits for animation frames to focus the page: none runs on its own
+  // here, so a frame left by one test never moves the focus in another.
+  vi.stubGlobal('requestAnimationFrame', () => 0);
   vi.stubGlobal(
     'fetch',
     async () =>
