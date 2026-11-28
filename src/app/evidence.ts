@@ -21,7 +21,7 @@ import {
   MAX_EVIDENCE_MB,
   safeFileName,
 } from '../core/evidence.ts';
-import type { Actor } from '../core/item.ts';
+import { type Actor, isOteaActor, OTEA_ACTOR } from '../core/item.ts';
 import type { Layout } from '../core/modules.ts';
 import {
   diffPartFor,
@@ -397,8 +397,8 @@ export function attachEvidence(project: Project, input: AttachInput, now = syste
 
 // The branch's own diff, kept by Otea beside what the agent attached (D-492953): the review reads
 // this one, as git computed it at the handoff from the base to the tip the person approves, and the
-// agent's file is shown as the agent's. Its actor is the person-side name `otea`, which no agent can
-// act as. The item is already in review, so none of the guards of an attach apply. Nothing is added
+// agent's file is shown as the agent's. Its actor is Otea itself (kind `otea`), never the person and
+// never an agent. The item is already in review, so none of the guards of an attach apply. Nothing is added
 // when the layout has no diff part, the diff is empty or over the limit, or the last one Otea kept
 // is the same.
 export function recordBranchDiff(
@@ -427,7 +427,7 @@ export function recordBranchDiff(
     }
     const sha256 = createHash('sha256').update(bytes).digest('hex');
     const last = selectEvidence(project.db, itemId)
-      .filter(({ actor }) => actor.kind === 'human' && actor.name === 'otea')
+      .filter(({ actor }) => isOteaActor(actor))
       .at(-1);
     if (last?.sha256 === sha256) return undefined;
     const caption = `git diff ${diff.base}...${diff.commit.slice(0, 7)} of ${diff.branch}, as Otea computed it`;
@@ -441,7 +441,7 @@ export function recordBranchDiff(
       project,
       itemId,
       { filename, bytes, caption, ...placement },
-      { actor: { kind: 'human', name: 'otea' }, channel: 'cli' },
+      { actor: OTEA_ACTOR, channel: 'cli' },
       at,
     );
   });

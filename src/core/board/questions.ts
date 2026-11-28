@@ -1,3 +1,4 @@
+import type { Actor } from '../item.ts';
 import { timeText } from '../time.ts';
 
 // An agent's question to the person (otea ask): asking hands the turn to the person without moving
@@ -86,7 +87,7 @@ export function checkOptions(
 export type QuestionEvent = {
   id?: number;
   type: string;
-  actor: { kind: 'human' | 'agent'; name: string };
+  actor: Actor;
   at: string;
   data: Record<string, unknown>;
 };

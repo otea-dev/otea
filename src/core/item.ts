@@ -1,7 +1,13 @@
 import { BANDEJA_PREFIX } from './bandeja.ts';
 import { OteaError } from './errors.ts';
 
-export type Actor = { kind: 'human' | 'agent'; name: string };
+// `otea` is Otea itself: what it does on its own (the branch diff it computes at a handoff). It is
+// never the person's act, and no agent can act as it.
+export type Actor = { kind: 'human' | 'agent' | 'otea'; name: string };
+
+export const OTEA_ACTOR: Actor = { kind: 'otea', name: 'otea' };
+
+export const isOteaActor = (actor: Pick<Actor, 'kind'>): boolean => actor.kind === 'otea';
 
 // An agent's name is its identity, one per agent working at the same time: a slug of at most 40
 // characters (a subagent's <name>-<role> runs long), lowercase letters and digits joined by single

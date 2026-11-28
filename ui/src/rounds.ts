@@ -109,7 +109,7 @@ export function roundsOf(
         // (P5-R3-1): it is never compared with the next round, nor listed as gone from it.
         evidence: evidence.filter(
           ({ createdAt, actor }) =>
-            actor.kind !== 'human' && createdAt > since && createdAt <= event.at,
+            actor.kind === 'agent' && createdAt > since && createdAt <= event.at,
         ),
         ...(step ? { step } : {}),
       });

@@ -56,7 +56,7 @@ export function updateAndTell(
       : item;
     relayChange(
       project,
-      { id: input.id, text: input.tell, actor: input.actor, channel: 'cli' },
+      { id: input.id, text: input.tell, actor: input.actor, channel: 'cli', role: 'secretary' },
       now,
     );
     return changed;

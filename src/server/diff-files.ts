@@ -7,6 +7,7 @@ import type { Project } from '../app/project.ts';
 import { approvedTipOf } from '../app/tips.ts';
 import { isClosed, positionOf } from '../core/board/engine.ts';
 import { guardedBranch } from '../core/board/model.ts';
+import { type Actor, isOteaActor } from '../core/item.ts';
 import { selectEvents, selectEvidence } from '../store/queries.ts';
 import { git } from './diff-tip.ts';
 
@@ -259,8 +260,7 @@ export async function branchDiffOf(
 }
 
 // Otea's own diff file of an item: kept by Otea at the handoff (app/evidence.ts recordBranchDiff).
-export const isOteaDiff = ({ actor }: { actor: { kind: string; name: string } }): boolean =>
-  actor.kind === 'human' && actor.name === 'otea';
+export const isOteaDiff = ({ actor }: { actor: Actor }): boolean => isOteaActor(actor);
 
 // The latest diff attached to an item in review, when the files it names are not the files the
 // work handed off changes; null while it is not in review, no tip was recorded, no diff is

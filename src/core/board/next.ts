@@ -1,4 +1,4 @@
-import { PERSON_READER } from '../item.ts';
+import { type Actor, PERSON_READER } from '../item.ts';
 import { timeText } from '../time.ts';
 import { mappedScales, rolePart, viewsOf } from './analysis.ts';
 import { choiceLines, type ItemChoice } from './choices.ts';
@@ -62,7 +62,7 @@ export const DROPPED_NAME = 'Dropped';
 // `note` the reason), not with a send-back from a review.
 export type SentBack = {
   note: string;
-  by: { kind: 'human' | 'agent'; name: string };
+  by: Actor;
   at: string;
   step: string;
   round: number;

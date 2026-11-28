@@ -1,3 +1,4 @@
+import { isOteaActor } from '../../src/core/item.ts';
 import { type PlainKey, t } from './i18n/i18n.ts';
 import type { Evidence, LayoutEntry, LayoutSlot, TypeView } from './types.ts';
 
@@ -316,7 +317,7 @@ export function diffOrigin(
   file: Pick<Evidence, 'kind' | 'actor'>,
   among: readonly Pick<Evidence, 'kind' | 'actor'>[],
 ): 'branch' | 'agent' | null {
-  const own = (e: Pick<Evidence, 'actor'>) => e.actor.kind === 'human' && e.actor.name === 'otea';
+  const own = (e: Pick<Evidence, 'actor'>) => isOteaActor(e.actor);
   if (file.kind !== 'diff') return null;
   if (own(file)) return 'branch';
   return among.some((e) => e.kind === 'diff' && own(e)) ? 'agent' : null;

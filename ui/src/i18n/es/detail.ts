@@ -972,6 +972,8 @@ export const detail = {
   'notes.allAnswered': { one: 'contestada', other: 'todas contestadas' },
   'notes.open': 'sin respuesta',
   'notes.you': 'tú',
+  'notes.relayed.secretary': 'La secretaria, de tu parte',
+  'notes.relayed.agent': '{agent}, de tu parte',
   'notes.waiting': '{agent} todavía no contestó.',
   'notes.waitingAny': 'El agente todavía no contestó.',
   'notes.waitingSmall':
@@ -997,6 +999,8 @@ export const detail = {
   'notes.sentAny': 'Le dejaste una nota al agente en «{title}».',
   'notes.failed': 'No se envió la nota. Vuelve a intentarlo.',
   'notes.h.left': 'Le dejaste una nota',
+  'notes.h.leftSecretary': 'La secretaria, de tu parte, le dejó una nota',
+  'notes.h.leftAgent': '{agent}, de tu parte, le dejó una nota',
   'notes.h.on': 'sobre {file}',
   'notes.h.answered': 'contestó {agent} a las {time}',
   'notes.phone.title': 'Nota para {agent}',

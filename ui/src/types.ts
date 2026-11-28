@@ -20,7 +20,7 @@ export type {
 
 export type Turn = 'human' | 'agent' | 'none';
 
-export type Actor = { kind: 'human' | 'agent'; name: string };
+export type Actor = { kind: 'human' | 'agent' | 'otea'; name: string };
 
 export type Lease = { holder: string; expiresAt: string };
 

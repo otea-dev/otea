@@ -248,7 +248,7 @@ export function agentStepOf(
 // as changed when it takes it.
 export function relayChange(
   ctx: Context,
-  input: { id: string; text: string; actor: Actor; channel: Channel },
+  input: { id: string; text: string; actor: Actor; channel: Channel; role?: 'secretary' },
   now = systemClock,
 ): ItemNote | undefined {
   const text = input.text.trim();
@@ -280,6 +280,8 @@ export function relayChange(
       round: on.round,
       delivered: deliverables(board.def, step.id, on.facts),
       relayed: true,
+      // Who wrote it: shown beside the person's words, never as the person (the thread's «for you»).
+      ...(input.role === undefined ? {} : { role: input.role }),
       ...(to === undefined ? {} : { to }),
       channel: input.channel,
     },

@@ -17,6 +17,15 @@ import type { Evidence, ItemEvent } from '../../types.ts';
 
 export type { ItemNote };
 
+// Who a note is signed by: «you» for the person's own, and the agent that wrote it for them (the
+// secretary, or another agent by its name) «for you»: never «you» for words the person did not write.
+export function noteSigner(note: Pick<ItemNote, 'relayedBy' | 'bySecretary'>): string {
+  if (note.relayedBy === undefined) return t('notes.you');
+  return note.bySecretary
+    ? t('notes.relayed.secretary')
+    : t('notes.relayed.agent', { agent: note.relayedBy });
+}
+
 // The agent at work on the item's step and its last sign of life (the board block's `worker`).
 export type Worker = { name: string; lastSeen: string | null; holds: boolean };
 
