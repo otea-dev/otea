@@ -138,6 +138,8 @@ export const shell = {
   // El riel
   'nav.toca': 'Te toca',
   'nav.atasco': 'Atasco',
+  'nav.pending': { one: '{count} pendiente', other: '{count} pendientes' },
+  'nav.stuckCount': { one: '{count} atascado', other: '{count} atascados' },
   'nav.views': 'vistas',
   'nav.boards': 'tableros',
   'nav.boardPair': 'Te toca: {yours} · Abiertos: {open}',

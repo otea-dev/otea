@@ -64,42 +64,66 @@ type RowProps = {
   pairTip?: string;
   badge?: { n: number; warn?: boolean };
   plus?: ReactNode;
+  // What the row's numbers say in words, after its label («1 pendiente»): its name is its label and
+  // this, never the digits drawn beside it.
+  say?: string | undefined;
+  // What more is known of the row (the secretary's state), read after its name.
+  hint?: string | undefined;
   // A small gap above it, no heading: a row of another kind in the same list (Temas under the views).
   apart?: boolean;
 };
 
-function Row({ k, on, icon, label, to, pair, pairTip, badge, plus, apart }: RowProps) {
+// A row is one control, a button laid over the whole row, named by its label and what it says; the
+// icon, the counts and the badge are the eye's and are hidden from a reader. Its «+» is a second
+// control beside it, never inside it.
+function Row({ k, on, icon, label, to, pair, pairTip, badge, plus, say, hint, apart }: RowProps) {
   const app = useApp();
   const go = () => {
     if (typeof to === 'string') window.location.hash = to;
     else app.go(to);
   };
+  const hintId = `nrow-hint-${k}`;
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a row that holds its own + button
     <div
       className={['nrow', on ? 'on' : '', apart ? 'apart' : ''].filter(Boolean).join(' ')}
-      role="button"
-      tabIndex={0}
-      aria-current={on ? 'page' : undefined}
       data-k={k}
       data-tip={pairTip ? `${label} · ${pairTip}` : label}
       data-tip-more={pairTip ? '' : undefined}
-      onClick={go}
-      onKeyDown={(e) => {
-        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault();
-          go();
-        }
-      }}
     >
-      <span className="ic">{icon}</span>
-      <span className="lb">{label}</span>
-      {pair === undefined ? <span /> : <span className="pair">{pair}</span>}
+      <button
+        type="button"
+        className="ngo"
+        aria-current={on ? 'page' : undefined}
+        aria-describedby={hint ? hintId : undefined}
+        onClick={go}
+      >
+        <span className="visually-hidden">{say ? `${label}, ${say}` : label}</span>
+      </button>
+      {hint ? (
+        // Kept out of the page and still its description: a reader says it after the name.
+        <span id={hintId} hidden>
+          {hint}
+        </span>
+      ) : null}
+      <span className="ic" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="lb" aria-hidden="true">
+        {label}
+      </span>
+      {pair === undefined ? (
+        <span />
+      ) : (
+        <span className="pair" aria-hidden="true">
+          {pair}
+        </span>
+      )}
       {badge ? (
         <i
           className={['badge', badge.warn ? 'warn' : '', badge.n ? 'has' : '']
             .filter(Boolean)
             .join(' ')}
+          aria-hidden="true"
         >
           {badge.n}
         </i>
@@ -300,6 +324,11 @@ export function Rail() {
             label={t('hablar.nav')}
             to={{ view: 'hablar' }}
             pair={<SecretaryDot status={secretary} />}
+            hint={
+              secretary
+                ? t(`hablar.status.${secretary.state}`, { name: secretary.name })
+                : undefined
+            }
           />
           <Row
             k="toca"
@@ -309,6 +338,7 @@ export function Rail() {
             to={{ view: 'toca' }}
             pair={<Count value={yours} tone="you" hold />}
             badge={{ n: yours }}
+            say={yours > 0 ? t('nav.pending', { count: yours }) : undefined}
           />
           <Row
             k="atasco"
@@ -318,6 +348,7 @@ export function Rail() {
             to={{ view: 'atasco' }}
             pair={<Count value={stuck} tone="warn" hold />}
             badge={{ n: stuck, warn: true }}
+            say={stuck > 0 ? t('nav.stuckCount', { count: stuck }) : undefined}
           />
         </nav>
         <div className="rail-label">{t('nav.boards')}</div>
@@ -341,6 +372,7 @@ export function Rail() {
                 </>
               }
               pairTip={t('nav.boardPair', { yours: b.yours, open: b.open })}
+              say={t('nav.boardPair', { yours: b.yours, open: b.open })}
               badge={{ n: b.yours }}
               plus={canWrite ? plus(b.name) : undefined}
             />

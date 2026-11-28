@@ -70,6 +70,23 @@ afterEach(() => {
 });
 
 describe('a board', () => {
+  // Pilot 1 (a1): with an item open beside the list the words of these controls are not drawn (the
+  // list is narrow), and each was a button with a name of nothing. The name never depends on them.
+  it('names each view tab and each tool, whether or not its words are drawn', () => {
+    const html = render('list');
+    const buttons = [...html.matchAll(/<button\b[^>]*>/g)].map(([tag]) => tag);
+    const named = (word: string) =>
+      buttons.find(
+        (tag) => tag.includes(`aria-label="${word}`) || tag.includes(`aria-label="${word}"`),
+      );
+    for (const word of ['Pasos', 'Lista', 'Tabla']) {
+      expect(named(word), word).toMatch(/role="tab"/);
+    }
+    expect(named('Filtrar'), 'filter').toMatch(/aria-haspopup="menu"/);
+    expect(named('Agrupar'), 'group').toMatch(/aria-haspopup="menu"/);
+    expect(named('Nuevo ítem'), 'new').toBeDefined();
+  });
+
   it('heads with its kicker, its name, the preset dek and the steps strip', () => {
     const html = render('list');
     expect(html).toContain('<b>Tablero</b>');

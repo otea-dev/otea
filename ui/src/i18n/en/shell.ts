@@ -136,6 +136,8 @@ export const shell = {
   // The rail
   'nav.toca': 'Your turn',
   'nav.atasco': 'Stuck',
+  'nav.pending': { one: '{count} waiting', other: '{count} waiting' },
+  'nav.stuckCount': { one: '{count} stuck', other: '{count} stuck' },
   'nav.views': 'views',
   'nav.boards': 'boards',
   'nav.boardPair': 'Your turn: {yours} · Open: {open}',

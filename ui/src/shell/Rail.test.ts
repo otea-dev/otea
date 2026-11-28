@@ -59,13 +59,13 @@ describe('the rail', () => {
   it('counts Te toca in your blue and Atasco in warn, each with its folded badge', () => {
     const html = rail();
     expect(html).toMatch(
-      /Te toca<\/span><span class="pair"><span class="n you"><span class="nv" data-v="2">/,
+      /Te toca<\/span><span class="pair"[^>]*><span class="n you"><span class="nv" data-v="2">/,
     );
     expect(html).toMatch(
-      /Atasco<\/span><span class="pair"><span class="n warn"><span class="nv" data-v="1">/,
+      /Atasco<\/span><span class="pair"[^>]*><span class="n warn"><span class="nv" data-v="1">/,
     );
-    expect(html).toContain('<i class="badge has">2</i>');
-    expect(html).toContain('<i class="badge warn has">1</i>');
+    expect(html).toMatch(/<i class="badge has"[^>]*>2<\/i>/);
+    expect(html).toMatch(/<i class="badge warn has"[^>]*>1<\/i>/);
   });
 
   it('lists each board with its icon, yours over open, and a + for a new item in it', () => {
@@ -122,7 +122,10 @@ describe('the rail', () => {
 
   it('marks the row in view and slides one pill under it', () => {
     const html = rail({ route: { view: 'board', board: 'Criaturas' } });
-    expect(html).toMatch(/class="nrow on"[^>]*aria-current="page"[^>]*data-k="board:Criaturas"/);
+    // The row's one button says it is the page in view.
+    expect(html).toMatch(
+      /class="nrow on"[^>]*data-k="board:Criaturas"[^>]*><button[^>]*aria-current="page"/,
+    );
     expect(html.match(/class="rsel"/g)).toHaveLength(1);
   });
 
@@ -145,7 +148,7 @@ describe('the rail', () => {
       at = i;
     }
     expect(rowOf(html, 'hablar')).toContain('<span class="mk secretary">se</span>');
-    expect(rowOf(html, 'hablar')).toContain('<span class="lb">Hablar</span>');
+    expect(rowOf(html, 'hablar')).toMatch(/<span class="lb"[^>]*>Hablar<\/span>/);
     expect(html).not.toContain('data-k="topics"');
     expect(html).not.toContain('Temas');
     // Studio, Configuración and Rendimiento keep the project to themselves.
@@ -159,7 +162,9 @@ describe('the rail', () => {
   it('slides the pill under Hablar while you talk', () => {
     const html = rail({ route: { view: 'hablar' } });
     expect(html.match(/class="nrow[^"]*\bon\b/g)).toHaveLength(1);
-    expect(rowOf(html, 'hablar')).toMatch(/^<div class="nrow on"[^>]*aria-current="page"/);
+    expect(rowOf(html, 'hablar')).toMatch(
+      /^<div class="nrow on"[^>]*><button[^>]*aria-current="page"/,
+    );
   });
 
   it('keeps the project’s Studio and its settings, even for a browser without a session', () => {

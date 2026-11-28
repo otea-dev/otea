@@ -183,6 +183,23 @@
 .nrow {
   cursor: pointer;
 }
+/* the row's one control: a button laid over the whole row (its icon, words and counts are the eye's
+   and sit under it), with the + beside it above it, so no control holds another */
+.nrow .ngo {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.nrow .ngo:focus-visible {
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+.nrow .plus {
+  z-index: 2;
+}
 .nrow .plus {
   position: absolute;
   right: 6px;
