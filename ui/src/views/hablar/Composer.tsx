@@ -57,6 +57,16 @@ export function Composer({ onSent }: { onSent: () => void }) {
   const words = text.trim();
   const ready = (words !== '' || drafts.length > 0) && !large && !offline && canWrite && !busy;
 
+  // The line that says the send failed sits under the box, which a small or zoomed window keeps
+  // below its fold: out of sight, it is said over the page too. In sight, once is enough (D-0607d1).
+  const failure = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (error === null) return;
+    const line = failure.current?.getBoundingClientRect();
+    if (line && (line.top < 0 || line.bottom > window.innerHeight))
+      toast({ msg: t('hablar.failed', { message: error }) });
+  }, [error]);
+
   // The box grows with what is written, up to a few lines, then scrolls.
   // biome-ignore lint/correctness/useExhaustiveDependencies: measures after the text changes
   useEffect(() => {
@@ -297,7 +307,7 @@ export function Composer({ onSent }: { onSent: () => void }) {
         </button>
       </div>
       {error !== null ? (
-        <p className="hb-err" role="alert">
+        <p ref={failure} className="hb-err" role="alert">
           {t('hablar.failed', { message: error })}
         </p>
       ) : offline ? (
