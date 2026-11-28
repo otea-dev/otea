@@ -27,7 +27,7 @@ describe('ImageCompare, blind', () => {
     setLanguage('es');
     const a = { ...image(1), role: 'before' as const };
     const b = { ...image(2), role: 'after' as const };
-    const html = renderToStaticMarkup(<ImageCompare evidence={[a, b]} blind />);
+    const html = renderToStaticMarkup(<ImageCompare evidence={[a, b]} blind initial="slider" />);
     expect(html).toContain('aria-label="Divisor entre A y B"');
     expect(html).not.toMatch(/antes|después/);
     setLanguage('en');
@@ -69,6 +69,43 @@ describe('ImageCompares, by viewport', () => {
     const html = renderToStaticMarkup(<ImageCompares evidence={files.slice(2)} />);
     expect(html.split('class="ev-compare"')).toHaveLength(2);
     expect(html).not.toContain('Phone');
+  });
+});
+
+// s-real D-5ccd20 / D-fdfd69: four cases in one part drew one compare of whichever before and after
+// came last, as a slider whose labels sat over the picture.
+describe('ImageCompares, by case', () => {
+  const shot = (id: number, filename: string, role: 'before' | 'after'): Evidence => ({
+    ...image(id),
+    role,
+    filename,
+  });
+  const files = [
+    shot(1, 'antes-al-abrir.png', 'before'),
+    shot(2, 'despues-al-abrir.png', 'after'),
+    shot(3, 'antes-no-existe.png', 'before'),
+    shot(4, 'despues-no-existe.png', 'after'),
+  ];
+
+  it('draws one compare for each case, each with its own two files, each file once', () => {
+    const html = renderToStaticMarkup(<ImageCompares evidence={files} />);
+    const compares = html.split('class="ev-compare"').slice(1);
+    expect(compares).toHaveLength(2);
+    const names = (block: string) =>
+      [...block.matchAll(/alt="[^"]*?([a-z-]+\.png)"/g)].map((m) => m[1]);
+    expect(names(compares[0] ?? '')).toEqual(['antes-al-abrir.png', 'despues-al-abrir.png']);
+    expect(names(compares[1] ?? '')).toEqual(['antes-no-existe.png', 'despues-no-existe.png']);
+  });
+
+  it('opens side by side, with the labels outside the picture, and keeps the slider as an option', () => {
+    const html = renderToStaticMarkup(<ImageCompare evidence={files.slice(0, 2)} />);
+    expect(html).toContain('data-mode="side"');
+    expect(html).not.toContain('role="slider"');
+    expect(html).toContain('slider');
+    // A label inside a picture's well would cover what changed.
+    for (const stage of html.split('class="ev-stage well"').slice(1)) {
+      expect(stage.split('</figure>')[0]).not.toContain('ev-tag');
+    }
   });
 });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   blindPartsOf,
+  byCase,
   byViewport,
   comparePair,
   diffOrigin,
@@ -176,6 +177,54 @@ describe('pairing before and after by viewport', () => {
     expect(byViewport([lone, shots.a390]).map(({ files }) => files.length)).toEqual([2]);
     // Nothing to tell apart: one group, the shots as they are.
     expect(byViewport([lone]).map(({ key }) => key)).toEqual([null]);
+  });
+});
+
+// s-real D-fdfd69: with four cases in one part («al-abrir», «a100», «a101», «no-existe»), the
+// reader paired every before with the newest after, so «antes-al-abrir» sat over the answer for a
+// code that does not exist and one after was listed three times.
+describe('pairing before and after by case', () => {
+  const cases = ['al-abrir', 'a100', 'a101', 'no-existe'];
+  const shots = cases.flatMap((name) => [
+    evidence(`antes-${name}.png`, { role: 'before', module: 'shots' }),
+    evidence(`despues-${name}.png`, { role: 'after', module: 'shots' }),
+  ]);
+  const of = (name: string) => shots.find(({ filename }) => filename === name) as Evidence;
+
+  it('pairs each shot with the other side of its own case, never the newest of another', () => {
+    for (const name of cases) {
+      const before = of(`antes-${name}.png`);
+      const after = of(`despues-${name}.png`);
+      expect(pairIn(shots, before)).toEqual({ before, after });
+      expect(pairIn(shots, after)).toEqual({ before, after });
+    }
+  });
+
+  it('keeps the viewport apart inside a case', () => {
+    const b = evidence('antes-a100-390.png', { role: 'before', module: 'shots' });
+    const a = evidence('despues-a100-1280.png', { role: 'after', module: 'shots' });
+    expect(pairIn([b, a], a)).toBeNull();
+  });
+
+  it('offers no pair for a shot whose case has no other side, among several cases', () => {
+    const lone = evidence('antes-a102.png', { role: 'before', module: 'shots' });
+    expect(pairIn([...shots, lone], lone)).toBeNull();
+  });
+
+  it('still pairs the one before and the one after of a part whatever their names', () => {
+    const b = evidence('pantalla-actual.png', { role: 'before', module: 'shots' });
+    const a = evidence('propuesta.png', { role: 'after', module: 'shots' });
+    expect(pairIn([b, a], a)).toEqual({ before: b, after: a });
+  });
+
+  it('groups a viewport’s shots by case, each group with both of its sides', () => {
+    const groups = byCase(shots);
+    expect(groups.map(({ name }) => name)).toEqual(['al abrir', 'a100', 'a101', 'no existe']);
+    expect(groups[3]?.files.map(({ filename }) => filename)).toEqual([
+      'antes-no-existe.png',
+      'despues-no-existe.png',
+    ]);
+    expect(byCase(shots.slice(0, 2))).toHaveLength(1);
   });
 });
 

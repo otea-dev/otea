@@ -110,6 +110,21 @@
   pointer-events: none;
 }
 
+/* A before/after label sits outside the picture, on its own line above it: inside, it covered the
+   corner that changed (s-real D-5ccd20). */
+.ev-tag.out {
+  position: static;
+  justify-self: start;
+  height: 22px;
+  background: var(--well);
+}
+
+.ev-sides {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .ev-tag.l {
   left: 10px;
 }
@@ -322,6 +337,13 @@
 }
 
 @container (max-width: 30rem) {
+  .ev-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The phone stacks them whatever the column holds. */
+@media (max-width: 720px) {
   .ev-pair {
     grid-template-columns: minmax(0, 1fr);
   }

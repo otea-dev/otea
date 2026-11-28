@@ -83,6 +83,32 @@ export function viewportOf(filename: string): Viewport | null {
   return null;
 }
 
+// The case a screenshot shows, read from its name: what is left once the side (antes, after), the
+// viewport (movil, 390, 1280x800) and the round marks (r2, v3, final) are taken out («antes-a100»
+// and «despues-a100» are the case «a100»; «antes-al-abrir» is another). A before and an after of
+// different cases judge nothing against each other (field study s-real: the compare laid the page
+// as it opened over the answer for a code that does not exist).
+const NOT_A_CASE =
+  /^(?:antes|despues|before|after|pre|post|old|new|viejo|vieja|nuevo|nueva|[rv]\d+|round|ronda|final|movil|mobile|phone|celular|cel|telefono|tablet|desktop|escritorio|compu|laptop|pc|px)$/;
+
+// The words of the case, in the order the name says them: how a page that shows several names one.
+export function caseName(filename: string): string {
+  return filename
+    .toLowerCase()
+    .replace(/\.[a-z0-9]+$/, '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\d{3,4}\s*[x×]\s*\d{3,4}/g, ' ')
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word !== '' && !NOT_A_CASE.test(word))
+    .filter((word) => !/^\d{3,4}$/.test(word) || byWidth(Number(word)) === null)
+    .join(' ');
+}
+
+// The same words, as the key two files of one case share whatever their order.
+export const caseOf = (filename: string): string =>
+  caseName(filename).split(' ').sort().join(' ');
+
 // The files of one side that stand beside a file of `viewport`: those of its own viewport, and those
 // that name none (nothing says they differ). A file of another viewport never does.
 function ofViewport(files: readonly Evidence[], viewport: Viewport | null): Evidence[] {
@@ -102,6 +128,21 @@ export function comparePair(evidence: readonly Evidence[]): {
   const befores = newest.filter(({ role }) => role === 'before');
   if (!after) return { before: befores[0], after };
   return { before: ofViewport(befores, viewportOf(after.filename))[0], after };
+}
+
+// Of `others`, the one that is the same case as `shown` (the newest first): by the words of the name,
+// or, when each side holds just one case, whatever the names say (a lone «actual.png» and
+// «propuesta.png» are the two of one case; with four cases, nothing else could say which is which).
+function ofCase(
+  shown: Evidence,
+  others: readonly Evidence[],
+  sameSide: readonly Evidence[],
+): Evidence | undefined {
+  const key = caseOf(shown.filename);
+  const exact = others.find((e) => caseOf(e.filename) === key);
+  if (exact) return exact;
+  const cases = (files: readonly Evidence[]) => new Set(files.map((e) => caseOf(e.filename)));
+  return cases(others).size === 1 && cases(sameSide).size === 1 ? others[0] : undefined;
 }
 
 // A module's screenshots grouped by the viewport they were taken at, the phone first (where the
@@ -125,6 +166,24 @@ export function byViewport(
   }));
 }
 
+// The shots of one viewport grouped by the case they show, in the order the cases first appear: each
+// group holds the before and the after of one case (see ofCase). With one case on each side, or none
+// named, everything is one group.
+export function byCase(files: readonly Evidence[]): { name: string; files: Evidence[] }[] {
+  const sides = (role: Evidence['role']) =>
+    new Set(files.filter((e) => e.role === role).map((e) => caseOf(e.filename)));
+  if (sides('before').size <= 1 && sides('after').size <= 1) return [{ name: '', files: [...files] }];
+  const groups = new Map<string, Evidence[]>();
+  for (const file of files) {
+    const key = caseOf(file.filename);
+    groups.set(key, [...(groups.get(key) ?? []), file]);
+  }
+  return [...groups.values()].map((own) => ({
+    name: caseName(own[0]?.filename ?? ''),
+    files: own,
+  }));
+}
+
 // The two sides of a before/after of one part, when the file shown is one of them and the other is
 // among the files: what the reader offers to compare.
 export function pairIn(
@@ -138,7 +197,16 @@ export function pairIn(
         e !== shown && e.module === shown.module && e.role !== 'single' && e.role !== shown.role,
     ),
   );
-  const other = ofViewport(others, viewportOf(shown.filename))[0];
+  const viewport = viewportOf(shown.filename);
+  const sameSide = latestFirst(
+    files.filter(
+      (e) => e !== shown && e.module === shown.module && e.role === shown.role && e.kind === 'image',
+    ),
+  );
+  const other = ofCase(shown, ofViewport(others, viewport), [
+    shown,
+    ...ofViewport(sameSide, viewport),
+  ]);
   if (!other) return null;
   return shown.role === 'before'
     ? { before: shown, after: other }

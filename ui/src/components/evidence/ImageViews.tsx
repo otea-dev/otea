@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { byViewport, comparePair, nudgeSplit, splitAt, stepIndex } from '../../evidence.ts';
+import { byCase, byViewport, comparePair, nudgeSplit, splitAt, stepIndex } from '../../evidence.ts';
 import { useFileUrl } from '../../evidence-files.ts';
 import { t } from '../../i18n/i18n.ts';
 import { Button, Icon } from '../../kit/index.ts';
@@ -217,9 +217,9 @@ function Framed({ evidence, label }: { evidence: Evidence; label: string }) {
   const fileUrl = useFileUrl();
   return (
     <figure className="ev-frame">
+      <span className="ev-tag out">{label}</span>
       <div className="ev-stage well">
         <img className="ev-img" src={fileUrl(evidence)} alt={sideAlt(label, evidence)} />
-        <span className="ev-tag l">{label}</span>
       </div>
       <figcaption>
         <FileMeta evidence={evidence} />
@@ -228,18 +228,24 @@ function Framed({ evidence, label }: { evidence: Evidence; label: string }) {
   );
 }
 
-// A compare part's shots, one compare for each viewport they were taken at (phone first, each named),
-// never a shot of one size laid over a shot of another. Shots whose names say no viewport are one
-// plain compare.
+// A compare part's shots, one compare for each viewport they were taken at (phone first, each named)
+// and, inside a viewport, one for each case they show (each named), never a shot of one size or one
+// case laid over a shot of another. Shots whose names say no viewport or case are one plain compare.
 export function ImageCompares({ evidence }: { evidence: Evidence[] }) {
-  const groups = byViewport(evidence);
+  const groups = byViewport(evidence).flatMap(({ key, files }) =>
+    byCase(files).map(({ name, files: own }) => ({ key, name, files: own })),
+  );
   const [only] = groups;
   if (groups.length < 2 || !only) return <ImageCompare evidence={evidence} />;
   return (
     <>
-      {groups.map(({ key, files }) => (
-        <section key={key ?? 'any'} className="ev-viewport">
-          {key ? <h4 className="ev-viewport-h">{t(`evidence.viewport.${key}`)}</h4> : null}
+      {groups.map(({ key, name, files }) => (
+        <section key={`${key ?? 'any'}/${name}`} className="ev-viewport">
+          {key || name ? (
+            <h4 className="ev-viewport-h">
+              {[key ? t(`evidence.viewport.${key}`) : '', name].filter(Boolean).join(' · ')}
+            </h4>
+          ) : null}
           <ImageCompare evidence={files} />
         </section>
       ))}
@@ -253,7 +259,7 @@ export function ImageCompare({
   evidence,
   blind = false,
   names,
-  initial = 'slider',
+  initial = 'side',
 }: {
   evidence: Evidence[];
   blind?: boolean;
@@ -321,6 +327,10 @@ export function ImageCompare({
       </fieldset>
       {mode === 'slider' ? (
         <figure className="ev-frame">
+          <div className="ev-sides">
+            <span className="ev-tag out">{label.before}</span>
+            <span className="ev-tag out">{label.after}</span>
+          </div>
           <div
             ref={frame}
             className="ev-cmp well"
@@ -345,8 +355,6 @@ export function ImageCompare({
               style={{ clipPath: `inset(0 ${100 - split}% 0 0)` }}
               draggable={false}
             />
-            <span className="ev-tag l">{label.before}</span>
-            <span className="ev-tag r">{label.after}</span>
             <div
               className="ev-divider"
               style={{ left: `${split}%` }}
