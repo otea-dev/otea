@@ -256,6 +256,8 @@ export function HablarView({
   // What «Te espera» points at: the question where it is answered, else the item, else the note.
   const jump = (entry: PendingEntry) => {
     if (entry.kind === 'secretary' && entry.turn !== undefined) return goTo(entry.turn);
+    // A board nobody works is named by the board, which is no item: its page lists what waits.
+    if (entry.kind === 'worker') return app.go({ view: 'board', board: entry.ref });
     if (entry.kind === 'question' || entry.kind === 'bandeja') {
       if (toAsk(entry.ref)) return;
     }

@@ -248,6 +248,29 @@ describe('the conversation on the two lanes', () => {
     expect(openItem).toHaveBeenCalledWith('CAM-13');
   });
 
+  // D-68c31c (field study s-real): the row of a board nobody works named the board as if it were an
+  // item, and its tap opened «Item not found» at #/i/Código. A board is not an item: it opens the
+  // board, where the items that wait are.
+  it('opens the board, never an item, from the row of a board with no agent', async () => {
+    const openItem = vi.fn();
+    const go = vi.fn();
+    const waiting: Pending = {
+      count: 1,
+      entries: [
+        { kind: 'worker', ref: 'Código', title: 'Código', since: ago(30), items: ['COD-1'] },
+      ],
+      blocks: [],
+      queues: [],
+      secretary: null,
+    };
+    const { root } = await open(conversation(), { pending: waiting, openItem, go });
+
+    await press(q(root, '.hb-te-row[data-kind="worker"]'));
+
+    expect(openItem).not.toHaveBeenCalled();
+    expect(go).toHaveBeenCalledWith({ view: 'board', board: 'Código' });
+  });
+
   // Field study 4 (design): «sec» and «tú» scrolled away with the first message, and the lanes
   // stopped mid-pane. The names stand over the thread, outside what scrolls.
   it('keeps the lanes’ names over the thread, outside what scrolls', async () => {
