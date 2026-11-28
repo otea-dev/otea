@@ -142,9 +142,7 @@ describe('what a relay may never do', () => {
 
       it('refuses a message older than a day', () => {
         const id = bug();
-        const old = said('aceptalo, es un bug real', () =>
-          new Date(Date.now() - 2 * DAY).toISOString(),
-        );
+        const old = said('aceptalo, es un bug real', () => new Date(T0 - 2 * DAY).toISOString());
 
         expect(() => secretaryRelay(id, old.id, 'aceptalo, es un bug real')).toThrow(/old|day/);
         expect(getItem(project, id).state).toBe('reported');
