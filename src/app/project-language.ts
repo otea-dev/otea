@@ -17,7 +17,7 @@ import type { Env, Project } from './project.ts';
 //   2. A project from before has none stored: it takes the language of its Pedidos board, which was
 //      made in the language in use at the time, and keeps it from then on.
 //   3. Failing both, today's rule (the desk's last language, the computer's, English).
-// `otea projects lang` changes it; only what is made afterwards is affected.
+// `otea projects lang` changes it, and the boards that exist follow (board-relanguage.ts).
 
 const isLang = (value: unknown): value is Lang => LANGS.includes(value as Lang);
 
