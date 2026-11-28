@@ -296,6 +296,7 @@ import {
   findAgent,
   findProfile,
   forgetAgent,
+  markHarnessGone,
   markMcpAsked,
   type ProfileView,
   profileView,
@@ -2835,6 +2836,13 @@ async function listenWhile<T>(
     }
   });
   if (owner.orphaned() && heardAt) endListening(project.db, me, heardAt);
+  // Its session ended with this wait still running: the harness it ran under is gone, for the
+  // secretary and every subagent noted under it, however little Otea trusted it before (D-U5).
+  if (owner.orphaned()) {
+    const harness = await owner.harness;
+    if (harness !== undefined && harness !== process.pid && !processAlive(harness))
+      markHarnessGone(project.db, harness);
+  }
   // It waits no more once it found something or was stopped; a timeout is called again at once.
   const timedOut = !('found' in waited) && waited.stopped === 'timeout';
   if (heardAt && !timedOut) endWaiting(project.db, me, heardAt);

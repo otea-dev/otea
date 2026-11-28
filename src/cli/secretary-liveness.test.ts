@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { postPersonMessage } from '../app/conversation.ts';
-import { processAlive } from '../app/presence.ts';
+import { listAgents, processAlive } from '../app/presence.ts';
 import { openProject, type Project } from '../app/project.ts';
 import { secretaryStatus } from '../app/secretary.ts';
 import { forgetHarness, selectListenerProcesses } from '../store/queries.ts';
@@ -34,7 +34,7 @@ describe('the secretary seen offline once its process is gone', () => {
     otea = cliAt(repo.dir);
     const made = await otea('init', '--local', '--template', 'none');
     if (made.code !== 0) throw new Error(made.err);
-    declareProfiles(repo.dir, 'sol');
+    declareProfiles(repo.dir, 'sol', 'sol-worker');
     const declared = await otea('profile', '--role', 'secretary', '--as', 'sol');
     if (declared.code !== 0) throw new Error(declared.err);
   }, 60_000);
@@ -191,6 +191,140 @@ describe('the secretary seen offline once its process is gone', () => {
         await until(() => stateNow() === 'offline', 8_000);
 
         expect(Date.now() - killedAt).toBeLessThan(8_000);
+      } finally {
+        for (const pid of pids) if (processAlive(pid)) process.kill(pid);
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    120_000,
+  );
+
+  // A harness runs its commands through a shell, which on Windows outlives it: killed in the
+  // middle of its wait, the wait behind the shell still ends within seconds, and the desk reads the
+  // secretary offline long before the wait's own timeout.
+  it('reads offline within seconds of its harness being killed in the middle of its wait, behind a shell', async () => {
+    const starter = [
+      "const { spawn } = require('node:child_process');",
+      'const line = JSON.parse(process.argv[2]);',
+      "const win = process.platform === 'win32';",
+      "const c = spawn(win ? 'cmd.exe' : 'sh', win ? ['/d', '/s', '/c', '\"' + line + '\"'] : ['-c', line], { detached: true, stdio: 'ignore', windowsVerbatimArguments: win });",
+      'console.log(c.pid);',
+      'setTimeout(() => {}, 120_000);',
+    ].join('\n');
+    const dir = mkdtempSync(join(tmpdir(), 'otea-harness-'));
+    const script = join(dir, 'claude-code.js');
+    writeFileSync(script, starter);
+    const line = [process.execPath, '--disable-warning=ExperimentalWarning', MAIN, 'wait']
+      .map((word) => `"${word}"`)
+      .concat(['--secretary', '--as', 'sol', '--timeout', '10m'])
+      .join(' ');
+    const harness = spawn(process.execPath, [script, JSON.stringify(line)], {
+      cwd: repo.dir,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    children.push(harness);
+    const pids: number[] = [];
+    harness.stdout.setEncoding('utf8').on('data', (text: string) => {
+      for (const each of text.split('\n')) if (each.trim() !== '') pids.push(Number(each));
+    });
+    try {
+      await until(() => stateNow() === 'listening', 30_000);
+      // The wait reads the processes after five seconds and notes the harness.
+      await until(() => harnessNoted() === harness.pid, 30_000);
+      const noted = lookAt((project) => selectListenerProcesses(project.db).get('sol'));
+      expect(noted?.harness).toBe(harness.pid);
+
+      const killedAt = Date.now();
+      process.kill(harness.pid as number);
+      await until(() => stateNow() === 'offline', 15_000);
+      expect(Date.now() - killedAt).toBeLessThan(15_000);
+    } finally {
+      for (const pid of pids) if (processAlive(pid)) process.kill(pid);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  // U5 (the final study): the secretary's subagents (its worker and its refiner) wait from the same
+  // harness, under their own names. After the harness was killed the desk still said «conectado»
+  // 14 minutes later, with a change «working» and nobody alive. Everything under the harness is
+  // gone with it: the secretary reads offline within seconds, and its worker is not there.
+  it.each([{ named: true }, { named: false }])(
+    'reads offline within seconds of its harness being killed while its subagent waits under it (named: $named)',
+    async ({ named }) => {
+      const starter = [
+        "const { spawn } = require('node:child_process');",
+        'const [main, ...rest] = process.argv.slice(2);',
+        'const at = rest.indexOf("--");',
+        'const first = rest.slice(0, at);',
+        'const second = rest.slice(at + 1);',
+        "const run = (args) => { const c = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', main, ...args], { detached: true, stdio: 'ignore' }); console.log(c.pid); return c; };",
+        'const one = run(first);',
+        "one.on('exit', () => { run(second); });",
+        'setTimeout(() => {}, 120_000);',
+      ].join('\n');
+      const dir = mkdtempSync(join(tmpdir(), 'otea-harness-'));
+      const script = join(dir, named ? 'claude-code.js' : 'launcher.js');
+      writeFileSync(script, starter);
+      const harness = spawn(
+        process.execPath,
+        [
+          script,
+          MAIN,
+          'wait',
+          '--secretary',
+          '--as',
+          'sol',
+          '--timeout',
+          '10m',
+          '--',
+          'wait',
+          '--turn',
+          'agent',
+          '--unclaimed',
+          '--as',
+          'sol-worker',
+          '--timeout',
+          '10m',
+        ],
+        { cwd: repo.dir, env: { ...process.env }, stdio: ['ignore', 'pipe', 'ignore'] },
+      );
+      children.push(harness);
+      const pids: number[] = [];
+      harness.stdout.setEncoding('utf8').on('data', (text: string) => {
+        for (const line of text.split('\n')) if (line.trim() !== '') pids.push(Number(line));
+      });
+      await until(() => pids.length >= 1, 30_000);
+      try {
+        await until(() => stateNow() === 'listening', 30_000);
+        const project = openProject(repo.dir);
+        try {
+          postPersonMessage(project, { text: 'is the PC on?' });
+        } finally {
+          project.db.close();
+        }
+        // The secretary's wait returns; the worker's starts and listens under the same harness.
+        await until(() => pids.length >= 2, 30_000);
+        // A harness Otea does not know by name is only a candidate for the secretary, whose wait
+        // returned after one find: nothing but the worker's wait watches it from here on.
+        if (named) await until(() => harnessNoted() === harness.pid, 30_000);
+        const workerBeats = () =>
+          lookAt((project) => selectListenerProcesses(project.db).get('sol-worker')?.waiter);
+        await until(() => workerBeats() === pids[1], 30_000);
+        // Let the worker's wait read the process table (it does so after five seconds).
+        await new Promise((resolve) => setTimeout(resolve, 7_000));
+        expect(stateNow()).toBe('connected');
+
+        const killedAt = Date.now();
+        process.kill(harness.pid as number);
+        await until(() => stateNow() === 'offline', 12_000);
+        expect(Date.now() - killedAt).toBeLessThan(12_000);
+        // Its worker is gone with it: nobody is working.
+        const workerLive = () =>
+          lookAt(
+            (project) => listAgents(project.db).find(({ name }) => name === 'sol-worker')?.live,
+          );
+        await until(() => workerLive() === false, 12_000);
       } finally {
         for (const pid of pids) if (processAlive(pid)) process.kill(pid);
         rmSync(dir, { recursive: true, force: true });

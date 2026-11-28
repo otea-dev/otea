@@ -907,6 +907,16 @@ export function forgetHarness(db: DatabaseSync, agent: string, pid: number): voi
   ).run({ agent, pid });
 }
 
+// A harness session seen gone by a wait that ran under it: it is the harness of every agent noted
+// under it, a candidate or not, so each of them reads as ended from now on. Only for a process
+// that is gone: a live one is never marked.
+export function markHarnessGone(db: DatabaseSync, pid: number): void {
+  db.prepare(
+    `UPDATE agents SET listening_harness = :pid
+      WHERE listening_session IS NULL AND (listening_harness = :pid OR listening_harness = -:pid)`,
+  ).run({ pid });
+}
+
 export type ListenerProcesses = {
   session: number | null;
   waiter: number | null;
