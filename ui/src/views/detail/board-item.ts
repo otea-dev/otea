@@ -46,6 +46,7 @@ import { type BoardSpeech, boardSpeech, capital } from '../../board-words.ts';
 import { relayOf } from '../../format.ts';
 import { listOf, listOr, quoted, t } from '../../i18n/i18n.ts';
 import type { Look } from '../../lanes/looks.ts';
+import { mergeReturnTimes } from '../../merge-round.ts';
 import type { AgentProfile } from '../../presence.ts';
 import { keptStateWord } from '../../preset-words.ts';
 import type { Evidence, ItemEvent, RelatedItem } from '../../types.ts';
@@ -119,8 +120,15 @@ export function boardItemOf(
   const round = isClosed(position) ? 0 : (rounds.rounds[position.step] ?? 1);
   const at = isClosed(position) ? DONE : { step: position.step, phase: position.phase };
   const drawn = leadRoute(def, position, item.fields ?? {}, rounds.rounds);
+  // An agent's return to merge main into approved work is no send-back, whether or not the item is
+  // still on its way back (a merge round).
+  const merges = mergeReturnTimes(item.events);
   const dips = rounds.dips.map((dip) =>
-    bounced && dip.at === bounced.at ? { ...dip, bounced: true as const } : dip,
+    merges.has(dip.at)
+      ? { ...dip, merged: true as const }
+      : bounced && dip.at === bounced.at
+        ? { ...dip, bounced: true as const }
+        : dip,
   );
   const out: BoardItem = { agent, round, route: definitionRoute(drawn, at, dips, words) };
   if (!isClosed(position) && position.phase === 'doing') {
@@ -479,6 +487,8 @@ export type RoundNote = {
   reopened?: true;
   // The agent that relayed it as the person's word: `person` is false, `by` is that agent.
   relayedBy?: string;
+  // A `back` note that opened a round which only merges main into approved work: no send-back.
+  merged?: true;
 };
 // `doer`: the agent that did the round, with the profile it did it with (agents mock §5).
 export type Round = {
@@ -528,6 +538,7 @@ export function roundNotes(
   const history = historyFor(def, events, created);
   const starts = roundsOfStep(def, history, stepId);
   const doers = roundDoers(stepId, starts, events);
+  const merges = mergeReturnTimes(events);
   const rounds: Round[] = starts.map(({ round, back }, i) => ({
     round,
     notes: back?.said.text
@@ -540,6 +551,7 @@ export function roundNotes(
             ...(back.said.relayedBy === undefined ? {} : { relayedBy: back.said.relayedBy }),
             at: back.at,
             ...(back.reopened ? { reopened: true as const } : {}),
+            ...(merges.has(back.at) ? { merged: true as const } : {}),
           },
         ]
       : [],
@@ -566,7 +578,7 @@ export function roundNotes(
 // How the item last left a step: moved on after a review (approved), moved on by its doer
 // (handed), moved on after a send-back into it (reworked), back to an earlier step, or closed.
 export type StepOutcome =
-  | { kind: 'approved' | 'handed' | 'reworked' | 'done' | 'dropped' | 'relayed' }
+  | { kind: 'approved' | 'handed' | 'reworked' | 'merged' | 'done' | 'dropped' | 'relayed' }
   | { kind: 'back'; to: string };
 
 // One step the item went through with its rounds (roundNotes). `current`: the step it is on;
@@ -620,6 +632,7 @@ export function stepRounds(
     if (isClosed(from) || (!isClosed(to) && to.step === from.step)) continue;
     left.set(from.step, move);
   }
+  const merges = mergeReturnTimes(events);
   const closing = history.moves.findLast(({ to, quiet }) => !quiet && isClosed(positionOf(to)));
   const closingFrom = closing ? positionOf(closing.from) : undefined;
   // A closed item opens on the last step whose rounds said something (the step it closed from first),
@@ -647,7 +660,10 @@ export function stepRounds(
     if (isClosed(to)) return { kind: to.closed === DONE ? 'done' : 'dropped' };
     if (stepIndex(def, to.step) < stepIndex(def, id))
       return { kind: 'back', to: stepWord(def, to.step, events) };
-    if (engine.dips.some((dip) => dip.to === id)) return { kind: 'reworked' };
+    const into = engine.dips.filter((dip) => dip.to === id);
+    // Taken back only to merge main into it, never sent back: not «sent back and redone».
+    if (into.length > 0 && into.every((dip) => merges.has(dip.at))) return { kind: 'merged' };
+    if (into.length > 0) return { kind: 'reworked' };
     const from = positionOf(move.from);
     return { kind: !isClosed(from) && from.phase !== 'doing' ? 'approved' : 'handed' };
   };

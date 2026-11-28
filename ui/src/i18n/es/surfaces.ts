@@ -411,6 +411,8 @@ export const surfaces = {
   'triage.send': 'Enviar',
   'triage.hands': '{agent} te lo entrega.',
   'triage.handsRound': '{agent} te lo entrega en la ronda {round}, después de tus notas.',
+  'triage.handsMerge':
+    '{agent} te lo entrega en la ronda {round}: solo fusiona main con lo que aprobaste.',
   'triage.yours': 'Es tuyo para revisar.',
   'triage.done': 'No quedan revisiones.',
   'triage.doneBody': {

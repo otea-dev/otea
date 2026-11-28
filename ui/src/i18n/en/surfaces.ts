@@ -408,6 +408,8 @@ export const surfaces = {
   'triage.send': 'Send',
   'triage.hands': '{agent} hands it to you.',
   'triage.handsRound': '{agent} hands it to you in round {round}, after your notes.',
+  'triage.handsMerge':
+    '{agent} hands it to you in round {round}: it only merges main into what you approved.',
   'triage.yours': 'It is yours to review.',
   'triage.done': 'No reviews left.',
   'triage.doneBody': {

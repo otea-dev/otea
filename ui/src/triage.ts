@@ -12,6 +12,7 @@ import type { Waits } from './actions.ts';
 import { moveBlock, moveVariants } from './actions.ts';
 import type { FeedEvent } from './activity.ts';
 import { handedNote, type TocaContext, tocaSection } from './derive/toca.ts';
+import { handedAsMerge } from './merge-round.ts';
 import { clamp, sstep } from './motion/curves.ts';
 import type { Evidence, Item, ItemView, Move } from './types.ts';
 import { heldForDraft, otherMoves, planMoves } from './views/detail/moves.ts';
@@ -277,7 +278,7 @@ export function cardWords(
   item: Item,
   feed: readonly FeedEvent[],
   view?: Pick<ItemView, 'state' | 'events'>,
-): { agent: string | null; say: string; round: number } {
+): { agent: string | null; say: string; round: number; merge?: true } {
   const handed = view
     ? handoffOf(view)
     : (() => {
@@ -288,6 +289,8 @@ export function cardWords(
     agent: handed?.agent ?? null,
     say: handed?.note ?? '',
     round: item.round ?? roundOf(item.id, feed),
+    // A round that only merges main into approved work: nobody sent anything back (D-9b5288).
+    ...(view && handed && handedAsMerge(view.events, view.state) ? { merge: true as const } : {}),
   };
 }
 

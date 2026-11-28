@@ -350,9 +350,11 @@ type CardProps = {
   note?: ReaderNote | undefined;
 };
 
-function standfirst({ agent, round }: ReturnType<typeof cardWords>): ReactNode {
+export function standfirst({ agent, round, merge }: ReturnType<typeof cardWords>): ReactNode {
   if (!agent) return t('triage.yours');
   const who = <b>{agent}</b>;
+  // A round that only merges main into what you approved is no «after your notes».
+  if (merge) return tx('triage.handsMerge', { agent: who, round });
   return round > 1
     ? tx('triage.handsRound', { agent: who, round })
     : tx('triage.hands', { agent: who });

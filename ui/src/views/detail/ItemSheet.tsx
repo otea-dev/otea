@@ -190,6 +190,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
               redone: (n) => t('sheet.dipRedone', { n }),
               reopen: (at) => t('sheet.reopenDip', { when: at ? dipWhen(at, now) : '' }),
               bounce: (n) => t('sheet.dipBounced', { n }),
+              merge: (n) => t('sheet.dipMerge', { n }),
             },
             item.bounced,
           )
