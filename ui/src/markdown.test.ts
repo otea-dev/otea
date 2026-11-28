@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderMarkdown } from './markdown.ts';
+import { renderLines, renderMarkdown } from './markdown.ts';
 
 describe('images a document points at beside it (P5-7)', () => {
   it('loads a relative image from the file of that name, leaving the rest as they are', () => {
@@ -95,6 +95,26 @@ describe('markdown', () => {
     expect(fenced).toContain('| a | b |');
     expect(renderMarkdown('a | b\nnot a delimiter')).not.toContain('<table>');
     expect(renderMarkdown('| <script>x</script> |\n|---|\n| y |')).not.toContain('<script>');
+  });
+
+  // s-real D-6f9caa: a handoff note named «library/__init__.py» and the page drew «library/init.py»
+  // with init in bold: between a slash and a dot, CommonMark reads «__» as strong emphasis.
+  it('leaves the underscores of a file path alone, and still draws emphasis around it', () => {
+    for (const source of [
+      'Toqué library/__init__.py y tests/test_a_b.py.',
+      'Abre __init__.py y __main__.py',
+    ]) {
+      const html = renderMarkdown(source);
+      expect(html, source).not.toContain('<strong>');
+      expect(html, source).not.toContain('<em>');
+    }
+    expect(renderMarkdown('Toqué library/__init__.py')).toContain('library/__init__.py');
+    expect(renderLines('Edité `a/__x__.py` y __importante__ y _esto_')).toBe(
+      '<p>Edité <code>a/__x__.py</code> y <strong>importante</strong> y <em>esto</em></p>',
+    );
+    // A fenced block and an autolink keep what they were written with.
+    expect(renderMarkdown('```\nlib/__init__.py\n```')).toContain('lib/__init__.py');
+    expect(renderMarkdown('<https://a.b/x__y__z>')).toContain('href="https://a.b/x__y__z"');
   });
 
   it('drops links with a dangerous protocol', () => {

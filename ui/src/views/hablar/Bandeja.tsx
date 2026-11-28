@@ -179,7 +179,19 @@ export function Bandeja({ entries, reload, lit, answerBelow = false }: BandejaPr
   const open = sorted.filter((entry) => !isDone(entry));
   const filed = sorted.filter(isDone);
   const shown = all ? filed : filed.slice(0, FILED_SHOWN);
-  if (entries === undefined || sorted.length === 0) return null;
+  if (entries === undefined) return null;
+  // Nothing jotted yet: it says what it is for, in a sentence, so the person who looked for a place
+  // to leave an idea (s-real D-a0b4a2: a tablet, a 63-year-old at 150%) finds it and knows it is it.
+  if (sorted.length === 0)
+    return (
+      <section className="bn-box" aria-label={t('bandeja.title')}>
+        <h3 className="bn-h">
+          {t('bandeja.title')}
+          <small>0</small>
+        </h3>
+        <p className="bn-dek">{t('bandeja.empty')}</p>
+      </section>
+    );
   return (
     <section className="bn-box" aria-label={t('bandeja.title')}>
       <h3 className="bn-h">

@@ -146,6 +146,7 @@ export const shell = {
   'nav.boardPair': 'Te toca: {yours} · Abiertos: {open}',
   'nav.newBoard': 'Nuevo tablero',
   'nav.newItem': 'Nuevo ítem',
+  'nav.jot': 'Anotar idea',
   'nav.newItemIn': 'Nuevo ítem en {board}',
   'nav.project': 'proyecto',
   'nav.studio': 'Studio',

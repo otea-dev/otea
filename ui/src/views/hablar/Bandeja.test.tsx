@@ -367,11 +367,14 @@ describe('the Bandeja beside what came out', () => {
     ]);
   });
 
-  it('is not there while the Bandeja is empty', async () => {
+  // s-real D-a0b4a2: with no notes the Bandeja vanished, and nobody who looked for where to jot an
+  // idea found it. Empty, it says in one sentence what it is for.
+  it('says what it is for while it is empty', async () => {
     server([]);
     const root = await show(<Live />);
 
-    expect(q(root, '.bn-box')).toBeNull();
+    expect(text(q(root, '.bn-dek'))).toContain('Anotar idea');
+    expect(root.querySelectorAll('.bn-row')).toHaveLength(0);
   });
 });
 

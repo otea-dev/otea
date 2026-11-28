@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react';
 import { type Attention, attentionOf, nextLeaseExpiry } from './attention.ts';
 import { apiUrl } from './base.ts';
+import { tocaCount } from './derive/toca.ts';
 import { activeLease, type TimeCell, timeCell } from './lease.ts';
 import { afterFailure, type Remote } from './remote.ts';
 import { hideTier } from './row-grid.ts';
@@ -131,7 +132,10 @@ export function useTimeCell(item: Pick<Item, 'updatedAt' | 'lease' | 'expiredLea
 
 // The workspace's attention, kept live: the items follow the stream, and since a lease running out
 // writes nothing, it reads itself again when the first active lease expires.
-export function useAttention(items: readonly Item[]): Attention {
+// What is yours is counted as the rail's Te toca counts it (tocaCount: your turn, what got stuck,
+// and `elsewhere`, what is no item: a question on a Bandeja note), so the tab's title never says
+// fewer than the page (s-real D-e84919).
+export function useAttention(items: readonly Item[], elsewhere = 0): Attention {
   const [, tick] = useReducer((count: number) => count + 1, 0);
   const now = Date.now();
   const expiry = nextLeaseExpiry(items, now);
@@ -140,7 +144,7 @@ export function useAttention(items: readonly Item[]): Attention {
     const timer = setTimeout(tick, Math.max(0, expiry - Date.now()) + 10);
     return () => clearTimeout(timer);
   }, [expiry]);
-  return attentionOf(items, now);
+  return { ...attentionOf(items, now), yours: tocaCount(items, { now }, elsewhere) };
 }
 
 function subscribeToHash(onChange: () => void): () => void {

@@ -171,6 +171,17 @@ export function Composer({ onSent }: { onSent: () => void }) {
       }}
     >
       <ul className="hb-suggs" aria-label={t('hablar.suggestions')}>
+        <li>
+          <button
+            type="button"
+            className="hb-jot"
+            disabled={!canWrite}
+            onClick={() => app.newItem()}
+          >
+            <Icon name="note" />
+            {t('nav.jot')}
+          </button>
+        </li>
         {SUGGESTIONS.map((key) => (
           <li key={key}>
             <button

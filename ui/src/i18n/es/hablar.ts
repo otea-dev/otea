@@ -207,6 +207,8 @@ export const hablar = {
   'bandeja.failed': 'No se anotó ({message}). Inténtalo de nuevo.',
   'bandeja.title': 'Bandeja',
   'bandeja.dek': 'Lo que anotaste y cómo va',
+  'bandeja.empty':
+    'Aquí van las ideas sueltas que anotas con «Anotar idea»: tu secretario las convierte en ítems y aquí ves cómo van.',
   'bandeja.onlyFiles': 'Solo archivos',
   'bandeja.files': { one: '{count} archivo', other: '{count} archivos' },
   'bandeja.st.waiting': 'esperando al secretario',

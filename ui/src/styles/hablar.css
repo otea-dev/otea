@@ -1300,7 +1300,8 @@ button.hb-chip:hover {
   flex-wrap: wrap;
   gap: 8px;
 }
-.hb-sugg {
+.hb-sugg,
+.hb-jot {
   position: relative;
   min-height: 30px;
   padding: 5px 11px;
@@ -1314,14 +1315,31 @@ button.hb-chip:hover {
     background-color 120ms var(--ease),
     color 120ms var(--ease);
 }
-.hb-sugg::after {
+.hb-sugg::after,
+.hb-jot::after {
   content: "";
   position: absolute;
   inset: -7px -3px;
 }
-.hb-sugg:hover:not(:disabled) {
+.hb-sugg:hover:not(:disabled),
+.hb-jot:hover:not(:disabled) {
   background: var(--hov);
   color: var(--ink);
+}
+/* «Anotar idea» leads the suggestions: it is not a sentence for the secretary but the way to the
+   quick note, so it carries an icon and the ink of your colour (s-real D-a0b4a2). */
+.hb-jot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--you-ink);
+}
+.hb-jot:hover:not(:disabled) {
+  color: var(--you-ink);
+}
+.hb-jot .ic {
+  width: 14px;
+  height: 14px;
 }
 .hb-input {
   display: flex;

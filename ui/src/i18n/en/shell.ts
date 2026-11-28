@@ -144,6 +144,7 @@ export const shell = {
   'nav.boardPair': 'Your turn: {yours} · Open: {open}',
   'nav.newBoard': 'New board',
   'nav.newItem': 'New item',
+  'nav.jot': 'Jot an idea',
   'nav.newItemIn': 'New item in {board}',
   'nav.project': 'project',
   'nav.studio': 'Studio',

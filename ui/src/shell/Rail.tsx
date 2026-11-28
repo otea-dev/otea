@@ -23,7 +23,6 @@ import { useSecretary } from '../views/hablar/use-conversation.ts';
 import { focusContentSoon, livePlace } from './focus-content.ts';
 import { PrefsButton } from './Preferences.tsx';
 import { type BoardIcon, boardEntries, foldClip, type RailKey, railKey } from './rail-model.ts';
-import { useMedia } from './use-media.ts';
 
 // The rail (SPEC §7.2, mock:159-198, 1420-1458, 4038-4069): the head (fold, + Nuevo ítem, named so
 // it never reads as a new view, P7-14), vistas with Hablar (the secretary's mark, lit while it
@@ -31,9 +30,9 @@ import { useMedia } from './use-media.ts';
 // the boards with yours / open, Nuevo tablero, the project's Studio, settings and performance (set
 // up and reviewed now and then), one selection pill that slides to the row in view, and
 // Preferences at the foot. It folds to a 60 px strip of icons: the rail clips, the labels fade, badges come up, and the main
-// pane slides from where it was, so nothing reflows. Below 1024 px it is always folded.
-
-const NARROW = '(max-width: 1023px)';
+// pane slides from where it was, so nothing reflows. A tablet (768 px) or a desk at 150% zoom keeps
+// the labels like any desk, and folds when the person says so (s-real D-3874e1: below 1024 px it was
+// always folded, with the button disabled, and nobody found "Hablar" or "Te toca").
 
 // The secretary's state on its row: a dot in its colour while it is there, a ring while it is away;
 // nothing while the project has none. The colour is for the eye; the state is also said in words.
@@ -233,8 +232,7 @@ function useBoardEntrance(navs: React.RefObject<HTMLDivElement | null>, version:
 export function Rail() {
   const app = useApp();
   const ws = useWorkspace();
-  const narrow = useMedia(NARROW);
-  const folded = ws.folded || narrow;
+  const folded = ws.folded;
   const railRef = useRef<HTMLElement>(null);
   const navs = useRef<HTMLDivElement>(null);
   const key = railKey(app.route);
@@ -247,14 +245,6 @@ export function Rail() {
 
   useSelPill(navs, key);
   useBoardEntrance(navs, app.version);
-
-  // Below 1024 px the rail is always folded: the frame reads .app[data-folded], so it says so too.
-  useLayoutEffect(() => {
-    const appEl = railRef.current?.closest('.app');
-    if (!appEl) return;
-    if (narrow) appEl.setAttribute('data-folded', '');
-    else if (!ws.folded) appEl.removeAttribute('data-folded');
-  }, [narrow, ws.folded]);
 
   // The fold (mock:4039-4054): the main pane slides from its old left, the rail clips, both 560
   // settle; a second press mid-way turns them back from where they are.
@@ -307,8 +297,7 @@ export function Rail() {
         <IconButton
           aria-expanded={!folded}
           aria-label={foldLabel}
-          {...(narrow ? {} : { 'data-tip': foldLabel })}
-          disabled={narrow}
+          data-tip={foldLabel}
           onClick={toggleFold}
         >
           <Icon name="side" />
@@ -357,6 +346,21 @@ export function Rail() {
             badge={{ n: stuck, warn: true }}
             say={stuck > 0 ? t('nav.stuckCount', { count: stuck }) : undefined}
           />
+          {canWrite ? (
+            // The quick note, named for what it does: in s-real nobody on a tablet or at 150% zoom
+            // found where to jot an idea (D-a0b4a2). The form opens on the note.
+            <button
+              type="button"
+              className="add jot"
+              data-tip={t('nav.jot')}
+              onClick={() => app.newItem()}
+            >
+              <span className="ic">
+                <Icon name="note" />
+              </span>
+              <span className="lb">{t('nav.jot')}</span>
+            </button>
+          ) : null}
         </nav>
         <div className="rail-label">{t('nav.boards')}</div>
         <nav className="nav boards">

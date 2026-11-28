@@ -208,6 +208,8 @@ export const hablar = {
   'bandeja.failed': 'Not saved ({message}). Try again.',
   'bandeja.title': 'Inbox',
   'bandeja.dek': 'What you jotted down, and how it is going',
+  'bandeja.empty':
+    'Loose ideas you jot with “Jot an idea” land here: your secretary turns them into items, and you see how they go.',
   'bandeja.onlyFiles': 'Files only',
   'bandeja.files': { one: '{count} file', other: '{count} files' },
   'bandeja.st.waiting': 'waiting for the secretary',

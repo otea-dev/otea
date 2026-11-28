@@ -11,12 +11,14 @@
 @media (max-width: 720px), (pointer: coarse) {
   /* Hablar: the suggestions, the tabs, the strip of what waits, a file's X, a message's «ver más». */
   .hb-sugg,
+  .hb-jot,
   .hb-tabs button,
   .hb-chip,
   .hb-te-head {
     min-height: 44px;
   }
-  .hb-sugg {
+  .hb-sugg,
+  .hb-jot {
     padding-block: 10px;
   }
   .hb-dx {

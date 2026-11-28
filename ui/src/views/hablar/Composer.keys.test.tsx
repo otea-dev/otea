@@ -98,3 +98,23 @@ describe('the way to the message box by a key', () => {
     expect(document.activeElement).toBe(b);
   });
 });
+
+// s-real D-a0b4a2: «Anotar idea» is in reach of the box that talks to the secretary, and opens the
+// quick note, not a message.
+describe('the quick note from the message box', () => {
+  it('opens the note form with «Anotar idea», writing nothing in the box', async () => {
+    let opened = 0;
+    page = mount(
+      <AppTestProvider value={testApp({ newItem: () => (opened += 1) })}>
+        <Composer onSent={() => undefined} />
+      </AppTestProvider>,
+    );
+    await settle();
+    const jot = page.root.querySelector('.hb-jot') as HTMLButtonElement;
+    expect(jot.textContent).toContain('Anotar idea');
+    await act(async () => jot.click());
+    expect(opened).toBe(1);
+    const box = page.root.querySelector('.hb-composer textarea') as HTMLTextAreaElement;
+    expect(box.value).toBe('');
+  });
+});
