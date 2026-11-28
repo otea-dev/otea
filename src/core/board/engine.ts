@@ -1,3 +1,4 @@
+import type { Actor } from '../item.ts';
 import {
   type BoardDefinition,
   CHOICE_KINDS,
@@ -501,7 +502,7 @@ export function refusalCode(
   return missing.some(({ ref }) => ref === WAIT_PARTS) ? 'children_open' : 'blockers_open';
 }
 
-export type Performer = { kind: 'agent' | 'human'; name: string };
+export type Performer = Actor;
 
 export type MoveRefusal =
   | { ok: false; code: 'missing'; missing: Missing[] }

@@ -1,8 +1,15 @@
 import { basename } from 'node:path';
 import type { Context } from 'hono';
 import { z } from 'zod';
+import type { GivenAnswer, MessageFileInput } from '../app/conversation.ts';
 import type { EvidenceFile } from '../app/evidence.ts';
 import type { Performer } from '../core/authority.ts';
+import {
+  MAX_MESSAGE_CHARS,
+  MAX_MESSAGE_FILES,
+  MESSAGE_KINDS,
+  type MessageKind,
+} from '../core/conversation.ts';
 import {
   EVIDENCE_ROLES,
   type EvidenceRole,
@@ -268,6 +275,106 @@ export async function attachRequest(c: Context): Promise<EvidenceFile[]> {
   return Promise.all(files.map((one, at) => fileOf(one, places[at])));
 }
 
+const MessageBody = z.object({
+  text: z.string(),
+  replyTo: z.number().int().positive().optional(),
+});
+
+const MESSAGE_SHAPE = '{"text": string, "replyTo"?: number}';
+
+// What the person says in the conversation: the text and, when it answers one, the message it
+// follows; the files come with it.
+export type MessageRequest = { text: string; replyTo?: number; files: MessageFileInput[] };
+
+// The person's message as JSON, or as a form: its JSON in the `message` part and each file in a
+// `file` part (the way a new item comes with its files).
+export async function messageRequest(c: Context): Promise<MessageRequest> {
+  const invalid = (detail = '') =>
+    new RejectedRequest(400, 'invalid_body', `Expected ${MESSAGE_SHAPE}${detail}`);
+  let raw: unknown;
+  let parts: File[] = [];
+  if (mediaOf(c.req.header('content-type')) !== FORM_TYPE) {
+    raw = await c.req.json().catch(() => undefined);
+  } else {
+    const form = await c.req.parseBody({ all: true }).catch(() => {
+      throw invalid(' as the "message" part of the form');
+    });
+    const { message, file = [] } = form;
+    parts = (Array.isArray(file) ? file : [file]).filter((part) => part instanceof File);
+    if (typeof message !== 'string') throw invalid(' as the "message" part of the form');
+    try {
+      raw = JSON.parse(message);
+    } catch {
+      throw invalid(' as the "message" part of the form');
+    }
+  }
+  const parsed = MessageBody.safeParse(raw);
+  if (!parsed.success) throw invalid();
+  if (parts.length > MAX_MESSAGE_FILES) {
+    throw new RejectedRequest(400, 'invalid_body', `Send at most ${MAX_MESSAGE_FILES} files`);
+  }
+  const files = await Promise.all(parts.map((part) => fileOf(part)));
+  return {
+    text: parsed.data.text,
+    ...(parsed.data.replyTo === undefined ? {} : { replyTo: parsed.data.replyTo }),
+    files: files.map(({ filename, bytes }) => ({ filename, bytes })),
+  };
+}
+
+const CaptureBody = z.object({ text: z.string() }).strict();
+
+const CAPTURE_SHAPE = '{"text": string}';
+
+// What the person captures in the Bandeja: the text and the files that come with it, as JSON or as
+// a form (its JSON in the `message` part, each file in a `file` part), as a message comes.
+export async function captureRequest(c: Context): Promise<MessageRequest> {
+  const invalid = (detail = '') =>
+    new RejectedRequest(400, 'invalid_body', `Expected ${CAPTURE_SHAPE}${detail}`);
+  let raw: unknown;
+  let parts: File[] = [];
+  if (mediaOf(c.req.header('content-type')) !== FORM_TYPE) {
+    raw = await c.req.json().catch(() => undefined);
+  } else {
+    const form = await c.req.parseBody({ all: true }).catch(() => {
+      throw invalid(' as the "message" part of the form');
+    });
+    const { message, file = [] } = form;
+    parts = (Array.isArray(file) ? file : [file]).filter((part) => part instanceof File);
+    if (typeof message !== 'string') throw invalid(' as the "message" part of the form');
+    try {
+      raw = JSON.parse(message);
+    } catch {
+      throw invalid(' as the "message" part of the form');
+    }
+  }
+  const parsed = CaptureBody.safeParse(raw);
+  if (!parsed.success) throw invalid();
+  if (parts.length > MAX_MESSAGE_FILES) {
+    throw new RejectedRequest(400, 'invalid_body', `Send at most ${MAX_MESSAGE_FILES} files`);
+  }
+  const files = await Promise.all(parts.map((part) => fileOf(part)));
+  return {
+    text: parsed.data.text,
+    files: files.map(({ filename, bytes }) => ({ filename, bytes })),
+  };
+}
+
+const KindBody = z.object({ kind: z.enum(MESSAGE_KINDS) });
+
+// The person's correction of a turn: one tap, `request` or `consultation`.
+export async function kindRequest(c: Context): Promise<MessageKind> {
+  const raw: unknown = await c.req.json().catch(() => undefined);
+  const parsed = KindBody.safeParse(raw);
+  if (!parsed.success) {
+    throw new RejectedRequest(
+      400,
+      'invalid_body',
+      `Expected {"kind": ${MESSAGE_KINDS.map((kind) => `"${kind}"`).join(' | ')}}`,
+    );
+  }
+  return parsed.data.kind;
+}
+
 const CLIENT_KEY = /^[A-Za-z0-9_-]{1,128}$/;
 
 // The create's Idempotency-Key, when the client sends one: a phone resending a capture it queued
@@ -283,6 +390,13 @@ export function clientKeyOf(c: Context): string | undefined {
     );
   }
   return key;
+}
+
+// Whose idempotency keys these are: each paired device has its own, and the desk's browser is one
+// more, so one client's key never answers another's.
+export function keyScopeOf(c: Context): string {
+  const client = clientOf(c);
+  return client.kind === 'device' ? `device:${client.device.id}` : 'desk';
 }
 
 const LinkBody = z.object({ kind: z.string().min(1), other: z.string().min(1) });
@@ -432,7 +546,7 @@ export async function answerRequest(c: Context): Promise<{ text: string }> {
 // a question that has since changed is refused.
 const question = z.number().int().positive();
 const ChosenAnswerBody = z.union([
-  z.object({ question, text: z.string() }).strict(),
+  z.object({ question, text: z.string().max(MAX_MESSAGE_CHARS) }).strict(),
   z.object({ question, option: z.number().int().positive() }).strict(),
   z.object({ question, delegate: z.literal(true) }).strict(),
 ]);
@@ -442,6 +556,34 @@ export type ChosenAnswer = { question: number } & (
   | { option: number }
   | { delegate: true }
 );
+
+// What the person gives a question of the assistant's: the same, with no question number (the
+// question is the message the route names).
+const AssistantAnswerBody = z.union([
+  z.object({ text: z.string() }).strict(),
+  z
+    .object({
+      option: z.number().int().positive(),
+      // The person's edit of the note a card sends back with.
+      note: z.string().max(MAX_MESSAGE_CHARS).optional(),
+      // What the person adds to an option that needs their own words.
+      explain: z.string().max(MAX_MESSAGE_CHARS).optional(),
+    })
+    .strict(),
+  z.object({ delegate: z.literal(true) }).strict(),
+]);
+
+export async function assistantAnswerRequest(c: Context): Promise<GivenAnswer> {
+  const raw: unknown = await c.req.json().catch(() => undefined);
+  const parsed = AssistantAnswerBody.safeParse(raw);
+  if (!parsed.success)
+    throw new RejectedRequest(
+      400,
+      'invalid_body',
+      'Expected {"text": string}, {"option": number} or {"delegate": true}',
+    );
+  return parsed.data;
+}
 
 export async function chosenAnswerRequest(c: Context): Promise<ChosenAnswer> {
   const raw: unknown = await c.req.json().catch(() => undefined);

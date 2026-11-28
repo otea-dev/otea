@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { activeLease } from '../../active-lease.ts';
 import { typeOfItem, useApp } from '../../app/context.tsx';
+import { waitingWords } from '../../assistant-waiting.ts';
 import { EmptyProject } from '../../components/EmptyProject.tsx';
 import { NextStep } from '../../components/NextStep.tsx';
+import type { AssistantView } from '../../conversation.ts';
 import { t, tx } from '../../i18n/i18n.ts';
 import { Button } from '../../kit/Button.tsx';
 import { Count } from '../../kit/Count.tsx';
@@ -11,8 +13,18 @@ import { Swap } from '../../kit/Swap.tsx';
 import { LaneHead } from '../../lanes/LaneHead.tsx';
 import { LaneList } from '../../lanes/LaneList.tsx';
 import { noAgents } from '../../listening.ts';
+import { InstallBanner } from '../../offline/InstallBanner.tsx';
 import { QueuedCaptures } from '../../offline/QueuedCaptures.tsx';
 import { discard, useQueue } from '../../offline/queue-store.ts';
+import {
+  entryRoute,
+  offItemCount,
+  offItemEntries,
+  offlineWithWaiting,
+  oldestOffItem,
+  rowKeyOf,
+} from '../../pending.ts';
+import { hablarHash } from '../../selection.ts';
 import type { Item } from '../../types.ts';
 import { AnsweredTopics } from '../topics/AnsweredTopics.tsx';
 import { dayLine, tocaBlocks, universeOf } from './blocks.tsx';
@@ -23,31 +35,28 @@ import { type Today, todayCounts } from './today.ts';
 // its dek and the day's recap under it, the lanes with the sections in order, closed work on the
 // trunk. Who does what is on each row and in the topbar's menu; an agent's last hours in its sheet.
 
-export { dayLine, roundOf, rowCall, tocaBlocks, universeOf } from './blocks.tsx';
+export { dayLine, rowCall, tocaBlocks, universeOf } from './blocks.tsx';
 
 // The day's recap under the title: what they handed over, what you approved (in your colour) and
 // what you sent back.
 function Recap({ today, phone }: { today: Today; phone: boolean }) {
+  // The sentence is the interface's voice (sans) with its figures in mono, on the desk and on the
+  // phone alike; only the phone's line has no hairline running out to the edge.
+  const sentence = tx('toca.colophon', {
+    handed: <Count value={today.handed} hold />,
+    approved: <Count className="you" value={today.approved} hold />,
+    sent: <Count value={today.sent} hold />,
+  });
   if (phone) {
     return (
       <p className="p-recap" data-leaf="">
-        {t('toca.colophon', {
-          handed: String(today.handed),
-          approved: String(today.approved),
-          sent: String(today.sent),
-        })}
+        {sentence}
       </p>
     );
   }
   return (
     <div className="recap" data-leaf="">
-      <span>
-        {tx('toca.colophon', {
-          handed: <Count value={today.handed} hold />,
-          approved: <Count className="you" value={today.approved} hold />,
-          sent: <Count value={today.sent} hold />,
-        })}
-      </span>
+      <span>{sentence}</span>
       <span className="rule" />
     </div>
   );
@@ -92,14 +101,47 @@ function NoAgents({
   );
 }
 
+// The assistant is offline and things wait for it: Te toca says so (it never reads «nothing waits»
+// while the person's messages and notes sit unread), with how many and the way to Hablar, where
+// the way to bring it back is.
+function AssistantAway({ assistant }: { assistant: AssistantView }) {
+  return (
+    <div className="assistant-off" role="status" data-leaf="">
+      <i aria-hidden="true" />
+      <div>
+        <h4>{t('toca.secOff.title', { name: assistant.name })}</h4>
+        <p>{t('toca.secOff.waiting', { what: waitingWords(assistant.waiting) })}</p>
+        <a className="assistant-off-go" href={hablarHash()}>
+          {t('toca.secOff.go')}
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export function TocaView({ atasco = false }: { atasco?: boolean }) {
   const app = useApp();
   const types = (it: Item) => typeOfItem(it, app.collectionOf);
   const ctx = { now: app.now, items: app.all, types };
   const today = todayCounts(app.feed, ctx);
-  const open = (id: string) => (app.route.item === id ? app.closeItem() : app.openItem(id));
+  // A row that is no item (a question on a Bandeja note, the assistant's own) opens Hablar.
+  const off = new Map(offItemEntries(app).map((entry) => [rowKeyOf(entry), entry]));
+  const open = (id: string) => {
+    const entry = off.get(id);
+    if (entry) return app.go(entryRoute(entry));
+    return app.route.item === id ? app.closeItem() : app.openItem(id);
+  };
+  // On the phone without the PC the assistant's state is the last one kept: the offline line says
+  // the PC is out of reach, and this card waits for an answer to be true.
+  const away =
+    atasco || (app.sync?.offline === true && app.phone) ? null : offlineWithWaiting(app.assistant);
   // No item on any board (every project has Pedidos, so never no board): the project's own page.
-  const empty = app.items.status === 'ready' && !atasco && app.all.length === 0;
+  const empty =
+    app.items.status === 'ready' &&
+    !atasco &&
+    app.all.length === 0 &&
+    off.size === 0 &&
+    away === null;
   // On the phone En camino comes folded in one line.
   const [encamino, setEncamino] = useState(false);
   // Before the first load nothing is known yet: it says so, never that nothing waits (P5-R3-6),
@@ -134,7 +176,10 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
       </>
     );
   } else {
-    const d = tocaDek(app.all, today.handed, app.now);
+    const d = tocaDek(app.all, today.handed, app.now, {
+      count: offItemCount(app),
+      since: oldestOffItem(app),
+    });
     dekKey = d.lead;
     dek = d.lead;
   }
@@ -155,6 +200,8 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
             </Swap>
           </div>
           {recap ? <Recap today={today} phone={app.phone} /> : null}
+          {/* The phone's first open in a browser: a quiet note in the header, never over the page. */}
+          {app.phone ? <InstallBanner /> : null}
         </header>
         {atasco ? null : (
           <QueuedCaptures captures={queue.captures} onDiscard={(id) => void discard(id)} />
@@ -163,6 +210,7 @@ export function TocaView({ atasco = false }: { atasco?: boolean }) {
           <EmptyProject />
         ) : (
           <>
+            {away ? <AssistantAway assistant={away} /> : null}
             {lonely ? <NoAgents items={app.all} now={app.now} onConnect={app.openConnect} /> : null}
             <LaneHead />
             <LaneList

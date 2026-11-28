@@ -37,7 +37,7 @@ describe('what the agent sheet says of an agent whose lease ran out', () => {
     setLanguage('es');
     const html = stand(kiln({ status: 'connected' }));
     expect(html).toMatch(
-      /^Conectado: su reserva de <em>Tortuga musgosa<\/em> venció a las \d\d:\d\d, pero puede seguir en ello\.$/,
+      /^Conectado: se acabó su tiempo en <em>Tortuga musgosa<\/em> a las \d\d:\d\d, pero puede seguir en ello\.$/,
     );
     expect(html).not.toMatch(/libre|sin señal/i);
     setLanguage('en');
@@ -53,8 +53,8 @@ describe('what the agent sheet says of an agent whose lease ran out', () => {
     expect(html).not.toContain('Conectado');
   });
 
-  // An agent with no signal on a live lease is «sin señal» on its sheet too, never idle text.
-  it('says «sin señal» of one that holds a live lease and gave no sign', () => {
+  // An agent with no news on a live lease is «sin novedades» on its sheet too, never idle text.
+  it('says «sin novedades» of one that holds a live lease and gave no sign', () => {
     setLanguage('es');
     const live = item({
       id: 'CRE-45',
@@ -65,7 +65,9 @@ describe('what the agent sheet says of an agent whose lease ran out', () => {
     const presence = kiln({ status: 'silent', live: false, holding: ['CRE-45'], lastSeen: ago(4) });
     const row = agentRows([presence], [live], NOW)[0];
     const html = renderToStaticMarkup(<Stand row={row} presence={presence} now={NOW} />);
-    expect(html).toMatch(/^Sin señal desde las \d\d:\d\d: tiene <em>Cangrejo<\/em> en la mano\.$/);
+    expect(html).toMatch(
+      /^Sin novedades desde las \d\d:\d\d: tiene <em>Cangrejo<\/em> en la mano\.$/,
+    );
     expect(html).not.toContain('Ausente');
   });
 

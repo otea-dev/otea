@@ -254,6 +254,20 @@ function landsAs(
   return tree !== undefined && tree === treeOf(cwd, tip);
 }
 
+// Whether `commit` holds exactly what the person approved of `branch` (at `approved`, else as the
+// branch stands), merged onto the local `base`: the approved commit itself, a merge of the base into
+// it, or any commit with the same result. Commits nobody reviewed, or a merge with conflicts, never.
+export function landsExactly(
+  cwd: string,
+  commit: string,
+  base: string,
+  branch: string,
+  approved?: Tip,
+): boolean {
+  const start = commitOf(cwd, `refs/heads/${base}`);
+  return landsAs(cwd, commit, start, [{ branch, ...(approved ? { tip: approved } : {}) }]);
+}
+
 // Runs git, giving back its output, or when it failed the first error line it wrote to stderr.
 function tried(cwd: string, ...args: string[]): { out: string } | { error: string } {
   try {
@@ -274,6 +288,19 @@ function tried(cwd: string, ...args: string[]): { out: string } | { error: strin
   }
 }
 
+// Where to run git when it must read a remote: the repository's main checkout. A remote given by a
+// relative path (`../origin.git`) is read from the folder git runs in, so from a linked worktree
+// (.otea/worktrees/<item>) it names a folder that is no repository (field study 4, U6). The refs
+// git fetches are shared by every checkout, so it makes no difference which one asks.
+export function remoteCwd(cwd: string): string {
+  try {
+    const common = git(cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir');
+    return basename(common) === '.git' ? dirname(common) : cwd;
+  } catch {
+    return cwd;
+  }
+}
+
 // What a merge of the approved branch takes, as its remote has it right now (P3C-R3-1): a forge
 // merges the branch there, which a clone without Otea's hook may have pushed to since the person
 // approved it. The branch and the base it merges into are fetched from the remote the branch is
@@ -290,7 +317,7 @@ export function mergeTake(cwd: string, tip: Tip, base?: string, given?: string):
     let start: string | undefined;
     if (remotes.includes(remote)) {
       const heads = [branch, ...(base ? [base] : [])].map((name) => `refs/heads/${name}`);
-      const listed = tried(cwd, 'ls-remote', '--heads', remote, ...heads);
+      const listed = tried(remoteCwd(cwd), 'ls-remote', '--heads', remote, ...heads);
       if ('error' in listed) return { unknown: `git could not reach ${remote} (${listed.error})` };
       const there = new Map(
         listed.out
@@ -305,7 +332,7 @@ export function mergeTake(cwd: string, tip: Tip, base?: string, given?: string):
         .filter((name) => commitOf(cwd, there.get(name) ?? '') === undefined)
         .map((name) => `+refs/heads/${name}:refs/remotes/${remote}/${name}`);
       if (fetch.length > 0) {
-        const fetched = tried(cwd, 'fetch', '--quiet', '--no-tags', remote, ...fetch);
+        const fetched = tried(remoteCwd(cwd), 'fetch', '--quiet', '--no-tags', remote, ...fetch);
         if ('error' in fetched)
           return { unknown: `git could not fetch it from ${remote} (${fetched.error})` };
       }
@@ -524,13 +551,152 @@ function configured(cwd: string, key: string): string | undefined {
   }
 }
 
-function isAncestor(cwd: string, ancestor: string, of: string): boolean {
+export function isAncestor(cwd: string, ancestor: string, of: string): boolean {
   try {
     git(cwd, 'merge-base', '--is-ancestor', ancestor, of);
     return true;
   } catch {
     return false;
   }
+}
+
+// An item landed on the remote's base while the main checkout's own base stayed where it was (an
+// agent pushed `HEAD:main` from a worktree): `behind` commits the remote has that the local base
+// lacks. `state`: whether git can bring the checkout up to date at once (`ready`: it is on the
+// base with no change to a tracked file), or it is left alone: `changes`, checked out `elsewhere`
+// (named in `on`), `diverged` (the local base has commits of its own the remote lacks, so no
+// fast-forward can bring it up: that is the person's to untangle) or `collides` (a file arriving
+// from the remote would replace one the person keeps out of git here, named in `paths`).
+//
+// With no remote at all (`local`): the item landed in a worktree branch, and nothing was pushed
+// anywhere; `behind` counts the commits of the landed tip the local base lacks, `remote` is empty
+// and `target` is the commit to fast-forward to (the landed tip itself).
+export type LocalBehind = {
+  base: string;
+  remote: string;
+  // What a fast-forward merges: the remote's base (the default), or with no remote the landed commit.
+  target?: string;
+  local?: true;
+  behind: number;
+  checkout: string;
+  state: 'ready' | 'changes' | 'elsewhere' | 'diverged' | 'collides';
+  on?: string;
+  paths?: string[];
+};
+
+// How many ignored paths are named when a fast-forward would replace them.
+const COLLISION_NAMED = 3;
+
+// The files that arrive with the remote's base (added there, not in the local base) where the
+// checkout holds an ignored file or folder of its own: a fast-forward writes over those without a
+// word (an .env, a local config). Empty when none does.
+function collidingPaths(checkout: string, from: string, to: string): string[] {
+  const split = (text: string) => text.split('\0').filter(Boolean);
+  const incoming = split(git(checkout, 'diff', '--name-only', '-z', '--diff-filter=A', from, to));
+  if (incoming.length === 0) return [];
+  const ignored = split(
+    git(
+      checkout,
+      '--no-optional-locks',
+      'ls-files',
+      '-z',
+      '--others',
+      '--ignored',
+      '--exclude-standard',
+      '--directory',
+    ),
+  );
+  return incoming.filter((path) =>
+    ignored.some((mine) => (mine.endsWith('/') ? path.startsWith(mine) : path === mine)),
+  );
+}
+
+// Brings the checkout's local base up to the remote's by a fast-forward and nothing else, and only
+// while the checkout is on that base with no change to a tracked file and no ignored file of its
+// own in the way (asked again here: it may have changed since it was read). Whether it moved.
+export function fastForward(behind: LocalBehind): boolean {
+  const { checkout, base, remote } = behind;
+  const target = behind.target ?? `refs/remotes/${remote}`;
+  if (checkedOutBranch(checkout) !== base) return false;
+  if (git(checkout, '--no-optional-locks', 'status', '--porcelain', '--untracked-files=no') !== '')
+    return false;
+  try {
+    if (collidingPaths(checkout, `refs/heads/${base}`, target).length > 0) return false;
+    git(checkout, 'merge', '--ff-only', '--quiet', target);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Whether `commit` (what landed) is in the remote's `base`, as this repo last saw it, and not in
+// the local `base` of the checkout at `checkout`; with no remote at all, whether it is not in the
+// local base yet (the item landed in a worktree's branch and nothing was pushed). Undefined
+// otherwise.
+export function localBehind(
+  checkout: string,
+  base: string,
+  commit: string,
+): LocalBehind | undefined {
+  const remote = remoteName(checkout, base);
+  const here = commitOf(checkout, `refs/heads/${base}`);
+  if (!remote) {
+    // A remote the base has no branch on is no case of this: only a repo with none at all.
+    if (git(checkout, 'remote') !== '') return undefined;
+    const tip = commitOf(checkout, commit);
+    if (!tip || !here || tip === here || isAncestor(checkout, tip, here)) return undefined;
+    return behindState(checkout, base, here, tip, tip, '', true);
+  }
+  const there = commitOf(checkout, `refs/remotes/${remote}`);
+  if (!there || !here || here === there) return undefined;
+  const holds = (ref: string) =>
+    isAncestor(checkout, commit, ref) || landedIn(checkout, commit, ref);
+  if (!holds(there) || holds(here)) return undefined;
+  return behindState(checkout, base, here, there, `refs/remotes/${remote}`, remote, false);
+}
+
+// How far the local base is from `there` and what stands in the way of a fast-forward to `target`.
+function behindState(
+  checkout: string,
+  base: string,
+  here: string,
+  there: string,
+  target: string,
+  remote: string,
+  local: boolean,
+): LocalBehind | undefined {
+  const behind = Number(git(checkout, 'rev-list', '--count', `${here}..${there}`));
+  if (!(behind > 0)) return undefined;
+  const on = checkedOutBranch(checkout);
+  // Asked without taking git's optional locks: it refreshes the index, which the person's own git
+  // (or their editor's) may be using at that moment.
+  const changed =
+    git(checkout, '--no-optional-locks', 'status', '--porcelain', '--untracked-files=no') !== '';
+  // The local base has commits of its own the target lacks: nothing fast-forwards it.
+  const diverged = !isAncestor(checkout, here, there);
+  const colliding =
+    diverged || on !== base || changed
+      ? []
+      : collidingPaths(checkout, `refs/heads/${base}`, target);
+  const state = diverged
+    ? 'diverged'
+    : on !== base
+      ? 'elsewhere'
+      : changed
+        ? 'changes'
+        : colliding.length > 0
+          ? 'collides'
+          : 'ready';
+  return {
+    base,
+    remote,
+    ...(local ? { local: true as const, target } : {}),
+    behind,
+    checkout,
+    state,
+    ...(on !== undefined && on !== base ? { on } : {}),
+    ...(state === 'collides' ? { paths: colliding.slice(0, COLLISION_NAMED) } : {}),
+  };
 }
 
 // Where `branch` (here, or else on origin) is in `base` already: `merged` when the base as the

@@ -37,6 +37,11 @@ export function agentsAcross(projects: readonly ProjectOverview[]): AcrossAgent[
     );
 }
 
+// How many things wait for you in a project: its items on your turn, and what asks you that is no
+// item (a question on a note, the assistant's, what agents escalated while it is away).
+export const waitingIn = (project: Pick<ProjectOverview, 'waiting' | 'asking'>): number =>
+  project.waiting.length + (project.asking?.length ?? 0);
+
 // What the projects inbox shows: the projects with something waiting for you, in the registry's
 // order, and what stays out of it (items with agents, projects with nothing open).
 export type Inbox = {
@@ -53,10 +58,10 @@ export type Inbox = {
 
 export function inboxOf(projects: readonly ProjectOverview[]): Inbox {
   const readable = projects.filter((project) => project.unavailable === undefined);
-  const groups = readable.filter((project) => project.waiting.length > 0);
+  const groups = readable.filter((project) => waitingIn(project) > 0);
   const agents = readable.filter((project) => project.withAgents > 0);
   return {
-    waiting: groups.reduce((sum, project) => sum + project.waiting.length, 0),
+    waiting: groups.reduce((sum, project) => sum + waitingIn(project), 0),
     groups,
     withAgents: agents.reduce((sum, project) => sum + project.withAgents, 0),
     agentProjects: agents.map((project) => project.name),
@@ -70,9 +75,9 @@ export function waitingElsewhere(projects: readonly ProjectOverview[]): {
   count: number;
   projects: number;
 } {
-  const others = projects.filter((project) => !project.current && project.waiting.length > 0);
+  const others = projects.filter((project) => !project.current && waitingIn(project) > 0);
   return {
-    count: others.reduce((sum, project) => sum + project.waiting.length, 0),
+    count: others.reduce((sum, project) => sum + waitingIn(project), 0),
     projects: others.length,
   };
 }
@@ -83,14 +88,35 @@ export function itemHref(project: ProjectOverview, item: WaitingItem): string {
   return projectPage(project.id, hashFor(item.id));
 }
 
-export function projectHref(project: Pick<ProjectOverview, 'id' | 'current'>): string {
+// `stay`: the hash to open the other project at (Hablar stays Hablar when you switch).
+export function projectHref(
+  project: Pick<ProjectOverview, 'id' | 'current'>,
+  stay?: string,
+): string {
   if (project.current) return '#/';
-  return projectPage(project.id);
+  return projectPage(project.id, stay);
 }
 
 // The first path of a project that is still there, to name where it lives.
 export function whereOf(project: Pick<ProjectOverview, 'paths'>): string | undefined {
   return (project.paths.find((path) => !path.missing) ?? project.paths[0])?.path;
+}
+
+// A folder, said short: from the home folder as «~/», and only its last two names when it is deep
+// (`C:\Users\ana\AppData\Local\Temp\run\scratch\shop` reads «…/scratch/shop», not the whole way).
+// The full path is the tooltip's.
+export function placeOf(path: string): string {
+  const slashed = path.replace(/\\/g, '/');
+  const drive = /^[A-Za-z]:/.exec(slashed)?.[0] ?? '';
+  const parts = slashed.slice(drive.length).split('/').filter(Boolean);
+  const homed = (parts[0] === 'Users' || parts[0] === 'home') && parts.length > 2;
+  const names = homed ? parts.slice(2) : parts;
+  if (names.length === 0) return path;
+  // The home folder is «~/»; any other place keeps its drive, if it has one.
+  const start = homed ? '~/' : `${drive}/`;
+  return names.length <= 3
+    ? `${start}${names.join('/')}`
+    : `${start}…/${names.slice(-2).join('/')}`;
 }
 
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;

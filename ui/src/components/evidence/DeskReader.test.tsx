@@ -76,6 +76,40 @@ describe('EvidenceReader deciding', () => {
   });
 });
 
+// R2 (field study 4, design): the phone's reader was a plain sheet with «1 de 3». The files now hang
+// on a lane of nodes under the bar, as the desk's list does (ring: not opened, grey disc: opened,
+// blue disc: the one shown); a node is a tap to that file.
+describe('EvidenceReader on the phone: the lane of files', () => {
+  it('draws a node per file, marks the one shown and the ones opened, and says so in words', () => {
+    const html = renderToStaticMarkup(
+      <EvidenceReader
+        evidence={files}
+        at={1}
+        onAt={noop}
+        phone
+        seen={new Set([files[0]?.id ?? 0, files[1]?.id ?? 0])}
+      />,
+    );
+    const nodes = [...html.matchAll(/<button[^>]*class="ev-node"[^>]*>/g)].map((m) => m[0]);
+    expect(nodes).toHaveLength(3);
+    expect(nodes[0]).toContain('data-seen="true"');
+    expect(nodes[0]).not.toContain('aria-current');
+    expect(nodes[1]).toContain('aria-current="true"');
+    expect(nodes[2]).not.toContain('data-seen');
+    // A node says which file it is, for a reader that sees no lane.
+    expect(nodes[2]).toContain('aria-label="3 · grabacion.webm"');
+  });
+
+  it('draws no lane for one file, nor on the desk, which has its own list', () => {
+    expect(
+      renderToStaticMarkup(<EvidenceReader evidence={[shot]} at={0} onAt={noop} phone />),
+    ).not.toContain('ev-lane');
+    expect(
+      renderToStaticMarkup(<EvidenceReader evidence={files} at={0} onAt={noop} />),
+    ).not.toContain('ev-lane');
+  });
+});
+
 describe('ReaderPane: the desk reader', () => {
   const parts = new Map([
     ['evideo', 'Grabación'],

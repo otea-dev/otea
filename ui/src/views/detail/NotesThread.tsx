@@ -9,7 +9,14 @@ import { AgentMark, Icon } from '../../kit/index.ts';
 import { C } from '../../motion/curves.ts';
 import { reduced } from '../../motion/reduced.ts';
 import type { Evidence } from '../../types.ts';
-import { type ItemNote, noteContext, notesCount, noteTime, profileWords } from './notes.ts';
+import {
+  type ItemNote,
+  noteContext,
+  noteSigner,
+  notesCount,
+  noteTime,
+  profileWords,
+} from './notes.ts';
 
 // The thread of notes (the notes mock, part 2): each note with the moment it was left in, between
 // rules; yours on the right in your blue, the agent's answer on the left with its mark and profile;
@@ -169,7 +176,7 @@ function Exchange({
               <span>·</span>
             </>
           ) : null}
-          <b>{t('notes.you')}</b>
+          <b>{noteSigner(note)}</b>
           <span>· {noteTime(note.at, now)}</span>
         </div>
       </div>

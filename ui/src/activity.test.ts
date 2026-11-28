@@ -71,6 +71,20 @@ describe('feedLines', () => {
     ]);
   });
 
+  // D-eb906c (s-real2): Otea's own diff read as «You attached …» in the drawer.
+  it('says what Otea itself did as Otea’s, never in your lane or as yours', () => {
+    const [line] = feedLines(
+      [
+        ev('WORK-1', 'evidence_added', { kind: 'otea', name: 'otea' }, 2, {
+          filename: 'otea-branch-abc1234.diff',
+        }),
+      ],
+      turnOf,
+    );
+
+    expect([line?.lane, line?.agent]).toEqual(['agent', 'Otea']);
+  });
+
   it('says a stuck item you put back in the queue, or left for an agent, in your lane', () => {
     const lines = feedLines(
       [

@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { comparePair, nudgeSplit, splitAt, stepIndex } from '../../evidence.ts';
+import { byCase, byViewport, comparePair, nudgeSplit, splitAt, stepIndex } from '../../evidence.ts';
 import { useFileUrl } from '../../evidence-files.ts';
 import { t } from '../../i18n/i18n.ts';
 import { Button, Icon } from '../../kit/index.ts';
@@ -15,17 +15,44 @@ import type { Evidence } from '../../types.ts';
 import { stepWithArrows } from './arrows.ts';
 import { FileMeta } from './FileMeta.tsx';
 import { ItemReview } from './item-evidence.ts';
+import { Pic } from './Pic.tsx';
 
 function altOf(evidence: Evidence): string {
   return evidence.caption ?? evidence.filename;
 }
 
+// A capture this much taller than wide is a whole page, not a screen: a phone's 390 x 844 is 2.2.
+export const TALL = 3;
+
+// What a picture needs to say it is tall (a full-page capture): the reader fits it to the width and
+// scrolls it down, where fitting the height left a sliver 130 px wide.
+function useTall(): {
+  'data-tall'?: '';
+  onLoad: (event: SyntheticEvent<HTMLImageElement>) => void;
+} {
+  const [tall, setTall] = useState(false);
+  return {
+    ...(tall ? { 'data-tall': '' as const } : {}),
+    onLoad: (event) => {
+      const { naturalWidth, naturalHeight } = event.currentTarget;
+      setTall(naturalWidth > 0 && naturalHeight > naturalWidth * TALL);
+    },
+  };
+}
+
 export function ImageSingle({ evidence }: { evidence: Evidence }) {
   const fileUrl = useFileUrl();
+  const tall = useTall();
   return (
     <figure className="ev-figure">
       <div className="ev-stage well">
-        <img className="ev-img ev-set" src={fileUrl(evidence)} alt={altOf(evidence)} />
+        <Pic
+          className="ev-img ev-set"
+          src={fileUrl(evidence)}
+          alt={altOf(evidence)}
+          name={evidence.filename}
+          {...tall}
+        />
       </div>
       <figcaption>
         <FileMeta evidence={evidence} />
@@ -100,11 +127,12 @@ export function ImageGallery({ evidence, label }: { evidence: Evidence[]; label:
       onKeyDown={many ? onKeyDown : undefined}
     >
       <div className="ev-stage well">
-        <img
+        <Pic
           key={current.id}
           className="ev-img ev-set"
           src={fileUrl(current)}
           alt={altOf(current)}
+          name={current.filename}
         />
         {many ? (
           <>
@@ -197,14 +225,44 @@ function Framed({ evidence, label }: { evidence: Evidence; label: string }) {
   const fileUrl = useFileUrl();
   return (
     <figure className="ev-frame">
+      <span className="ev-tag out">{label}</span>
       <div className="ev-stage well">
-        <img className="ev-img" src={fileUrl(evidence)} alt={sideAlt(label, evidence)} />
-        <span className="ev-tag l">{label}</span>
+        <Pic
+          className="ev-img"
+          src={fileUrl(evidence)}
+          alt={sideAlt(label, evidence)}
+          name={evidence.filename}
+        />
       </div>
       <figcaption>
         <FileMeta evidence={evidence} />
       </figcaption>
     </figure>
+  );
+}
+
+// A compare part's shots, one compare for each viewport they were taken at (phone first, each named)
+// and, inside a viewport, one for each case they show (each named), never a shot of one size or one
+// case laid over a shot of another. Shots whose names say no viewport or case are one plain compare.
+export function ImageCompares({ evidence }: { evidence: Evidence[] }) {
+  const groups = byViewport(evidence).flatMap(({ key, files }) =>
+    byCase(files).map(({ name, files: own }) => ({ key, name, files: own })),
+  );
+  const [only] = groups;
+  if (groups.length < 2 || !only) return <ImageCompare evidence={evidence} />;
+  return (
+    <>
+      {groups.map(({ key, name, files }) => (
+        <section key={`${key ?? 'any'}/${name}`} className="ev-viewport">
+          {key || name ? (
+            <h4 className="ev-viewport-h">
+              {[key ? t(`evidence.viewport.${key}`) : '', name].filter(Boolean).join(' · ')}
+            </h4>
+          ) : null}
+          <ImageCompare evidence={files} />
+        </section>
+      ))}
+    </>
   );
 }
 
@@ -214,7 +272,7 @@ export function ImageCompare({
   evidence,
   blind = false,
   names,
-  initial = 'slider',
+  initial = 'side',
 }: {
   evidence: Evidence[];
   blind?: boolean;
@@ -282,6 +340,10 @@ export function ImageCompare({
       </fieldset>
       {mode === 'slider' ? (
         <figure className="ev-frame">
+          <div className="ev-sides">
+            <span className="ev-tag out">{label.before}</span>
+            <span className="ev-tag out">{label.after}</span>
+          </div>
           <div
             ref={frame}
             className="ev-cmp well"
@@ -306,8 +368,6 @@ export function ImageCompare({
               style={{ clipPath: `inset(0 ${100 - split}% 0 0)` }}
               draggable={false}
             />
-            <span className="ev-tag l">{label.before}</span>
-            <span className="ev-tag r">{label.after}</span>
             <div
               className="ev-divider"
               style={{ left: `${split}%` }}

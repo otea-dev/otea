@@ -8,6 +8,7 @@ import type { FeedEvent } from '../../activity.ts';
 import { agent, ago, inMinutes, item, moved, NOW, officialType } from '../../derive/fixtures.ts';
 import { setLanguage } from '../../i18n/i18n.ts';
 import { stateWordIn } from '../../preset-words.ts';
+import { roundOf } from '../../rounds.ts';
 import type { CollectionView, Item, TypeView } from '../../types.ts';
 import {
   applyFilters,
@@ -29,7 +30,6 @@ import {
   pasosColumns,
   phoneChips,
   phonePrefs,
-  roundOf,
   rowWords,
   signalOf,
   sortBoard,
@@ -378,9 +378,28 @@ describe('the groups of Lista and Tabla', () => {
     ]);
   });
 
+  // Field study s-real (D-db4167): a discarded item sat under «Done 3» with a struck icon.
+  it('lists what was discarded in a group of its own after Done, never under Done', () => {
+    const closed = [
+      ...items,
+      item({ id: 'D', state: 'wont_fix', turn: 'none', closes: 'discarded' }),
+    ];
+    const groups = groupBoard(closed, 'state', ctx());
+    expect(groups.map((g) => g.items.map((i) => i.id))).toEqual([['B'], ['A'], ['C'], ['D']]);
+    expect(groups.slice(2).map((g) => g.title)).toEqual(['Done', 'Discarded']);
+    // Without one, nothing changes.
+    expect(groupBoard(items, 'state', ctx()).map((g) => g.title)).not.toContain('Discarded');
+    // The row says which group it stands in, so a move between them is a move between sections.
+    const folds = { collapsed: new Set<string>(), expanded: new Set<string>() };
+    const rows = boardEntries(closed, { group: 'state', sort: null, filters: {} }, folds, ctx())
+      .entries.filter((e) => e.kind === 'row')
+      .map((e) => (e.kind === 'row' ? [e.item.id, e.sec] : []));
+    expect(rows.find(([id]) => id === 'D')?.[1]).not.toBe(rows.find(([id]) => id === 'C')?.[1]);
+  });
+
   it('groups by turn and by who, closed work last', () => {
     expect(groupBoard(items, 'turn', ctx()).map((g) => g.title)).toEqual([
-      'Waiting for you',
+      'Your turn',
       'With agents',
       'Closed',
     ]);
@@ -515,9 +534,9 @@ describe('what a board row says', () => {
       moved('A', 'verify', agent('mender'), { reason: 'fixed' }),
       moved('A', 'fixing', { kind: 'human', name: 'you' }, { reason: 'not yet', from: 'verify' }),
     ];
-    expect(roundOf(item({ id: 'A' }), feed, bug)).toBe(3);
-    expect(roundOf(item({ id: 'B' }), feed, bug)).toBe(1);
-    expect(roundOf({ ...item({ id: 'A' }), round: 1 }, feed, bug)).toBe(1);
+    expect(roundOf(item({ id: 'A' }), feed)).toBe(3);
+    expect(roundOf(item({ id: 'B' }), feed)).toBe(1);
+    expect(roundOf({ ...item({ id: 'A' }), round: 1 }, feed)).toBe(1);
   });
 
   it('shows the first enum field that is off its default', () => {

@@ -2,9 +2,11 @@ import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalSt
 import { type Attention, attentionOf, nextLeaseExpiry } from './attention.ts';
 import { apiUrl } from './base.ts';
 import { activeLease, type TimeCell, timeCell } from './lease.ts';
+import { type Pending, waitingCount } from './pending.ts';
 import { afterFailure, type Remote } from './remote.ts';
 import { hideTier } from './row-grid.ts';
 import { type Route, routeFromHash } from './selection.ts';
+import { PHONE_QUERY, SHORT_QUERY } from './styles/phone-media.ts';
 import type { Item, Lease } from './types.ts';
 
 export type Connection = 'connecting' | 'live' | 'reconnecting';
@@ -130,7 +132,9 @@ export function useTimeCell(item: Pick<Item, 'updatedAt' | 'lease' | 'expiredLea
 
 // The workspace's attention, kept live: the items follow the stream, and since a lease running out
 // writes nothing, it reads itself again when the first active lease expires.
-export function useAttention(items: readonly Item[]): Attention {
+// What is yours is the one number every surface shows (waitingCount: your turn, what got stuck, and
+// what is no item), so the tab's title never says fewer than the page (s-real D-e84919).
+export function useAttention(items: readonly Item[], pending?: Pending | null): Attention {
   const [, tick] = useReducer((count: number) => count + 1, 0);
   const now = Date.now();
   const expiry = nextLeaseExpiry(items, now);
@@ -139,7 +143,7 @@ export function useAttention(items: readonly Item[]): Attention {
     const timer = setTimeout(tick, Math.max(0, expiry - Date.now()) + 10);
     return () => clearTimeout(timer);
   }, [expiry]);
-  return attentionOf(items, now);
+  return { ...attentionOf(items, now), yours: waitingCount({ all: items, now, pending }) };
 }
 
 function subscribeToHash(onChange: () => void): () => void {
@@ -163,11 +167,17 @@ export function useMediaQuery(query: string): boolean {
   return useSyncExternalStore(subscribe, () => window.matchMedia(query).matches);
 }
 
-// The phone: up to 720 px wide (SPEC §10.7, mock:893).
-export const PHONE_QUERY = '(max-width: 720px)';
+// The phone: up to 720 px wide (SPEC §10.7, mock:893), or on its side (styles/phone-media.ts, which
+// also puts it into the style sheets' phone queries).
+export { PHONE_QUERY };
 
 export function usePhone(): boolean {
   return useMediaQuery(PHONE_QUERY);
+}
+
+// A screen too short for the strips above the conversation: they fold to a line.
+export function useShort(): boolean {
+  return useMediaQuery(SHORT_QUERY);
 }
 
 // Marks an element (the list pane) with the hide tier its width puts it in (data-tier, see

@@ -23,6 +23,16 @@ function exitCodeRows(): string[][] {
 
 export const HELP_HINT = 'Run "otea help" for usage.';
 
+// What the person does only on the desk, said where a terminal user looks for a command: it is by
+// design, not a gap (field study s-real, D-f32f30). The terminal reads everything.
+const DESK_ONLY_WORDS =
+  "The person's own acts: approve or send back what waits for their review, answer an agent's question, discard an item, write to the assistant or the Inbox. No command does them, because an agent shares this command line and cannot be told apart from you there: only a tap on the desk is provably yours. The terminal reads it all (otea list --turn human, show, pending, events, wait), and an agent only relays your words. Why, and what is relayed: docs/desk.md.";
+
+const deskOnly = (): string[] => [
+  'Only on the desk (browser or phone), by design:',
+  wrapped(DESK_ONLY_WORDS.split(' ')),
+];
+
 // The words `otea help` takes after it: `all` for the whole reference, or a command's name.
 export const HELP_ALL = 'all';
 
@@ -70,6 +80,8 @@ export function shortHelp(): string {
     "Setup and the person's commands:",
     wrapped(others.map((name, index) => (index < others.length - 1 ? `${name},` : name))),
     '',
+    ...deskOnly(),
+    '',
     `otea <command> --help (or otea help <command>) prints a command's options; otea help ${HELP_ALL} prints every command in full, the global options and the exit codes.`,
   ].join('\n');
 }
@@ -83,6 +95,8 @@ export function generalHelp(): string {
     '',
     'Global options:',
     indent(columns(GLOBAL_OPTIONS)),
+    '',
+    ...deskOnly(),
     '',
     'Exit codes:',
     indent(columns(exitCodeRows())),

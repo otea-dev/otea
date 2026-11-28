@@ -41,6 +41,20 @@ const agent = (name: string, o: Partial<Agent> = {}): Agent => ({
 describe('the project menu’s rows', () => {
   const here = { id: 'hm', name: 'Hollowmere', icon: null };
 
+  // F4 review round: a question on a note in another project is something waiting for you there.
+  it('counts what asks you in another project, though no item waits', () => {
+    setLanguage('es');
+    const ask = { kind: 'bandeja', ref: 'B-1', title: 'x', since: null } as const;
+    const { rows, total } = projectRows(
+      here,
+      [overview({ id: 'mirefall', asking: [ask] }), overview({ id: 'hm', current: true })],
+      0,
+    );
+
+    expect(rows.find(({ id }) => id === 'mirefall')).toMatchObject({ waiting: 1 });
+    expect(total).toBe(1);
+  });
+
   it('puts the project open now first, with your count, a tick and no address', () => {
     setLanguage('es');
     const { rows } = projectRows(
@@ -108,7 +122,7 @@ describe('the project menu’s rows', () => {
       0,
     );
     expect(rows.find((r) => r.id === 'busy')?.line).toBe(
-      '2 te esperan · 2 trabajando · 1 sin señal',
+      '2 te esperan · 2 trabajando · 1 sin novedades',
     );
     // An away agent (it left an item stuck) says «ausente», apart from «sin señal».
     const away = projectRows(
@@ -121,7 +135,7 @@ describe('the project menu’s rows', () => {
       ],
       0,
     ).rows.find((r) => r.id === 'gone');
-    expect(away?.line).toBe('1 sin señal · 1 ausente');
+    expect(away?.line).toBe('1 sin novedades · 1 ausente');
     // Listening is not at work: nothing to report; an older server that sends no agents is the same.
     expect(rows.find((r) => r.id === 'calm')?.line).toBe('nada te espera');
     expect(rows.find((r) => r.id === 'old')?.line).toBe('nada te espera');
@@ -263,6 +277,26 @@ describe('the agents menu’s rows', () => {
     const kiln = agent('Kiln', { holding: ['CRI-1'], status: 'connected' });
     const [row] = agentRows([kiln], [asked], NOW);
     expect(row).toMatchObject({ state: 'wait', working: false, item: { id: 'CRI-1' } });
+  });
+
+  // H2 (field study 4): a worker at a long step whose session runs is working, never «sin señal»;
+  // past a quarter of an hour with no sign the menu only says, softly, how long it has been quiet.
+  it('says how long a working agent has been quiet once it is past a quarter of an hour', () => {
+    const held = item({
+      id: 'CRE-50',
+      title: 'Pruebas largas',
+      state: 'sconcept',
+      lease: { holder: 'Kiln', expiresAt: inMinutes(10) },
+    });
+    const working = (quiet: number) =>
+      agentRows(
+        [agent('Kiln', { holding: ['CRE-50'], status: 'working', lastSeen: ago(quiet) })],
+        [held],
+        NOW,
+      )[0];
+
+    expect(working(5)).toMatchObject({ state: 'work', silent: false, hushed: null });
+    expect(working(20)).toMatchObject({ state: 'work', silent: false, hushed: 20 });
   });
 
   it('tags a command-line agent with the harness its profile names', () => {

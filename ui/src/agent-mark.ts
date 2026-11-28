@@ -2,6 +2,9 @@
 // same name everywhere (the list's who, the handoff line, History, Details).
 export const AGENT_HUES = 5;
 
+// What the assistant's mark says; the agents' marks never do.
+export const ASSISTANT_INITIALS = 'as';
+
 // claude-b is cb; a name of one word gives its first two letters.
 export function initialsOf(name: string): string {
   const words = name
@@ -41,7 +44,9 @@ function letterPairs(name: string): string[] {
 export function marksFor(names: readonly string[]): Map<string, Mark> {
   const sorted = [...new Set(names)].sort();
   const marks = new Map<string, Mark>();
-  const usedInitials = new Set<string>();
+  // «as» is the assistant's own mark (views/hablar/AssistantMark): no agent takes it, so a chip
+  // that reads «as» is always the assistant.
+  const usedInitials = new Set<string>([ASSISTANT_INITIALS]);
   const usedHues = new Set<number>();
   for (const name of sorted) {
     const own = initialsOf(name);
@@ -68,5 +73,5 @@ export function knowAgents(names: readonly string[]): void {
 }
 
 export function markOf(name: string): Mark {
-  return known.get(name) ?? { initials: initialsOf(name), hue: agentHue(name) };
+  return known.get(name) ?? marksFor([name]).get(name) ?? { initials: '··', hue: agentHue(name) };
 }

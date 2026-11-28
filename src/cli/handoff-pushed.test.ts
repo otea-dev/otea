@@ -119,6 +119,38 @@ describe('a handoff of a branch', () => {
     expect((await handoff()).code).toBe(0);
   });
 
+  // Field study 5, V7: on a repo with no remote the review's footnote promised a push to the remote.
+  // The handoff records that there is none, for the review to say what approving really does.
+  it('records that the repo has no remote, so the review does not promise a push', async () => {
+    expect((await handoff()).code).toBe(0);
+
+    const project = openProject(repo.dir);
+    try {
+      const tips = selectEvents(project.db, 'CAM-1').flatMap(({ data }) =>
+        data.tip === undefined ? [] : [data.tip as { branch: string; local?: true }],
+      );
+      expect(tips.at(-1)).toMatchObject({ branch: BRANCH, local: true });
+    } finally {
+      project.db.close();
+    }
+  });
+
+  it('records no such mark once the repo has a remote', async () => {
+    git('remote', 'add', 'origin', 'https://example.invalid/regar.git');
+    git('update-ref', `refs/remotes/origin/${BRANCH}`, BRANCH);
+    expect((await handoff()).code).toBe(0);
+
+    const project = openProject(repo.dir);
+    try {
+      const tips = selectEvents(project.db, 'CAM-1').flatMap(({ data }) =>
+        data.tip === undefined ? [] : [data.tip as { local?: true }],
+      );
+      expect(tips.at(-1)?.local).toBeUndefined();
+    } finally {
+      project.db.close();
+    }
+  });
+
   it('refuses a Rama this checkout does not have, naming the branch checked out', async () => {
     git('branch', '-m', BRANCH, 'cambio/1-regar-bis');
 

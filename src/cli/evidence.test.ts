@@ -10,6 +10,7 @@ import {
   type Cli,
   cliAt,
   declareProfiles,
+  dropItemDirectly,
   presetCollection,
   type SeededRepo,
   seededLocalRepo,
@@ -222,7 +223,7 @@ describe('attach', () => {
 
     it('refuses a closed item with item_closed (exit 4)', async () => {
       await otea('create', '--collection', 'tasks', '--title', 'Vague');
-      await otea('relay', 'TASKS-2', 'dropped', '--quote', 'Drop it', '--reason', 'Too vague');
+      dropItemDirectly(repo.dir, 'TASKS-2');
 
       const { code, err } = await otea('attach', 'TASKS-2', 'test.log', '--json');
 

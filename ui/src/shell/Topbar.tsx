@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { clockOf } from '../activity.ts';
 import { useApp } from '../app/context.tsx';
 import { Prof } from '../components/Prof.tsx';
-import { tocaCount } from '../derive/toca.ts';
 import { agoLabel } from '../format.ts';
 import { t, tx } from '../i18n/i18n.ts';
 import { iconDrawing, TypeIcon } from '../icons/TypeIcon.tsx';
@@ -12,9 +11,12 @@ import { MenuLabel } from '../kit/pop/Menu.tsx';
 import { Pop } from '../kit/pop/Pop.tsx';
 import { lookOf } from '../lanes/looks.ts';
 import { NodeGlyph } from '../lanes/NodeGlyph.tsx';
+import { workersOf } from '../listening.ts';
 import { useSync } from '../offline/sync-state.ts';
+import { waitingCount } from '../pending.ts';
 import { closeSearch, openSearch, useSearchOpen } from '../phone/search-open.ts';
 import { monogramOf } from '../place-icons.ts';
+import { waitingElsewhere } from '../projects.ts';
 import {
   type AgentRow,
   agentCounts,
@@ -183,8 +185,17 @@ function ProjectPill() {
   const project = app.project;
   const name = project?.name ?? '';
   const menu = project
-    ? projectRows(project, app.projects, tocaCount(app.all, { now: app.now }), app.phone)
+    ? projectRows(
+        project,
+        app.projects,
+        waitingCount(app),
+        app.phone,
+        app.route.view === 'hablar' ? '#/hablar' : undefined,
+      )
     : { rows: [], total: 0 };
+  // On the phone the line «N más te esperan en M proyectos» has no room: the pill carries the count.
+  const elsewhere = app.phone ? waitingElsewhere(app.projects ?? []).count : 0;
+  const elsewhereText = elsewhere > 0 ? elsewhereLine(app.projects) : null;
   return (
     <>
       <button
@@ -198,6 +209,11 @@ function ProjectPill() {
       >
         <ProjectTile name={name} icon={project?.icon} />
         <span className="nm">{name}</span>
+        {elsewhereText ? (
+          <span className="pelse" title={elsewhereText} role="img" aria-label={elsewhereText}>
+            {elsewhere}
+          </span>
+        ) : null}
         <Chevron />
       </button>
       <Pop
@@ -310,9 +326,9 @@ export function PillWords({ summary }: { summary: PillSummary }) {
       {extra ? (
         <small
           className={
-            extra.kind === 'silent' || extra.kind === 'away' || extra.kind === 'silentAway'
-              ? 'wl warn-t'
-              : 'wl'
+            // Quiet is not stuck: its datum stays grey. An agent away on an item it left stuck is
+            // the one that asks for attention.
+            extra.kind === 'away' || extra.kind === 'silentAway' ? 'wl warn-t' : 'wl'
           }
         >
           {extra.kind === 'of'
@@ -355,7 +371,8 @@ function RowDoing({ row, now }: { row: AgentRow; now: number }) {
   if (row.state === 'silent') {
     const held = row.held[0];
     return (
-      <span className="held warn">
+      // In warn only when its item was left stuck (it is away); a quiet one is in ink.
+      <span className={row.quiet ? 'held warn' : 'held'}>
         {held ? <NodeGlyph look={held.look} size={14} /> : null}
         <span className="verb">
           {row.quiet ? t('shell.row.quiet', { time: clockOf(row.since) }) : t('shell.row.silent')}
@@ -368,7 +385,8 @@ function RowDoing({ row, now }: { row: AgentRow; now: number }) {
   if (row.state === 'idle' || !it) {
     const time = clockOf(Math.min(row.since, now));
     return (
-      <span className="held">
+      // `wrap`: the line is a sentence («verá lo nuevo cuando vuelva a esperar»), never cut at 390.
+      <span className="held wrap">
         <span className="verb">
           {row.waiting ? t('shell.row.idle', { time }) : t('shell.row.connected')}
         </span>
@@ -382,6 +400,9 @@ function RowDoing({ row, now }: { row: AgentRow; now: number }) {
       <span className="verb">{verb}</span>
       <span className="id">{it.id}</span>
       <span className="tx">{it.title}</span>
+      {row.hushed === null ? null : (
+        <span className="tx">{t('shell.row.hushed', { minutes: row.hushed })}</span>
+      )}
     </span>
   );
 }
@@ -426,7 +447,7 @@ export function AgentsMenuBody({
             {counts.silent ? (
               <>
                 {counts.holding || waiting || counts.connected ? ' · ' : null}
-                <span className="warn-t">{t('shell.pill.silent', { count: counts.silent })}</span>
+                <span>{t('shell.pill.silent', { count: counts.silent })}</span>
               </>
             ) : null}
             {counts.away ? (
@@ -549,12 +570,18 @@ function AgentsPill() {
   // Until the server first answers, the pill says nothing rather than «Sin agentes» or «Sin
   // conexión» (P1-R2-8); a stream that cannot open still says it is offline.
   if (app.agents === undefined && connection !== 'reconnecting') return null;
+  // On the phone the line under the bar already says «Sin conexión» (and since when, and
+  // Reintentar): the pill gives way to it and keeps the agents as they were last known, dimmed
+  // (field study 7: the same words twice, one above the other).
+  const stale = app.phone && app.sync.offline;
+  if (stale && app.agents === undefined) return null;
   const agents = app.agents ?? [];
   // One source for the pill and its menu: the menu's rows.
-  const rows = agentRows(agents, app.all, app.now, app.feed);
-  const mark = pillMark(connection, rows);
-  const summary = pillSummary(connection, rows);
-  const offline = mark === 'offline';
+  const rows = agentRows(workersOf(agents), app.all, app.now, app.feed);
+  const known = stale ? 'live' : connection;
+  const mark = stale ? (agentCounts(rows).live > 0 ? 'idle' : 'none') : pillMark(known, rows);
+  const summary = pillSummary(known, rows);
+  const offline = mark === 'offline' || stale;
   const counts = agentCounts(rows);
   const close = () => setOpen(false);
   return (
@@ -564,6 +591,7 @@ function AgentsPill() {
         type="button"
         className="apill"
         data-quiet={offline || counts.live === 0 || undefined}
+        data-stale={stale || undefined}
         aria-haspopup={offline ? undefined : 'dialog'}
         aria-expanded={offline ? undefined : open}
         disabled={offline}
@@ -634,7 +662,7 @@ function SearchButton() {
 
 export function Topbar() {
   const app = useApp();
-  const yours = tocaCount(app.all, { now: app.now }) > 0;
+  const yours = waitingCount(app) > 0;
   const working = app.all.some((it) => lookOf(it, app.now) === 'working');
   return (
     <header className="topbar">

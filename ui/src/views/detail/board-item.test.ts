@@ -24,6 +24,7 @@ import {
   handRows,
   holdApproval,
   linksOf,
+  localBehindSaid,
   ownStepOf,
   partsCount,
   railStep,
@@ -165,6 +166,93 @@ describe('boardItemOf: the item page reads a published board through the step en
     expect(atAnimate?.round).toBe(1);
     // The route's stops are the steps and the reviews on the other lane, never «· revisión» columns.
     expect(atAnimate?.route.words).toEqual(['Concepto', '', 'Animar', 'Pulir', 'Hecho']);
+  });
+
+  // R2 left: an item approved and then taken back by an agent (a conflict at landing) was not
+  // sent back by the person, yet its route said «ronda 1 · devuelta hoy» under the step.
+  it('words the loop of an approved item an agent took back as the bounce it is, not a send-back', () => {
+    const events = [
+      created('sconcept'),
+      moved('sconcept', 'sconcept__review', agent('quill'), '2026-01-02T00:00:00Z'),
+      moved('sconcept__review', 'sanimate', you, '2026-01-03T00:00:00Z'),
+      moved('sanimate', 'sconcept', agent('quill'), '2026-01-04T00:00:00Z'),
+    ];
+    const said = { ...words, bounce: (n: number) => `ronda ${n} · volvió` };
+    const sentBack = boardItemOf(creatures(), item('sconcept', events), said);
+    expect(sentBack?.route.dips.map((dip) => dip.label)).toEqual(['ronda 1']);
+    const bounced = boardItemOf(creatures(), item('sconcept', events), said, {
+      at: '2026-01-04T00:00:00Z',
+    });
+    expect(bounced?.route.dips.map((dip) => dip.label)).toEqual(['ronda 1 · volvió']);
+  });
+
+  // D-9b5288, D-0879d9 (s-real2): the round that only merges main into approved work was drawn as
+  // «ronda 1 · devuelta hoy» and listed as «sent back and redone», though nothing was sent back.
+  describe('a round that only merges main into approved work', () => {
+    const merge = { since: 'a1b2c3d', tip: 'e4f5a6b', joined: 'c7d8e9f', files: ['README.md'] };
+    const withData = (event: ItemEvent, data: Record<string, unknown>): ItemEvent => ({
+      ...event,
+      data: { ...event.data, ...data },
+    });
+    // Approved into the step after concept, an agent takes it back to merge what landed first and
+    // hands it off again; the person approves the merge.
+    const flow = (returned: Record<string, unknown>, handed: Record<string, unknown>) => [
+      created('sconcept'),
+      moved('sconcept', 'sconcept__review', agent('quill'), '2026-01-02T00:00:00Z'),
+      moved('sconcept__review', 'sanimate', you, '2026-01-03T00:00:00Z'),
+      withData(moved('sanimate', 'sconcept', agent('quill'), '2026-01-04T00:00:00Z'), returned),
+      withData(
+        moved('sconcept', 'sconcept__review', agent('quill'), '2026-01-05T00:00:00Z'),
+        handed,
+      ),
+    ];
+    const said = {
+      ...words,
+      bounce: (n: number) => `ronda ${n} · volvió`,
+      merge: (n: number) => `ronda ${n} · fusión`,
+    };
+
+    it('says so on the route, whether it came back after others landed or merged a clash', () => {
+      const labels = (events: ItemEvent[]) =>
+        boardItemOf(creatures(), item('sconcept__review', events), said)?.route.dips.map(
+          (dip) => dip.label,
+        );
+      expect(labels(flow({ waited: ['CAM-2'] }, {}))).toEqual(['ronda 1 · fusión']);
+      expect(labels(flow({}, { merge }))).toEqual(['ronda 1 · fusión']);
+    });
+
+    it('leaves a plain send-back and a bounce on a clash as they were', () => {
+      const labels = (events: ItemEvent[]) =>
+        boardItemOf(creatures(), item('sconcept__review', events), said)?.route.dips.map(
+          (dip) => dip.label,
+        );
+      expect(labels(flow({}, {}))).toEqual(['ronda 1']);
+    });
+
+    it('is no «sent back and redone» in Rondas, and its opening note says who merged', () => {
+      const events = [
+        ...flow({ waited: ['CAM-2'], reason: 'CAM-2 landed first' }, { merge }),
+        moved('sconcept__review', 'sanimate', you, '2026-01-06T00:00:00Z'),
+      ];
+      const [concept] = stepRounds(creatures(), 'sanimate', events);
+      expect(concept?.outcome).toEqual({ kind: 'merged' });
+      expect(roundNotes(creatures(), 'sconcept', events)[1]?.notes[0]).toMatchObject({
+        kind: 'back',
+        merged: true,
+        text: 'CAM-2 landed first',
+      });
+      // A send-back by the person into the same step is still one.
+      const sent = [
+        created('sconcept'),
+        moved('sconcept', 'sconcept__review', agent('quill'), '2026-01-02T00:00:00Z'),
+        withData(moved('sconcept__review', 'sconcept', you, '2026-01-03T00:00:00Z'), {
+          reason: 'no',
+        }),
+        moved('sconcept', 'sconcept__review', agent('quill'), '2026-01-04T00:00:00Z'),
+        moved('sconcept__review', 'sanimate', you, '2026-01-05T00:00:00Z'),
+      ];
+      expect(stepRounds(creatures(), 'sanimate', sent)[0]?.outcome).toEqual({ kind: 'reworked' });
+    });
   });
 
   it('draws a closed item at Hecho, and leaves a state the board does not know to the preset', () => {
@@ -334,6 +422,34 @@ describe('branchStrip: the protected branch where the item stands', () => {
     // Its branch the base itself (a main-only board): pushed, never merged (P2S-R3-2).
     const onMain = { ...fields, fbranch: 'main' };
     expect(branchStrip(landing, 'sland', onMain)).toMatchObject({ key: 'landing', own: true });
+    // With no remote there is nothing to push: it says the folder is brought up to date (field
+    // study 5, V7), never «sube main al remoto».
+    const local = branchStrip(landing, 'sland', onMain, { local: true });
+    expect(local).toMatchObject({ key: 'landing', own: true, local: true });
+    if (!local) throw new Error('no strip');
+    expect(branchSaid(local)).toBe('an agent brings main up to date in your folder next');
+    setLanguage('es');
+    expect(branchSaid(local)).toBe('un agente pone main al día en tu carpeta a continuación');
+    expect(branchSaid(local)).not.toMatch(/remoto/);
+    setLanguage('en');
+  });
+
+  it('says a Done item landed in a repo with no remote is not in the person’s main yet', () => {
+    const behind = {
+      base: 'main',
+      remote: '',
+      target: 'abc1234',
+      local: true as const,
+      behind: 1,
+      checkout: 'D:/proyecto',
+      state: 'ready' as const,
+    };
+    expect(localBehindSaid(behind)).toContain('no remote');
+    expect(localBehindSaid(behind)).toContain('otea land sync');
+    setLanguage('es');
+    expect(localBehindSaid(behind)).toContain('no hay remoto');
+    expect(localBehindSaid(behind)).not.toContain('git pull');
+    setLanguage('en');
   });
 
   it('is nothing on a board without a protected branch, or before the branch is named', () => {
@@ -626,10 +742,10 @@ describe('approvalRefusal: Aprobar refused in words when a wait no longer holds'
       },
     } as unknown as Parameters<typeof linksOf>[0];
     const links = linksOf(item, (r) => ({ board: r.collection }));
-    expect(links.blockers[0]).toMatchObject({ closed: false, step: 'Hecho, sin fusionar' });
+    expect(links.blockers[0]).toMatchObject({ closed: false, step: 'Hecho, falta integrar' });
     const rows = waitRows(errores(), 'sfix', links);
     expect(approvalRefusal('ENT-2', rows)).toBe(
-      'No se aprobó ENT-2: ENT-1 (en «Entregas») lo frena y aún no se fusionó: apruébalo cuando su rama esté en la base.',
+      'No se aprobó ENT-2: ENT-1 (en «Entregas») lo frena y aún no se integró: apruébalo cuando esté integrado.',
     );
     expect(waitBlock(rows)).toBe('espera a ENT-1, que lo frena');
     setLanguage('en');
@@ -647,7 +763,7 @@ describe('approvalRefusal: Aprobar refused in words when a wait no longer holds'
     } as unknown as Parameters<typeof linksOf>[0];
     const links = linksOf(item, (r) => ({ board: r.collection }));
     expect(approvalRefusal('TRA-1', waitRows(cambios(), 'sexec', links))).toBe(
-      'No se aprobó TRA-1: ENT-1 aún no se fusionó.',
+      'No se aprobó TRA-1: ENT-1 aún no se integró.',
     );
     setLanguage('en');
   });
@@ -1213,14 +1329,14 @@ describe('branchSaid', () => {
       base: 'main',
     } as const;
     expect(branchSaid(landing)).toBe(
-      'un agente la integra en main ahora, como dice el paso Integrar',
+      'un agente la integra en main a continuación, como dice el paso Integrar',
     );
     const frozen = { tone: 'frozen', key: 'frozen', value: 'feat/x', step: 'Hacerlo' } as const;
     expect(branchSaid(frozen)).toBe(
       'los agentes no la tocan mientras la revisas; si alguien más sube, lo verás aquí',
     );
     setLanguage('en');
-    expect(branchSaid(landing)).toBe('an agent lands it in main now, as the Integrar step says');
+    expect(branchSaid(landing)).toBe('an agent lands it in main next, as the Integrar step says');
     expect(branchSaid(frozen)).toBe(
       'agents leave it alone while you review it; if anyone else pushes, it shows here',
     );
@@ -1239,11 +1355,42 @@ describe('branchSaid', () => {
     const outside = { branch: 'feat/x', base: 'main', land: 'Integrar' };
     setLanguage('es');
     expect(branchSaid(landing, outside)).toBe(
-      'ya está en main, fusionada fuera de Otea: un agente cierra el paso Integrar',
+      'ya está en main, integrada fuera de Otea: un agente cierra el paso Integrar',
     );
     setLanguage('en');
     expect(branchSaid(landing, outside)).toBe(
       'in main already, merged outside Otea: an agent closes the Integrar step',
+    );
+  });
+
+  // Field study 3: an item was Done with its work on the remote's main while the person's local
+  // main never moved, and nothing said so. A Done item says it, with the way to catch up.
+  it('says the local base is behind what landed, and how to catch up', () => {
+    const behind = {
+      base: 'main',
+      remote: 'origin/main',
+      behind: 2,
+      checkout: 'D:\\work\\app',
+      state: 'ready',
+    } as const;
+    setLanguage('es');
+    expect(localBehindSaid(behind)).toBe(
+      'Subido a origin/main, pero en tu main local van 2 commits atrasados: en D:\\work\\app ejecuta git pull --ff-only',
+    );
+    expect(localBehindSaid({ ...behind, behind: 1 })).toContain('va 1 commit atrasado');
+    expect(localBehindSaid({ ...behind, behind: 3, state: 'changes' })).toContain(
+      'van 3 commits atrasados',
+    );
+    expect(localBehindSaid({ ...behind, behind: 3, state: 'elsewhere', on: 'x' })).toContain(
+      'van 3 commits atrasados',
+    );
+    expect(localBehindSaid({ ...behind, state: 'changes' })).toContain('tiene cambios tuyos');
+    expect(localBehindSaid({ ...behind, state: 'elsewhere', on: 'feat/x' })).toContain(
+      'está en feat/x',
+    );
+    setLanguage('en');
+    expect(localBehindSaid(behind)).toBe(
+      'Landed on origin/main, but your local main is 2 commits behind: run git pull --ff-only in D:\\work\\app',
     );
   });
 

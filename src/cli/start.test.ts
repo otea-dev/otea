@@ -118,6 +118,8 @@ describe('otea start', () => {
     expect(text.out).toContain('Boards: already has');
     expect(text.out).toContain('was not added');
     expect(text.out).toContain('Desk: already running');
+    // Hablar's conversation is the assistant's: start says where its text is (field study 3).
+    expect(text.out).toContain('otea prompt --role assistant');
   }, 120_000);
 
   it('makes no board unless one is named, and leaves the boards to the agent', async () => {
@@ -151,6 +153,56 @@ describe('otea start', () => {
     );
     // With a board made, the agent's text is the one that joins it, in Spanish.
     expect(started.out).toContain('Empieza a trabajar en este proyecto');
+    // U1/U2 (field study 4): the way to the assistant comes first, short and in the project's
+    // language, before the status and before the long text for an agent.
+    expect(started.out.startsWith('Para empezar (1 minuto):\n')).toBe(true);
+    expect(started.out).toContain('Entra en Hablar y copia el texto del asistente');
+    expect(started.out).toContain('La primera respuesta tarda 1-2 minutos');
+    expect(started.out).toContain('otea prompt --role assistant');
+    expect(started.out.indexOf('Para empezar')).toBeLessThan(started.out.indexOf('Project:'));
+    expect(started.out.indexOf('Para empezar')).toBeLessThan(
+      started.out.indexOf('Empieza a trabajar en este proyecto'),
+    );
+  }, 120_000);
+
+  // O (field study 4): the assistant's three steps are the first thing `otea start` prints, before
+  // any board text, whether or not a board was made; and an English project gets them in English.
+  it('starts its report with the three steps to the assistant, in the language of the project', async () => {
+    const none = await person(
+      repo.dir,
+      'start',
+      '--no-open',
+      '--port',
+      '0',
+      '--no-board',
+      '--lang',
+      'es',
+    );
+    expect(none.code).toBe(0);
+    const lines = none.out.split('\n');
+    expect(lines[0]).toBe('Para empezar (1 minuto):');
+    expect(lines[2]).toContain('Entra en Hablar');
+    expect(lines[3]).toContain('Pégalo en una sesión nueva de tu agente');
+    // The board hint (the design text) comes after, never before.
+    expect(none.out.indexOf('Para empezar')).toBeLessThan(none.out.indexOf('Boards: none yet'));
+    // With no board made, the agent's text is offered as the way to have the boards designed.
+    expect(none.out).toContain('to have your agent design the boards with you');
+
+    const english = await person(repo.dir, 'start', '--no-open', '--port', '0', '--lang', 'en');
+    expect(english.out.split('\n')[0]).toBe('To start (1 minute):');
+    expect(english.out).toContain("Go to Talk and copy the assistant's text");
+    expect(english.out).not.toMatch(/Hablar|Bandeja|Te toca/);
+  }, 120_000);
+
+  // O: a first run never ends on an empty desk. With no terminal to ask (a harness running it for
+  // the person) a git repo gets the board the question defaults to; --no-board and --json do not.
+  it('makes the default board when nobody can be asked, unless told not to', async () => {
+    const started = await person(repo.dir, 'start', '--no-open', '--port', '0', '--lang', 'en');
+    expect(started.code).toBe(0);
+    expect(started.out).toContain('Boards: made "Changes"');
+
+    const again = await person(repo.dir, 'start', '--no-open', '--lang', 'en');
+    expect(again.out).toContain('Boards: already has "Changes"');
   }, 120_000);
 
   // P8-F2: the second run, with the same arguments, said Spanish after the desk changed language. The
@@ -187,11 +239,11 @@ describe('otea start', () => {
     }
   }, 120_000);
 
-  // With no one to ask, no board is made for the person: they leave with the way to one (an agent,
-  // or the template command with its keys), and the init their agent runs next does not tell them
-  // to start the desk that already runs.
+  // With --no-board no board is made for the person: they leave with the way to one (an agent, or
+  // the template command with its keys), and the init their agent runs next does not tell them to
+  // start the desk that already runs.
   it('says how to get a board when none was made, and init does not say to start a running desk', async () => {
-    const started = await person(repo.dir, 'start', '--no-open', '--port', '0');
+    const started = await person(repo.dir, 'start', '--no-open', '--port', '0', '--no-board');
     expect(started.code).toBe(0);
     // A choice in one line, by what the person does: the two templates a first session is likely to
     // want (a simple dev has no way to know which to pick), each a real key, or the agent's design.
@@ -469,7 +521,9 @@ describe('otea start', () => {
 
     const lines = started.out.split('\n');
     const link = lines.findIndex((line) => line.includes('/auth?token='));
-    const paste = lines.findIndex((line) => line.startsWith('Next, paste this'));
+    const paste = lines.findIndex(
+      (line) => line.startsWith('Or, to ') && line.includes('paste this'),
+    );
     expect(link).toBeGreaterThan(-1);
     expect(paste).toBeGreaterThan(link);
     // On its own line, a blank line between it and the agent's text, and nothing after it but that.

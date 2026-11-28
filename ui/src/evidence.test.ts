@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   blindPartsOf,
+  byCase,
+  byViewport,
   comparePair,
+  diffOrigin,
   emptyText,
   evidenceOf,
   isEvidenceModule,
@@ -10,10 +13,12 @@ import {
   logView,
   moduleTitle,
   nudgeSplit,
+  pairIn,
   parseDiff,
   sideWord,
   splitAt,
   stepIndex,
+  viewportOf,
 } from './evidence.ts';
 import type { Evidence, LayoutEntry, TypeView } from './types.ts';
 
@@ -107,6 +112,119 @@ describe('comparePair', () => {
 
     expect(comparePair([b1, a1, b2])).toEqual({ before: b2, after: a1 });
     expect(comparePair([b1])).toEqual({ before: b1, after: undefined });
+  });
+});
+
+// H3 (field study 4, U7): «antes-1280.png» was laid over «despues-390.png», and the slider of a
+// desktop shot against a phone shot judged nothing. A pair is two shots of one viewport.
+describe('the viewport a screenshot was taken at', () => {
+  it('reads it from the name: a size, a width, or a word', () => {
+    const at = (name: string) => viewportOf(name);
+    expect(at('antes-390.png')).toBe('phone');
+    expect(at('despues_390x844.png')).toBe('phone');
+    expect(at('after-1280.png')).toBe('desktop');
+    expect(at('cam4-768-despues.png')).toBe('tablet');
+    expect(at('movil-antes.png')).toBe('phone');
+    expect(at('home-desktop.png')).toBe('desktop');
+    expect(at('antes.png')).toBeNull();
+    expect(at('captura-2026-11-27.png')).toBeNull();
+  });
+});
+
+describe('pairing before and after by viewport', () => {
+  const shots = {
+    b1280: evidence('antes-1280.png', { role: 'before', module: 'shots' }),
+    a1280: evidence('despues-1280.png', { role: 'after', module: 'shots' }),
+    b390: evidence('antes-390.png', { role: 'before', module: 'shots' }),
+    a390: evidence('despues-390.png', { role: 'after', module: 'shots' }),
+  };
+
+  it('pairs the shown shot with the other side of its own viewport, whatever came first', () => {
+    const files = [shots.b1280, shots.b390, shots.a1280, shots.a390];
+    expect(pairIn(files, shots.a390)).toEqual({ before: shots.b390, after: shots.a390 });
+    expect(pairIn(files, shots.a1280)).toEqual({ before: shots.b1280, after: shots.a1280 });
+    expect(pairIn(files, shots.b390)).toEqual({ before: shots.b390, after: shots.a390 });
+  });
+
+  it('offers no pair for a shot whose other side is of another viewport', () => {
+    expect(pairIn([shots.b1280, shots.a390], shots.a390)).toBeNull();
+  });
+
+  it('still pairs shots whose names say nothing of a viewport', () => {
+    const b = evidence('antes.png', { role: 'before', module: 'shots' });
+    const a = evidence('despues.png', { role: 'after', module: 'shots' });
+    expect(pairIn([b, a], a)).toEqual({ before: b, after: a });
+  });
+
+  it('compares the latest of each side within one viewport', () => {
+    const files = [shots.b1280, shots.b390, shots.a1280, shots.a390];
+    expect(comparePair(files)).toEqual({ before: shots.b390, after: shots.a390 });
+    expect(comparePair([shots.b1280, shots.a390])).toEqual({
+      before: undefined,
+      after: shots.a390,
+    });
+  });
+
+  it('groups a module’s shots by viewport, each group with both of its sides', () => {
+    const lone = evidence('antes.png', { role: 'before', module: 'shots' });
+    const groups = byViewport([shots.b1280, shots.b390, shots.a1280, shots.a390, lone]);
+    expect(groups.map(({ key }) => key)).toEqual(['phone', 'desktop']);
+    expect(groups[0]?.files.map(({ filename }) => filename)).toEqual([
+      'antes-390.png',
+      'despues-390.png',
+    ]);
+    // A shot with no viewport in its name joins the groups that lack its side.
+    expect(byViewport([lone, shots.a390]).map(({ files }) => files.length)).toEqual([2]);
+    // Nothing to tell apart: one group, the shots as they are.
+    expect(byViewport([lone]).map(({ key }) => key)).toEqual([null]);
+  });
+});
+
+// s-real D-fdfd69: with four cases in one part («al-abrir», «a100», «a101», «no-existe»), the
+// reader paired every before with the newest after, so «antes-al-abrir» sat over the answer for a
+// code that does not exist and one after was listed three times.
+describe('pairing before and after by case', () => {
+  const cases = ['al-abrir', 'a100', 'a101', 'no-existe'];
+  const shots = cases.flatMap((name) => [
+    evidence(`antes-${name}.png`, { role: 'before', module: 'shots' }),
+    evidence(`despues-${name}.png`, { role: 'after', module: 'shots' }),
+  ]);
+  const of = (name: string) => shots.find(({ filename }) => filename === name) as Evidence;
+
+  it('pairs each shot with the other side of its own case, never the newest of another', () => {
+    for (const name of cases) {
+      const before = of(`antes-${name}.png`);
+      const after = of(`despues-${name}.png`);
+      expect(pairIn(shots, before)).toEqual({ before, after });
+      expect(pairIn(shots, after)).toEqual({ before, after });
+    }
+  });
+
+  it('keeps the viewport apart inside a case', () => {
+    const b = evidence('antes-a100-390.png', { role: 'before', module: 'shots' });
+    const a = evidence('despues-a100-1280.png', { role: 'after', module: 'shots' });
+    expect(pairIn([b, a], a)).toBeNull();
+  });
+
+  it('offers no pair for a shot whose case has no other side, among several cases', () => {
+    const lone = evidence('antes-a102.png', { role: 'before', module: 'shots' });
+    expect(pairIn([...shots, lone], lone)).toBeNull();
+  });
+
+  it('still pairs the one before and the one after of a part whatever their names', () => {
+    const b = evidence('pantalla-actual.png', { role: 'before', module: 'shots' });
+    const a = evidence('propuesta.png', { role: 'after', module: 'shots' });
+    expect(pairIn([b, a], a)).toEqual({ before: b, after: a });
+  });
+
+  it('groups a viewport’s shots by case, each group with both of its sides', () => {
+    const groups = byCase(shots);
+    expect(groups.map(({ name }) => name)).toEqual(['al abrir', 'a100', 'a101', 'no existe']);
+    expect(groups[3]?.files.map(({ filename }) => filename)).toEqual([
+      'antes-no-existe.png',
+      'despues-no-existe.png',
+    ]);
+    expect(byCase(shots.slice(0, 2))).toHaveLength(1);
   });
 });
 
@@ -357,5 +475,37 @@ describe('the compare divider', () => {
     expect(nudgeSplit(50, 'Home', false)).toBe(0);
     expect(nudgeSplit(50, 'End', false)).toBe(100);
     expect(nudgeSplit(50, 'Enter', false)).toBeUndefined();
+  });
+});
+
+// D-492953: the review's diff is the branch's own, which Otea keeps under its own name; what the
+// agent attached is the agent's file, said so only while Otea kept the branch's beside it.
+describe('whose a diff file is', () => {
+  const agentDiff = evidence('regar.diff', { kind: 'diff' });
+  const branchDiff = evidence('otea-branch-abc1234.diff', {
+    kind: 'diff',
+    actor: { kind: 'otea', name: 'otea' },
+  });
+
+  it('is the branch’s for Otea’s file and the agent’s for the other, once Otea kept one', () => {
+    const all = [agentDiff, branchDiff];
+    expect(diffOrigin(branchDiff, all)).toBe('branch');
+    expect(diffOrigin(agentDiff, all)).toBe('agent');
+  });
+
+  it('says nothing of an agent’s diff when Otea kept none, nor of a file that is no diff', () => {
+    expect(diffOrigin(agentDiff, [agentDiff])).toBeNull();
+    expect(diffOrigin(evidence('shot.png'), [agentDiff, branchDiff])).toBeNull();
+  });
+
+  it('is not taken from a person’s own file or an agent that names itself otea', () => {
+    const person = evidence('mine.diff', { kind: 'diff', actor: { kind: 'human', name: 'human' } });
+    const spoof = evidence('x.diff', { kind: 'diff', actor: { kind: 'agent', name: 'otea' } });
+    expect(diffOrigin(person, [person, branchDiff])).toBe('agent');
+    expect(diffOrigin(spoof, [spoof])).toBeNull();
+    expect(diffOrigin(spoof, [spoof, branchDiff])).toBe('agent');
+    // The person is not Otea, whatever name their upload carries.
+    const named = evidence('y.diff', { kind: 'diff', actor: { kind: 'human', name: 'otea' } });
+    expect(diffOrigin(named, [named, branchDiff])).toBe('agent');
   });
 });

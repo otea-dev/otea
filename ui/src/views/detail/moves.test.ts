@@ -182,11 +182,43 @@ describe('what an approve leads to, said before it acts', () => {
     setLanguage('en');
   });
 
+  // Field study 5, V7: a repo with no remote still read «la sube al remoto» before every approval.
+  it('says nothing is pushed and the change lands in the person’s folder when the repo has no remote', () => {
+    const p = planMoves([land], { own: false, word });
+    const lands = () => ({
+      agent: null,
+      round: 1,
+      lands: 'main',
+      landStep: 'Integrar',
+      pushes: true as const,
+      local: true as const,
+    });
+    const own = () => ({
+      agent: null,
+      round: 1,
+      lands: 'main',
+      own: true as const,
+      local: true as const,
+    });
+    const tail = (back: typeof lands | typeof own) =>
+      moveSaysOf(must(p.primary), { agent: null, round: 1, word, back }).tail;
+    expect(tail(lands)).toBe(
+      'an agent then lands it in main in your folder, as the Integrar step says; nothing is pushed',
+    );
+    expect(tail(own)).toBe('an agent then brings main up to date in your folder');
+    setLanguage('es');
+    expect(tail(lands)).toBe(
+      'luego un agente la integra en main, en tu carpeta, como dice el paso Integrar; no se sube nada',
+    );
+    expect(tail(lands)).not.toMatch(/remoto/);
+    setLanguage('en');
+  });
+
   it('says an approve that closes as Done merged nothing yet, on a board with no land step (P6-12)', () => {
     const p = planMoves([fixed], { own: false, word });
     const unmerged = () => ({ agent: null, round: 0, unmerged: true as const });
     expect(moveSaysOf(must(p.primary), { agent: null, round: 1, word, back: unmerged }).tail).toBe(
-      'it is Done, but its branch is not merged yet: it still has to be merged and marked merged',
+      'it is Done, but it has not landed yet: it still has to land and be marked as landed',
     );
   });
 

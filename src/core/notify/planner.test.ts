@@ -321,10 +321,41 @@ describe('Planner', () => {
       stuck: true,
       aside: false,
       unheard: true,
+      assistant_reply: true,
+      assistant_offline: true,
       askText: true,
       quiet: null,
       muted: [],
     });
+  });
+
+  it('gives the assistant’s notices their own item cooldown, switch and project mute', () => {
+    const reply: Signal = {
+      key: 'assistant_reply:7',
+      kind: 'assistant_reply',
+      item: 'hablar:3',
+      title: '',
+      by: 'sage',
+      turn: 3,
+      text: 'Listo',
+    };
+    const off = { ...prefs, assistant_reply: false };
+    planner.offer([reply], off, T0);
+    expect(planner.hasPending()).toBe(false);
+    const muted = new Planner(minuteOfDay, 'web');
+    muted.offer([reply], { ...prefs, muted: ['web'] }, T0);
+    expect(muted.hasPending()).toBe(false);
+    planner.offer([reply], prefs, T0);
+    expect(planner.take(T0 + GATHER_MS, keys([reply]), prefs)).toEqual([
+      { kind: 'assistant_reply', item: 'hablar:3', title: '', by: 'sage', text: 'Listo', turn: 3 },
+    ]);
+    // Hiding the text hides the reply's words, not the notice.
+    const hidden = new Planner(minuteOfDay);
+    const quiet = { ...prefs, askText: false };
+    hidden.offer([reply], quiet, T0);
+    expect(hidden.take(T0 + GATHER_MS, keys([reply]), quiet)).toEqual([
+      { kind: 'assistant_reply', item: 'hablar:3', title: '', by: 'sage', turn: 3 },
+    ]);
   });
 
   it('keeps quiet in the quiet hours, and does not catch up after', () => {

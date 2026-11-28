@@ -5,10 +5,14 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  harnessOf,
+  isKnownHarness,
   ownerChain,
+  readListing,
   readPosixTable,
   readProcessTable,
   watchOwner,
+  withCommands,
   withPosixParents,
 } from './owner.ts';
 import { until } from './testing.ts';
@@ -30,6 +34,127 @@ describe('the processes that own a command', () => {
 
   it('stops at its parent when that is no shell', () => {
     expect(ownerChain(windows, 700)).toEqual([700]);
+  });
+
+  // The harness session is the process that lasts as long as the session: a shell, or a program
+  // that only runs another for a moment (`timeout 600 otea wait`), is never it.
+  it('names the harness above the shells and the wrappers of a command, never one of those', () => {
+    expect(harnessOf(windows, 500)).toBe(700);
+    const wrapped = [
+      { pid: 700, parent: 1, name: 'claude' },
+      { pid: 600, parent: 700, name: 'bash' },
+      { pid: 500, parent: 600, name: 'timeout' },
+    ];
+    expect(harnessOf(wrapped, 500)).toBe(700);
+    // A command run by the harness itself.
+    expect(harnessOf(windows, 700)).toBe(700);
+  });
+
+  // On Windows npx and npm are node programs: told from the harness by their command line only.
+  it('walks up past node running npx or npm, which end with the command', () => {
+    const rows = readProcessTable(
+      [
+        '700 1 claude.exe\tC:\\bin\\claude.exe\tclaude',
+        '600 700 bash.exe\tC:\\Git\\bin\\bash.exe\tbash -c otea',
+        '500 600 node.exe\tC:\\node\\node.exe\t"C:\\node\\node.exe" "C:\\node\\node_modules\\npm\\bin\\npx-cli.js" otea wait',
+        '400 500 sh.exe\tC:\\Git\\usr\\bin\\sh.exe\tsh -c otea wait',
+      ].join('\r\n'),
+    );
+
+    expect(harnessOf(rows, 400)).toBe(700);
+  });
+
+  // A harness may run otea from a script or a task: python, uv or make end with their command, so
+  // the harness is above them (adversarial review of S: the binding compares harnesses).
+  it.each(['python3', 'uv', 'make', 'py'])(
+    'walks up past %s, which ends with its command',
+    (launcher) => {
+      const rows = readProcessTable(
+        [
+          '700 1 claude\t/usr/bin/claude\tclaude',
+          '600 700 bash\t/bin/bash\tbash -c run',
+          `500 600 ${launcher}\t/usr/bin/${launcher}\t${launcher} run.py`,
+          '400 500 sh\t/bin/sh\tsh -c otea say',
+        ].join('\n'),
+      );
+
+      expect(harnessOf(rows, 400)).toBe(700);
+    },
+  );
+
+  it('reads the start time a listing gives, to the second, and none when the system gives 0', () => {
+    const rows = readProcessTable(
+      '700 1 claude\t/usr/bin/claude\tclaude\t@1764237600000\n600 700 sh\t/bin/sh\tsh -c x\t@0',
+    );
+
+    expect(rows[0]).toMatchObject({ pid: 700, command: 'claude', started: 1764237600000 });
+    expect(rows[1]).not.toHaveProperty('started');
+    expect(rows[1]?.command).toBe('sh -c x');
+  });
+
+  it('takes node itself for the harness when it runs something that is no package runner', () => {
+    const rows = readProcessTable(
+      [
+        '700 1 node.exe\tC:\\node\\node.exe\tnode C:\\harness\\agent.js',
+        '500 700 sh.exe\tC:\\Git\\usr\\bin\\sh.exe\tsh -c otea',
+      ].join('\r\n'),
+    );
+
+    expect(harnessOf(rows, 500)).toBe(700);
+  });
+
+  // A harness that is a node program (codex, gemini, opencode on Windows) carries the person's
+  // prompt, or a word of its own arguments, on its command line: only the script node runs says
+  // whether it is npm.
+  it.each([
+    ['a prompt that names npm', '"C:\\node\\node.exe" "C:\\g\\gemini.js" -p "fix the npm install"'],
+    ['an argument that is npx', 'node C:\\harness\\agent.js npx'],
+    ['a flag value that is yarn', 'node C:\\harness\\agent.js --pkg yarn --model x'],
+    [
+      'a script folder with a space',
+      '"C:\\node\\node.exe" "C:\\Users\\Fede Ara\\agent\\agent.js" --use npm',
+    ],
+  ])('takes node for the harness when %s is only an argument', (_, command) => {
+    const rows = readProcessTable(
+      [
+        `700 1 node.exe\tC:\\node\\node.exe\t${command}`,
+        '600 700 cmd.exe\tC:\\Windows\\cmd.exe\tcmd /c otea say x',
+        '500 600 node.exe\tC:\\node\\node.exe\tnode C:\\otea\\otea.mjs say x',
+      ].join('\r\n'),
+    );
+
+    expect(harnessOf(rows, 600)).toBe(700);
+  });
+
+  it('still walks up past npm and npx whose script has a space in its folder', () => {
+    const rows = readProcessTable(
+      [
+        '700 1 claude.exe\tC:\\bin\\claude.exe\tclaude',
+        '600 700 bash.exe\tC:\\Git\\bin\\bash.exe\tbash -c otea',
+        '500 600 node.exe\tC:\\Program Files\\nodejs\\node.exe\t"C:\\Program Files\\nodejs\\node.exe" "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npx-cli.js" otea wait',
+      ].join('\r\n'),
+    );
+
+    expect(harnessOf(rows, 500)).toBe(700);
+  });
+
+  it('reads the command line the listing says, and none when it says none', () => {
+    expect(
+      readProcessTable('500 600 node.exe\tC:\\n\\node.exe\tnode npm-cli.js exec x\r\n'),
+    ).toEqual([
+      {
+        pid: 500,
+        parent: 600,
+        name: 'node.exe',
+        path: 'C:\\n\\node.exe',
+        command: 'node npm-cli.js exec x',
+      },
+    ]);
+  });
+
+  it('names no harness when the table does not reach one', () => {
+    expect(harnessOf([{ pid: 500, parent: 600, name: 'sh' }], 500)).toBeUndefined();
+    expect(harnessOf([], 500)).toBeUndefined();
   });
 
   it('keeps what it found when a parent is no longer listed', () => {
@@ -68,6 +193,101 @@ describe('the processes that own a command', () => {
       { pid: 500, parent: 600, name: 'sh.exe', path: 'C:\\Program Files\\Git\\usr\\bin\\sh.exe' },
       { pid: 4, parent: 0, name: 'System' },
     ]);
+  });
+
+  // Linux and macOS list a process by its program only: Claude Code there is node running its
+  // script, told from any node by the command line, which a second listing gives.
+  it('adds the command line of each process to the rows of a system that lists the program only', () => {
+    const rows = [
+      { pid: 10, parent: 1, name: 'node' },
+      { pid: 11, parent: 1, name: 'node' },
+    ];
+    const text = [
+      '   10 node /usr/lib/node_modules/@anthropic-ai/claude-code/cli.js --resume',
+      '   11 node server.js',
+      '   12 ps -A -o pid=,args=',
+    ].join('\n');
+
+    const withCommand = withCommands(rows, text);
+
+    expect(withCommand[0]?.command).toContain('claude-code/cli.js');
+    expect(withCommand.map(({ pid }) => isKnownHarness(withCommand, pid))).toEqual([true, false]);
+  });
+
+  // G1 review: a harness known by name is the session itself; an intermediary is not.
+  it('knows the harnesses by name, node running one, and never an intermediary', () => {
+    const rows = [
+      { pid: 1, parent: 0, name: 'claude.exe' },
+      { pid: 2, parent: 0, name: 'codex' },
+      {
+        pid: 3,
+        parent: 0,
+        name: 'node.exe',
+        command: 'node C:\\x\\opencode\\bin\\opencode.js run',
+      },
+      { pid: 4, parent: 0, name: 'node.exe', command: 'node server.js' },
+      { pid: 5, parent: 0, name: 'bwrap' },
+      { pid: 6, parent: 0, name: 'ssh' },
+      { pid: 7, parent: 0, name: 'gemini' },
+      // A system may name a node process by its thread, whatever it runs.
+      {
+        pid: 8,
+        parent: 0,
+        name: 'MainThread',
+        command: 'node /usr/lib/node_modules/@anthropic-ai/claude-code/cli.js',
+      },
+      // The program's own words are not the harness: an intermediary that only mentions one.
+      { pid: 9, parent: 0, name: 'ssh', command: 'ssh host claude --resume' },
+      { pid: 10, parent: 0, name: 'node', command: 'node -e setInterval(()=>{}) claude' },
+      {
+        pid: 11,
+        parent: 0,
+        name: 'node.exe',
+        command: '"C:\\Program Files\\nodejs\\node.exe" C:\\u\\codex\\bin\\codex.js',
+      },
+    ];
+
+    expect(rows.map(({ pid }) => isKnownHarness(rows, pid))).toEqual([
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+    ]);
+    expect(isKnownHarness(rows, 99)).toBe(false);
+  });
+
+  // G1: a busy Windows machine lists far more than execFile's default 1 MB; the listing then failed
+  // quietly and the session of an agent was never noted.
+  describe('reading the system’s listing', () => {
+    const program = (code: string) => [process.execPath, ['-e', code]] as const;
+
+    it('reads a listing of several megabytes', async () => {
+      const [command, args] = program("process.stdout.write('x'.repeat(3_000_000))");
+
+      const out = await readListing(command, args, new AbortController().signal, () => {});
+
+      expect(out?.length).toBe(3_000_000);
+    });
+
+    it('says what went wrong when it cannot read it, and answers nothing', async () => {
+      const [command, args] = program('process.exit(3)');
+      const told: string[] = [];
+
+      const out = await readListing(command, args, new AbortController().signal, (line) =>
+        told.push(line),
+      );
+
+      expect(out).toBeUndefined();
+      expect(told).toHaveLength(1);
+      expect(told[0]).toContain('process');
+    });
   });
 
   describe('Git Bash on Windows', () => {

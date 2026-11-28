@@ -144,7 +144,7 @@
 .lane-head {
   display: block;
   width: 56px;
-  font: 400 10.5px / 1 var(--mono);
+  font: 400 11px / 1 var(--mono);
   color: var(--ink-3);
   position: relative;
   height: 14px;
@@ -305,6 +305,18 @@
      columns beside it. */
   overflow-wrap: anywhere;
 }
+/* One rule for a title that can be long (the list's rows, anything marked `.clamp`): two lines, then
+   an ellipsis, and the whole title in the themed tooltip while it is cut (kit/Tooltip.tsx CLAMPED).
+   An unbroken title would otherwise push the rows under it down by a page. */
+.row .t,
+.clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
 .tt {
   background: linear-gradient(var(--rule-2), var(--rule-2)) 0 58% / 0% 1px no-repeat;
   -webkit-box-decoration-break: clone;
@@ -399,6 +411,13 @@
 }
 .m .stp.you {
   color: var(--you-ink);
+}
+.m .stp.warn {
+  color: var(--warn);
+}
+/* what the row asks of you, in words: only where the phone has no column for it */
+.m .pw {
+  display: none;
 }
 .row .a {
   font-size: 13px;

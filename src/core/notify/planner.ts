@@ -13,7 +13,8 @@ import type { NotifyKind, Signal } from './signals.ts';
 export type QuietHours = { from: string; to: string };
 
 export type NotifyPrefs = Record<NotifyKind, boolean> & {
-  // Whether a question's own words go in its notice, which a lock screen shows to anyone.
+  // Whether the words of what is told go in its notice (a question, the assistant's reply), which
+  // a lock screen shows to anyone.
   askText: boolean;
   quiet: QuietHours | null;
   // The projects (their ids) nothing is told from.
@@ -29,6 +30,8 @@ export const DEFAULT_PREFS: NotifyPrefs = {
   stuck: true,
   aside: false,
   unheard: true,
+  assistant_reply: true,
+  assistant_offline: true,
   askText: true,
   quiet: null,
   muted: [],
@@ -50,6 +53,11 @@ export type ItemNotice = {
   text?: string;
   // A question's options, said after its text when they fit.
   options?: string[];
+  // The turn of Hablar an assistant reply opens; how many messages wait for an offline assistant.
+  turn?: number;
+  count?: number;
+  // `item` is a Bandeja note (B-3), not an item.
+  bandeja?: true;
 };
 
 export type GroupNotice = {
@@ -57,8 +65,24 @@ export type GroupNotice = {
   count: number;
   // What the items have in common, or mixed.
   of: NotifyKind | 'mixed';
-  items: { item: string; title: string; kind: NotifyKind }[];
+  items: { item: string; title: string; kind: NotifyKind; bandeja?: true }[];
+  // How many things wait for the person now, as `otea pending` counts them: a mixed burst says it
+  // instead of its own count of notices (the server fills it in; text.ts falls back to the notices
+  // other than the assistant's replies).
+  waiting?: number;
 };
+
+// A burst of these items: one kind, or mixed.
+export function groupOf(items: GroupNotice['items']): GroupNotice {
+  const kinds = new Set(items.map(({ kind }) => kind));
+  const [same] = kinds;
+  return {
+    kind: 'group',
+    count: items.length,
+    of: kinds.size === 1 && same ? same : 'mixed',
+    items,
+  };
+}
 
 export type Notice = ItemNotice | GroupNotice;
 
@@ -86,9 +110,11 @@ const RANK: Record<NotifyKind, number> = {
   ask: 0,
   turn: 1,
   stuck: 2,
-  unheard: 3,
-  replied: 4,
-  aside: 5,
+  assistant_offline: 3,
+  unheard: 4,
+  assistant_reply: 5,
+  replied: 6,
+  aside: 7,
 };
 
 function noticeOf(signal: Signal, prefs: NotifyPrefs): ItemNotice {
@@ -103,8 +129,15 @@ function noticeOf(signal: Signal, prefs: NotifyPrefs): ItemNotice {
     ...(by === undefined ? {} : { by }),
     ...(text === undefined ? {} : { text }),
     ...(options === undefined ? {} : { options }),
+    ...(signal.turn === undefined ? {} : { turn: signal.turn }),
+    ...(signal.count === undefined ? {} : { count: signal.count }),
+    ...(signal.bandeja ? { bandeja: true as const } : {}),
   };
 }
+
+// What a signal is about: an item, or a Bandeja note that may have the same id as one.
+export const aboutOf = ({ item, bandeja }: Pick<Signal, 'item' | 'bandeja'>): string =>
+  bandeja ? `bandeja:${item}` : item;
 
 export class Planner {
   private pending: Signal[] = [];
@@ -152,8 +185,8 @@ export class Planner {
     );
     const byItem = new Map<string, Signal>();
     for (const signal of this.pending) {
-      const held = byItem.get(signal.item);
-      if (!held || RANK[signal.kind] < RANK[held.kind]) byItem.set(signal.item, signal);
+      const held = byItem.get(aboutOf(signal));
+      if (!held || RANK[signal.kind] < RANK[held.kind]) byItem.set(aboutOf(signal), signal);
     }
     const ready: Signal[] = [];
     let wait: number | null = null;
@@ -162,23 +195,23 @@ export class Planner {
       if (free <= now) ready.push(signal);
       else wait = Math.min(wait ?? free, free);
     }
-    const out = new Set(ready.map(({ item }) => item));
-    this.pending = this.pending.filter(({ item }) => !out.has(item));
+    const out = new Set(ready.map(aboutOf));
+    this.pending = this.pending.filter((signal) => !out.has(aboutOf(signal)));
     this.due = wait;
     if (ready.length === 0 || inQuietHours(prefs.quiet, this.minuteOfDay(now))) return [];
-    for (const { item } of ready) this.told.set(item, now);
+    for (const signal of ready) this.told.set(aboutOf(signal), now);
     this.sentAt = now;
     const [only] = ready;
     if (ready.length === 1 && only) return [noticeOf(only, prefs)];
-    const kinds = new Set(ready.map(({ kind }) => kind));
-    const [same] = kinds;
     return [
-      {
-        kind: 'group',
-        count: ready.length,
-        of: kinds.size === 1 && same ? same : 'mixed',
-        items: ready.map(({ item, title, kind }) => ({ item, title, kind })),
-      },
+      groupOf(
+        ready.map(({ item, title, kind, bandeja }) => ({
+          item,
+          title,
+          kind,
+          ...(bandeja ? { bandeja: true as const } : {}),
+        })),
+      ),
     ];
   }
 }

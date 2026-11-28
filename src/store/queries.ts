@@ -260,6 +260,19 @@ export function takeLease(db: DatabaseSync, id: string, lease: Lease, at: string
   return db.prepare(sql).run({ id, at, ...lease }).changes === 1;
 }
 
+// Extends a lease only while it is still the one that was read: the holder and expiry the reader
+// saw (`seen`). A lease released or taken since (a person freed the item, another agent took it) is
+// never brought back, and a free item is never given a holder: unlike takeLease, a renewal cannot
+// undo what happened between the read and the write.
+export function renewLease(db: DatabaseSync, id: string, seen: Lease, expiresAt: string): boolean {
+  const sql = `UPDATE items SET lease_expires_at = :expiresAt
+    WHERE id = :id AND lease_holder = :holder AND lease_expires_at = :seen
+      AND lease_expires_at < :expiresAt`;
+  return (
+    db.prepare(sql).run({ id, holder: seen.holder, seen: seen.expiresAt, expiresAt }).changes === 1
+  );
+}
+
 export function clearLease(db: DatabaseSync, id: string): void {
   db.prepare('UPDATE items SET lease_holder = NULL, lease_expires_at = NULL WHERE id = ?').run(id);
 }
@@ -384,6 +397,64 @@ export function selectEvents(db: DatabaseSync, itemId: string): EventRecord[] {
 export function selectEventsOfTypes(db: DatabaseSync, types: readonly string[]): EventRecord[] {
   const sql = `SELECT * FROM events WHERE type IN (${types.map(() => '?').join(', ')}) ORDER BY id`;
   return (db.prepare(sql).all(...types) as EventRow[]).map(toEvent);
+}
+
+// The moves that carry a key of their data (`waits` on an approval that waited for others,
+// `waited` on a return to merge main), in commit order: a read of what few events say, not of all.
+export function selectMovesWith(db: DatabaseSync, key: 'waits' | 'waited'): EventRecord[] {
+  const sql = `SELECT * FROM events WHERE type = 'transitioned'
+    AND json_extract(data, '$.${key}') IS NOT NULL ORDER BY id`;
+  return (db.prepare(sql).all() as EventRow[]).map(toEvent);
+}
+
+// What agents did on the boards lately: the newest claims, releases and moves of theirs, with the
+// collection of the item each was on. The newest `limit` events are read, whatever their age.
+export type AgentWork = {
+  agent: string;
+  collection: string;
+  at: string;
+  type: 'claimed' | 'released' | 'transitioned';
+  // The state the item was in before a move (null for a claim or a release); `state` is the one it
+  // is in now.
+  from: string | null;
+  state: string;
+};
+
+// What agents did to move an item since `since` (an ISO time): claims, releases and moves. By time
+// and type, not by a count of the newest events: a busy minute of notes and evidence must never
+// push a worker's handoff out of what is read.
+export function selectRecentAgentWork(db: DatabaseSync, since: string): AgentWork[] {
+  // Events are appended in time order: walk back from the newest until one is older than `since`
+  // (no index on time), and read everything after that one.
+  let floor = 0;
+  for (const row of db.prepare('SELECT id, at FROM events ORDER BY id DESC').iterate()) {
+    if (String(row.at) < since) {
+      floor = Number(row.id);
+      break;
+    }
+  }
+  const sql = `SELECT e.actor_name AS agent, i.collection AS collection, e.at AS at, e.type AS type,
+      e.data AS data, i.state AS state
+    FROM events e JOIN items i ON i.id = e.item_id
+    WHERE e.id > :floor AND e.actor_kind = 'agent'
+      AND e.type IN ('claimed', 'released', 'transitioned') AND e.at >= :since`;
+  const rows = db.prepare(sql).all({ floor, since }) as {
+    agent: string;
+    collection: string;
+    at: string;
+    type: AgentWork['type'];
+    data: string;
+    state: string;
+  }[];
+  return rows.map(({ data, ...row }) => {
+    let from: unknown = null;
+    try {
+      from = (JSON.parse(data) as { from?: unknown }).from ?? null;
+    } catch {
+      // An event with no readable data says no state it left.
+    }
+    return { ...row, from: typeof from === 'string' ? from : null };
+  });
 }
 
 // limit caps the oldest events after the cursor; latest keeps the newest ones instead (where a feed
@@ -796,18 +867,96 @@ export function selectListening(db: DatabaseSync): Map<string, string> {
   return new Map(rows.map((row) => [row.name, row.listening_at]));
 }
 
-// The processes each agent was last heard listening through: its MCP server, its running wait.
-export function selectListenerProcesses(
+// The harness session a command-line agent runs under (the process above the shells that run its
+// otea commands), noted by its wait, which reads the process table. Kept after the wait ends: it is
+// the one process that says the agent's session is over while no otea process runs. An agent heard
+// through an MCP server has its harness noted by that server (`listening_harness` is its launcher).
+//
+// A process found above one wait only is a candidate, stored negated (-pid): the first wait of a
+// session may pick an intermediary that lives one command (bwrap, docker exec, ssh, wsl.exe), whose
+// end says nothing of the session. Found above the next wait too (the same id), it is the harness
+// (+pid) and may say «ended». Another id restarts the candidate. A process that is a harness known
+// by name (`known`: claude, codex...) is no intermediary and is trusted at the first find, so a
+// killed session still reads offline within seconds. No column: a negative id is read as «not
+// trusted yet» (selectListenerProcesses).
+export function saveHarness(
   db: DatabaseSync,
-): Map<string, { session: number | null; waiter: number | null }> {
+  agent: string,
+  pid: number,
+  known = false,
+  // When the process started (epoch ms): kept with its id, to tell it from another that got the
+  // same id later.
+  started?: number,
+): void {
+  const row = db
+    .prepare('SELECT listening_harness AS harness FROM agents WHERE name = :agent')
+    .get({ agent }) as { harness: number | null } | undefined;
+  const next = known || row?.harness === pid || row?.harness === -pid ? pid : -pid;
+  db.prepare(
+    `UPDATE agents SET listening_harness = :next, listening_harness_started = :started
+      WHERE name = :agent AND listening_session IS NULL`,
+  ).run({ agent, next, started: started ?? null });
+}
+
+// Forgets a harness noted for the command line once it is gone: the agent speaking again is another
+// session of it (a restart under the same name), which notes its own with its next wait.
+export function forgetHarness(db: DatabaseSync, agent: string, pid: number): void {
+  db.prepare(
+    `UPDATE agents SET listening_harness = NULL, listening_harness_started = NULL
+      WHERE name = :agent AND listening_session IS NULL AND listening_harness = :pid`,
+  ).run({ agent, pid });
+}
+
+// A harness session seen gone by a wait that ran under it: it is the harness of every agent noted
+// under it, a candidate or not, so each of them reads as ended from now on. Only for a process
+// that is gone: a live one is never marked.
+export function markHarnessGone(db: DatabaseSync, pid: number): void {
+  db.prepare(
+    `UPDATE agents SET listening_harness = :pid
+      WHERE listening_session IS NULL AND (listening_harness = :pid OR listening_harness = -:pid)`,
+  ).run({ pid });
+}
+
+export type ListenerProcesses = {
+  session: number | null;
+  waiter: number | null;
+  // Only a command-line agent's: see saveHarness.
+  harness: number | null;
+  // When that process started (epoch ms), when it was noted with it.
+  harnessStarted: number | null;
+};
+
+// The processes each agent was last heard listening through: its MCP server, its running wait, and
+// the harness session its waits ran under.
+export function selectListenerProcesses(db: DatabaseSync): Map<string, ListenerProcesses> {
   const rows = db
     .prepare(
-      `SELECT name, listening_session, listening_waiter FROM agents
-        WHERE listening_session IS NOT NULL OR listening_waiter IS NOT NULL`,
+      `SELECT name, listening_session, listening_waiter, listening_harness,
+              listening_harness_started FROM agents
+        WHERE listening_session IS NOT NULL OR listening_waiter IS NOT NULL
+          OR listening_harness > 0`,
     )
-    .all() as { name: string; listening_session: number | null; listening_waiter: number | null }[];
+    .all() as {
+    name: string;
+    listening_session: number | null;
+    listening_waiter: number | null;
+    listening_harness: number | null;
+    listening_harness_started: number | null;
+  }[];
   return new Map(
-    rows.map((row) => [row.name, { session: row.listening_session, waiter: row.listening_waiter }]),
+    rows.map((row) => [
+      row.name,
+      {
+        session: row.listening_session,
+        waiter: row.listening_waiter,
+        // A candidate (negated, see saveHarness) is not a harness yet.
+        harness:
+          row.listening_session === null && (row.listening_harness ?? 0) > 0
+            ? row.listening_harness
+            : null,
+        harnessStarted: row.listening_harness_started,
+      },
+    ]),
   );
 }
 

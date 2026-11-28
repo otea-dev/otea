@@ -19,6 +19,7 @@ const HEADS = new Set([
   'Handoff',
   'Branch',
   'Before you hand it off',
+  'Antes de entregarlo',
   'Next',
   'When you finish',
 ]);

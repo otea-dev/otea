@@ -14,7 +14,7 @@ import type { Item, ItemEvent } from './types.ts';
 // server that does not say, it is taken as yes: the desk never warns of a silence it cannot tell.
 export function anyoneWaits(agents: readonly Agent[] | null | undefined): boolean {
   if (!agents) return true;
-  return agents.some(hearsDesk);
+  return takers(agents).some(hearsDesk);
 }
 
 // Whether a move the person can make here lands the item on an agent: only then does it matter
@@ -32,11 +32,42 @@ export function handsToAgent(
 // hears waits its turn in a queue: the desk says so calmly, not as an alarm.
 export function workingAgents(
   agents: readonly Agent[] | null | undefined,
-  items: readonly Pick<Item, 'id' | 'asks'>[],
+  items: readonly Pick<Item, 'id' | 'asks' | 'collection'>[],
   now: number,
+  // The board the queue is of: an agent at work only on another board never comes to it (field
+  // study 4, U3: «en cola: ines-check-3 está trabajando» on a board nobody worked).
+  board?: string,
 ): string[] {
-  return (agents ?? []).filter((a) => isWorking(a, items, now)).map((a) => a.name);
+  return takers(agents)
+    .filter((a) => isWorking(a, items, now) && !worksOnlyElsewhere(a, items, board))
+    .map((a) => a.name);
 }
+
+// Whether the agent holds items and none of them is on `board`: it works another board.
+function worksOnlyElsewhere(
+  agent: Agent,
+  items: readonly Pick<Item, 'id' | 'collection'>[],
+  board: string | undefined,
+): boolean {
+  if (board === undefined || agent.holding.length === 0) return false;
+  const held = items.filter(({ id }) => agent.holding.includes(id));
+  return held.length > 0 && held.every(({ collection }) => collection !== board);
+}
+
+// The agents that take items, the workers: every one but the assistant, which talks with the
+// person, and the refiner, which turns the Bandeja's notes into items and waits for the next note
+// (neither takes an item, so neither is the one an item waits in the queue for, and neither counts
+// as a listener on the boards: field study 3, S2, and the review of F6).
+//
+// «Agents» is said of these and only these on every surface: the pill and its menu count them, and
+// the notices say «no agent is connected» when none is. The assistant has its own place (the rail's
+// dot, Hablar), so a project with the assistant alone never reads «1 listening» in the pill and «no
+// agent connected» on its items at once (the owner's rule: what is shown must be true).
+export function workersOf(agents: readonly Agent[] | null | undefined): Agent[] {
+  return (agents ?? []).filter((a) => a.role !== 'assistant' && a.role !== 'refiner');
+}
+
+const takers = workersOf;
 
 // Whether one agent is at work: the server's status, the one definition the pill, the menu and the
 // queue note share (it holds an item it works on, not one that waits for its own question to be
@@ -53,7 +84,9 @@ export function isWorking(
 // off, or sits idle in its chat with its MCP server open. They hear nothing of the desk until they
 // wait again, which is no fault: the desk says so calmly (P5-F12, P2-F4).
 export function connectedAgents(agents: readonly Agent[] | null | undefined): string[] {
-  return (agents ?? []).filter((a) => statusOf(a) === 'connected').map((a) => a.name);
+  return takers(agents)
+    .filter((a) => statusOf(a) === 'connected')
+    .map((a) => a.name);
 }
 
 // The agent that holds the item's live lease while it is no longer connected (P7-R3-10): its
@@ -112,16 +145,17 @@ export type Hearing =
 // Whether no agent is here at all (none connected, none silent on a lease): an empty room, which
 // the desk says calmly, never as a silence to fix. Before presence loads it is not.
 export function noAgents(agents: readonly Agent[] | null | undefined): boolean {
-  return !!agents && agents.every((a) => statusOf(a) === 'away');
+  return !!agents && takers(agents).every((a) => statusOf(a) === 'away');
 }
 
 export function hearing(
   agents: readonly Agent[] | null | undefined,
-  items: readonly Pick<Item, 'id' | 'asks'>[],
+  items: readonly Pick<Item, 'id' | 'asks' | 'collection'>[],
   now: number,
+  board?: string,
 ): Hearing | null {
   if (anyoneWaits(agents)) return null;
-  const working = workingAgents(agents, items, now);
+  const working = workingAgents(agents, items, now, board);
   if (working.length > 0) return { kind: 'working', agents: working };
   const connected = connectedAgents(agents);
   if (connected.length > 0) return { kind: 'connected', agents: connected };

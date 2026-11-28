@@ -13,11 +13,10 @@ import { Chevron } from '../../kit/Marks.tsx';
 import { anchorAbove } from '../../kit/pop/anchors.ts';
 import { MenuItem, MenuLabel } from '../../kit/pop/Menu.tsx';
 import { Pop } from '../../kit/pop/Pop.tsx';
-import { toast } from '../../kit/pop/toast.tsx';
+import { noticeDwell, toast } from '../../kit/pop/toast.tsx';
 import { Swap } from '../../kit/Swap.tsx';
 import { motionBus } from '../../motion/bus.ts';
 import { Choreo, part } from '../../motion/choreo.ts';
-import { reduced } from '../../motion/reduced.ts';
 import { stateWordIn } from '../../preset-words.ts';
 import type { CollectionView, Item, Move } from '../../types.ts';
 import { useStudioBoard } from './studio-board.tsx';
@@ -36,13 +35,13 @@ import {
 // buttons, the main one filled, the closing ones behind Cerrar como; one plain sentence says what
 // the selection shares, the moves left out behind "por qué"; Limpiar sits in the corner. Devolver
 // asks its reason once; a run moves one item at a time through the handoff, then a receipt stays
-// 6 s and a toast offers Deshacer.
+// as long as the toast that offers Deshacer.
 
 type Phase =
   | { kind: 'idle' }
   | { kind: 'reason'; button: TrayButton }
   | { kind: 'run'; state: string; total: number; done: number }
-  | { kind: 'receipt'; text: string };
+  | { kind: 'receipt'; text: string; seconds: number };
 
 // The moves each ticked item can take where it stands, read from the server as the detail reads
 // them; keyed by id and state, so a move reads them again.
@@ -151,7 +150,7 @@ export function Tray({
 }) {
   const app = useApp();
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
-  // The receipt's 6 s; a new run or leaving clears it, so it never cuts a later run.
+  // The receipt's time (the toast's); a new run or leaving clears it, so it never cuts a later run.
   const idleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(idleTimer.current), []);
   const busy = phase.kind === 'run' || phase.kind === 'receipt';
@@ -266,7 +265,14 @@ export function Tray({
       setPhase({ kind: 'run', state, total: order.length, done: i + 1 });
     }
     const count = moved.length;
-    setPhase({ kind: 'receipt', text: t('boardView.tray.receipt', { count, state }) });
+    // The receipt stands as long as the notice beside it, never less: it said 6 s while the toast
+    // with Deshacer stood 15 (D-1a3b09).
+    const stands = noticeDwell(count > 0 ? { undo: () => undefined } : {});
+    setPhase({
+      kind: 'receipt',
+      text: t('boardView.tray.receipt', { count, state }),
+      seconds: Math.round(stands / 1000),
+    });
     toast({
       msg: t('boardView.tray.toast', { count, state }),
       ...(count > 0
@@ -285,7 +291,7 @@ export function Tray({
           }
         : {}),
     });
-    idleTimer.current = setTimeout(() => setPhase({ kind: 'idle' }), reduced() ? 1200 : 6000);
+    idleTimer.current = setTimeout(() => setPhase({ kind: 'idle' }), stands);
   };
 
   // «Poner arriba»: the ticked items go on top of the agents' work, in the order ticked;
@@ -330,7 +336,7 @@ export function Tray({
     body = (
       <div className="tgrid">
         <div className="tprog" style={{ gridColumn: '1 / -1' }}>
-          <b>{phase.text}</b> {t('boardView.tray.closesIn')}
+          <b>{phase.text}</b> {t('boardView.tray.closesIn', { s: phase.seconds })}
         </div>
       </div>
     );

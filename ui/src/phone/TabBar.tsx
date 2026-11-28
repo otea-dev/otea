@@ -1,9 +1,9 @@
 import type { Ref } from 'react';
 import { useApp } from '../app/context.tsx';
 import { useWorkspace, type Workspace } from '../app/workspace.ts';
-import { tocaCount } from '../derive/toca.ts';
 import { t } from '../i18n/i18n.ts';
 import { Icon } from '../kit/Icon.tsx';
+import { waitingCount } from '../pending.ts';
 import type { Route } from '../selection.ts';
 import { openCapture } from './capture.ts';
 import { navSheet, useNavSheet } from './nav.ts';
@@ -14,7 +14,7 @@ import { useRise } from './rise.ts';
 // it, so nothing floats over content. It stands on every page of the project and goes while an
 // item, the new item page or the activity drawer takes the screen.
 
-export type Tab = 'toca' | 'panel';
+export type Tab = 'hablar' | 'toca' | 'panel';
 
 export function tabBarFor(route: Route, ws: Pick<Workspace, 'intake' | 'activity'>): boolean {
   return !(route.item || ws.intake || ws.activity);
@@ -29,6 +29,8 @@ export function tabOn(route: Route): Tab | null {
     case 'atasco':
     case 'triage':
       return 'toca';
+    case 'hablar':
+      return 'hablar';
     case 'board':
       return 'panel';
     default:
@@ -47,6 +49,7 @@ export type TabBarViewProps = {
   panelOpen: boolean;
   canCreate: boolean;
   onToca: () => void;
+  onHablar: () => void;
   onNew: () => void;
   onPanel: () => void;
   ref?: Ref<HTMLElement>;
@@ -57,6 +60,16 @@ export function TabBarView(p: TabBarViewProps) {
   const current = (tab: Tab) => (p.on === tab ? ('page' as const) : undefined);
   return (
     <nav className="tabbar" aria-label={t('phone.tabs')} ref={p.ref}>
+      <button
+        type="button"
+        className={cls('hablar')}
+        data-tab="hablar"
+        aria-current={current('hablar')}
+        onClick={p.onHablar}
+      >
+        <Icon name="talk" />
+        <span className="lb">{t('hablar.nav')}</span>
+      </button>
       <button
         type="button"
         className={cls('toca')}
@@ -107,8 +120,12 @@ export function TabBar() {
     <TabBarView
       ref={ref}
       on={tabOn(app.route)}
-      toca={tocaCount(app.all, { now: app.now })}
+      toca={waitingCount(app)}
       panelOpen={open}
+      onHablar={() => {
+        navSheet.close();
+        app.go({ view: 'hablar' });
+      }}
       // Offline too, where the app keeps a queue: the capture waits for the PC.
       canCreate={app.canCapture}
       onToca={() => {

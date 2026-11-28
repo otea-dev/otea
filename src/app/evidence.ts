@@ -19,8 +19,9 @@ import {
   evidenceTypeOf,
   MAX_EVIDENCE_BYTES,
   MAX_EVIDENCE_MB,
+  safeFileName,
 } from '../core/evidence.ts';
-import type { Actor } from '../core/item.ts';
+import { type Actor, isOteaActor, OTEA_ACTOR } from '../core/item.ts';
 import type { Layout } from '../core/modules.ts';
 import {
   diffPartFor,
@@ -43,7 +44,12 @@ import {
   selectEvidence,
 } from '../store/queries.ts';
 import { typeOfItem } from './collections.ts';
-import { requireWritableItem, systemClock } from './items.ts';
+import {
+  assertNotInPersonsReview,
+  requireItem,
+  requireWritableItem,
+  systemClock,
+} from './items.ts';
 import { assertMayWriteItem } from './lease-take.ts';
 import { boardModule, liveBoardOf } from './next.ts';
 import type { Project } from './project.ts';
@@ -66,10 +72,20 @@ export function evidenceReadPath(
   dataDir: string,
   evidence: Pick<EvidenceRecord, 'id' | 'sha256' | 'filename'>,
 ): string | undefined {
+  return namedReadPath(dataDir, String(evidence.id), evidence);
+}
+
+// The same for any stored file, under files/<folder>/ (the conversation's attachments keep their
+// own folders, `m<id>`, apart from the evidence numbers).
+export function namedReadPath(
+  dataDir: string,
+  folder: string,
+  evidence: Pick<EvidenceRecord, 'sha256' | 'filename'>,
+): string | undefined {
   const stored = evidenceFile(dataDir, evidence.sha256);
   if (!existsSync(stored)) return undefined;
-  const name = basename(evidence.filename).replace(/[<>:"/\\|?*]/g, '_') || 'file';
-  const named = join(dataDir, 'files', String(evidence.id), name);
+  const name = safeFileName(basename(evidence.filename.replaceAll('\\', '/')));
+  const named = join(dataDir, 'files', folder, name);
   if (existsSync(named)) return named;
   mkdirSync(dirname(named), { recursive: true });
   try {
@@ -92,7 +108,7 @@ export type AttachInput = {
   channel: Channel;
 };
 
-function readEvidence(path: string): Buffer {
+export function readEvidence(path: string): Buffer {
   const stats = statSync(path, { throwIfNoEntry: false });
   if (!stats) throw new OteaError('file_not_found', `File "${path}" not found`);
   if (!stats.isFile()) throw new OteaError('file_not_found', `"${path}" is not a file`);
@@ -106,7 +122,7 @@ function readEvidence(path: string): Buffer {
 }
 
 // Written aside and renamed into place, so a reader never sees a partial file.
-function store(dataDir: string, sha256: string, bytes: Buffer): void {
+export function storeFile(dataDir: string, sha256: string, bytes: Buffer): void {
   const target = evidenceFile(dataDir, sha256);
   if (existsSync(target)) return;
   mkdirSync(evidenceDir(dataDir), { recursive: true });
@@ -255,7 +271,7 @@ export function recordEvidence(
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   const { kind, contentType } = evidenceTypeOf(filename);
   const caption = file.caption?.trim() || null;
-  store(project.dataDir, sha256, bytes);
+  storeFile(project.dataDir, sha256, bytes);
   const entry = {
     itemId,
     role,
@@ -358,7 +374,10 @@ export function attachEvidence(project: Project, input: AttachInput, now = syste
   };
   return transaction(project.db, () => {
     const item = requireWritableItem(project.db, input.id);
+    // A step that pushes the protected branch says first why (its branch is frozen); any other
+    // step in the person's review is held the same way, with the review's own words.
     refuseWhileFrozen(project, item, input.actor);
+    assertNotInPersonsReview(project, item, typeOfItem(project, item), input.actor);
     const at = now();
     const placed = placeFile(project, item, file, input.actor, at);
     const same = sameSinceMoved(project, item.id, placed);
@@ -376,6 +395,58 @@ export function attachEvidence(project: Project, input: AttachInput, now = syste
   });
 }
 
+// The branch's own diff, kept by Otea beside what the agent attached (D-492953): the review reads
+// this one, as git computed it at the handoff from the base to the tip the person approves, and the
+// agent's file is shown as the agent's. Its actor is Otea itself (kind `otea`), never the person and
+// never an agent. The item is already in review, so none of the guards of an attach apply. Nothing is added
+// when the layout has no diff part, the diff is empty or over the limit, or the last one Otea kept
+// is the same.
+export function recordBranchDiff(
+  project: Project,
+  itemId: string,
+  diff: { text: string; commit: string; branch: string; base: string },
+  now = systemClock,
+): EvidenceRecord | undefined {
+  const bytes = Buffer.from(diff.text, 'utf8');
+  if (bytes.length === 0 || bytes.length > MAX_EVIDENCE_BYTES) return undefined;
+  return transaction(project.db, () => {
+    const item = requireItem(project.db, itemId);
+    const type = typeOfItem(project, item);
+    const part = evidenceModules(type.layout).find(({ module }) => module === 'diff');
+    if (!part) return undefined;
+    const filename = `otea-branch-${diff.commit.slice(0, 7)}.diff`;
+    let placement: Placement;
+    try {
+      placement = placeEvidence(
+        type.layout,
+        { id: item.id, type: type.name },
+        { filename, module: part.id },
+      );
+    } catch {
+      return undefined;
+    }
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const last = selectEvidence(project.db, itemId)
+      .filter(({ actor }) => isOteaActor(actor))
+      .at(-1);
+    if (last?.sha256 === sha256) return undefined;
+    const caption = `git diff ${diff.base}...${diff.commit.slice(0, 7)} of ${diff.branch}, as Otea computed it`;
+    // It belongs to the round of the handoff it was computed for: a moment before it, as a file the
+    // agent attached before handing off, whatever the clock says of the time git took.
+    const handoff = selectEvents(project.db, itemId).findLast(
+      ({ type }) => type === 'transitioned',
+    );
+    const at = handoff ? new Date(Date.parse(handoff.at) - 1).toISOString() : now();
+    return recordEvidence(
+      project,
+      itemId,
+      { filename, bytes, caption, ...placement },
+      { actor: OTEA_ACTOR, channel: 'cli' },
+      at,
+    );
+  });
+}
+
 export type DetachInput = { id: string; evidence: number; actor: Actor; channel: Channel };
 
 // Takes back a file attached by mistake (AGENTS3-4): only the one who attached it, while the item
@@ -389,6 +460,7 @@ export function detachEvidence(
 ): EvidenceRecord {
   return transaction(project.db, () => {
     const item = requireWritableItem(project.db, input.id);
+    assertNotInPersonsReview(project, item, typeOfItem(project, item), input.actor);
     const at = now();
     assertMayWriteItem(project, item, input.actor, at);
     const entry = selectEvidence(project.db, item.id).find(({ id }) => id === input.evidence);

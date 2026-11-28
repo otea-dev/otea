@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openDatabase } from './database.ts';
@@ -49,16 +50,78 @@ describe('migrate', () => {
         'name_offers',
         'mcp_loads',
         'process_beats',
+        'assistant_signals',
+        'unheard_stretches',
+        'conversation_messages',
+        'conversation_attachments',
+        'conversation_links',
+        'bandeja_entries',
+        'bandeja_attachments',
+        'bandeja_questions',
       ]),
     );
-    expect(userVersion(db)).toBe(42);
+    expect(userVersion(db)).toBe(57);
+  });
+
+  // Cold review G2: what answers a message, and the notes and turns of an item by its id, were
+  // found by scanning (a NOCASE comparison cannot use a BINARY index).
+  it('looks up replies, an item’s notes and an item’s turns by index', () => {
+    migrate(db);
+    const plan = (sql: string) =>
+      db
+        .prepare(`EXPLAIN QUERY PLAN ${sql}`)
+        .all(1)
+        .map((row) => String(row.detail))
+        .join(' ');
+
+    expect(plan('SELECT id FROM conversation_messages WHERE reply_to = ?')).toContain(
+      'conversation_reply_to',
+    );
+    expect(plan('SELECT id FROM bandeja_entries WHERE item_id = ?')).toContain('bandeja_item');
+    expect(plan('SELECT message_id FROM conversation_links WHERE item_id = ?')).toMatch(
+      /conversation_links_item|PRIMARY KEY|autoindex/,
+    );
   });
 
   it('is idempotent', () => {
     migrate(db);
     migrate(db);
 
-    expect(userVersion(db)).toBe(42);
+    expect(userVersion(db)).toBe(57);
+  });
+
+  // The desk and the agents' commands open a project the moment an upgrade lands: one that read the
+  // version before another finished must not run what the other already did (a duplicate column).
+  it('runs nothing twice when another process migrated since it read the version', () => {
+    const path = join(String(process.env.OTEA_HOME), 'concurrent-open.db');
+    const first = openDatabase(path);
+    const second = openDatabase(path);
+    try {
+      migrate(first, 30);
+      const stale = Number(userVersion(second));
+      migrate(first);
+      let lagging = true;
+      // `second` read the version before `first` migrated the rest: its first read is the old one.
+      const slow = new Proxy(second, {
+        get(target, key) {
+          if (key === 'prepare') {
+            return (sql: string) => {
+              if (!lagging || sql !== 'PRAGMA user_version') return target.prepare(sql);
+              lagging = false;
+              return { get: () => ({ user_version: stale }) };
+            };
+          }
+          const value = Reflect.get(target, key);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+
+      expect(() => migrate(slow)).not.toThrow();
+      expect(userVersion(second)).toBe(57);
+    } finally {
+      first.close();
+      second.close();
+    }
   });
 
   describe('from version 40, which kept a language on the project', () => {
@@ -386,6 +449,88 @@ describe('migrate', () => {
       db.exec("UPDATE boards SET archived_at = 't' WHERE id = 'b1'");
 
       expect(() => db.exec("UPDATE events SET type = 'edited'")).toThrow(/append-only/);
+    });
+  });
+
+  // D-274c07: the links a turn already had read as the new rule does: made when the item was
+  // created after the turn began, only mentioned otherwise.
+  describe('from version 55, with links between turns and items', () => {
+    it('marks as made the items created after their turn began, and no other', () => {
+      migrate(db, 55);
+      db.exec(`
+        INSERT INTO collections (name, prefix, preset, preset_version, next_seq)
+        VALUES ('tasks', 'TASKS', 'tasks', 1, 3);
+        INSERT INTO items (id, collection, seq, title, fields, preset_version, state, created_at,
+          updated_at, created_by_kind, created_by_name)
+        VALUES ('TASKS-1', 'tasks', 1, 'old', '{}', 1, 'todo', '2026-11-26T09:00:00Z', 't', 'human', 'ana'),
+               ('TASKS-2', 'tasks', 2, 'new', '{}', 1, 'todo', '2026-11-26T11:00:00Z', 't', 'human', 'ana');
+        INSERT INTO conversation_messages (id, author, author_name, text, at, root)
+        VALUES (1, 'person', 'ana', 'add it', '2026-11-26T10:00:00Z', 1);
+        INSERT INTO conversation_links (message_id, item_id, at)
+        VALUES (1, 'TASKS-1', 't'), (1, 'TASKS-2', 't');
+      `);
+
+      migrate(db);
+
+      expect(
+        db.prepare('SELECT item_id, made FROM conversation_links ORDER BY item_id').all(),
+      ).toEqual([
+        { item_id: 'TASKS-1', made: 0 },
+        { item_id: 'TASKS-2', made: 1 },
+      ]);
+    });
+  });
+
+  // The assistant was "the secretary" while 0.8 was built: what was stored under that word is
+  // rewritten, and the event log stays append-only.
+  describe('from version 56, which stored the assistant as "secretary"', () => {
+    beforeEach(() => {
+      migrate(db, 56);
+      db.exec(`
+        INSERT INTO collections (name, prefix, preset, preset_version, next_seq)
+        VALUES ('tasks', 'TASKS', 'tasks', 1, 2);
+        INSERT INTO items (id, collection, seq, title, fields, preset_version, state, created_at,
+          updated_at, created_by_kind, created_by_name)
+        VALUES ('TASKS-1', 'tasks', 1, 'A', '{}', 1, 'todo', 't', 't', 'human', 'ana');
+        INSERT INTO events (item_id, type, actor_kind, actor_name, at, data)
+        VALUES ('TASKS-1', 'note_left', 'agent', 'sec', 't', '{"relayed":true,"role":"secretary"}'),
+               ('TASKS-1', 'note_left', 'agent', 'bot', 't', '{"relayed":true,"role":"refiner"}');
+        INSERT INTO agents (name, last_seen, role) VALUES ('sec', 't', 'secretary'),
+          ('bot', 't', 'refiner');
+        INSERT INTO conversation_messages (id, author, author_name, text, at, root, kind_by)
+        VALUES (1, 'person', 'ana', 'hi', 't', 1, 'secretary'),
+               (2, 'secretary', 'sec', 'hello', 't', 1, NULL);
+        INSERT INTO secretary_signals (kind, ref, text, at) VALUES ('person_message', '1', 'hi', 't');
+      `);
+      migrate(db);
+    });
+
+    it('rewrites the role, the author, who set a kind and the signals table', () => {
+      expect(db.prepare('SELECT name, role FROM agents ORDER BY name').all()).toEqual([
+        { name: 'bot', role: 'refiner' },
+        { name: 'sec', role: 'assistant' },
+      ]);
+      expect(
+        db.prepare('SELECT id, author, kind_by FROM conversation_messages ORDER BY id').all(),
+      ).toEqual([
+        { id: 1, author: 'person', kind_by: 'assistant' },
+        { id: 2, author: 'assistant', kind_by: null },
+      ]);
+      expect(tables(db)).toContain('assistant_signals');
+      expect(tables(db)).not.toContain('secretary_signals');
+      expect(db.prepare('SELECT kind, ref FROM assistant_signals').all()).toEqual([
+        { kind: 'person_message', ref: '1' },
+      ]);
+    });
+
+    it('rewrites the role a relayed note recorded, and keeps events append-only', () => {
+      const roles = db.prepare(
+        "SELECT json_extract(data, '$.role') AS role FROM events ORDER BY id",
+      );
+
+      expect(roles.all()).toEqual([{ role: 'assistant' }, { role: 'refiner' }]);
+      expect(() => db.exec("UPDATE events SET type = 'edited'")).toThrow(/append-only/);
+      expect(() => db.exec('DELETE FROM events')).toThrow(/append-only/);
     });
   });
 });

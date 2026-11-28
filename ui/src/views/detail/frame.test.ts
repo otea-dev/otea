@@ -77,6 +77,19 @@ describe('the toast after a move, and its Undo', () => {
     expect(toastOf('discard', 'X', 'rejected')).toBe('You discarded “X”: rejected.');
   });
 
+  // D-3cf576: the notice after an answer said only the title, and a reader had to hunt the page for
+  // what was chosen.
+  it('names what was chosen when an answer is sent', () => {
+    expect(toastOf('answer', 'Show the price', '', 'Keep the current format')).toBe(
+      'You answered “Show the price”: Keep the current format.',
+    );
+    expect(toastOf('answer', 'X', '')).toBe('You answered “X”.');
+    expect(toastOf('answer', 'X', '', 'a'.repeat(200))).toMatch(/: a+….$/);
+    setLanguage('es');
+    expect(toastOf('answer', 'X', '', 'Sí, créalo')).toBe('Respondiste «X»: Sí, créalo.');
+    setLanguage('en');
+  });
+
   it('says where a stuck item went: back in the queue of its step, or left for an agent', () => {
     expect(stuckToastOf({ title: 'Los pasos suenan dos veces', state: 'fixing' })).toBe(
       'You put “Los pasos suenan dos veces” back in the queue of fixing.',

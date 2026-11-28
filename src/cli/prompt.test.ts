@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { designPrompt, rolePrompt, startPrompt } from '../core/agent-prompts.ts';
+import { findCommand } from './commands.ts';
 import { type Cli, cliAt, tempGitRepo } from './testing.ts';
 
 // otea prompt prints what the person pastes into an agent's chat: the whole first contact on a
@@ -47,10 +48,13 @@ describe('otea prompt', () => {
   });
 
   it('prints the canonical text of a role, with the board and name filled in', async () => {
-    // A coordinator's text needs no project.
-    const coordinator = await otea('prompt', '--role', 'coordinator', '--lang', 'en');
-    expect(coordinator.code).toBe(0);
-    expect(coordinator.out.trim()).toBe(rolePrompt('coordinator', 'en', {}));
+    // The assistant's and the refiner's texts need no project.
+    const assistant = await otea('prompt', '--role', 'assistant', '--lang', 'en');
+    expect(assistant.code).toBe(0);
+    expect(assistant.out.trim()).toBe(rolePrompt('assistant', 'en', {}));
+    const refiner = await otea('prompt', '--role', 'refiner', '--as', 'rita', '--lang', 'es');
+    expect(refiner.code).toBe(0);
+    expect(refiner.out.trim()).toBe(rolePrompt('refiner', 'es', { name: 'rita' }));
 
     await otea('init', '--local', '--template', 'changes');
     await otea('board', 'add', 'Bug reports', '--template', 'bug-reports');
@@ -76,7 +80,7 @@ describe('otea prompt', () => {
     );
   });
 
-  // The name is the one given with --as, never the session's own: a coordinator printing the text
+  // The name is the one given with --as, never the session's own: an assistant printing the text
   // for a worker must not hand it its own name.
   it('does not give a worker the name of the agent that prints its text', async () => {
     await otea('init', '--local', '--template', 'changes');
@@ -91,7 +95,9 @@ describe('otea prompt', () => {
     for (const args of [
       ['--role', 'boss'],
       ['--role', 'worker'],
-      ['--role', 'coordinator', '--board', 'Cambios'],
+      ['--role', 'coordinator'],
+      ['--role', 'assistant', '--board', 'Cambios'],
+      ['--role', 'refiner', '--board', 'Cambios'],
       ['--role', 'worker', '--board', 'Cambios', 'design'],
       ['--board', 'Cambios'],
       ['--as', 'ana'],
@@ -123,20 +129,66 @@ describe('otea prompt', () => {
     }
   });
 
-  // `otea wait` without --turn fails; the one the coordinator is told to run must be a command the
-  // CLI accepts (it times out here, exit 13, with nothing waiting).
+  // `otea wait` without --turn fails; the one the assistant is told to run is the assistant's own,
+  // and must be a command the CLI accepts (it times out here, exit 13, with nothing waiting).
   for (const lang of ['en', 'es']) {
-    it(`gives the coordinator a wait command that parses (${lang})`, async () => {
+    it(`gives the assistant a wait command that parses and runs (${lang})`, async () => {
       await otea('init', '--local', '--template', 'none');
-      const text = (await otea('prompt', '--role', 'coordinator', '--as', 'ana', '--lang', lang))
-        .out;
+      await otea('profile', '--role', 'assistant', '--as', 'ana');
+      const text = (await otea('prompt', '--role', 'assistant', '--as', 'ana', '--lang', lang)).out;
       const command = /`(otea wait [^`]*)`/.exec(text)?.[1];
-      expect(command).toBe('otea wait --turn agent --unclaimed --as ana');
+      expect(command).toBe('otea wait --assistant --as ana');
       const args = (command ?? '').split(' ').slice(1);
       const waited = await otea(...args, '--timeout', '1s');
       expect(waited.code, waited.err).toBe(13);
     });
   }
+
+  // Every command a role text tells an agent to run is a real one, with options it takes: the CLI's
+  // own command table is the judge. A placeholder (<id>) stands for a value; `$` alternatives and
+  // the notes in the text are not commands.
+  describe('the commands in the role texts', () => {
+    const GLOBAL = new Set(['json', 'as', 'help', 'version']);
+    const texts = (['en', 'es'] as const).flatMap((lang) => [
+      { what: `assistant ${lang}`, text: rolePrompt('assistant', lang, {}) },
+      { what: `worker ${lang}`, text: rolePrompt('worker', lang, { board: 'Cambios' }) },
+      { what: `refiner ${lang}`, text: rolePrompt('refiner', lang, {}) },
+    ]);
+
+    for (const { what, text } of texts) {
+      it(`are real commands with real options (${what})`, () => {
+        const commands = [...text.matchAll(/`(otea [^`]+)`/g)].map((found) => found[1] ?? '');
+        expect(commands.length).toBeGreaterThan(3);
+        for (const line of commands) {
+          // Words and options apart from quoted values (a "<question>" with spaces is one value).
+          const bare = line.replace(/"[^"]*"/g, '"x"').replace(/<[^>]*>/g, '<x>');
+          const tokens = (bare.match(/\S+/g) ?? []).slice(1);
+          const command = findCommand(tokens);
+          expect(command, line).toBeDefined();
+          const words = command?.name.split(' ').length ?? 0;
+          const given = tokens.slice(words);
+          for (const token of given) {
+            if (!token.startsWith('--')) continue;
+            const name = token.slice(2);
+            expect(
+              GLOBAL.has(name) || command?.options[name] !== undefined,
+              `${line}: --${name}`,
+            ).toBe(true);
+          }
+          // The arguments a command takes: no more than it names.
+          const positionals = given.filter((token, index) => {
+            const before = given[index - 1]?.startsWith('--')
+              ? given[index - 1]?.slice(2)
+              : undefined;
+            const spec = before === undefined ? undefined : command?.options[before];
+            const valued = before === 'as' || (spec !== undefined && spec.flag !== true);
+            return !token.startsWith('--') && !valued;
+          });
+          expect(positionals.length, line).toBeLessThanOrEqual(command?.args.length ?? 0);
+        }
+      });
+    }
+  });
 
   it('refuses an unknown moment or language', async () => {
     expect((await otea('prompt', 'later')).code).toBe(2);

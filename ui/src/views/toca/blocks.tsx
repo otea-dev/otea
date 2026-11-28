@@ -1,8 +1,8 @@
 import { activeLease } from '../../active-lease.ts';
-import type { FeedEvent } from '../../activity.ts';
 import { type App, typeOfItem } from '../../app/context.tsx';
 import { onPublishedBoard, publishedDefinition } from '../../board-studio/home/boards-store.ts';
 import { Prof } from '../../components/Prof.tsx';
+import { Ticked } from '../../components/Ticked.tsx';
 import { SetAsideMark, UnheardMark } from '../../components/Unheard.tsx';
 import { mainPath } from '../../derive/path.ts';
 import {
@@ -15,7 +15,7 @@ import {
   type TocaSection,
   tocaSection,
 } from '../../derive/toca.ts';
-import { turnSince, whenText } from '../../derive/when.ts';
+import { turnSince, waitedText, whenText } from '../../derive/when.ts';
 import { language, type PlainKey, t, tx } from '../../i18n/i18n.ts';
 import { Icon } from '../../kit/Icon.tsx';
 import { AgentMark } from '../../kit/Marks.tsx';
@@ -30,11 +30,13 @@ import {
   unheard,
   workingAgents,
 } from '../../listening.ts';
+import { offItemEntries, type PendingEntry, rowKeyOf } from '../../pending.ts';
 import { actedWith } from '../../presence.ts';
 import { stateWord } from '../../preset-words.ts';
-import { roundsOf } from '../../rounds.ts';
-import type { Item, TypeView } from '../../types.ts';
+import { roundOf } from '../../rounds.ts';
+import type { Item } from '../../types.ts';
 import { byPriority } from '../board/matrix.ts';
+import { rowText } from '../hablar/TeEspera.tsx';
 import { deliveryOf, evidenceWords, quietLine } from './phone.ts';
 import { spanText } from './words.ts';
 
@@ -67,24 +69,6 @@ export function universeOf(items: readonly Item[], now: number): Universe {
   );
 }
 
-// The rounds an item has been through: each agent handoff to you ends one; while an agent works
-// again after you sent it back, the next is under way.
-export function roundOf(
-  item: Item,
-  feed: readonly FeedEvent[],
-  type: TypeView | undefined,
-): number {
-  if (item.round !== undefined) return item.round;
-  if (!type) return 0;
-  const rounds = roundsOf(
-    feed.filter((e) => e.itemId === item.id),
-    [],
-    type.states,
-  );
-  const last = rounds.at(-1);
-  return rounds.length + (item.turn === 'agent' && last?.verdict?.kind === 'sent-back' ? 1 : 0);
-}
-
 export type SubKey =
   | 'toca.sub.holds'
   | 'toca.sub.asks'
@@ -100,6 +84,8 @@ export type SubKey =
   | 'toca.sub.waitsKids'
   | 'toca.sub.landsAfter'
   | 'toca.sub.setAside'
+  | 'toca.sub.bounced'
+  | 'toca.sub.merging'
   | 'toca.sub.didIt'
   | 'toca.sub.closedBy'
   | 'toca.sub.closedByYou'
@@ -174,7 +160,15 @@ export function rowCall(item: Item, sec: TocaSection, ctx: TocaContext): RowCall
       };
     }
     case 'encamino': {
-      const act = onTheWay(item, ctx);
+      // Approved is not landed: it says so until an agent has merged it (U1, field study 4).
+      const act =
+        item.landing && item.landsAfter?.overlap
+          ? t('boardView.approvedWaits', { first: item.landsAfter.first })
+          : item.merging
+            ? t('boardView.approvedMerging')
+            : item.landing
+              ? t('boardView.approvedLanding')
+              : onTheWay(item, ctx);
       // Set aside for later: who did, never «espera a un agente» (P7-R3-1).
       if (item.setAside) return { act, sub: sub('toca.sub.setAside', item.setAside.by) };
       const holder = activeLease(item.lease, now)?.holder;
@@ -184,6 +178,10 @@ export function rowCall(item: Item, sec: TocaSection, ctx: TocaContext): RowCall
       const silent = holder ? silentHolder(item, ctx.agents, events, now) : null;
       if (silent) return { act, sub: sub('toca.sub.silent', silent.agent) };
       if (holder) return { act, sub: sub('toca.sub.does', holder) };
+      // Taken back after it was approved: a change landed first and this one conflicted with it.
+      if (item.merging && !item.landsAfter?.overlap)
+        return { act, sub: sub('toca.sub.merging', item.merging.after.join(', ')) };
+      if (item.bounced) return { act, sub: sub('toca.sub.bounced') };
       // Approved, and another item lands in its base first (the line is on its page).
       if (item.landsAfter) return { act, sub: sub('toca.sub.landsAfter', item.landsAfter.first) };
       if ((item.children?.open ?? 0) > 0) return { act, sub: sub('toca.sub.waitsKids') };
@@ -238,7 +236,77 @@ export function notesMark(notes: NonNullable<Item['notes']>): string | null {
 }
 
 type TocaApp = Pick<App, 'all' | 'now' | 'feed' | 'collectionOf' | 'route'> &
-  Partial<Pick<App, 'agents'>>;
+  Partial<Pick<App, 'agents' | 'pending'>>;
+
+// A question that is no item (on a Bandeja note, or the assistant's own), as a row of «Preguntas para
+// ti»: what it is about, who asks, since when. It opens Hablar, where its buttons are.
+function OffRow({ entry, now }: { entry: PendingEntry; now: number }) {
+  const assistant = entry.kind === 'assistant';
+  const report = entry.kind === 'escalation';
+  const worker = entry.kind === 'worker';
+  if (worker) {
+    return (
+      <>
+        <div className="main-c">
+          <div className="t" data-leaf="" data-title="">
+            <span className="tt">
+              <Ticked text={rowText(entry)} />
+            </span>
+          </div>
+          <div className="m" data-leaf="">
+            <span className="id">{entry.ref}</span>
+            <span className="bd">
+              <span className="bdc">{t('toca.off.worker')}</span>
+            </span>
+          </div>
+        </div>
+        <div className="a" data-leaf="">
+          {t('toca.act.worker')}
+          <small>{t('toca.sub.yourTurn')}</small>
+        </div>
+        <div className="age" data-leaf="">
+          {waitedText(entry.since, now)}
+        </div>
+      </>
+    );
+  }
+  return (
+    <>
+      <div className="main-c">
+        <div className="t" data-leaf="" data-title="">
+          <span className="tt">
+            {assistant || report ? (entry.text ?? entry.title) : entry.title}
+          </span>
+        </div>
+        <div className="m" data-leaf="">
+          <span className="id">
+            {assistant ? (entry.about ?? t('toca.off.assistant')) : entry.ref}
+          </span>
+          <span className="bd">
+            <span className="bdc">
+              {t(assistant ? 'toca.off.inHablar' : report ? 'toca.off.report' : 'toca.off.bandeja')}
+            </span>
+            {entry.text !== undefined && !assistant && !report ? (
+              <span className="bds">› {entry.text}</span>
+            ) : null}
+            {report ? <span className="bds">› {entry.title}</span> : null}
+          </span>
+        </div>
+      </div>
+      <div className="a" data-leaf="">
+        {t(report ? 'toca.act.report' : 'toca.act.preguntas')}
+        <small>
+          {entry.by
+            ? tx(report ? 'toca.sub.reports' : 'toca.sub.asks', { agent: <b>{entry.by}</b> })
+            : t('toca.sub.yourTurn')}
+        </small>
+      </div>
+      <div className="age" data-leaf="">
+        {waitedText(entry.since, now)}
+      </div>
+    </>
+  );
+}
 
 function TocaRow({
   it,
@@ -257,7 +325,7 @@ function TocaRow({
   const type = ctx.types(it);
   const call = rowCall(it, sec, ctx);
   const stuck = sec === 'atasco' && it.expiredLease;
-  const round = stuck ? 0 : roundOf(it, app.feed, type);
+  const round = stuck ? 0 : roundOf(it, app.feed);
   // On the phone a review says what the agent delivered: its note and how much evidence.
   const delivered = phone && sec === 'revisiones' ? deliveryOf(it, app.feed) : null;
   const files = delivered ? evidenceWords(delivered.images, delivered.files) : '';
@@ -315,7 +383,7 @@ function TocaRow({
           ) : null}
           {sec === 'encamino' && unheard(it, app.agents, app.now) ? (
             <UnheardMark
-              busy={workingAgents(app.agents, app.all, app.now)}
+              busy={workingAgents(app.agents, app.all, app.now, it.collection)}
               nobody={noAgents(app.agents)}
               connected={connectedAgents(app.agents)}
             />
@@ -327,7 +395,11 @@ function TocaRow({
           <div className="p-said" data-leaf="">
             <AgentMark name={delivered.agent} />
             <span>
-              {delivered.note ? <q>{delivered.note}</q> : null}
+              {delivered.note ? (
+                <q>
+                  <Ticked text={delivered.note} />
+                </q>
+              ) : null}
               {delivered.note && files ? ' · ' : null}
               {files}
             </span>
@@ -389,6 +461,30 @@ function FoldLine({ rows, ctx, o }: { rows: Item[]; ctx: TocaContext; o: TocaPho
   );
 }
 
+// A heading of its own for what waits for you that is neither an item nor a question: the reports
+// agents escalated and the boards nobody works. Nothing at all when there are none.
+function offBlocks(key: 'avisos' | 'sinagente', entries: PendingEntry[], now: number): LaneBlock[] {
+  if (entries.length === 0) return [];
+  return [
+    {
+      kind: 'sec',
+      key: `sec:${key}`,
+      title: t(`toca.sec.${key}` as PlainKey),
+      count: entries.length,
+    },
+    ...entries.map(
+      (entry): LaneBlock => ({
+        kind: 'row',
+        key: rowKeyOf(entry),
+        lane: 'you',
+        look: 'yours',
+        sec: key,
+        content: <OffRow entry={entry} now={now} />,
+      }),
+    ),
+  ];
+}
+
 export function tocaBlocks(
   app: TocaApp,
   atasco: boolean,
@@ -413,6 +509,14 @@ export function tocaBlocks(
     const s = tocaSection(it, ctx);
     if (s) by.set(s, [...(by.get(s) ?? []), it]);
   }
+  // What Otea counts that is no item: the questions of the Bandeja and of the assistant join the
+  // questions for you, beside the items that ask. An agent's report and a board nobody works are not
+  // questions: each has a heading of its own, so «Preguntas para ti» counts only questions
+  // (s-real2, D-0454fd, D-35c7b8).
+  const off = atasco ? [] : offItemEntries(app);
+  const questions = off.filter(({ kind }) => kind === 'bandeja' || kind === 'assistant');
+  const reports = off.filter(({ kind }) => kind === 'escalation');
+  const noWorker = off.filter(({ kind }) => kind === 'worker');
   const blocks: LaneBlock[] = [];
   const at = (it: Item) => turnSince(it);
   const quiet: TocaSection[] = [];
@@ -424,11 +528,18 @@ export function tocaBlocks(
   for (const sec of TOCA_SECTIONS) {
     if (atasco && sec !== 'atasco') continue;
     if (phone && sec === 'cerrados') continue;
-    if (phone && YOURS.includes(sec) && !by.get(sec)?.length) {
+    const asked = sec === 'preguntas' ? questions : [];
+    if (phone && YOURS.includes(sec) && !by.get(sec)?.length && asked.length === 0) {
       quiet.push(sec);
       continue;
     }
     if (phone && !YOURS.includes(sec)) quietBlock();
+    if (sec === 'encamino') {
+      blocks.push(
+        ...offBlocks('avisos', reports, app.now),
+        ...offBlocks('sinagente', noWorker, app.now),
+      );
+    }
     const aged = (by.get(sec) ?? []).sort((a, b) => at(a) - at(b));
     // Your own steps follow the order you fixed on the Matrix, then the rest by age (P4-R3-11).
     const rows =
@@ -443,7 +554,8 @@ export function tocaBlocks(
       kind: 'sec',
       key: `sec:${sec}`,
       title: t(`toca.sec.${sec}` as PlainKey),
-      count: rows.length,
+      // Cerrados shows the last twelve, and counts what is closed (s-real D-bcb4e2: it said 12 of 14).
+      count: (sec === 'cerrados' ? aged.length : rows.length) + asked.length,
       ...(gloss ? { gloss: t(gloss) } : {}),
       ...(triage
         ? {
@@ -464,7 +576,7 @@ export function tocaBlocks(
           }
         : {}),
     });
-    if (!rows.length)
+    if (!rows.length && asked.length === 0)
       blocks.push({
         kind: 'empty',
         key: `empty:${sec}`,
@@ -478,6 +590,17 @@ export function tocaBlocks(
         content: <FoldLine rows={rows} ctx={ctx} o={phone} />,
       });
     const shown = phone && sec === 'encamino' && !phone.encamino ? [] : rows;
+    // The questions that are no item stand with the others, oldest first among them.
+    for (const entry of asked) {
+      blocks.push({
+        kind: 'row',
+        key: rowKeyOf(entry),
+        lane: 'you',
+        look: 'yours',
+        sec,
+        content: <OffRow entry={entry} now={app.now} />,
+      });
+    }
     for (const it of shown) {
       blocks.push({
         kind: 'row',

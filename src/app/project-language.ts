@@ -4,6 +4,7 @@ import { LANGS, type Lang } from '../core/board/template-words.ts';
 import { boardLang } from '../core/board/templates.ts';
 import { findVersion, listBoards } from '../store/boards.ts';
 import { selectProjectLang, updateProjectLang } from '../store/queries.ts';
+import { relanguageBoards } from './board-relanguage.ts';
 import { defaultLang } from './language.ts';
 import type { Env, Project } from './project.ts';
 
@@ -16,7 +17,7 @@ import type { Env, Project } from './project.ts';
 //   2. A project from before has none stored: it takes the language of its Pedidos board, which was
 //      made in the language in use at the time, and keeps it from then on.
 //   3. Failing both, today's rule (the desk's last language, the computer's, English).
-// `otea projects lang` changes it; only what is made afterwards is affected.
+// `otea projects lang` changes it, and the boards that exist follow (board-relanguage.ts).
 
 const isLang = (value: unknown): value is Lang => LANGS.includes(value as Lang);
 
@@ -59,5 +60,14 @@ export function projectLanguage(project: Pick<Project, 'db'>, env: Env = process
 // Changes it; what exists keeps the words it was made in.
 export function setProjectLanguage(project: Pick<Project, 'db'>, lang: Lang): Lang {
   updateProjectLang(project.db, lang);
+  return lang;
+}
+
+// The person says the project is in `lang`: the project takes it, and the boards that exist follow
+// (board-relanguage.ts), so an English project is English in every word Otea writes for it, the
+// boards a template made included.
+export function sayProjectLanguage(project: Project, lang: Lang): Lang {
+  setProjectLanguage(project, lang);
+  relanguageBoards(project, lang);
   return lang;
 }

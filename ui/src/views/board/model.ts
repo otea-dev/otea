@@ -428,6 +428,9 @@ export function sortBoard(items: readonly Item[], sort: BoardSort, ctx: BoardCtx
 
 export type Group = { key: string; title: string; items: Item[] };
 
+// The list's group for the work thrown away: Pasos' closed column holds it with Done's.
+const DROPPED_GROUP = '__dropped';
+
 const GROUP_TITLE_TURN = {
   human: 'section.human',
   agent: 'section.agent',
@@ -445,13 +448,19 @@ export function groupBoard(
   if (by === 'none') return [{ key: 'all', title: '', items: sorted }];
   const of = (it: Item) => {
     const v = holds(it, by, ctx);
+    if (by === 'state' && v === CLOSED_COL && it.closes === 'discarded') return DROPPED_GROUP;
     return by === 'who' && (v === 'done' || v === 'dropped') ? 'closed' : v;
   };
+  // Pasos has one closed column; the list says which of its work was thrown away, apart from Done
+  // (D-db4167).
   const order =
     by === 'who'
       ? [...orderOf('who', items, ctx).filter((v) => v !== 'done' && v !== 'dropped'), 'closed']
-      : orderOf(by, items, ctx);
+      : by === 'state'
+        ? orderOf(by, items, ctx).flatMap((v) => (v === CLOSED_COL ? [v, DROPPED_GROUP] : [v]))
+        : orderOf(by, items, ctx);
   const title = (key: string) => {
+    if (by === 'state' && key === DROPPED_GROUP) return t('boardView.droppedCol');
     if (by === 'turn')
       return t(GROUP_TITLE_TURN[key as keyof typeof GROUP_TITLE_TURN] ?? 'section.none');
     if (by === 'who') {
@@ -535,26 +544,6 @@ export function boardEntries(
 }
 
 // ---- what a row says ----
-
-// The round an item is in: on a board, the engine's (the server sends it); else one, plus every
-// time you sent it back to an agent with your notes.
-export function roundOf(
-  item: Item,
-  feed: readonly FeedEvent[],
-  type: TypeView | undefined,
-): number {
-  if (item.round !== undefined) return item.round;
-  const agentStates = new Set(
-    (type?.states ?? []).filter((s) => s.turn === 'agent').map((s) => s.name),
-  );
-  let n = 1;
-  for (const e of feed) {
-    if (e.itemId !== item.id || e.type !== 'transitioned' || e.actor.kind !== 'human') continue;
-    const reason = typeof e.data.reason === 'string' ? e.data.reason.trim() : '';
-    if (reason && agentStates.has(String(e.data.to))) n += 1;
-  }
-  return n;
-}
 
 // What the row shows besides the step (the board's row, Acomodar): each value placed there, in
 // words, the severity left to its bars. Empty values say nothing.

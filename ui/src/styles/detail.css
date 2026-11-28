@@ -1288,3 +1288,93 @@ select.input {
     margin-right: 40px;
   }
 }
+
+/* An agent's question or note set short: the rest under the conclusion, quiet, behind «ver más» */
+.st-body {
+  margin-top: 4px;
+  max-width: 62ch;
+  font: 400 13.5px / 1.5 var(--sans);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+p.st-body,
+p.st-lines {
+  white-space: pre-line;
+}
+.st-rest {
+  min-width: 0;
+}
+.st-clamp {
+  max-height: 9.5em;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(#000 70%, transparent);
+  mask-image: linear-gradient(#000 70%, transparent);
+}
+.st-toggle {
+  position: relative;
+  display: inline-block;
+  margin-top: 2px;
+  padding: 3px 0;
+  font: 500 12.5px / 1.2 var(--sans);
+  color: var(--you-ink);
+  border-radius: 4px;
+}
+.st-toggle::after {
+  content: "";
+  position: absolute;
+  inset: -10px -8px;
+}
+
+/* «Detalles técnicos»: what only a reader of code uses (the branch, the diff, the test output, the
+   files two changes share) folded under a review that leads with words and pictures. Closed; its
+   summary says how many notices wait inside, so a closed fold never hides a problem. */
+.tech {
+  margin: 12px 0 8px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.tech > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 44px;
+  padding: 11px 2px;
+  list-style: none;
+  cursor: pointer;
+  font: 500 13px / 1.3 var(--sans);
+  color: var(--ink-2);
+}
+.tech > summary::-webkit-details-marker {
+  display: none;
+}
+/* a fold whose summary draws its own chevron (the agent's details, pairing.css) gets this one
+   only when it has none: two arrows side by side were one too many (field study 7) */
+.tech > summary:not(:has(> svg))::before {
+  content: "";
+  flex: none;
+  align-self: center;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentcolor;
+  border-bottom: 1.5px solid currentcolor;
+  transform: rotate(-45deg);
+  transition: transform 240ms var(--o-settle);
+}
+.tech[open] > summary:not(:has(> svg))::before {
+  transform: rotate(45deg);
+}
+.tech > summary small {
+  font: 400 12px / 1.3 var(--mono);
+  color: var(--warn);
+}
+.tech > summary:focus-visible {
+  outline: 2px solid var(--you);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.tech-body {
+  padding: 2px 0 12px;
+}
+.tech-body > .bstrip:first-child {
+  margin-top: 0;
+}

@@ -1,6 +1,8 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { optionsNeedingWords } from '../../../../src/core/own-words.ts';
 import type { AnswerWords } from '../../api.ts';
 import { useApp } from '../../app/context.tsx';
+import { ShortText } from '../../components/ShortText.tsx';
 import { Unheard } from '../../components/Unheard.tsx';
 import { mainPath } from '../../derive/path.ts';
 import { agoText, whenText } from '../../derive/when.ts';
@@ -15,11 +17,13 @@ import { keepInView } from '../../phone/keep-in-view.ts';
 import { statusWord } from '../../presence.ts';
 import type { ItemView, TypeView } from '../../types.ts';
 import { closerOf, type Facts } from './facts.ts';
-import { resumedToastOf, stuckToastOf, toastOf } from './frame.ts';
+import { reopenedToastOf, resumedToastOf, stuckToastOf, toastOf } from './frame.ts';
 import { type MoveChoice, type MovePlan, moveSaysOf } from './moves.ts';
 import { answerDraftKeyOf, draftStore, dropDraft, keepDraft, readDraft } from './note-draft.ts';
 import { PickForm, type PickMade } from './PickForm.tsx';
 import type { Pick } from './pick.ts';
+import { ReviewNotices } from './ReviewNotices.tsx';
+import type { ReviewNotice } from './review-notices.ts';
 
 // The moves and what stands in for them (SPEC §10.3, mock:2689-2702): the moves with the line that
 // says what the hovered one does; a question answered in place; the stuck item's commands; Retomar
@@ -84,6 +88,9 @@ type ActsProps = {
   // Under the moves, when files of the round were not opened in the reader: one line, never a
   // hold on Aprobar.
   unopened?: string | undefined;
+  // Beside Aprobar: what the person should know before it (the attached diff is not what lands,
+  // what the assistant advised). Advice and warnings, never a hold on the move.
+  notices?: readonly ReviewNotice[] | undefined;
   // Reviewing an item that carries options (mode 'pick'): the options and the ways on, named for
   // the pick; `plan` then holds the rest (the send-backs, the closes).
   pick?: { pick: Pick; ways: MoveChoice[] } | undefined;
@@ -205,6 +212,7 @@ export function Acts({
   back,
   note,
   unopened,
+  notices,
   pick,
 }: ActsProps) {
   const app = useApp();
@@ -224,6 +232,7 @@ export function Acts({
   // While the answer is typed: its send row kept above the phone's keyboard (DR3-15).
   const sendRow = useRef<HTMLDivElement>(null);
   const following = useRef<(() => void) | null>(null);
+  const freeBox = useRef<HTMLTextAreaElement>(null);
   useEffect(() => () => following.current?.(), []);
   const agent = facts.agent;
   const says = (c: MoveChoice | null) =>
@@ -325,7 +334,7 @@ export function Acts({
 
   // Nobody waits in otea wait: what the person does here, handed to an agent, waits for one, or
   // for one at work to wait again (P7-R2-9).
-  const heard = hearing(app.agents, app.all, app.now);
+  const heard = hearing(app.agents, app.all, app.now, item.collection);
   // The move in view: the one the person opened (a send-back's notes) or points at, else the first.
   // The notice stands beside it and beside the first: a review whose Aprobar closes the item says
   // nothing of listening until the person goes for Devolver.
@@ -354,6 +363,7 @@ export function Acts({
           {closeAs}
         </div>
         <SaysLine text={says(pointed ?? first)} />
+        <ReviewNotices item={item.id} notices={notices ?? []} />
         {unopened && !refusedNow ? <p className="said unseen">{unopened}</p> : null}
         {refusedNow ? (
           <p className="said warn" role="alert">
@@ -388,6 +398,7 @@ export function Acts({
             {closeAs}
           </div>
         ) : null}
+        <ReviewNotices item={item.id} notices={notices ?? []} />
         {unopened && !refusedNow ? <p className="said unseen">{unopened}</p> : null}
         {refusedNow ? (
           <p className="said warn" role="alert">
@@ -408,6 +419,9 @@ export function Acts({
     // What an agent's question (otea ask) offers: one tap on an option, or on «Decide tú», answers.
     const offered = item.asks?.options ?? [];
     const recommended = item.asks?.recommended;
+    // The options that need your own words (marked, or any that promises them): tapping one opens
+    // the text box with the option in it, nothing is sent yet.
+    const words = optionsNeedingWords(offered, item.asks?.optionText ?? []);
     // The answer says which question it is to: one that changed while the page was open is refused,
     // and the page says so (the item itself comes back fresh with the live feed).
     const refusedBy = (error: unknown) => {
@@ -418,7 +432,13 @@ export function Acts({
     };
     const answerWith = (given: AnswerWords) => {
       if (!item.asks) return;
-      const message = toastOf('answer', item.title, '');
+      const said =
+        'option' in given
+          ? (offered[given.option - 1] ?? '')
+          : 'delegate' in given
+            ? t('sheet.qa.delegate')
+            : given.text;
+      const message = toastOf('answer', item.title, '', said);
       app
         .answer(item.id, { ...given, question: item.asks.question }, message)
         .then(() => dropDraft(draftStore(), answerKey), refusedBy);
@@ -430,7 +450,7 @@ export function Acts({
           <span>{ago}</span>
         </div>
         <div>
-          <p className="q">{facts.handed?.reason}</p>
+          <ShortText text={facts.handed?.reason ?? ''} leadClass="q" question />
           {options.length > 0 ? (
             <div className="opts">
               {options.map((o) => {
@@ -457,11 +477,20 @@ export function Acts({
                   type="button"
                   className="opt"
                   disabled={offline}
-                  onClick={() => answerWith({ option: i + 1 })}
+                  data-words={words.includes(i + 1) ? '' : undefined}
+                  data-rec={recommended === i + 1 ? '' : undefined}
+                  onClick={() => {
+                    if (!words.includes(i + 1)) return answerWith({ option: i + 1 });
+                    setFree(`${text} — `);
+                    freeBox.current?.focus();
+                  }}
                 >
-                  {text}
+                  <span className="opt-t">{text}</span>
                   {recommended === i + 1 ? (
-                    <span className="opt-rec"> · {t('pick.recommended')}</span>
+                    <>
+                      {' '}
+                      <span className="opt-rec">{t('pick.recommended')}</span>
+                    </>
                   ) : null}
                 </button>
               ))}
@@ -470,6 +499,7 @@ export function Acts({
           <label className="free">
             {freeAnswerLabel(options.length > 0 || offered.length > 0)}
             <textarea
+              ref={freeBox}
               placeholder={t('sheet.qa.placeholder')}
               rows={2}
               value={free}
@@ -493,7 +523,12 @@ export function Acts({
                 // that asked is answered by sending it back with it.
                 if (item.asks) return answerWith({ text: answer });
                 const sent = back
-                  ? app.move(item.id, back.move.to, answer, toastOf('answer', item.title, ''))
+                  ? app.move(
+                      item.id,
+                      back.move.to,
+                      answer,
+                      toastOf('answer', item.title, '', answer),
+                    )
                   : Promise.reject(new Error('no way to answer'));
                 sent.then(() => dropDraft(draftStore(), answerKey), refusedBy);
               }}
@@ -688,10 +723,20 @@ export function Acts({
         <p className="receipt">{text}</p>
         {/* While an agent is at work, it sees the item when it waits again (P7-R2-9). */}
         {heard && unheard(item, app.agents, app.now) ? <Unheard hearing={heard} /> : null}
-        {freeButton || open ? (
+        {freeButton || open || look === 'dropped' ? (
           <div className="actions">
             {freeButton}
             {open ? closeAs : null}
+            {/* A discard nobody should have made: the person takes it back, to where it was. */}
+            {look === 'dropped' ? (
+              <Button
+                variant="quiet"
+                data-reopen-dropped=""
+                onClick={() => void app.reopenDropped(item.id, reopenedToastOf(item.title))}
+              >
+                {t('sheet.dropped.reopen')}
+              </Button>
+            ) : null}
           </div>
         ) : null}
         {freeable ? <div className="movesays">{freeSays}</div> : null}

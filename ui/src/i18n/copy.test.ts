@@ -112,3 +112,80 @@ describe('the computer, by one name', () => {
     expect(words(en).filter((text) => /\b(your|the) PC\b/.test(text))).toEqual([]);
   });
 });
+
+// Field study 4 (O): one name per thing for the person. The English desk never speaks Spanish
+// (Talk, Inbox, Your turn), the Spanish desk says «agente» for what works (not «trabajador»),
+// «integrar» for landing (not «fusionar»), «subítem» (not «hijo»), «refinando» (not «puliendo»),
+// and no lease or git word where a plain one does. «Te toca» is the page, and Hablar's panel is
+// that same list, named after it. These are the words the product settled on: a change of one is
+// a decision, made here.
+describe('one name per thing, for the person', () => {
+  const texts = (catalog: object) =>
+    Object.entries(catalog).map(
+      ([key, value]) =>
+        [
+          key,
+          typeof value === 'string' ? value : Object.values(value as object).join(' '),
+        ] as const,
+    );
+  const found = (catalog: object, pattern: RegExp) =>
+    texts(catalog)
+      .filter(([, text]) => pattern.test(text))
+      .map(([key]) => key);
+
+  it('never shows the English desk a Spanish name', () => {
+    expect(found(en, /Hablar|Bandeja|Te toca|Te espera|Te esperan/)).toEqual([]);
+  });
+
+  it('says agent, integrar, subítem and refinando in Spanish, and no lease or relay jargon', () => {
+    expect(found(es, /trabajador/i)).toEqual([]);
+    expect(found(es, /fusionad|sin fusionar|se fusion/i)).toEqual([]);
+    expect(found(es, /\bhijos?\b|\bpadre\b/i)).toEqual([]);
+    expect(found(es, /puliend|relayad|reserva venc|venció|sin nadie|nadie escucha/i)).toEqual([]);
+  });
+
+  it('calls the pinned panel of Hablar by the name of the Te toca page', () => {
+    setLanguage('es');
+    expect(t('hablar.te.title')).toBe('Te toca ahora');
+    expect(t('hablar.te.title').startsWith(t('toca.title'))).toBe(true);
+    setLanguage('en');
+    expect(t('hablar.te.title')).toBe('Your turn now');
+    expect(t('hablar.te.title').startsWith(t('toca.title'))).toBe(true);
+  });
+
+  // R2 (field study 4, design): the list of what is the person's to do had three names: the page
+  // and Hablar's panel said Te toca, the all-projects page and the board's section said Te espera
+  // / Waiting for you. It is one list; every name for it is in the family of «Te toca» / «Your
+  // turn», in the page, the board's section, the move's receipt and the rail.
+  it('names the list of what is yours the same on every surface, in both languages', () => {
+    const names = [
+      'projects.display',
+      'projects.waiting',
+      'section.human',
+      'move.leaves',
+      'move.comes',
+      'rail.waiting',
+      'shell.allProjectsLine',
+    ] as const;
+    for (const [lang, family] of [
+      ['es', /Te toca|te toca/],
+      ['en', /Your turn|your turn/],
+    ] as const) {
+      setLanguage(lang);
+      for (const key of names) {
+        expect(t(key), `${lang} ${key}`).toMatch(family);
+        expect(t(key), `${lang} ${key}`).not.toMatch(/te esperan?\b|waiting for you/i);
+      }
+    }
+  });
+
+  it('says what to do next after an error, in both languages', () => {
+    for (const lang of ['es', 'en'] as const) {
+      setLanguage(lang);
+      for (const key of ['hablar.failed', 'hablar.kind.failed', 'bandeja.failed'] as const) {
+        expect(t(key, { message: 'x' }), `${lang} ${key}`).toMatch(/Inténtalo de nuevo|Try again/);
+      }
+      expect(t('hablar.readOnly')).toMatch(/otea open/);
+    }
+  });
+});

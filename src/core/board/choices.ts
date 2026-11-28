@@ -1,3 +1,4 @@
+import type { Actor } from '../item.ts';
 import { isClosed, positionOf, stateOf, waysOf } from './engine.ts';
 import { type BoardDefinition, DONE, stepById } from './model.ts';
 
@@ -101,7 +102,7 @@ export type ItemChoice = {
 
 type ChoiceEvent = {
   type: string;
-  actor: { kind: 'human' | 'agent'; name: string };
+  actor: Actor;
   at: string;
   data: Record<string, unknown>;
 };

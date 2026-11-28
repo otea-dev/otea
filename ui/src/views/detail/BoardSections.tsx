@@ -1,8 +1,9 @@
 import { type ReactNode, useId, useState } from 'react';
+import type { RequestChanged } from '../../../../src/core/board/request-changed.ts';
 import { useApp } from '../../app/context.tsx';
 import { NoteText } from '../../components/NoteText.tsx';
 import { Prof } from '../../components/Prof.tsx';
-import { itemWord } from '../../format.ts';
+import { itemWord, momentLabel } from '../../format.ts';
 import { listOr, t, tx } from '../../i18n/i18n.ts';
 import {
   Button,
@@ -26,6 +27,7 @@ import {
   type HandRow,
   type ItemLinks,
   type LinkedView,
+  localBehindSaid,
   partsCount,
   type Round,
   type RoundNote,
@@ -33,12 +35,13 @@ import {
   type StepRounds,
   type WaitRow,
 } from './board-item.ts';
-import { type DiffFilesOff, type DiffOffTip, diffFilesText, diffOffTipText } from './diff-tip.ts';
 import { type Drift, driftText } from './drift.ts';
+import type { LocalBehind } from './local-behind.ts';
 import { type MergeOnly, mergeOnlyText } from './merge-only.ts';
 import type { MergedOutside } from './merged-outside.ts';
-import { type Overlap, overlapTexts } from './overlaps.ts';
+import { type Overlap, overlapNotice } from './overlaps.ts';
 import { type RoundSame, roundSameText } from './round-same.ts';
+import { TechDetails } from './TechDetails.tsx';
 
 // The item page of a Studio board (the mock's itemHtml, 75-cover.js): what its step waits for in
 // the checklist's words (F12), the protected branch after the buttons (F10), the notes of every
@@ -335,27 +338,45 @@ export function WaitChecklist({
   );
 }
 
+// How many notices a branch line carries besides the branch itself (what a closed «Detalles
+// técnicos» says on its summary, so the fold never hides a problem).
+export function branchNoticeCount(o: {
+  behind?: unknown;
+  drift?: unknown;
+  same?: unknown;
+  merge?: unknown;
+  waits?: unknown;
+  overlaps?: readonly unknown[];
+}): number {
+  return [o.behind, o.drift, o.same, o.merge, o.waits, (o.overlaps?.length ?? 0) > 0].filter(
+    Boolean,
+  ).length;
+}
+
 // "Rama feat/x en api · se puede subir / congelada mientras la revisas / se puede fusionar".
 // Under it, what a clone without Otea's hook pushed to the branch since the handoff (P3C-R3-1).
-// In its land step, when the PC saw it merged outside Otea, it says so instead (P1-R3-9); under
-// it too, when the attached diff does not come from the tip handed off (P1-R3-1).
+// In its land step, when the PC saw it merged outside Otea, it says so instead (P1-R3-9). What is
+// said of the attached diff is no longer here: it stands beside Aprobar (ReviewNotices).
 export function BranchLine({
   strip,
   drift = null,
   outside = null,
-  off = null,
-  files = null,
   same = null,
   item = '',
   overlaps = [],
   merge = null,
   waits,
+  behind = null,
+  plain = false,
 }: {
   strip: BranchStrip | null;
+  // The review is in plain words (the phone, or the person chose it): the branch and everything
+  // that speaks of it sit folded behind «Detalles técnicos», their count on its summary.
+  plain?: boolean;
+  // A Done item landed on the remote's base while the local one stayed behind.
+  behind?: LocalBehind | null;
   drift?: Drift | null;
   outside?: MergedOutside | null;
-  off?: DiffOffTip | null;
-  files?: DiffFilesOff | null;
   same?: RoundSame | null;
   item?: string;
   overlaps?: readonly Overlap[];
@@ -363,37 +384,32 @@ export function BranchLine({
   // Why it waits to land after another item (src/app/land-order.ts), as the PC words it.
   waits?: string | undefined;
 }) {
-  if (!strip) return null;
-  const said = branchSaid(strip, outside);
-  const line = (
+  if (!strip && !behind) return null;
+  const line = strip ? (
     <div className={`bstrip ${strip.tone}`} data-c title={t('bi.branch.label')}>
       <Icon name="branch" />
       <span className="mono">{strip.value}</span>
       {strip.repo ? <span className="pvtag">{t('bi.branch.in', { repo: strip.repo })}</span> : null}
       <span className="sep">·</span>
-      <span className="bsaid">{said}</span>
+      <span className="bsaid">{branchSaid(strip, outside)}</span>
     </div>
-  );
-  if (!drift && !off && !files && !same && !merge && !waits && overlaps.length === 0) return line;
-  return (
+  ) : null;
+  if (!behind && !drift && !same && !merge && !waits && overlaps.length === 0)
+    return plain ? <TechDetails>{line}</TechDetails> : line;
+  const notices = branchNoticeCount({ behind, drift, same, merge, waits, overlaps });
+  const lines = (
     <>
       {line}
+      {behind ? (
+        <div className="bstrip drift" data-c role="status">
+          <Icon name="warn" />
+          <span>{localBehindSaid(behind)}</span>
+        </div>
+      ) : null}
       {drift ? (
         <div className="bstrip drift" data-c role="status">
           <Icon name="warn" />
           <span>{driftText(drift)}</span>
-        </div>
-      ) : null}
-      {off ? (
-        <div className="bstrip drift" data-c role="status">
-          <Icon name="warn" />
-          <span>{diffOffTipText(off)}</span>
-        </div>
-      ) : null}
-      {files ? (
-        <div className="bstrip drift" data-c role="status">
-          <Icon name="warn" />
-          <span>{diffFilesText(files)}</span>
         </div>
       ) : null}
       {same ? (
@@ -420,13 +436,65 @@ export function BranchLine({
           )}
         </div>
       ) : null}
-      {overlapTexts(item, overlaps).map((text) => (
-        <div key={text} className="bstrip drift" data-c role="status">
-          <Icon name="warn" />
-          <span>{text}</span>
-        </div>
-      ))}
+      <OverlapLine item={item} overlaps={overlaps} />
     </>
+  );
+  return plain ? <TechDetails notices={notices}>{lines}</TechDetails> : lines;
+}
+
+// Every other open change that shares files, said once: a line, and the files of each folded. It is
+// information, not a fault in this change: the neutral note, never the warn tone (DESIGN).
+export function OverlapLine({ item, overlaps }: { item: string; overlaps: readonly Overlap[] }) {
+  const notice = overlapNotice(item, overlaps);
+  if (!notice) return null;
+  return (
+    <div className="bstrip note" data-c role="status">
+      <Icon name="branch" />
+      <span>{notice.text}</span>
+      {notice.each.length === 0 ? null : (
+        <details>
+          <summary>{t('bi.branch.overlapEach')}</summary>
+          <ul>
+            {notice.each.map((text) => (
+              <li key={text}>{text}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+// «El pedido cambió después de esta entrega»: the request was rewritten while its delivery waits for
+// review, so the diff and the branch answer the earlier one. Says what changed (U5, field study 4).
+export function RequestChangedLine({ changed }: { changed?: RequestChanged | undefined }) {
+  const app = useApp();
+  if (!changed) return null;
+  const shown = (value: string | null) =>
+    value === null
+      ? t('bi.changed.empty')
+      : `«${value.length > 90 ? `${value.slice(0, 90)}…` : value}»`;
+  return (
+    <div className="bstrip drift changed" data-c role="status">
+      <Icon name="warn" />
+      <span>
+        {t('bi.changed.lead', {
+          by: changed.by,
+          time: momentLabel(changed.changedAt, app.now),
+        })}
+      </span>
+      <ul>
+        {changed.changes.map(({ field, from, to }) => (
+          <li key={field}>
+            {t('bi.changed.line', {
+              field: field === 'title' ? t('bi.changed.title') : field,
+              from: shown(from),
+              to: shown(to),
+            })}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -752,6 +820,8 @@ const bylineOf = (n: RoundNote): string => {
     );
   if (n.reopened)
     return n.person ? t('bi.rounds.reopenedYou') : t('bi.rounds.reopened', { by: n.by });
+  // An agent bringing main into approved work: nobody sent anything back.
+  if (n.merged) return t('bi.rounds.mergedBy', { by: n.by });
   if (n.person) return n.kind === 'back' ? t('bi.rounds.backYou') : t('bi.rounds.handoffYou');
   return n.kind === 'back'
     ? t('bi.rounds.back', { by: n.by })

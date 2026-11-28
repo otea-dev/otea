@@ -147,11 +147,14 @@ export type RefusalDetails =
         | 'not_person'
         | 'not_agent'
         | 'empty'
+        | 'too_long'
         | 'not_working'
         | 'asking'
         | 'none_open'
         | 'options'
+        | 'option_text'
         | 'no_option'
+        | 'not_asker'
         | 'stale';
     }
   // An option picked with a move refused: by an agent, off a review, with a send-back, on an item

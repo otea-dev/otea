@@ -1,6 +1,7 @@
 import { isStuck } from '../../derive/toca.ts';
 import { turnSince } from '../../derive/when.ts';
 import { t } from '../../i18n/i18n.ts';
+import { waitingTotal } from '../../pending.ts';
 import type { Item } from '../../types.ts';
 import { numberWord, sinceText, spanText } from './words.ts';
 
@@ -28,13 +29,23 @@ export function oldestWaiting(items: readonly Item[], now: number): number {
 
 export type TocaDek = { lead: string; handed: { before: string; n: string; after: string } };
 
-export function tocaDek(items: readonly Item[], handed: number, now: number): TocaDek {
-  const waiting = items.filter((it) => waitingSince(it, now) !== null).length;
+// What waits for you that is no item (a question on a Bandeja note, one of the assistant's): how
+// many, and since when the oldest.
+export type OffItem = { count: number; since: string | null };
+
+export function tocaDek(
+  items: readonly Item[],
+  handed: number,
+  now: number,
+  off: OffItem = { count: 0, since: null },
+): TocaDek {
+  const waiting = waitingTotal(items, now, off.count);
+  const offFor = off.since === null ? 0 : now - Date.parse(off.since);
   const lead = waiting
     ? t('toca.dek.waiting', {
         count: waiting,
         n: numberWord(waiting, true),
-        since: sinceText(oldestWaiting(items, now)),
+        since: sinceText(Math.max(oldestWaiting(items, now), offFor)),
       })
     : t('toca.dek.none');
   if (!handed) return { lead, handed: { before: t('toca.dek.handedNone'), n: '', after: '' } };

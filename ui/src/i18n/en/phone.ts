@@ -14,9 +14,12 @@ export const phone = {
   'phone.search': 'Search',
   'phone.search.field': 'Search items',
   'phone.search.placeholder': 'A title, an id or a word',
-  'phone.search.hint': 'Searches the titles, the ids and what each item’s fields say.',
+  'phone.search.hint':
+    'Searches the titles, the ids and what each item’s fields say, and what was said in Talk.',
+  'phone.search.talk': 'In Talk',
   'phone.search.none': 'No item says “{search}”.',
   'phone.search.count': { one: '{count} item', other: '{count} items' },
+  'phone.search.countTalk': '{count} in Talk',
   // Quick capture (mock screen 3)
   'phone.capture.board': 'Board: {board}. Change it',
   'phone.capture.here': 'this board',
@@ -75,7 +78,10 @@ export const phone = {
   'phone.r.delivered': 'What it delivered',
   'phone.r.newIn': 'new in round {n}',
   'phone.r.noNote': 'It left no note.',
-  'phone.r.unopened': 'Not opened: {n} of {total} files',
+  'phone.r.unopened': {
+    one: 'Not opened: {n} of {total} file',
+    other: 'Not opened: {n} of {total} files',
+  },
   'phone.r.noEvidence': 'No files in this round.',
   'phone.r.pictures': 'Pictures',
   'phone.r.noPicture': 'no picture',
@@ -89,7 +95,7 @@ export const phone = {
   'phone.r.same': 'same',
   'phone.r.changedFile': 'changed',
   'phone.r.read': 'Read {file}',
-  'phone.r.reader': 'Files',
+  'phone.r.reader': 'Reader',
   'phone.r.details': 'Details',
   'phone.r.request': 'The request',
   'phone.r.dock': 'Your verdict',
@@ -237,16 +243,21 @@ export const phone = {
   'phone.ts.ledger':
     'The HTTPS certificate is public: the name {host} is listed in the Certificate Transparency logs, which anyone can read.',
   // The installed app over HTTPS: without the computer, the queue, updates (offline/)
-  'offline.noReach': 'I can’t reach your computer.',
+  // One word for being without the computer: «No connection» (the pill, the line, each page's
+  // notes). What changes is the cause, which follows, and what can still be done.
+  'offline.head': 'No connection',
+  'offline.askLocal': 'Otea is not answering on this computer.',
   'offline.askTailscale': 'Is Tailscale connected on this phone? Is Otea open on your computer?',
   'offline.askLan':
     'Is this phone on the same Wi‑Fi as your computer? Is Otea open on your computer?',
-  'offline.closed': 'Otea is not open on your computer.',
-  'offline.askClosed': 'Open it there: the desktop app or otea serve.',
+  'offline.askClosed':
+    'Otea is not open on your computer. Open it there: the desktop app or otea serve.',
   'offline.nothingSaved': 'this phone has nothing saved from this project yet',
-  'offline.readQueue': 'read-only · new items wait in the queue',
+  'offline.noData': 'no data',
+  // What can be done without the computer: read; what is captured (New, a note) waits in the
+  // queue. A message to the assistant is not captured: Talk writes again once the PC is back.
+  'offline.readQueue': 'read-only · what you capture waits in the queue',
   'offline.retry': 'Retry',
-  'offline.oteaDown': 'Otea is not answering',
   'offline.synced': 'last synced {time}',
   'offline.readOnly': 'read-only',
   'offline.updated': 'Otea updated',
@@ -293,9 +304,16 @@ export const phone = {
   'notify.stuckHint': 'an agent lost signal holding it',
   'notify.ask': 'An agent asks you',
   'notify.aside': 'An agent set something aside for later',
-  'notify.askText': 'Show the question text',
-  'notify.askTextHint': 'a lock screen shows it to anyone who looks',
-  'notify.unheard': 'Work waits for an agent and nobody is listening',
+  'notify.askText': 'Show the text in the notice',
+  'notify.askTextHint':
+    'the question or the assistant’s reply; a lock screen shows it to anyone who looks',
+  'notify.assistantReply': 'Your assistant replies',
+  'notify.assistantReplyHint': 'in Talk',
+  'notify.assistantOffline': 'Your assistant is offline and messages wait for it',
+  'notify.assistantOfflineHint': 'after 10 minutes waiting; one notice per disconnection',
+  'notify.short.assistant_reply': 'assistant replies',
+  'notify.short.assistant_offline': 'assistant offline',
+  'notify.unheard': 'Work is waiting and no agent is connected',
   'notify.unheardHint': 'no agent waits or is at work',
   'notify.projects': 'projects',
   'notify.short.turn': 'reviews',
@@ -303,7 +321,7 @@ export const phone = {
   'notify.short.replied': 'answers',
   'notify.short.stuck': 'stuck items',
   'notify.short.aside': 'set aside',
-  'notify.short.unheard': 'nobody listening',
+  'notify.short.unheard': 'no agent connected',
   'notify.summary.off': 'Notifications off',
   'notify.summary.none': 'Notifications on, every kind off',
   'notify.summary.on': 'Notifications: {what}',
@@ -328,6 +346,8 @@ export const phone = {
   'notify.needsHome':
     'On iPhone, notifications reach Otea only once it is on the Home Screen (see above) and opened from there.',
   'notify.unsupported': 'This browser does not receive notifications.',
+  'notify.onPhone':
+    'Notifications arrive on the phone: install Otea on it (home screen) and turn them on in its Preferences.',
   'notify.blocked':
     'Notifications are blocked for Otea. Allow them in this browser’s settings for this site.',
   'notify.failed': 'They could not be turned on. Try again.',

@@ -43,7 +43,9 @@ describe('the empty project page', () => {
     setLanguage('es');
     const html = render();
     expect(html).toContain('tableros');
-    expect(html).toContain('Pedidos, Tareas');
+    // Each board is a way in, by its name alone.
+    expect(html).toMatch(/<a class="pj-board" href="#\/b\/Pedidos">Pedidos<svg/);
+    expect(html).toMatch(/<a class="pj-board" href="#\/b\/Tareas">Tareas<svg/);
     expect(html).not.toContain('bd7q3ukd');
     expect(html).not.toContain('colecciones');
     setLanguage('en');

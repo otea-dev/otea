@@ -126,6 +126,38 @@ describe('an agent asks the person, on the CLI and over MCP', () => {
     expect((await otea('show', 'CRI-1')).out).toContain('Waiting for the person to answer');
   });
 
+  // D-816632: any agent answered a question it did not ask, in the person's name, and the agent
+  // that asked went on with an answer nobody gave. Only the agent that asked notes what the person
+  // told it in its chat; the question stays open for anyone else, on the CLI and over MCP.
+  it('refuses an answer noted by an agent that did not ask the question', async () => {
+    declareProfiles(repo.dir, 'intruso');
+    await otea('ask', 'CRI-1', '¿Caparazón liso o con musgo?');
+
+    const refused = await otea('answer', 'CRI-1', 'Con musgo', '--as', 'intruso');
+    expect(refused.code).toBe(7);
+    expect(refused.err).toContain('asked it');
+    expect((await otea('show', 'CRI-1')).out).toContain('Waiting for the person to answer');
+
+    const server = createMcpServer(COMMANDS, {
+      json: true,
+      cwd: repo.dir,
+      agent: 'intruso',
+      warn: () => {},
+    });
+    const client = new Client({ name: 'test', version: '0' });
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverSide);
+    await client.connect(clientSide);
+    const reply = (await client.callTool({
+      name: 'answer',
+      arguments: { id: 'CRI-1', answer: 'Con musgo' },
+    })) as { isError?: boolean; content: { text: string }[] };
+    expect(reply.isError).toBe(true);
+    expect(reply.content[0]?.text).toContain('asked it');
+    await client.close();
+    expect((await otea('show', 'CRI-1')).out).toContain('Waiting for the person to answer');
+  });
+
   // P4-R2-2: the person answered in the chat, and otea reply could not put it on the question.
   it('notes on the question an answer the person gave in the chat, on the CLI and over MCP', async () => {
     await otea('ask', 'CRI-1', '¿Caparazón liso o con musgo?');
@@ -212,6 +244,40 @@ describe('an agent asks the person, on the CLI and over MCP', () => {
     const next = (await otea('next')).out;
     expect(next).toContain('You asked the person: "¿Caparazón?"');
     expect(next).toContain('The person chose option 2: "Con musgo"');
+  });
+
+  // Field study 5, V7/V2: «Te escribo las fechas» was sent as it read when tapped, and otea ask had
+  // no way to say that option needs the person's words (say has --option-text).
+  it('marks the options that need the person’s own words, and refuses one that names no option', async () => {
+    const asked = await otea(
+      'ask',
+      'CRI-1',
+      '¿Qué fechas?',
+      '--option',
+      'Las de siempre',
+      '--option',
+      'Te escribo las fechas',
+      '--option-text',
+      '2',
+    );
+    expect(asked.code, asked.err).toBe(0);
+    const shown = JSON.parse((await otea('show', 'CRI-1', '--json')).out);
+    expect(shown.asks).toMatchObject({ options: ['Las de siempre', 'Te escribo las fechas'] });
+    expect(shown.asks.optionText).toEqual([2]);
+
+    const stray = await otea(
+      'ask',
+      'CRI-2',
+      '¿A?',
+      '--option',
+      'a',
+      '--option',
+      'b',
+      '--option-text',
+      '3',
+    );
+    expect(stray.code).not.toBe(0);
+    expect(stray.err).toContain('--option-text 3 names no option');
   });
 
   it('refuses options it cannot offer, and a recommendation with none, on the CLI', async () => {

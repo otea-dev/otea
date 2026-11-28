@@ -1,5 +1,5 @@
 // Routes live in the hash (SPEC §6.2): `#/` Te toca, `#/atasco`, `#/b/<board>` a board, `#/triage`,
-// `#/projects`, `#/settings`, `#/performance`, `#/preferences`, `#/lan` (the pairing dialog over Te toca; `#/settings/lan` over Configuración), `#/studio[/...]` (see
+// `#/projects`, `#/settings`, `#/performance`, `#/preferences`, `#/hablar[/<turn>]`, `#/lan` (the pairing dialog over Te toca; `#/settings/lan` over Configuración), `#/studio[/...]` (see
 // StudioPage), `#/modules[/<name>]` and `#/brief/<id>,<id>`. An open item appends
 // `/i/<id>` to Te toca, Atasco, a board and Triage (`#/b/Errores/i/ERR-214`; `#/i/ERR-214` on
 // Te toca; `#/triage/i/ERR-214` over the pass, which goes on as it was once it closes). A
@@ -13,7 +13,7 @@ export type ViewRoute =
   | { view: 'settings' }
   | { view: 'performance' }
   | { view: 'preferences' }
-  | { view: 'topics'; topic?: string }
+  | { view: 'hablar'; turn?: number; topic?: string; bandeja?: string }
   | { view: 'lan'; over?: 'settings' }
   | { view: 'studio'; page: StudioPage }
   | { view: 'modules'; name?: string }
@@ -34,7 +34,7 @@ const PROJECTS = '/projects';
 const SETTINGS = '/settings';
 const PERFORMANCE = '/performance';
 const PREFERENCES = '/preferences';
-const TOPICS = '/topics';
+const HABLAR = '/hablar';
 
 // LAN access: the pairing code for a phone and the paired devices.
 export const LAN_HASH = `#${LAN}`;
@@ -51,9 +51,12 @@ export const PERFORMANCE_HASH = `#${PERFORMANCE}`;
 // What is yours on this browser, not the project's: theme, language, notifications, the window.
 export const PREFERENCES_HASH = `#${PREFERENCES}`;
 
-// Side topics: what you asked an agent off the work, as short conversations; one open by its id.
-export function topicsHash(topic?: string): string {
-  return topic ? `#${TOPICS}/${encodeURIComponent(topic)}` : `#${TOPICS}`;
+// Hablar: the conversation with the project's assistant, open at a turn (the number of the message
+// that began it), at the consultation a side topic became (TEM-3) or at a Bandeja note (B-3).
+export function hablarHash(at: { turn?: number; topic?: string; bandeja?: string } = {}): string {
+  if (at.turn !== undefined) return `#${HABLAR}/${at.turn}`;
+  if (at.bandeja) return `#${HABLAR}/${encodeURIComponent(at.bandeja)}`;
+  return at.topic ? `#${HABLAR}/${encodeURIComponent(at.topic)}` : `#${HABLAR}`;
 }
 
 // Swipe triage: what waits for you, one card at a time.
@@ -104,9 +107,14 @@ export function routeFromHash(hash: string): Route {
   if (path === SETTINGS) return { view: 'settings' };
   if (path === PERFORMANCE) return { view: 'performance' };
   if (path === PREFERENCES) return { view: 'preferences' };
-  if (path === TOPICS || path.startsWith(`${TOPICS}/`)) {
-    const topic = decode(path.slice(TOPICS.length + 1));
-    return topic ? { view: 'topics', topic } : { view: 'topics' };
+  if (path === HABLAR || path.startsWith(`${HABLAR}/`)) {
+    const at = decode(path.slice(HABLAR.length + 1));
+    if (!at) return { view: 'hablar' };
+    if (/^[1-9]\d*$/.test(at)) return { view: 'hablar', turn: Number(at) };
+    // B-3 is a Bandeja note (core/bandeja.ts); the prefix is reserved, so it is no topic's.
+    return /^b-[1-9]\d*$/i.test(at)
+      ? { view: 'hablar', bandeja: at.toUpperCase() }
+      : { view: 'hablar', topic: at };
   }
   if (path === ATASCO || path.startsWith(`${ATASCO}/`)) {
     return withItem({ view: 'atasco' }, path.slice(ATASCO.length));
@@ -161,8 +169,8 @@ export function hashOf(route: Route): string {
       return PERFORMANCE_HASH;
     case 'preferences':
       return PREFERENCES_HASH;
-    case 'topics':
-      return topicsHash(route.topic);
+    case 'hablar':
+      return hablarHash(route);
     case 'lan':
       return route.over === 'settings' ? `#${SETTINGS}${LAN}` : LAN_HASH;
     case 'studio':

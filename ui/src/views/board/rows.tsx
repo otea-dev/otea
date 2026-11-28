@@ -14,8 +14,9 @@ import { parentOf } from '../../nesting.ts';
 import type { Agent } from '../../presence.ts';
 import { stateWordIn, typeWord, valueWordIn } from '../../preset-words.ts';
 import { openLabel } from '../../relations.ts';
+import { roundOf } from '../../rounds.ts';
 import type { CollectionView, Item } from '../../types.ts';
-import { type Entry, roundOf, rowWords, severityOf, signalOf, tablaCells } from './model.ts';
+import { type Entry, rowWords, severityOf, signalOf, tablaCells } from './model.ts';
 import { cellClass } from './table.ts';
 
 // The rows of Lista (board rows on the lanes, mock:1725-1733) and Tabla (40 px rows whose cells
@@ -124,9 +125,6 @@ const rowBase = (e: Extract<Entry, { kind: 'row' }>, ctx: RowCtx) => ({
   selected: ctx.selected === e.item.id,
 });
 
-const typeOf = (it: Item, c: CollectionView) =>
-  c.types.find((ty) => ty.name === it.type) ?? c.types[0];
-
 function groupBlock(e: Extract<Entry, { kind: 'group' }>): LaneBlock {
   return { kind: 'sec', key: `sec:${e.key}`, title: e.title, count: e.count };
 }
@@ -153,10 +151,16 @@ export function listaBlocks(entries: readonly Entry[], ctx: RowCtx): LaneBlock[]
     const word =
       it.merge === 'waiting'
         ? t('boardView.approvedUnmerged')
-        : stateWordIn(ctx.collection.types, it.state);
+        : it.landing && it.landsAfter?.overlap
+          ? t('boardView.approvedWaits', { first: it.landsAfter.first })
+          : it.merging
+            ? t('boardView.approvedMerging')
+            : it.landing
+              ? t('boardView.approvedLanding')
+              : stateWordIn(ctx.collection.types, it.state);
     const when = whenText(it, ctx.now);
     const stuck = isStuck(it, ctx.now);
-    const round = roundOf(it, ctx.feed, typeOf(it, ctx.collection));
+    const round = roundOf(it, ctx.feed);
     // What the board's row shows (a repo, a branch, a kind), else the first choice set off its default.
     const placed = rowWords(it, ctx.collection);
     const signals =

@@ -9,9 +9,17 @@ import { AgentMark } from '../kit/Marks.tsx';
 import { LaneHead } from '../lanes/LaneHead.tsx';
 import { type LaneBlock, LaneList } from '../lanes/LaneList.tsx';
 import { lookOf } from '../lanes/looks.ts';
-import { keptStateWord, stateWord } from '../preset-words.ts';
-import { agentsAcross, inboxOf, itemHref, projectHref, whereOf } from '../projects.ts';
-import { topicsHash } from '../selection.ts';
+import { stateWord } from '../preset-words.ts';
+import {
+  agentsAcross,
+  inboxOf,
+  itemHref,
+  placeOf,
+  projectHref,
+  waitingIn,
+  whereOf,
+} from '../projects.ts';
+import { hablarHash } from '../selection.ts';
 import { capped } from '../topics.ts';
 import type { AnsweredTopic, Item, ProjectOverview } from '../types.ts';
 import { rowCall } from '../views/toca/blocks.tsx';
@@ -40,7 +48,8 @@ function action(
 
 // Where a topic row opens: the topic on its project's page (this one's, or another of this server).
 function topicHref(project: string | undefined, id?: string): string {
-  return project === undefined ? topicsHash(id) : projectPage(project, topicsHash(id));
+  const hash = hablarHash(id === undefined ? {} : { topic: id });
+  return project === undefined ? hash : projectPage(project, hash);
 }
 
 // A project's answered topics: yours to read, never work. A few rows, then how many more wait on
@@ -172,6 +181,11 @@ export function hereBlocks(
                 <span className="bdc">{it.collection}</span>
                 <span className="bds">› {state}</span>
               </span>
+              {/* The phone has no column for what it asks of you: it says so here, in words. */}
+              <span className="mpt pw">
+                <span className="sep">·</span>
+                <span className={sec === 'atasco' ? 'stp warn' : 'stp you'}>{a}</span>
+              </span>
             </div>
           </div>
           <div className={sec === 'atasco' ? 'a warn' : 'a'} data-leaf="">
@@ -192,13 +206,16 @@ export function hereBlocks(
 // Another project's section: its name, its count, where it lives; its rows say where they open.
 export function elsewhereBlocks(project: ProjectOverview): LaneBlock[] {
   const key = `p:${project.id}`;
+  const where = whereOf(project);
   const blocks: LaneBlock[] = [
     {
       kind: 'sec',
       key,
       title: project.name,
-      count: project.waiting.length + (project.topics?.length ?? 0),
-      gloss: whereOf(project) ?? '',
+      count: waitingIn(project) + (project.topics?.length ?? 0),
+      // Where it lives, short: its folder and what is above it, the whole path on hover.
+      gloss: where ? placeOf(where) : '',
+      ...(where ? { glossTip: where } : {}),
     },
   ];
   if (project.unavailable !== undefined) {
@@ -231,12 +248,46 @@ export function elsewhereBlocks(project: ProjectOverview): LaneBlock[] {
             </span>
             <span className="mpt">
               <span className="sep">·</span>
-              <span className="stp you">{keptStateWord(it.stateName ?? it.state)}</span>
+              <span className="stp you">
+                {it.asks ? t('projects.row.asks', { agent: it.asks.by }) : t('projects.row.review')}
+              </span>
             </span>
           </div>
         </div>
       ),
     });
+  }
+  // What asks you that is no item: the row opens Hablar in that project, where it is answered.
+  if (project.unavailable === undefined) {
+    for (const entry of project.asking ?? []) {
+      blocks.push({
+        kind: 'row',
+        key: `${project.id}:ask:${entry.kind}:${entry.ref}`,
+        lane: 'you',
+        look: 'yours',
+        sec: key,
+        content: (
+          <div className="main-c">
+            <div className="t" data-leaf="" data-title="">
+              <span className="tt">{entry.text ?? entry.title}</span>
+            </div>
+            <div className="m" data-leaf="">
+              <span className="id">{entry.kind === 'assistant' ? '' : entry.ref}</span>
+              <span className="mpt">
+                <span className="sep">·</span>
+                <span className="pid">{project.name}</span>
+              </span>
+              <span className="mpt">
+                <span className="sep">·</span>
+                <span className="stp you">
+                  {t(`hablar.te.k.${entry.kind}`, { agent: entry.by ?? '' })}
+                </span>
+              </span>
+            </div>
+          </div>
+        ),
+      });
+    }
   }
   if (project.unavailable === undefined)
     blocks.push(
@@ -281,7 +332,7 @@ export function ProjectsInbox() {
   const projects = app.projects ?? [];
   const others = projects.filter((p) => !p.current);
   const shown = others.filter(
-    (p) => p.waiting.length > 0 || (p.topics?.length ?? 0) > 0 || p.unavailable !== undefined,
+    (p) => waitingIn(p) > 0 || (p.topics?.length ?? 0) > 0 || p.unavailable !== undefined,
   );
   const here = projects.find((p) => p.current)?.topics ?? [];
   const blocks = [...hereBlocks(app, name, here), ...shown.flatMap(elsewhereBlocks)];
@@ -293,6 +344,10 @@ export function ProjectsInbox() {
       return;
     }
     for (const p of others) {
+      if (key.startsWith(`${p.id}:ask:`)) {
+        window.location.assign(projectPage(p.id, hablarHash()));
+        return;
+      }
       const it = p.waiting.find((w) => `${p.id}:${w.id}` === key);
       const href = it ? itemHref(p, it) : undefined;
       if (href) {

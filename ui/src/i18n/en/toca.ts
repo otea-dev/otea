@@ -7,6 +7,8 @@ export const toca = {
   'toca.sec.preguntas': 'Questions for you',
   'toca.sec.revisiones': 'Reviews',
   'toca.sec.propios': 'Your own steps',
+  'toca.sec.avisos': 'Reports from agents',
+  'toca.sec.sinagente': 'Boards with no agent',
   'toca.sec.encamino': 'On the way',
   'toca.sec.cerrados': 'Closed',
   'toca.gloss.encamino': 'with agents for now',
@@ -34,7 +36,7 @@ export const toca = {
   'toca.since.yesterday': 'since yesterday',
   'toca.since.days': { one: 'for {count} day', other: 'for {count} days' },
   'toca.dekStuck.lead': { one: '{n} thing went quiet: ', other: '{n} things went quiet: ' },
-  'toca.dekStuck.agent': '{agent} has given no sign for {time}',
+  'toca.dekStuck.agent': '{agent} has been quiet for {time}',
   'toca.dekStuck.none': 'Nothing stuck: the agents keep checking in.',
 
   // A row's call to act and its small line
@@ -57,12 +59,14 @@ export const toca = {
   'toca.sub.thenAgent': 'then an agent takes it',
   'toca.sub.thenClose': 'then it closes',
   'toca.sub.does': '{agent} is on it',
-  'toca.sub.silent': '{agent} has no signal',
+  'toca.sub.silent': '{agent} has been quiet for a while',
   'toca.sub.waitsFor': 'waiting for {agent}',
   'toca.sub.waitsAgent': 'waiting for an agent',
   'toca.sub.waitsKids': 'waiting for its children',
   'toca.sub.landsAfter': 'lands after {agent}',
   'toca.sub.setAside': '{agent} set it aside for later',
+  'toca.sub.bounced': 'it came back: it conflicted with a change that landed first',
+  'toca.sub.merging': 'its agent merges main into it after {agent}; you review that merge once',
   'toca.sub.didIt': 'done by {agent}',
   'toca.sub.closedBy': 'closed by {agent}',
   'toca.sub.closedByYou': 'closed by you',
@@ -72,6 +76,21 @@ export const toca = {
   'toca.quiet': '{agent} · {time} ago',
   'toca.replied': '{agent} answered',
   'toca.round': 'round {n}',
+
+  // What waits for you that is no item: a question on an Inbox note, one of the assistant's
+  'toca.off.bandeja': 'Inbox note',
+  'toca.off.assistant': 'assistant',
+  'toca.off.inHablar': 'in Talk',
+  'toca.off.report': 'Notice',
+  'toca.act.report': 'Read',
+  'toca.off.worker': 'Board with no agent',
+  'toca.act.worker': 'Open a session',
+  'toca.sub.reports': '{agent} reports',
+
+  // The assistant is offline with things waiting for it
+  'toca.secOff.title': '{name} is offline',
+  'toca.secOff.waiting': '{what} waiting for it.',
+  'toca.secOff.go': 'Open Talk to bring it back',
 
   // After the project's first finished item: what people usually do next (once, then it is gone)
   'next.label': 'What to do next',

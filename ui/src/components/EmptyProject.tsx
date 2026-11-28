@@ -5,6 +5,7 @@ import { useRemote } from '../hooks.ts';
 import { t, tx } from '../i18n/i18n.ts';
 import { Button } from '../kit/Button.tsx';
 import { Icon } from '../kit/Icon.tsx';
+import { hashOf } from '../selection.ts';
 import type { ProjectSettings } from '../types.ts';
 import { PromptBlock, TechDetails, useAgentPrompt } from './AgentPrompt.tsx';
 
@@ -92,10 +93,23 @@ export function EmptyProjectView({
         {none ? null : (
           <>
             <TechDetails>{agents}</TechDetails>
-            <dl className="pj-facts">
-              <dt>{t('emptyProject.boards')}</dt>
-              <dd>{boards.join(', ')}</dd>
-            </dl>
+            {/* The boards, each a way in: a row of links under the card, never a caption and a name
+                left hanging on their own. */}
+            <nav className="pj-boards" aria-label={t('emptyProject.boards')}>
+              <span className="pj-boards-k" aria-hidden="true">
+                {t('emptyProject.boards')}
+              </span>
+              <ul className="pj-boards-list">
+                {boards.map((board) => (
+                  <li key={board}>
+                    <a className="pj-board" href={hashOf({ view: 'board', board })}>
+                      {board}
+                      <Icon name="right" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
           </>
         )}
       </div>

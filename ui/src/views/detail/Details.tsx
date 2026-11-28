@@ -39,7 +39,7 @@ const keyed = (cells: Cell[]): (Cell & { key: string })[] => {
   });
 };
 
-function Value({ placed }: { placed: PlacedValue }) {
+export function Value({ placed }: { placed: PlacedValue }) {
   const url = externalUrl(placed.value);
   // An empty list (a checklist with nothing ticked) is as empty as no value.
   if (placed.value === '' || placed.value === '[]') return <>—</>;
@@ -110,6 +110,8 @@ export function detailCells(o: {
       ) : (
         <span className="warn">{t('sheet.d.expired')}</span>
       )
+    ) : item.expiredLease?.connected ? (
+      <span>{t('when.lapsed')}</span>
     ) : item.expiredLease ? (
       <span className="warn">{t('sheet.d.expired')}</span>
     ) : (

@@ -30,6 +30,16 @@ describe('agentHue', () => {
   });
 });
 
+describe("marksFor: «as» is the assistant's, never an agent's", () => {
+  // Field study 3: the assistant's worker took the assistant's mark when its own initials were
+  // taken, and its chips read as the assistant doing the work.
+  it("never gives an agent the assistant's mark", () => {
+    const marks = marksFor(['as-a', 'as-a-changes', 'as-a-refiner', 'assistant', 'asb']);
+    for (const [name, mark] of marks) expect(mark.initials, name).not.toBe('as');
+    expect(new Set([...marks.values()].map((m) => m.initials)).size).toBe(marks.size);
+  });
+});
+
 describe('marksFor: every agent of a project gets a mark of its own', () => {
   it('gives two agents with the same initials different ones', () => {
     const marks = marksFor(['claude-a', 'cli-a']);

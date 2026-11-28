@@ -37,7 +37,45 @@ export function toastClass(at: ToastOptions['at']): string {
 
 type Shown = ToastOptions & { seq: number };
 
-const DWELL = 12_000;
+// How long a toast stands (field study 6): never under ten seconds, since a slow finger or a screen
+// reader needs the time; a notice that offers a move (Deshacer, Responder) stays longer, and so
+// does any for a person on a finger or who asked for less motion (the calm). Hover and focus hold
+// it besides.
+const DWELL = 10_000;
+const DWELL_MOVE = 15_000;
+// What is left when a hold ends: a person who looked away for a moment is not rushed.
+const RESUME = 4_000;
+
+export function dwellFor(o: Pick<ToastOptions, 'undo' | 'action'>, calm: boolean): number {
+  const base = o.undo || o.action ? DWELL_MOVE : DWELL;
+  return calm ? base * 2 : base;
+}
+
+export const afterHold = (left: number): number => Math.max(RESUME, left);
+
+const isCalm = (): boolean =>
+  reduced() || (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches);
+
+// How long a notice that goes with a toast stands, for this person now: the one rule, for whatever
+// says the same thing as its toast (the bulk tray's receipt).
+export const noticeDwell = (o: Pick<ToastOptions, 'undo' | 'action'>): number =>
+  dwellFor(o, isCalm());
+
+// The key that goes to the toast's move from wherever the focus is (the toast stands at the end of
+// the page, past the rail and the thread). Alt+Shift+Z: «Z» for Deshacer, and no text box or
+// browser menu owns it.
+export const reachesToast = (
+  e: Pick<KeyboardEvent, 'code' | 'altKey' | 'shiftKey' | 'ctrlKey' | 'metaKey'>,
+): boolean => e.code === 'KeyZ' && e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey;
+
+// The ordinary undo key: Ctrl+Z, or Cmd+Z, with no Shift (redo) and no Alt.
+export const undoesToast = (
+  e: Pick<KeyboardEvent, 'key' | 'altKey' | 'shiftKey' | 'ctrlKey' | 'metaKey'>,
+): boolean => e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey;
+
+const inTextBox = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement &&
+  (target.isContentEditable || target.matches('input, textarea, select'));
 
 // A mouse resting on the toast holds it up; a finger never does: a tap fires mouseenter with no
 // mouseleave after it, and the toast stayed over Triage's buttons for minutes (P7-4).
@@ -92,7 +130,9 @@ export function ToastHost() {
   const sweep = useRef<number | undefined>(undefined);
   useEffect(() => () => clearTimeout(sweep.current), []);
   const seen = useRef(seenAtMount());
-  const dwell = useRef({ left: DWELL, t0: 0, timer: 0 });
+  // What a screen reader is told: set into a live region that is on the page before it is needed.
+  const [say, setSay] = useState('');
+  const dwell = useRef({ left: DWELL, t0: 0, timer: 0, due: Number.POSITIVE_INFINITY });
   const replaced = useRef(false);
   const pendingNode = useRef(false);
 
@@ -105,20 +145,20 @@ export function ToastHost() {
         choreo.current = null;
         setMounted(false);
         setMsgs([]);
+        setSay('');
       }
     });
   };
   const arm = () => {
     clearTimeout(dwell.current.timer);
     dwell.current.t0 = performance.now();
+    dwell.current.due = dwell.current.t0 + dwell.current.left;
     dwell.current.timer = window.setTimeout(close, dwell.current.left);
   };
   const pause = () => {
     clearTimeout(dwell.current.timer);
-    dwell.current.left = Math.max(
-      1200,
-      dwell.current.left - (performance.now() - dwell.current.t0),
-    );
+    dwell.current.due = Number.POSITIVE_INFINITY;
+    dwell.current.left = afterHold(dwell.current.left - (performance.now() - dwell.current.t0));
   };
 
   // A new toast: open the surface, or replace the message in place.
@@ -130,6 +170,20 @@ export function ToastHost() {
     setAction(next.action);
     setAt(next.at);
     const showing = mounted && choreo.current?.dir === 1;
+    // The same words said again while they stand are the same notice: it keeps its time running
+    // anew and is not set down a second time, where a screen reader would say it twice.
+    const current = msgs.filter((m) => !m.out).at(-1);
+    if (
+      showing &&
+      current &&
+      typeof next.msg === 'string' &&
+      current.msg === next.msg &&
+      current.id === next.id
+    ) {
+      dwell.current.left = dwellFor(next, isCalm());
+      arm();
+      return;
+    }
     replaced.current = showing;
     pendingNode.current = !!next.node;
     setMsgs((was) =>
@@ -141,9 +195,57 @@ export function ToastHost() {
         : [{ seq: next.seq, msg: next.msg, id: next.id }],
     );
     setMounted(true);
-    dwell.current.left = DWELL;
+    dwell.current.left = dwellFor(next, isCalm());
     arm();
   }, [next]);
+
+  // What the surface says, handed to the live region once it is drawn: the words, and for a toast
+  // with a move the key that reaches it.
+  useLayoutEffect(() => {
+    const node = el.current;
+    if (!node || !msgs.length) return;
+    const words = [...node.querySelectorAll('.tmsg:not(.out)')]
+      .map((p) =>
+        [...p.childNodes]
+          .map((n) => n.textContent)
+          .join(' ')
+          .trim(),
+      )
+      .join(' ');
+    const move = action?.label ?? (undo ? t('toast.undo') : undefined);
+    setSay(move ? `${words} ${t('toast.reach', { move })}` : words);
+  }, [msgs, undo, action]);
+
+  // The key that reaches the toast's move from wherever the focus is.
+  useEffect(() => {
+    const reach = (e: KeyboardEvent) => {
+      if (!reachesToast(e)) return;
+      const button = el.current?.querySelector<HTMLButtonElement>('.tbtns button:not([hidden])');
+      if (!button) return;
+      e.preventDefault();
+      button.focus();
+    };
+    document.addEventListener('keydown', reach);
+    return () => document.removeEventListener('keydown', reach);
+  }, []);
+
+  // Ctrl+Z (Cmd+Z) undoes the move while its toast stands (D-befe9d). A text box keeps its own undo.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: close reads refs only
+  useEffect(() => {
+    if (!undo || !mounted) return;
+    let spent = false;
+    const press = (e: KeyboardEvent) => {
+      if (spent || !undoesToast(e) || inTextBox(e.target)) return;
+      spent = true;
+      e.preventDefault();
+      const f = undo;
+      setUndo(undefined);
+      close();
+      f();
+    };
+    document.addEventListener('keydown', press);
+    return () => document.removeEventListener('keydown', press);
+  }, [undo, mounted]);
 
   useLayoutEffect(() => {
     const node = el.current;
@@ -249,19 +351,57 @@ export function ToastHost() {
 
   useEffect(() => () => clearTimeout(dwell.current.timer), []);
 
+  // The room a toast at the foot takes, for a page whose own last lines would lie under it (Hablar's
+  // thread: the question just answered) to make: `--toast-room`, its height and a gap. Gone with it.
+  useEffect(() => {
+    const node = el.current;
+    const root = document.documentElement;
+    if (!mounted || !node || at === 'top') return;
+    const measure = () => root.style.setProperty('--toast-room', `${node.offsetHeight + 12}px`);
+    measure();
+    const seen = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    seen?.observe(node);
+    return () => {
+      seen?.disconnect();
+      root.style.removeProperty('--toast-room');
+    };
+  }, [mounted, at]);
+
+  // A page that was in the background (a phone locked, a hidden tab) throttles its timers: its
+  // toast sat there an hour over Te toca (field study 4). Back in view, a toast past its time goes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: close reads refs only
+  useEffect(() => {
+    const check = () => {
+      if (document.visibilityState === 'visible' && performance.now() > dwell.current.due) close();
+    };
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('focus', check);
+    return () => {
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('focus', check);
+    };
+  }, []);
+
   const gone = useSyncExternalStore(subscribe, sentAway, () => 0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: when an opening sends one away only
   useEffect(() => {
     if (gone && gone === seen.current) close();
   }, [gone]);
 
-  if (!mounted) return null;
+  // The reader's own region stands on the page always, empty until a toast comes (a region made with
+  // its words already in it is not announced); the surface it mirrors does not speak twice.
+  const announcer = (
+    <p className="visually-hidden" role="status" aria-live="polite" data-toast-say="">
+      {say}
+    </p>
+  );
+  if (!mounted) return announcer;
   const surface = (
     <div
       ref={el}
       className={toastClass(at)}
       role="status"
-      aria-live="polite"
+      aria-live="off"
       onPointerEnter={(e) => holdsOn(e.pointerType) && pause()}
       onPointerLeave={(e) => holdsOn(e.pointerType) && arm()}
       // Only a keyboard's focus holds it: a tap focuses Deshacer too.
@@ -319,5 +459,10 @@ export function ToastHost() {
     </div>
   );
   const layer = layerEl();
-  return layer ? createPortal(surface, layer) : surface;
+  return (
+    <>
+      {announcer}
+      {layer ? createPortal(surface, layer) : surface}
+    </>
+  );
 }

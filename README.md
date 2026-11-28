@@ -13,21 +13,41 @@
 
 **A local board where your AI agents hand you their work, and you hand back decisions, without keeping their sessions open.**
 
+You talk with one agent, your assistant: it turns what you ask into work and keeps your other agents busy.
+You only review and decide, on the desk or on your phone, and nothing leaves your computer.
+
 ¿Hablas español? Lee el [inicio rápido en español](README.es.md).
 
 ## Start in a minute
 
-In the folder you want to track, usually a repository:
+1. **Install** (needs Node.js 22.18 or later):
 
-```sh
-npm i -g @otea/cli   # needs Node.js 22.18 or later
-otea start
-```
+   ```sh
+   npm i -g @otea/cli
+   ```
 
-`otea start` makes the project, opens the desk in your browser and prints the text to paste into your agent's chat. [Get started](#from-the-terminal-npm-or-source) says what it does, step by step.
+2. **Start**, in the folder you want to track, usually a repository:
+
+   ```sh
+   otea start
+   ```
+
+   It makes the project and a first board (**Changes** in a git repository, **To-dos** in a plain folder), starts the desk and opens it in your browser. [Get started](#from-the-terminal-npm-or-source) says what it does, step by step.
+
+3. **Meet your assistant.** On the desk open **Talk**, copy the assistant's text and paste it into a new session of your agent (Claude Code, OpenCode, Codex or any other with a shell or MCP). In a terminal, `otea prompt --role assistant` prints the same text. The first reply takes 1-2 minutes; from then on you ask for things in **Talk** and decide in **Your turn**.
 
 - **`npm i -g` says permission denied?** Install into a folder of your own, with no `sudo`: `npm i -g --prefix "$HOME/.otea-npm" @otea/cli`, then put that folder's `bin` on your `PATH` on macOS and Linux, or the folder itself on Windows ([details](#the-otea-command-from-npm)).
 - **No Node, or you prefer Otea in its own window?** Install the desktop app instead: [Install](#install) has both ways.
+
+## You don't code?
+
+You need no terminal, no Node and no npm. Start from the desktop app:
+
+1. **Download the installer** for your system from the [latest release](https://github.com/otea-dev/otea/releases/latest) and open it. [The desktop app](#the-desktop-app) says how to get past the "unsigned" warning.
+2. **Open Otea and pick a folder**: the one your project lives in, or a new empty one. Otea makes the project there; make a first board in **Studio** by picking a template (Changes, To-dos…).
+3. **Open Talk.** One step is left, and it happens outside Otea: Talk gives you a text to copy; open your agent's app (Claude Code, Codex, OpenCode…), start a new conversation, paste the text and send it. That agent is now your assistant. Come back to Talk and ask it for things.
+
+Otea needs an agent to do the work, and the agent comes from its own app: Otea does not start one for you.
 
 > From the Spanish verb *otear*: to scan from a high vantage point, to watch what is happening and what is coming.
 
@@ -170,7 +190,7 @@ otea --version
 
 That is for macOS and Linux (and Git Bash). `~` is not expanded everywhere (PowerShell and cmd pass it as it is), so the commands spell the folder with `$HOME`. On Windows the command lands in the prefix folder itself, not in a `bin` subfolder: in PowerShell run `npm i -g --prefix "$HOME\.otea-npm" @otea/cli` (in cmd, `%USERPROFILE%\.otea-npm`) and add that folder to your `PATH`. Update and remove with the same `--prefix` (`npm i -g --prefix "$HOME/.otea-npm" @otea/cli`, `npm uninstall -g --prefix "$HOME/.otea-npm" @otea/cli`).
 
-**On Windows, `otea` not found or "Cannot find module ...otea.mjs" in an agent's shell?** npm, not Otea, writes the shims next to the command: `otea.cmd`, `otea.ps1` and an extensionless `sh` script. A shell that is not Git Bash (opencode's, for one) can pick the `sh` script and fail, because it lacks `sh`, `sed` or `dirname`. Call `otea.cmd`, or run Node on the package directly: `node <prefix>\node_modules\@otea\cli\dist\cli\main.js <command>` (`npm root -g` prints the `node_modules` folder). The desktop app's `otea` also works from Git Bash.
+**On Windows, `otea` not found or "Cannot find module ...otea.mjs" in an agent's shell?** npm, not Otea, writes the shims next to the command: `otea.cmd`, `otea.ps1` and an extensionless `sh` script. A shell that is not Git Bash (opencode's, for one) can pick the `sh` script and fail, because it lacks `sh`, `sed` or `dirname`. Call `otea.cmd`, or run Node on the package directly: `node <prefix>\node_modules\@otea\cli\dist\cli\main.js <command>` (`npm root -g` prints the `node_modules` folder). In Windows PowerShell 5.1, `otea` runs `otea.ps1`, which its default execution policy refuses ("running scripts is disabled on this system"): call `otea.cmd` instead, or allow scripts once with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`. The desktop app's `otea` also works from Git Bash.
 
 To update, run `npm i -g @otea/cli` again. To remove it, `npm uninstall -g @otea/cli`. Then run `otea start` in the folder you want to track: it makes the project, starts the desk and opens it ([Get started](#from-the-terminal-npm-or-source) says what it does).
 
@@ -226,27 +246,29 @@ Then [give your agent the text](#give-your-agent-the-text).
 
    - makes the project when there is none (what `otea init` does);
    - starts the desk in the background (`otea serve start`) and opens it in your browser, signed in; `--no-open` prints a sign-in link instead (single-use, good for 10 minutes: it is never the key); it keeps the port it last ran on;
-   - at a terminal, offers a first board as a short numbered choice (code changes, to-dos, or let your agent design the boards), with the default marked: Enter takes it, `none` makes no board, Ctrl+C stops with nothing made. It is asked only when you are at a terminal on both ends (typing and screen). `--template <key>` names a board and skips the question; `--yes` says yes to the default (changes in a git repo, to-dos in a plain folder) without asking; `--no-board` asks nothing and makes none. `--json` and a pipe ask nothing and make no board: the report names the command for each;
-   - prints the text to paste into your agent's chat, and the MCP server it adds to its own config.
+   - makes a first board, so the desk is not empty. At a terminal it asks once, as a short numbered choice (code changes, to-dos, or let your agent design the boards), with the default marked: Enter takes it, `none` makes no board, Ctrl+C stops with nothing made. It is asked only when you are at a terminal on both ends (typing and screen); with no terminal (a pipe, a harness running it for you) it takes the default without asking, so a first run never ends on an empty desk. The default is **Changes** in a git repo and **To-dos** in a plain folder. `--template <key>` names a board and skips the question; `--yes` takes the default without asking; `--no-board` asks nothing and makes none. `--json` is for scripts: it asks nothing and makes no board, and the report names the command for each;
+   - starts its report with the three steps to your assistant (open **Talk**, copy the assistant's text, paste it into a new session), in the project's language, then the status, then the text to paste into one agent's chat and the MCP server it adds to its own config.
 
-   The boards and the text come in the project's language, which is fixed when the project is made, in the language you use then: the one your desk last used, else your locale variables (`LC_ALL`, `LC_MESSAGES`, `LANG`), else your computer's, else English. A later run says the same thing even if your desk changed language. The report says which, `--lang en` or `--lang es` forces one for that run (on a new project, it makes the project in it), and `otea projects lang en|es` changes the project's from then on.
+   The boards and the text come in the project's language, which is fixed when the project is made, in the language you use then: the one your desk last used, else your locale variables (`LC_ALL`, `LC_MESSAGES`, `LANG`; on Windows a bare `LANG` ranks below Windows' own language), else your computer's, else English. A later run says the same thing even if your desk changed language. The report says which, `--lang en` or `--lang es` forces one for that run (on a new project, it makes the project in it), and `otea projects lang en|es` changes the project's, with its boards, from then on (`--lang` on a project that exists does the same).
 
    ```text
+   To start (1 minute):
+     1. Open the desk in your browser (if it did not open by itself): http://127.0.0.1:4400/p/tienda-web-yafrhx/
+     2. Go to Talk and copy the assistant's text (or, in a terminal: otea prompt --role assistant).
+     3. Paste it into a new session of your agent. The first reply takes 1-2 minutes.
+
    Project: set up "tienda-web" (data in ~/.otea/data/tienda-web-yafrhx)
-   Boards: none yet (nothing is made until you choose). In a code repo run the first; for anything else, the second:
-     otea start --template changes  code: your agent does each change on its own branch, and it merges once you approve
-     otea start --template todos    anything that is not code: a to-do list your agent works through
-     or paste the text below and your agent designs the boards with you (otea start --help lists every template)
+   Boards: made "Changes"
    Language: English for the boards and the text below (--lang es makes them Spanish)
    Desk: running in the background at http://127.0.0.1:4400/p/tienda-web-yafrhx/ (pid 4120; stop it with otea serve stop)
 
-   Next, paste this into your agent's chat (otea prompt prints it again):
-     Set up Otea in this project and design with me how we will work. ...
+   Or, to connect one agent without an assistant, paste this into its chat (otea prompt prints it again):
+     Start working on this project as its agent: its boards are ready. ...
    ```
 
-   With `--no-open` the sign-in link comes in a block of its own above the agent's text: it is yours alone, so it never travels with what you paste. It asks about a first board only when it makes the project, and only at a terminal.
+   With `--no-open` the sign-in link comes in a block of its own above the agent's text: it is yours alone, so it never travels with what you paste. It makes the first board only when it makes the project.
 
-   Run it again any time: it looks before it acts, changes nothing that exists and says what was already there. It is for you: an agent never runs it (it connects with `otea connect` and never starts the desk). It writes nothing into the repo, and the project starts with no boards unless you pick one (your agent's `otea connect` adds one block to `AGENTS.md`: see [What Otea writes in your repo](#what-otea-writes-in-your-repo)).
+   Run it again any time: it looks before it acts, changes nothing that exists and says what was already there. It is for you: an agent never runs it (it connects with `otea connect` and never starts the desk). It writes nothing into the repo (your agent's `otea connect` adds one block to `AGENTS.md`: see [What Otea writes in your repo](#what-otea-writes-in-your-repo)).
 
    A project with no boards opens on **Your turn** with a **Copy the instruction** button; **Technical details** under it holds the full text, for whoever wants to read it.
 
@@ -254,9 +276,15 @@ Then [give your agent the text](#give-your-agent-the-text).
 
 ### Give your agent the text
 
-Both paths meet here. Paste the text into your agent's chat (Claude Code, OpenCode, Codex or any other with a shell or MCP); `otea prompt` prints the same text in a terminal. The agent connects itself, reads the project, asks you one question at a time how you work and drafts its boards. You try them and publish them in Studio. From then on each request goes through a board, and what waits for you shows in **Your turn**.
+Both paths meet here. For daily work there is one setup, the assistant, in three steps:
 
-For daily work there is a canonical setup: one chat coordinates and never does an item, and a worker per board does them (`otea prompt --role coordinator`, `otea prompt --role worker --board <name>`). [The canonical way](docs/working-with-agents.md#the-canonical-way-a-coordinator-and-two-workers) says how to launch them.
+1. **Paste the assistant's text into ONE session's chat** (Claude Code, OpenCode, Codex or any other with a shell or MCP): `otea prompt --role assistant` prints it (`otea start` points to it, and the empty **Talk** page on the desk has a Copy button). That session is your assistant: it keeps the agents at work and never does an item itself. Its first reply takes 1-2 minutes.
+2. **Talk with it in Talk**, the first row of the desk's menu and a tab of the phone. It turns what you ask into items (a request) or answers (a consultation), says which it made, and launches an agent per board and a refiner with their own texts (`otea prompt --role worker --board <name>`, `otea prompt --role refiner`). When your harness cannot run background subagents, it tells you how many other sessions to open and gives the text for each. The panel at the top of Talk, **Your turn now**, is the same list as the **Your turn** page.
+3. **Capture rough ideas in the Inbox** (**New › Quick note** on the desk or the phone): the refiner turns each note into an item and asks you what is missing with buttons. You decide: approve, send back with a note, answer. If you change your mind about something in review, the assistant offers a one-tap card in Talk that sends it back with your note.
+
+[The canonical way](docs/working-with-agents.md#the-canonical-way-an-assistant-workers-and-a-refiner) says how to launch them, with or without background subagents.
+
+Without an assistant, one agent can work on its own: paste the text `otea prompt` prints into its chat. It connects itself, reads the project, asks you one question at a time how you work and drafts its boards. You try them and publish them in Studio. From then on each request goes through a board, and what waits for you shows in **Your turn**.
 
 ### MCP config for your harness
 
@@ -350,7 +378,7 @@ On Windows write the paths with `/` or doubled `\\` inside JSON (and inside a TO
 | `otea start` | the first minutes in one command: the project, a first board, the desk in the background and the text for your agent; run again, it reports what exists |
 | `otea init` | makes the project for this folder |
 | `otea serve` | opens the desk in your browser |
-| `otea prompt` | prints the text to paste into an agent's chat |
+| `otea prompt` | prints the text to paste into an agent's chat; `otea prompt --role assistant` the one for the session you talk with in Talk |
 | `otea board add <name> --template <key>` | adds a board from a template, published at once |
 | `otea topic on` | has agents keep the side questions you ask them, with their answers |
 | `otea devices list` | lists the paired phones; `otea devices revoke <id>` unpairs one |

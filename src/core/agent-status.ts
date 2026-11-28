@@ -23,6 +23,13 @@ export const AGENT_STATUSES = ['working', 'listening', 'connected', 'silent', 'a
 
 export type AgentStatus = (typeof AGENT_STATUSES)[number];
 
+// How long an agent holding an item on a live lease may go with no sign before the desk says «sin
+// señal»: half a default lease, the point where any call of it renews the lease (renewLeases). A
+// step of its own (a rebase, a test run, screenshots) makes no otea call, and the lease is the
+// promise it works; «sin señal» is for the one that stopped, which the lease running out turns into
+// a stuck item.
+export const SILENT_AFTER_MS = 7.5 * 60_000;
+
 export type StatusFacts = {
   live: boolean;
   // How many items it holds on a live lease.
@@ -31,10 +38,25 @@ export type StatusFacts = {
   // A question of its own waits for the person to answer.
   asking: boolean;
   sessionEnded: boolean;
+  // How long since it last gave a sign (a call, a beat), when known.
+  quietMs?: number;
+  // The session it runs under (its harness, its MCP server) runs now and gave a sign within
+  // THERE_FOR_MS: a long step of its own makes no otea call, and a process that runs is the sign
+  // that it is at it. «silent» is for the one whose session is gone or that went quiet for long.
+  there?: boolean;
 };
 
+// How long a running session counts as there with no sign from it: a long step (a test run, a
+// build, a review of many files) may go this long without an otea call, past it a process that still
+// runs may be hung, or its id another process's (the harness id counts only while noted lately).
+export const THERE_FOR_MS = 35 * 60_000;
+
 export function agentStatus(f: StatusFacts): AgentStatus {
-  if (!f.live) return f.holding > 0 && !f.sessionEnded ? 'silent' : 'away';
+  if (!f.live) {
+    if (f.holding === 0 || f.sessionEnded) return 'away';
+    if (f.there === true) return 'working';
+    return f.quietMs === undefined || f.quietMs >= SILENT_AFTER_MS ? 'silent' : 'working';
+  }
   const idle = f.waiting ? 'listening' : 'connected';
   if (f.asking) return idle;
   return f.holding > 0 ? 'working' : idle;

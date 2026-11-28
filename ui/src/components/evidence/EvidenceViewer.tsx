@@ -22,6 +22,7 @@ import { DiagramView } from './DiagramView.tsx';
 import { FileMeta } from './FileMeta.tsx';
 import { FileView } from './FileViews.tsx';
 import { ImageCompare, ImageSingle } from './ImageViews.tsx';
+import { keepLineStops, lineStep, lineStops } from './line-keys.ts';
 import { ZOOM_MAX, ZOOM_MIN, zoomIn, zoomOut } from './pdf-view.ts';
 import {
   findPick,
@@ -170,6 +171,9 @@ export type ReaderDecide = {
   approve?: { label: string; onClick: () => void; hold?: () => boolean } | undefined;
   // What waits for the second press, said where the person is: a refusal-weight line, never a hold.
   warn?: string | undefined;
+  // What the person should know before Aprobar (the attached diff is not what lands, what the
+  // assistant advised), the same lines the page says beside the button: advice, never a hold.
+  notices?: readonly string[] | undefined;
 };
 
 // A note to the agent at work from inside the reader, on the file read: on the line or diagram node
@@ -203,11 +207,14 @@ export function EvidenceReader({
   onDraft,
   draftPick = null,
   onDraftPick,
+  seen,
 }: {
   evidence: readonly Evidence[];
   at: number;
   onAt: (at: number) => void;
   phone?: boolean;
+  // The files opened in the reader, by evidence id: their nodes on the phone's lane are discs.
+  seen?: ReadonlySet<number> | undefined;
   decide?: ReaderDecide | undefined;
   note?: ReaderNote | undefined;
   start?: ReaderPick | undefined;
@@ -224,6 +231,15 @@ export function EvidenceReader({
 }) {
   const shown = evidence[at];
   const view = useRef<HTMLDivElement>(null);
+  const lane = useRef<HTMLElement>(null);
+  // The lane of files (phone) keeps the node shown in its middle as you step through the files.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on each file shown
+  useLayoutEffect(() => {
+    const strip = lane.current;
+    const node = strip?.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!strip || !node) return;
+    strip.scrollLeft = node.offsetLeft - (strip.clientWidth - node.offsetWidth) / 2;
+  }, [at]);
   const [pick, setPickHere] = useState<Picked | null>(draftPick);
   const setPick = (value: Picked | null) => {
     setPickHere(value);
@@ -398,6 +414,14 @@ export function EvidenceReader({
     mark();
     return () => cancelAnimationFrame(frame);
   }, [markedKey, shownId]);
+  // With a note to leave, the lines are reached with the keys: one Tab stop, the arrows between them.
+  const noting = note !== undefined;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: marked anew per file shown
+  useEffect(() => {
+    const root = view.current;
+    if (!root || !noting) return;
+    return keepLineStops(root);
+  }, [noting, shownId]);
   // The picked line or node is lit once its viewer has drawn it (a text is fetched first).
   // biome-ignore lint/correctness/useExhaustiveDependencies: another file shown clears the light
   useEffect(() => {
@@ -479,6 +503,11 @@ export function EvidenceReader({
       <span className="ev-reader-seen">
         {t('evidence.seenOf', { n: decide.seen, total: evidence.length })}
         {decide.notice ? <small className="ev-reader-notice">{decide.notice}</small> : null}
+        {(decide.notices ?? []).map((line) => (
+          <small key={line} className="ev-reader-notice" data-rvn="">
+            {line}
+          </small>
+        ))}
         {decide.warn ? (
           <small className="ev-reader-notice warn" role="alert">
             {decide.warn}
@@ -534,65 +563,88 @@ export function EvidenceReader({
           <Icon name="right" />
         </button>
       </div>
-      {pair ? (
-        <div className="ev-reader-pair">
-          <span>
-            {t(blind ? 'evidence.reader.sideBlind' : 'evidence.reader.side', {
-              side: roleWord(shown) ?? '',
-            })}
-          </span>
-          {blind && note ? (
-            <BlindPick
-              ids={[pair.before.id, pair.after.id]}
-              shown={shown}
-              side={(roleWord(shown) ?? 'A') as 'A' | 'B'}
-              note={note}
+      {phone && evidence.length > 1 ? (
+        <nav className="ev-lane" aria-label={t('evidence.reader.files')} ref={lane}>
+          {evidence.map((e, i) => (
+            <button
+              key={e.id}
+              type="button"
+              className="ev-node"
+              aria-current={i === at ? 'true' : undefined}
+              aria-label={`${i + 1} · ${e.filename}`}
+              data-seen={seen?.has(e.id) ? 'true' : undefined}
+              onClick={() => onAt(i)}
             />
-          ) : null}
-          <button
-            type="button"
-            className="btn quiet sm"
-            aria-pressed={compared}
-            onClick={() => setComparing(!compared)}
-          >
-            {t(blind ? 'evidence.reader.compareBlind' : 'evidence.reader.compare')}
-          </button>
-        </div>
+          ))}
+        </nav>
       ) : null}
-      {zoomable ? (
-        <div className="ev-reader-zoom">
-          <button
-            type="button"
-            className="btn quiet sm icon"
-            disabled={zoom <= ZOOM_MIN}
-            aria-label={t('evidence.pdf.zoomOut')}
-            onClick={() => setZoom(zoomOut(zoom))}
-          >
-            −
-          </button>
-          <button
-            type="button"
-            className="btn quiet sm"
-            aria-pressed={zoom === 1}
-            aria-label={t('evidence.pdf.fit')}
-            title={t('evidence.pdf.fit')}
-            onClick={() => setZoom(1)}
-          >
-            {zoom === 1 ? t('evidence.pdf.fitShort') : `${Math.round(zoom * 100)} %`}
-          </button>
-          <button
-            type="button"
-            className="btn quiet sm icon"
-            disabled={zoom >= ZOOM_MAX}
-            aria-label={t('evidence.pdf.zoomIn')}
-            onClick={() => setZoom(zoomIn(zoom))}
-          >
-            +
-          </button>
+      {/* The tools are one row on the phone (the desk lays them out as it always did): which side
+          you are looking at, compare, and the zoom. */}
+      {pair || zoomable ? (
+        <div className="ev-reader-tools">
+          {pair ? (
+            <div className="ev-reader-pair" data-blind={blind ? 'true' : undefined}>
+              <span>
+                {t(blind ? 'evidence.reader.sideBlind' : 'evidence.reader.side', {
+                  side: roleWord(shown) ?? '',
+                })}
+              </span>
+              {blind && note ? (
+                <BlindPick
+                  ids={[pair.before.id, pair.after.id]}
+                  shown={shown}
+                  side={(roleWord(shown) ?? 'A') as 'A' | 'B'}
+                  note={note}
+                />
+              ) : null}
+              <button
+                type="button"
+                className="btn quiet sm ev-compare-btn"
+                aria-pressed={compared}
+                onClick={() => setComparing(!compared)}
+              >
+                <Icon name="compare" />
+                <span className="lb">
+                  {t(blind ? 'evidence.reader.compareBlind' : 'evidence.reader.compare')}
+                </span>
+              </button>
+            </div>
+          ) : null}
+          {zoomable ? (
+            <div className="ev-reader-zoom">
+              <button
+                type="button"
+                className="btn quiet sm icon"
+                disabled={zoom <= ZOOM_MIN}
+                aria-label={t('evidence.pdf.zoomOut')}
+                onClick={() => setZoom(zoomOut(zoom))}
+              >
+                −
+              </button>
+              <button
+                type="button"
+                className="btn quiet sm"
+                aria-pressed={zoom === 1}
+                aria-label={t('evidence.pdf.fit')}
+                title={t('evidence.pdf.fit')}
+                onClick={() => setZoom(1)}
+              >
+                {zoom === 1 ? t('evidence.pdf.fitShort') : `${Math.round(zoom * 100)} %`}
+              </button>
+              <button
+                type="button"
+                className="btn quiet sm icon"
+                disabled={zoom >= ZOOM_MAX}
+                aria-label={t('evidence.pdf.zoomIn')}
+                onClick={() => setZoom(zoomIn(zoom))}
+              >
+                +
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: a click on a line picks it for the note; the note is also sent without one */}
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: picking is optional, the note goes on the whole file */}
       <div
         ref={view}
         className="ev-reader-view"
@@ -667,6 +719,30 @@ export function EvidenceReader({
                 // What you type next is the note, as after a zone drawn on an image (P5-R3-4):
                 // the focus stayed on the page and the typing was lost. The phone waits for a tap.
                 if (!phone) noteArea.current?.focus({ preventScroll: true });
+              }
+            : undefined
+        }
+        onKeyDown={
+          note
+            ? (e) => {
+                // The lines are stops when a note can be left on one: the arrows move between
+                // them, Enter or Space picks the line that has the focus, as a click does.
+                const line = (e.target as Element).closest<HTMLElement>('.ev-line[tabindex]');
+                const root = view.current;
+                if (!line || !root || e.altKey || e.ctrlKey || e.metaKey) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  const hit = pickAt(line);
+                  if (!hit) return;
+                  e.preventDefault();
+                  setPick({ id: shown.id, pick: hit.pick });
+                  noteArea.current?.focus({ preventScroll: true });
+                  return;
+                }
+                const stops = lineStops(root);
+                const to = lineStep(e.key, stops.indexOf(line), stops.length);
+                if (to === null) return;
+                e.preventDefault();
+                stops[to]?.focus();
               }
             : undefined
         }

@@ -11,7 +11,7 @@ import {
   type ProjectView,
   projectView,
 } from './project.ts';
-import { projectLanguage } from './project-language.ts';
+import { projectLanguage, sayProjectLanguage } from './project-language.ts';
 import { listRepos } from './repos.ts';
 
 // otea start: what a person needs in their first minutes, in the project's folder, in one pass.
@@ -39,8 +39,8 @@ export type StartReport = {
 export type StartOptions = {
   // A template key (or `none`), as init --template takes it.
   template?: string | undefined;
-  // Forces the language of this run's boards and prompt. A project being made is made in it; one
-  // that exists keeps its own, which `otea projects lang` changes.
+  // The language the person says they use. A project being made is made in it; one that exists
+  // moves to it (its boards too), as `otea projects lang` does.
   lang?: Lang | undefined;
   // Asked once, only when nothing was named and the project is new: the key the person picks, or
   // nothing to leave the boards to the agent. A project that exists is never asked again, so a
@@ -73,6 +73,10 @@ export async function startProject(cwd: string, options: StartOptions): Promise<
     project = initProject(cwd, options.lang === undefined ? {} : { lang: options.lang });
   }
   try {
+    // --lang on a project that exists says what the person is: the project follows, boards included
+    // (the first run on a Spanish computer cannot know an English person is at the keyboard).
+    if (options.lang !== undefined && options.lang !== projectLanguage(project))
+      sayProjectLanguage(project, options.lang);
     const lang = options.lang ?? projectLanguage(project);
     if (created) listRepos(project);
     const made = initBoards(project, picked, lang);

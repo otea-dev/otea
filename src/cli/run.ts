@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { type ParseArgsOptionsConfig, parseArgs } from 'node:util';
 import { oteaHome } from '../app/home.ts';
 import { findOnPath, installRoot } from '../app/launcher.ts';
+import { msysDrive } from '../app/msys-path.ts';
 import type { Probe } from '../app/phone.ts';
 import { CLI_HARNESS } from '../app/presence.ts';
 import { NO_TAILSCALE, type TailscaleCli } from '../app/tailscale.ts';
@@ -60,6 +61,8 @@ const GLOBAL_OPTIONS: ParseArgsOptionsConfig = {
   version: { type: 'boolean', short: 'v' },
 };
 
+// An option is parsed once for every command, by its name: one that any command takes more than once
+// (--file of say) is read as a list, and a command that takes it once reads the last (option).
 const PARSE_OPTIONS: ParseArgsOptionsConfig = Object.assign(
   {},
   GLOBAL_OPTIONS,
@@ -67,7 +70,10 @@ const PARSE_OPTIONS: ParseArgsOptionsConfig = Object.assign(
     Object.entries(command.options).map(([name, spec]) => ({
       [name]: spec.flag
         ? { type: 'boolean' }
-        : { type: 'string', multiple: spec.multiple ?? false },
+        : {
+            type: 'string',
+            multiple: COMMANDS.some((other) => other.options[name]?.multiple === true),
+          },
     })),
   ),
 );
@@ -166,7 +172,8 @@ export function undoGitBashPath(env: Io['env']): (value: string) => string {
 function inputFor(command: Command, values: Values, args: string[], io: Io, json: boolean): Input {
   const text = undoGitBashPath(io.env);
   const option = (name: string) => {
-    const value = values[name];
+    const given = values[name];
+    const value = Array.isArray(given) ? given.at(-1) : given;
     if (typeof value !== 'string') return undefined;
     return PATH_OPTIONS.has(name) ? value : text(value);
   };
@@ -198,6 +205,7 @@ function inputFor(command: Command, values: Values, args: string[], io: Io, json
     agent,
     unnamedTerminal: asPerson,
     channel: 'cli',
+    command: command.name,
     harness: CLI_HARNESS,
     signal: io.signal,
     openUrl: io.openUrl,
@@ -205,7 +213,9 @@ function inputFor(command: Command, values: Values, args: string[], io: Io, json
     probe: io.probe ?? (async () => false),
     ...(io.gh === undefined ? {} : { gh: io.gh }),
     forge: io.forge ?? NO_FORGE,
-    ...(io.env.OTEA_HOME ? { home: resolve(io.cwd, io.env.OTEA_HOME) } : {}),
+    ...(io.env.OTEA_HOME
+      ? { home: resolve(io.cwd, msysDrive(io.env.OTEA_HOME) ?? io.env.OTEA_HOME) }
+      : {}),
     oteaOnPath: () => {
       const found = findOnPath(io.env);
       return found && { ...found, root: installRoot(found.file) };

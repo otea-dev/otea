@@ -50,6 +50,7 @@ import {
 } from './home.ts';
 import { loadPresets } from './presets.ts';
 import { settleProjectLang } from './project-language.ts';
+import { keepOldTopicsAsConsultations } from './topics.ts';
 
 // `root` is the folder the project was found from (where AGENTS.md and .mcp.json go); `dataDir`
 // holds its database, evidence, presets and blueprint: `.otea/` in the root for a local project, a folder in
@@ -247,6 +248,8 @@ function open(
     const lang = settleProjectLang(db, env, creation);
     migrateProjectBoards(project, lang);
     ensureRequestsBoard(project, lang);
+    // The topics of a 0.7 project show in Hablar as consultations (app/topics.ts).
+    keepOldTopicsAsConsultations(project);
     return project;
   });
 }

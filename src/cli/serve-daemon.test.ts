@@ -8,7 +8,7 @@ import { processAlive } from '../app/presence.ts';
 import { ensureUiToken } from '../server/token.ts';
 import { SERVE_LOG } from './daemon.ts';
 import { readServeFile, SERVE_FILE } from './serve-file.ts';
-import { spawnCli, startCli, type TempRepo, tempGitRepo, until } from './testing.ts';
+import { seedOnce, spawnCli, startCli, type TempRepo, until } from './testing.ts';
 
 const MAIN = fileURLToPath(new URL('./main.ts', import.meta.url));
 
@@ -50,12 +50,28 @@ async function stopWhatRuns(cwd: string) {
   if (running) await until(() => !processAlive(running.pid), 15_000);
 }
 
+// Sets an environment variable for the processes a test spawns, and returns what puts it back.
+function setEnv(name: string, value: string): () => void {
+  const before = process.env[name];
+  process.env[name] = value;
+  return () => {
+    if (before === undefined) delete process.env[name];
+    else process.env[name] = before;
+  };
+}
+
+// A probe of a server that never answers waits this long, each of its three tries (the product
+// waits 2 s); what the hung servers below prove does not depend on how long that is.
+const SHORT_PROBE = '300';
+
 describe('serve start, status and stop', () => {
   let repo: TempRepo;
+  // A repo with a local project, made once: each test gets its own copy, as `init --local` in a
+  // repo of its own left it.
+  const seeded = seedOnce(async () => {});
 
-  beforeEach(async () => {
-    repo = tempGitRepo();
-    expect((await spawnCli(repo.dir, 'init', '--local')).code).toBe(0);
+  beforeEach(() => {
+    repo = seeded.fresh().repo;
   });
 
   afterEach(async () => {
@@ -67,9 +83,16 @@ describe('serve start, status and stop', () => {
 
   // The agent's shell ends right after the command (here: the process that ran it has ended and
   // its pipes are closed, as spawnCli's resolving shows), and the server must outlive it, past
-  // the checks that stop a server whose starter is gone (every 5 s).
+  // the checks that stop a server whose starter is gone (every 5 s in the product; here every
+  // 200 ms, so a handful of them pass in two seconds: a server that kept the check would be gone).
   it('starts a server that outlives the command that started it, then stops it by its pid', async () => {
-    const started = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
+    const restore = setEnv('OTEA_OWNER_CHECK_MS', '200');
+    let started: Awaited<ReturnType<typeof spawnCli>>;
+    try {
+      started = await spawnCli(repo.dir, 'serve', 'start', '--no-open', '--port', '0');
+    } finally {
+      restore();
+    }
     expect(started.err).toBe('');
     expect(started.code).toBe(0);
     expect(started.out).toMatch(
@@ -78,7 +101,7 @@ describe('serve start, status and stop', () => {
     const info = readServeFile(home());
     if (!info) throw new Error('serve start left no serve.json');
 
-    await new Promise((resolve) => setTimeout(resolve, 8_000));
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
 
     expect(processAlive(info.pid)).toBe(true);
     const status = await spawnCli(repo.dir, 'serve', 'status');
@@ -304,6 +327,7 @@ describe('serve start, status and stop', () => {
     ensureUiToken(home());
     // Accepts connections and never answers; its command line is this install's background server.
     const hung = hungServer([MAIN, 'serve', '--no-owner', '--no-open', '--daemon']);
+    const restore = setEnv('OTEA_PROBE_TIMEOUT_MS', SHORT_PROBE);
     try {
       const port = await hung.port;
       const pid = hung.child.pid ?? 0;
@@ -324,6 +348,7 @@ describe('serve start, status and stop', () => {
       await until(() => !processAlive(pid), 10_000);
       expect(readServeFile(home())).toBeUndefined();
     } finally {
+      restore();
       hung.child.kill();
     }
   }, 120_000);
@@ -334,6 +359,7 @@ describe('serve start, status and stop', () => {
     ensureUiToken(home());
     const other = hungServer(['serve', '--port', '5173']);
     const lookalike = hungServer([MAIN, 'serve']); // otea's own serve, but not the daemon
+    const restore = setEnv('OTEA_PROBE_TIMEOUT_MS', SHORT_PROBE);
     try {
       for (const bystander of [other, lookalike]) {
         const port = await bystander.port;
@@ -348,6 +374,7 @@ describe('serve start, status and stop', () => {
         expect(readServeFile(home())).toBeUndefined();
       }
     } finally {
+      restore();
       other.child.kill();
       lookalike.child.kill();
     }

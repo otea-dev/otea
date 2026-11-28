@@ -1,7 +1,56 @@
 import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { clickTarget, launchNotice, openFromClick, pushNotification } from './sw-push.ts';
+import {
+  clickTarget,
+  closeShown,
+  closeTag,
+  launchNotice,
+  openFromClick,
+  pushNotification,
+} from './sw-push.ts';
+
+describe('a push that closes a notice', () => {
+  it('is told apart from one that shows', () => {
+    expect(closeTag({ close: 'otea-item-p-TASKS-7' })).toBe('otea-item-p-TASKS-7');
+    expect(closeTag({ title: 'Te toca', tag: 'x' })).toBeUndefined();
+    expect(closeTag({ close: '' })).toBeUndefined();
+    expect(closeTag({ close: 7 })).toBeUndefined();
+    expect(closeTag(undefined)).toBeUndefined();
+  });
+
+  const fakeShade = (open: string[]) => {
+    const closed: string[] = [];
+    const shown: string[] = [];
+    const made: string[] = [];
+    const shade = {
+      async getNotifications({ tag }: { tag: string }) {
+        return [...open, ...made]
+          .filter((each) => each === tag)
+          .map((each) => ({ close: () => void closed.push(each) }));
+      },
+      async showNotification(_title: string, { tag }: { tag: string; silent: true }) {
+        shown.push(tag);
+        made.push(tag);
+      },
+    };
+    return { shade, closed, shown };
+  };
+
+  it('closes the notices under its tag and shows nothing', async () => {
+    const { shade, closed, shown } = fakeShade(['a', 'b']);
+    await closeShown('a', shade);
+    expect(closed).toEqual(['a']);
+    expect(shown).toEqual([]);
+  });
+
+  it('when the person had dismissed it already, shows a silent one and closes it at once', async () => {
+    const { shade, closed, shown } = fakeShade([]);
+    await closeShown('a', shade);
+    expect(shown).toEqual(['a']);
+    expect(closed).toEqual(['a']);
+  });
+});
 
 const ORIGIN = 'https://desk.tail1234.ts.net';
 

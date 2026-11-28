@@ -4,9 +4,11 @@ import { ago, item as fixture, inMinutes, NOW } from './derive/fixtures.ts';
 import { setLanguage } from './i18n/i18n.ts';
 import {
   anyoneWaits,
+  connectedAgents,
   goneHolder,
   handsToAgent,
   hearing,
+  noAgents,
   silentHolder,
   unheard,
   unheardLead,
@@ -141,6 +143,26 @@ describe('workingAgents', () => {
     ).toEqual([]);
   });
 
+  // U3 (field study 4): every piece of a board nobody works read «en cola: ines-check-3 está
+  // trabajando» because that agent works another board.
+  it('names, for a board, only the agents that can come to it: not one at work on another board', () => {
+    const research = item({ id: 'PRE-1', collection: 'Investigación', lease });
+    const docs = item({ id: 'PIE-1', collection: 'Documentos' });
+    const onResearch = agent('a', { holding: ['PRE-1'], status: 'working' as const });
+    const between = agent('b', { status: 'working' as const });
+    expect(workingAgents([onResearch, between], [research, docs], NOW, 'Documentos')).toEqual([
+      'b',
+    ]);
+    expect(workingAgents([onResearch, between], [research, docs], NOW, 'Investigación')).toEqual([
+      'a',
+      'b',
+    ]);
+    expect(workingAgents([onResearch], [research, docs], NOW, 'Documentos')).toEqual([]);
+    expect(hearing([onResearch], [research, docs], NOW, 'Documentos')).not.toMatchObject({
+      kind: 'working',
+    });
+  });
+
   it('names none that only waits for your answer, nor one gone', () => {
     const asks = { question: 1, by: 'a', text: 'Which one?', at: ago(1) };
     const asking = [item({ id: 'TASK-2', lease, asks })];
@@ -178,6 +200,23 @@ describe('hearing', () => {
     expect(hearing([silent, idle], [], NOW)).toEqual({ kind: 'connected', agents: ['a'] });
   });
 
+  // Field study 3, S2: «en cola: lucia-sec está conectado» named the assistant, which never takes an
+  // item, as if it would do the work. The queue is about the agents that take items.
+  it('never counts the assistant as one that will see what waits for an agent', () => {
+    const assistant = agent('sec', { role: 'assistant', status: 'connected' });
+    expect(connectedAgents([assistant])).toEqual([]);
+    expect(
+      workingAgents([agent('sec', { role: 'assistant', status: 'working' })], [], NOW),
+    ).toEqual([]);
+    expect(hearing([assistant], [], NOW)).toEqual({ kind: 'nobody' });
+    expect(noAgents([assistant])).toBe(true);
+    // A worker beside it is the one named.
+    const worker = agent('w', { status: 'connected' });
+    expect(hearing([assistant, worker], [], NOW)).toEqual({ kind: 'connected', agents: ['w'] });
+    expect(unheardLead([], [assistant, worker], 'TASK-1')).toContain('w');
+    expect(unheardLead([], [assistant, worker], 'TASK-1')).not.toContain('sec');
+  });
+
   it('raises the alarm only when the agents that remain gave no signal', () => {
     const silent = agent('s', { live: false, holding: ['TASK-2'], status: 'silent' });
     expect(hearing([silent], [], NOW)).toEqual({ kind: 'unheard' });
@@ -199,6 +238,24 @@ describe('hearing', () => {
     expect(hearing([], [], NOW)).toEqual({ kind: 'nobody' });
     expect(hearing([agent('a', { live: false })], [], NOW)).toEqual({ kind: 'nobody' });
     expect(unheardWords([], true)).toEqual({ text: 'no agent is connected', calm: true });
+  });
+
+  // Review of F6: a refiner waiting on the Bandeja, like the assistant, takes no item: with only
+  // those connected the queue says no worker is there.
+  it('counts only workers: a refiner or the assistant alone leaves the queue with no worker connected', () => {
+    const refiner = agent('ref', { role: 'refiner', status: 'connected' });
+    const assistant = agent('sec', { role: 'assistant', status: 'listening', waiting: true });
+    expect(connectedAgents([refiner])).toEqual([]);
+    expect(hearing([refiner, assistant], [], NOW)).toEqual({ kind: 'nobody' });
+    expect(noAgents([refiner, assistant])).toBe(true);
+    expect(unheardLead([], [refiner, assistant], 'TASK-1')).toBe('No agent is connected.');
+    // A worker beside them is the one named.
+    const worker = agent('w', { status: 'connected' });
+    expect(hearing([refiner, worker], [], NOW)).toEqual({ kind: 'connected', agents: ['w'] });
+    // Nor does either keep an item from being unheard.
+    expect(
+      anyoneWaits([agent('ref', { role: 'refiner', status: 'listening', waiting: true })]),
+    ).toBe(false);
   });
 });
 

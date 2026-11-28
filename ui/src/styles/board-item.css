@@ -74,8 +74,9 @@
   color: var(--ink-3);
   white-space: nowrap;
 }
+/* what is missing is said in words and a bare box, in ink: red is for what is stuck or critical */
 .bi-check .hc.miss.req small {
-  color: var(--warn);
+  color: var(--ink-3);
 }
 .lks {
   display: flex;
@@ -158,18 +159,47 @@ button.lk2:hover {
   color: var(--warn);
   flex: none;
 }
-.bstrip.drift span {
+.bstrip.drift span,
+.bstrip.note span {
   flex: 1 1 0;
   min-width: 0;
 }
-/* a round that only merges main: what the merge changed by hand, folded under the line */
-.bstrip.merge details {
+/* information about the change, not a fault in it (items that share files): the quiet outline,
+   the branch's own icon, never the warn colour (DESIGN: --warn is a stuck agent or a critical) */
+.bstrip.note {
+  margin-top: 4px;
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--rule);
+  color: var(--ink);
+}
+.bstrip.note svg {
+  color: var(--ink-3);
+  flex: none;
+}
+/* what to know before Aprobar (ReviewNotices): the line after them keeps its distance */
+.rvn {
+  margin-bottom: 10px;
+}
+/* a round that only merges main: what the merge changed by hand, folded under the line; the open
+   changes that share files, each folded under their one line; what a rewritten request said */
+.bstrip.drift details,
+.bstrip.note details {
   flex: 1 1 100%;
   min-width: 0;
 }
-.bstrip.merge summary {
+.bstrip.drift summary,
+.bstrip.note summary {
   cursor: pointer;
   color: var(--ink-2);
+}
+.bstrip.drift ul,
+.bstrip.note ul {
+  flex: 1 1 100%;
+  min-width: 0;
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
 }
 .bstrip.merge pre {
   margin: 8px 0 0;
@@ -318,7 +348,7 @@ button.lk2:hover {
   color: var(--ink-3);
 }
 .bi-rounds .rk {
-  font: 600 10px / 1.3 var(--sans);
+  font: 600 11px / 1.3 var(--sans);
   letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -567,7 +597,7 @@ button.pmain:hover {
 }
 .bi-dlg .flab {
   display: block;
-  font: 600 10px / 1.3 var(--sans);
+  font: 600 11px / 1.3 var(--sans);
   letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -687,18 +717,26 @@ button.pmain:hover {
   padding: 4px 0;
   border-bottom: 1px solid var(--rule);
 }
+/* the kit's tick box (kit.css .ck, and the handoff list's above): the same size and radius, ink when
+   ticked; blue is yours, and a tick is nobody's */
 .proof-box {
   flex: none;
   display: grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
-  border: 1.5px solid var(--ink-3);
+  width: 14px;
+  height: 14px;
   border-radius: 4px;
-  color: var(--you-ink);
+  box-shadow: inset 0 0 0 1.25px var(--ink-3);
 }
 .proof-point:not(.unticked) .proof-box {
-  border-color: var(--you);
+  background: var(--ink);
+  box-shadow: none;
+  color: var(--sheet);
+}
+.proof-box svg {
+  width: 11px;
+  height: 11px;
+  stroke-width: 2;
 }
 .proof-name {
   flex: 1 1 auto;
@@ -763,8 +801,8 @@ button.pmain:hover {
   color: var(--ink-3);
 }
 .proof-point.unproved .proof-gap {
-  border-color: var(--warn);
-  color: var(--warn);
+  border-color: var(--ink-2);
+  color: var(--ink-2);
 }
 .proof-foot {
   margin: 8px 0 0;
@@ -772,7 +810,7 @@ button.pmain:hover {
   color: var(--ink-3);
 }
 .proof-foot.short {
-  color: var(--warn);
+  color: var(--ink-2);
 }
 @media (max-width: 560px) {
   .proof-point {

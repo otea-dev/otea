@@ -18,6 +18,7 @@ import { listOf, t, tx } from '../i18n/i18n.ts';
 import { useEscape } from '../kit/escape.ts';
 import { Button, Count, StepPill } from '../kit/index.ts';
 import { toast } from '../kit/pop/toast.tsx';
+import { SEND_KEYS, sendsOnCtrlEnter } from '../kit/send-keys.ts';
 import { type Look, lookOf } from '../lanes/looks.ts';
 import { NodeGlyph } from '../lanes/NodeGlyph.tsx';
 import { anim } from '../motion/anim.ts';
@@ -53,6 +54,7 @@ import {
   triDecide,
   triNext,
   triPile,
+  triPlace,
   triReturn,
   triStart,
   triSync,
@@ -68,7 +70,10 @@ import { toastOf } from '../views/detail/frame.ts';
 import { draftWaitsOf } from '../views/detail/moves.ts';
 import { threadOf } from '../views/detail/notes.ts';
 import { askPick } from '../views/detail/pick-intent.ts';
+import { ReviewNotices } from '../views/detail/ReviewNotices.tsx';
+import { noticeIdOf, useReviewNotices } from '../views/detail/review-notices.ts';
 import { BlindPick, type ReaderNote } from './evidence/EvidenceViewer.tsx';
+import { Pic } from './evidence/Pic.tsx';
 import { NoteText } from './NoteText.tsx';
 import {
   arriveUnder,
@@ -84,6 +89,7 @@ import {
   springHome,
   throwOut,
 } from './triage-flight.ts';
+import { focusNewCard, handedByKeys } from './triage-focus.ts';
 
 // Triaje (#/triage, SPEC §10.4, mock:829-847, 3995-4036): the reviews, one card at a time over the
 // next one. The card follows the pointer or the finger, stamped with the move a release would make;
@@ -142,9 +148,10 @@ export function Figures({
           const side = sideWord(e, blind);
           return (
             <figure key={e.id}>
-              <img
+              <Pic
                 src={evidenceFileUrl(e.id)}
                 alt={e.caption ?? e.filename}
+                name={e.filename}
                 loading="lazy"
                 draggable={false}
               />
@@ -207,7 +214,7 @@ export function Delivered({ round }: { round: RoundShown }) {
 
 // The notes that go back with Devolver…: unrolled from under the moves, the same gesture mirrored
 // to close (mock:4023-4024).
-function Notes({
+export function Notes({
   open,
   onSend,
   onCancel,
@@ -273,7 +280,11 @@ function Notes({
         value={text}
         placeholder={t('triage.notesPlaceholder')}
         aria-label={t('triage.notes')}
+        aria-keyshortcuts={SEND_KEYS}
         onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (text.trim() !== '') sendsOnCtrlEnter(e, () => onSend(text.trim()));
+        }}
       />
       <div className="nbtns">
         <Button
@@ -339,9 +350,11 @@ type CardProps = {
   note?: ReaderNote | undefined;
 };
 
-function standfirst({ agent, round }: ReturnType<typeof cardWords>): ReactNode {
+export function standfirst({ agent, round, merge }: ReturnType<typeof cardWords>): ReactNode {
   if (!agent) return t('triage.yours');
   const who = <b>{agent}</b>;
+  // A round that only merges main into what you approved is no «after your notes».
+  if (merge) return tx('triage.handsMerge', { agent: who, round });
   return round > 1
     ? tx('triage.handsRound', { agent: who, round })
     : tx('triage.hands', { agent: who });
@@ -537,6 +550,12 @@ export function TriCard({
   const blocked = plan?.blocked?.[0];
   const waitId = `tc-wait-${item.id}`;
   const pickId = `tc-pick-${item.id}`;
+  // What every page that offers Aprobar says beside it (the attached diff is not what lands, what
+  // the assistant advised), asked of the card that is on top and can approve.
+  const notices = useReviewNotices(
+    { id: item.id, updatedAt: view?.updatedAt ?? item.updatedAt, advice: view?.advice },
+    !under && !!forward,
+  );
   return (
     <article
       ref={(el) => {
@@ -566,12 +585,21 @@ export function TriCard({
       {words.say ? <NoteText className="say" text={words.say} /> : null}
       <Delivered round={round} />
       <Figures shown={round.figures} blind={round.blind ?? NO_BLIND} note={note} />
+      <ReviewNotices item={item.id} notices={notices} className="tc-rvn" />
       <div className="tc-acts">
         <Button
           variant="primary"
           disabled={!ready || !(forward || pick)}
           onClick={approve}
-          aria-describedby={blocked ? waitId : pick ? pickId : undefined}
+          aria-describedby={
+            blocked
+              ? waitId
+              : pick
+                ? pickId
+                : notices.length > 0
+                  ? notices.map(({ key }) => noticeIdOf(item.id, key)).join(' ')
+                  : undefined
+          }
           data-pick={pick ? '' : undefined}
         >
           {t(pick ? 'triage.pick' : 'triage.approve')}
@@ -614,9 +642,10 @@ export function TriCard({
           {line}
         </p>
       ) : null}
-      {/* The hint names both ways: said only while both are open. */}
+      {/* The hint names both ways: said only while both are open. On the desk it says the keyboard's
+          way too (the buttons), and a reader reads it: the drag is the only way it leaves out. */}
       {ready && forward && back ? (
-        <p className="tc-hint" aria-hidden="true">
+        <p className="tc-hint" {...(phone ? { 'aria-hidden': true } : {})}>
           {phone ? t('triage.swipeHint') : t('triage.dragHint')}
         </p>
       ) : null}
@@ -821,6 +850,8 @@ export function Triage() {
       stack.current.style.minHeight = `${top.offsetHeight + 40}px`;
       stack.current.style.setProperty('--h', `${top.offsetHeight}px`);
     }
+    // No card left: the stack is no longer as tall as the one that went.
+    if (!cur && stack.current) stack.current.style.minHeight = '';
     if (cur === settled.current) return;
     const first = settled.current === undefined;
     settled.current = cur;
@@ -837,6 +868,15 @@ export function Triage() {
   }, [cur, nextShown, pass]);
 
   useEffect(() => () => flight.current?.cancel(), []);
+
+  // Whether the keys decided the card that went: the focus then follows to the card that comes up.
+  const handoff = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: when the card on top changes only
+  useLayoutEffect(() => {
+    if (!handoff.current) return;
+    handoff.current = false;
+    focusNewCard(root.current);
+  }, [cur]);
 
   // The stack keeps the top card's height as it changes (the notes unrolling, evidence loading).
   useEffect(() => {
@@ -956,6 +996,9 @@ export function Triage() {
     flying.current = id;
     if (shown) frozen.current.set(id, shown);
     const card = els.current.get(id);
+    // Decided from the keys with the focus in the card: it goes to the next card's heading once it
+    // is up, never to its Aprobar.
+    handoff.current = handedByKeys() && !!card?.contains(document.activeElement);
     const pile = pileOf(kind);
     if (pile && move) setLanding({ id, pile, to: move.to });
     const out = card
@@ -996,8 +1039,7 @@ export function Triage() {
     });
   };
 
-  const at = s.i + 1;
-  const n = s.q.length;
+  const { at, n } = triPlace(s);
   const behind = Math.max(0, Math.min(2, n - s.i - 1));
   const card = (id: string, under: boolean) => {
     const shown = frozen.current.get(id) ?? shownOf(id);
@@ -1100,10 +1142,13 @@ export function Triage() {
   );
 }
 
-function Done({ decided, onBack }: { decided: number; onBack: () => void }) {
+export function Done({ decided, onBack }: { decided: number; onBack: () => void }) {
   const el = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (decided > 0 && el.current) {
+      // The card that went was tall and the page was scrolled down to its buttons: this is short and
+      // at the top, so without this the screen stays on blank space (D-14cde0).
+      el.current.scrollIntoView({ block: 'start', inline: 'nearest' });
       const kf = reduced()
         ? [{ opacity: 0 }, { opacity: 1 }]
         : [

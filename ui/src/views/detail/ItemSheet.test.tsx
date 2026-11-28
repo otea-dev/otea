@@ -359,7 +359,7 @@ describe('the item sheet', () => {
       setLanguage('es');
       const html = render(held, withHolder({ sessionEnded: true }));
       expect(html).toContain(
-        'La sesión de <b>claude-haiku</b> terminó; vuelve a la cola cuando venza su reserva.',
+        'La sesión de <b>claude-haiku</b> terminó; vuelve a la cola cuando se acabe su tiempo.',
       );
       expect(html).not.toContain('lo está haciendo');
       setLanguage('en');
@@ -373,7 +373,7 @@ describe('the item sheet', () => {
       setLanguage('es');
       const html = render(held, withHolder({ sessionEnded: false }));
       expect(html).toContain(
-        '<b>claude-haiku</b> no da señales desde hace 4 min; vuelve a la cola cuando venza su reserva.',
+        '<b>claude-haiku</b> no da señales desde hace 4 min; vuelve a la cola cuando se acabe su tiempo.',
       );
       expect(html).not.toContain('lo está haciendo');
     });
@@ -399,7 +399,7 @@ describe('the item sheet', () => {
       const quiet = { live: true, listening: true, lastSeen: ago(0.5), actedAt: ago(13) };
       const html = render(answered, withHolder(quiet));
       expect(html).toContain(
-        '<b>claude-haiku</b> no da señales desde que respondiste su pregunta, hace 12 min; vuelve a la cola cuando venza su reserva.',
+        '<b>claude-haiku</b> no da señales desde que respondiste su pregunta, hace 12 min; vuelve a la cola cuando se acabe su tiempo.',
       );
       expect(html).not.toContain('lo está haciendo');
       // Once it calls Otea again, it is on it.

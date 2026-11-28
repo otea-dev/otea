@@ -168,6 +168,24 @@ describe('Te toca on the phone', () => {
     expect(html).toContain('<q>Reintenta la subida.</q>');
     expect(html).toContain('1 imagen');
   });
+
+  // Field study 5 (D2): the quote showed «Corrí `otea pending` y las pruebas pasan» with the marks as
+  // written, in the serif; code between backticks is a mono chip, as everywhere an agent's words go.
+  it('draws the code in an agent’s note as code, never with its backticks', () => {
+    setLanguage('es');
+    const noted = [
+      added('R1', 'image', 130, 'kiln'),
+      moved('R1', 'verify', agent('kiln'), {
+        reason: 'Corrí `otea pending` y las pruebas pasan.',
+        minutes: 120,
+      }),
+    ];
+    const blocks = tocaBlocks(app(all, noted), false, phone());
+    const row = blocks.find((b) => b.key === 'R1') as Extract<LaneBlock, { kind: 'row' }>;
+    const html = markup(row.content);
+    expect(html).toContain('<code class="tick">otea pending</code>');
+    expect(html).not.toContain('`');
+  });
 });
 
 describe("Te toca's head on the phone", () => {
@@ -198,10 +216,13 @@ describe("Te toca's head on the phone", () => {
   it('says what waits in the dek and the day under it, the way the agents column did', () => {
     setLanguage('es');
     const html = render(fake(true));
-    expect(html).toContain('Una cosa espera por ti');
+    expect(html).toContain('Una cosa te espera');
     expect(html).not.toContain('Los agentes entregaron');
     expect(html).toContain('class="p-recap"');
-    expect(html).toContain('Hoy entregaron 1, aprobaste 0 y devolviste 0 con notas.');
+    // The sentence is words with its figures set apart (mono, as on the desk): `.n` is a figure.
+    expect(html).toMatch(
+      /Hoy entregaron <span class="n">.*1.*<\/span>, aprobaste <span class="n you">.*0.*<\/span> y devolviste <span class="n">.*0.*<\/span> con notas\./,
+    );
   });
 
   it('says the day under the title on the desk too, now that the agents column is gone', () => {

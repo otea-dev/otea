@@ -173,14 +173,12 @@ describe('the dek of Te toca', () => {
     ];
     expect(oldestWaiting(items, NOW)).toBe(130 * MIN);
     expect(tocaDek(items, 5, NOW)).toEqual({
-      lead: 'Tres cosas esperan por ti; la más antigua, desde hace 2 h.',
+      lead: 'Tres cosas te esperan; la más antigua, desde hace 2 h.',
       handed: { before: 'Los agentes entregaron ', n: 'cinco', after: ' hoy.' },
     });
-    expect(tocaDek([items[0] as never], 1, NOW).lead).toBe(
-      'Una cosa espera por ti desde hace 14 min.',
-    );
+    expect(tocaDek([items[0] as never], 1, NOW).lead).toBe('Una cosa te espera desde hace 14 min.');
     expect(tocaDek([], 0, NOW)).toEqual({
-      lead: 'Nada espera por ti.',
+      lead: 'Nada te espera.',
       handed: { before: 'Los agentes no entregaron nada hoy.', n: '', after: '' },
     });
   });
@@ -199,7 +197,7 @@ describe('the dek of Te toca', () => {
     expect(quietOnes(items, NOW)).toEqual([{ agent: 'Kiln', since: 12 * MIN }]);
     expect(atascoDek(items, NOW)).toEqual({
       lead: 'Una cosa se quedó quieta: ',
-      quiet: [{ agent: 'Kiln', text: ' no da señales desde hace 12 min' }],
+      quiet: [{ agent: 'Kiln', text: ' lleva 12 min sin avisar' }],
     });
     expect(atascoDek([], NOW)).toEqual({
       lead: 'Nada parado: los agentes siguen dando señales.',

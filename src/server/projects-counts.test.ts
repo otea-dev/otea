@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { askOnBandeja, captureToBandeja, takeBandeja } from '../app/bandeja.ts';
 import { addCollection } from '../app/collections.ts';
 import { createItem, moveItem } from '../app/items.ts';
 import { claimItem } from '../app/leases.ts';
@@ -73,6 +74,29 @@ describe('what waits for you in a project', () => {
       },
     ]);
     expect(counts.waiting).toEqual([]);
+  });
+});
+
+// F4 review round: «Todos los proyectos» and the switcher counted items only, so a refiner's question
+// in another project waited unseen while the person was in this one.
+describe('what waits for you that is no item, in a project', () => {
+  it('lists the question a refiner asked on a Bandeja note, though no item waits', () => {
+    const project = memoryProject();
+    addCollection(project, { name: 'tasks' });
+    captureToBandeja(project, { text: 'the Aprobar button is hidden' });
+    takeBandeja(project, { id: 1, agent: 'lia' });
+    askOnBandeja(project, { id: 1, agent: 'lia', text: 'Which screen?', options: ['A', 'B'] });
+
+    const counts = countsOf(project);
+
+    expect(counts.waiting).toEqual([]);
+    expect(counts.asking).toEqual([
+      expect.objectContaining({ kind: 'bandeja', ref: 'B-1', text: 'Which screen?' }),
+    ]);
+  });
+
+  it('has none when nothing asks', () => {
+    expect(countsOf(memoryProject()).asking).toEqual([]);
   });
 });
 

@@ -5,7 +5,18 @@ import { basename, dirname, join } from 'node:path';
 import { ownerGone, processAlive } from '../app/presence.ts';
 import { STARTED_BY } from './started-by.ts';
 
-export type ProcessRow = { pid: number; parent: number; name: string; path?: string };
+// `command`: the command line, when the system says it (Windows does): npm and npx are node
+// programs there, told from the harness only by it.
+export type ProcessRow = {
+  pid: number;
+  parent: number;
+  name: string;
+  path?: string;
+  command?: string;
+  // When it started (epoch ms, to the second), when the system says it: a process id handed out
+  // again is another process.
+  started?: number;
+};
 
 // The programs that only run a command for someone else: a harness runs `otea` through them (its
 // shell, npm's sh or cmd shim), and on Windows they outlive the harness that started them.
@@ -42,15 +53,191 @@ export function ownerChain(
   return chain;
 }
 
+// The programs that run another one for a moment and end with it (`timeout 600 otea wait`, `nohup`,
+// npm's launcher): never the session, however far up they stand.
+const WRAPPERS = new Set([
+  'timeout',
+  'nohup',
+  'env',
+  'time',
+  'setsid',
+  'stdbuf',
+  'nice',
+  'ionice',
+  'sudo',
+  'doas',
+  'xargs',
+  'npx',
+  'npm',
+  'pnpm',
+  'yarn',
+  'winpty',
+  // Launchers of a script or a task a harness runs for its agent: they end with their command.
+  'python',
+  'python3',
+  'pythonw',
+  'py',
+  'uv',
+  'uvx',
+  'pipx',
+  'make',
+  'gmake',
+  'just',
+  'bunx',
+]);
+
+// The program a process runs, by its name: `npm exec otea` (a process title) is npm.
+const programOf = (name: string) =>
+  basename(name.replaceAll('\\', '/'))
+    .toLowerCase()
+    .replace(/\.(exe|cmd|bat)$/, '')
+    .split(/\s+/)[0] as string;
+
+// The words of a command line, a double-quoted one whole (a folder with a space in its name).
+function commandWords(command: string): string[] {
+  return [...command.matchAll(/"([^"]*)"|(\S+)/g)].map((match) => match[1] ?? (match[2] as string));
+}
+
+// The options of node that take the next word as their value.
+const NODE_VALUE_OPTIONS = new Set(['-r', '--require', '--import', '--loader', '--env-file']);
+
+// The script a node command line runs: its first word that is no option; undefined for an inline
+// script (-e, -p) or none. Its other words are the harness's own arguments, the person's prompt
+// among them, which may name npm without being it.
+function scriptOf(command: string): string | undefined {
+  const words = commandWords(command).slice(1);
+  for (let at = 0; at < words.length; at++) {
+    const word = words[at] as string;
+    if (/^(-e|-p|-c|--eval|--print)$/.test(word)) return undefined;
+    if (NODE_VALUE_OPTIONS.has(word)) at++;
+    else if (!word.startsWith('-')) return word;
+  }
+  return undefined;
+}
+
+// npm, npx, pnpm and yarn are node programs: node running their script is a wrapper too, however
+// the system names the process.
+const PACKAGE_RUNNER =
+  /(?:^|[\\/])(?:npm-cli|npx-cli|npm|npx|pnpm|pnpm\.cjs|yarn(?:-[\d.]+)?)(?:\.c?js)?$/i;
+
+function isWrapper(row: ProcessRow): boolean {
+  const program = programOf(row.name);
+  if (WRAPPERS.has(program)) return true;
+  if (program !== 'node' || row.command === undefined) return false;
+  // npm retitles its process `npm exec otea`: the program is then the first word.
+  const title = commandWords(row.command)[0];
+  if (title !== undefined && PACKAGE_RUNNER.test(title)) return true;
+  const script = scriptOf(row.command);
+  return script !== undefined && PACKAGE_RUNNER.test(script);
+}
+
+// The harness session a command started by `start` runs under: the first process above it that is
+// no shell and no wrapper, and so lasts as long as the session does. Undefined when the table does
+// not reach one (a parent it does not list).
+export function harnessOf(rows: readonly ProcessRow[], start: number): number | undefined {
+  const byPid = new Map(rows.map((row) => [row.pid, row]));
+  const seen = new Set<number>();
+  let row = byPid.get(start);
+  while (row && !seen.has(row.pid)) {
+    seen.add(row.pid);
+    if (!SHELLS.has(programOf(row.name)) && !isWrapper(row)) return row.pid;
+    row = byPid.get(row.parent);
+  }
+  return undefined;
+}
+
+// The processes above `pid`, nearest first, as far as the table's parent links can be trusted: a
+// parent that started after its child is a process id handed out again, not the child's parent, and
+// the walk stops there.
+export function ancestorsOf(rows: readonly ProcessRow[], pid: number): number[] {
+  const byPid = new Map(rows.map((row) => [row.pid, row]));
+  const above: number[] = [];
+  let row = byPid.get(pid);
+  while (row && above.length < 64) {
+    const parent = byPid.get(row.parent);
+    if (!parent || parent.pid === pid || above.includes(parent.pid)) break;
+    if (row.started !== undefined && parent.started !== undefined && parent.started > row.started)
+      break;
+    above.push(parent.pid);
+    row = parent;
+  }
+  return above;
+}
+
+// The agent harnesses Otea knows by name: a process that is one (or node running one) is the
+// session itself, never an intermediary that ends with its command (bwrap, docker exec, ssh,
+// wsl.exe, script). Its first find is trusted at once; an unknown process needs two waits.
+const KNOWN_HARNESS = /^(claude|opencode|codex|agy|gemini|antigravity)(-[a-z]+)?$/;
+
+const harnessWord = (token: string) =>
+  KNOWN_HARNESS.test(
+    basename(token.replaceAll('\\', '/'))
+      .replace(/\.(exe|c?js|mjs|cmd)$/i, '')
+      .toLowerCase(),
+  );
+
+// Whether the command line runs a known harness: its program (a bin called claude), or the script
+// it runs (node .../claude-code/cli.js), never a word further on (`ssh host claude` is ssh). Some
+// systems name a process by its thread, whatever it runs, so the name alone cannot say it.
+function commandRunsHarness(command: string): boolean {
+  const program = commandWords(command)[0] ?? '';
+  const script = scriptOf(command)?.replace(/^["']|["']$/g, '');
+  return harnessWord(program) || (script?.split(/[\\/]/).some(harnessWord) ?? false);
+}
+
+export function isKnownHarness(rows: readonly ProcessRow[], pid: number): boolean {
+  const row = rows.find((each) => each.pid === pid);
+  if (!row) return false;
+  if (KNOWN_HARNESS.test(programOf(row.name))) return true;
+  return row.command !== undefined && commandRunsHarness(row.command);
+}
+
 // Lines of "pid parent name", as both listings below print them; on Windows a tab and the program's
 // file follow, when Windows says it.
 export function readProcessTable(text: string): ProcessRow[] {
   return text.split(/\r?\n/).flatMap((line) => {
-    const match = /^\s*(\d+)\s+(\d+)\s+([^\t]+?)\s*(?:\t(.*?)\s*)?$/.exec(line);
+    // A start time may close the line: a tab, @ and epoch milliseconds.
+    const match =
+      /^\s*(\d+)\s+(\d+)\s+([^\t]+?)\s*(?:\t([^\t]*)(?:\t(.*?))?)?(?:\t@(\d+))?\s*$/.exec(line);
     if (!match) return [];
-    const [, pid, parent, name, path] = match;
+    const [, pid, parent, name, path, command, started] = match;
     const row: ProcessRow = { pid: Number(pid), parent: Number(parent), name: name as string };
-    return [path ? { ...row, path } : row];
+    return [
+      {
+        ...row,
+        ...(path?.trim() ? { path: path.trim() } : {}),
+        ...(command?.trim() ? { command: command.trim() } : {}),
+        // 0: the system did not say.
+        ...(started === undefined || Number(started) === 0 ? {} : { started: Number(started) }),
+      },
+    ];
+  });
+}
+
+// The rows with the command line of each, from lines of "pid command line" (ps -o pid=,args=).
+export function withCommands(rows: readonly ProcessRow[], text: string): ProcessRow[] {
+  const commands = new Map<number, string>();
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^\s*(\d+)\s+(.+?)\s*$/.exec(line);
+    if (match) commands.set(Number(match[1]), match[2] as string);
+  }
+  return rows.map((row) => {
+    const command = commands.get(row.pid);
+    return command === undefined ? row : { ...row, command };
+  });
+}
+
+// The rows with the start time of each, from lines of "pid <start as ps -o lstart= prints it>".
+export function withStarts(rows: readonly ProcessRow[], text: string): ProcessRow[] {
+  const starts = new Map<number, number>();
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^\s*(\d+)\s+(.+?)\s*$/.exec(line);
+    const at = match ? Date.parse(match[2] as string) : Number.NaN;
+    if (match && !Number.isNaN(at)) starts.set(Number(match[1]), Math.floor(at / 1000) * 1000);
+  }
+  return rows.map((row) => {
+    const started = starts.get(row.pid);
+    return started === undefined ? row : { ...row, started };
   });
 }
 
@@ -95,15 +282,22 @@ export function withPosixParents(
 }
 
 const WINDOWS_LISTING =
-  'Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,Name,ExecutablePath | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.Name)`t$($_.ExecutablePath)" }';
+  "Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine,CreationDate | ForEach-Object { \"$($_.ProcessId) $($_.ParentProcessId) $($_.Name)`t$($_.ExecutablePath)`t$(($_.CommandLine -replace '[\\t\\r\\n]+', ' '))`t@$(if ($_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeSeconds() * 1000 } else { 0 })\" }";
 
 // The busy Windows runner answered WMI after 20 s; the owner check waits for it in the background.
 const LISTING_TIMEOUT_MS = 60_000;
 
-function run(
+// A listing with the command line of every process runs past execFile's default 1 MB on a busy
+// Windows machine.
+const LISTING_MAX_BYTES = 16 * 1024 * 1024;
+
+// What a program prints, or undefined when it cannot be read; `warn` is told why, once (an aborted
+// listing, one nobody waits for any more, is no trouble).
+export function readListing(
   command: string,
   args: readonly string[],
   signal: AbortSignal,
+  warn: (line: string) => void = warnListing,
 ): Promise<string | undefined> {
   return new Promise((resolve) => {
     execFile(
@@ -111,11 +305,29 @@ function run(
       args as string[],
       // From the temp folder: on Windows a process holds the folder it runs in, and the listing
       // may outlive this command for a moment; it must never keep the project's folder busy.
-      { cwd: tmpdir(), encoding: 'utf8', timeout: LISTING_TIMEOUT_MS, windowsHide: true, signal },
-      (error, stdout) => resolve(error ? undefined : stdout),
+      {
+        cwd: tmpdir(),
+        encoding: 'utf8',
+        timeout: LISTING_TIMEOUT_MS,
+        windowsHide: true,
+        signal,
+        maxBuffer: LISTING_MAX_BYTES,
+      },
+      (error, stdout) => {
+        if (error && !signal.aborted) {
+          warn(
+            `Otea could not read the process table (${basename(command)}: ${error.message.split('\n')[0]}): it cannot tell when this agent's session ends`,
+          );
+        }
+        resolve(error ? undefined : stdout);
+      },
     );
   });
 }
+
+const warnListing = (line: string) => process.stderr.write(`${line}\n`);
+
+const run = readListing;
 
 // The ps of the MSYS that runs `start` (Git Bash's usr/bin, next to its sh.exe), if it is one.
 function posixLister(rows: readonly ProcessRow[], start: number): string | undefined {
@@ -137,7 +349,15 @@ export async function listProcesses(
 ): Promise<ProcessTable | undefined> {
   if (process.platform !== 'win32') {
     const out = await run('ps', ['-A', '-o', 'pid=,ppid=,comm='], signal);
-    return out === undefined ? undefined : { rows: readProcessTable(out), complete: true };
+    if (out === undefined) return undefined;
+    // The program alone says `node` for Claude Code: its command line, from a second listing,
+    // tells it from any node (isKnownHarness). Without it the rows are still good.
+    const commands = await run('ps', ['-A', '-o', 'pid=,args='], signal, () => {});
+    const rows = readProcessTable(out);
+    const named = commands === undefined ? rows : withCommands(rows, commands);
+    // When each started, from a third listing: a process id handed out again is another process.
+    const starts = await run('ps', ['-A', '-o', 'pid=,lstart='], signal, () => {});
+    return { rows: starts === undefined ? named : withStarts(named, starts), complete: true };
   }
   const out = await run(
     'powershell.exe',
@@ -154,7 +374,18 @@ export async function listProcesses(
 }
 
 // How often a long-running command checks that the processes that started it still run.
+// OTEA_OWNER_CHECK_MS may shorten it (a test that shows a server outliving its starter need not wait
+// several of these), never lengthen it: a check that comes sooner only finds a gone owner sooner.
 const OWNER_CHECK_MS = 5_000;
+const MIN_OWNER_CHECK_MS = 100;
+export function ownerCheckMsOf(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): number {
+  const given = env.OTEA_OWNER_CHECK_MS ? Number(env.OTEA_OWNER_CHECK_MS) : Number.NaN;
+  return Number.isFinite(given)
+    ? Math.min(OWNER_CHECK_MS, Math.max(MIN_OWNER_CHECK_MS, given))
+    : OWNER_CHECK_MS;
+}
 
 // `started`: the process that started this one, which the watch stops it with.
 export type OwnerWatch = {
@@ -162,6 +393,18 @@ export type OwnerWatch = {
   orphaned: () => boolean;
   stop: () => void;
   started: number;
+  // The harness session it runs under (harnessOf), once the processes were listed; undefined when
+  // they could not be, or the watch stopped first.
+  harness: Promise<number | undefined>;
+  // Whether that process is a harness known by name (isKnownHarness); false while unknown.
+  harnessKnown: Promise<boolean>;
+  // When that process started (epoch ms), when the system says.
+  harnessStarted: Promise<number | undefined>;
+  // The processes above that harness that the table's parent links vouch for (ancestorsOf): the
+  // session noted for the agent may be one of them.
+  harnessAbove: Promise<number[]>;
+  // Ends an early listing still running (a watch started with `early` leaves it to its caller).
+  release: () => void;
 };
 
 // Aborts `signal` once the session that started this process is gone (ownerGone), on `parent` (the
@@ -173,11 +416,15 @@ export function watchOwner(
   {
     list = listProcesses,
     alive = processAlive,
-    everyMs = OWNER_CHECK_MS,
+    everyMs = ownerCheckMsOf(),
+    early = false,
   }: {
     list?: (signal: AbortSignal) => Promise<ProcessTable | undefined>;
     alive?: (pid: number) => boolean;
     everyMs?: number;
+    // List the processes at once, not on the first check: for a command that must know its
+    // session soon (the assistant's wait), at the cost of one listing even when it ends at once.
+    early?: boolean;
   } = {},
 ): OwnerWatch {
   // The parent the process started under, not the one it has when this runs: a shell that ended
@@ -190,25 +437,57 @@ export function watchOwner(
   let orphaned = false;
   const onAbort = () => controller.abort();
   parent.addEventListener('abort', onAbort, { once: true });
+  const harness = Promise.withResolvers<number | undefined>();
+  const known = Promise.withResolvers<boolean>();
+  const started = Promise.withResolvers<number | undefined>();
+  const above = Promise.withResolvers<number[]>();
+  const look = () => {
+    if (listed) return;
+    listed = true;
+    void list(listing.signal).then((table) => {
+      if (table) chain = ownerChain(table.rows, start, table.complete);
+      const pid = table ? harnessOf(table.rows, start) : undefined;
+      harness.resolve(pid);
+      known.resolve(table !== undefined && pid !== undefined && isKnownHarness(table.rows, pid));
+      started.resolve(table?.rows.find((row) => row.pid === pid)?.started);
+      above.resolve(table ? ancestorsOf(table.rows, start) : []);
+    });
+  };
   const timer = setInterval(() => {
     if (ownerGone(start, process.ppid, alive, chain)) {
       orphaned = true;
       controller.abort();
       return;
     }
-    if (listed) return;
-    listed = true;
-    void list(listing.signal).then((table) => {
-      if (table) chain = ownerChain(table.rows, start, table.complete);
-    });
+    look();
   }, everyMs);
   timer.unref();
+  // Lets the listing go: nothing waits for the harness any more.
+  const release = () => {
+    listing.abort();
+    harness.resolve(undefined);
+    known.resolve(false);
+    started.resolve(undefined);
+    above.resolve([]);
+  };
   const stop = () => {
     clearInterval(timer);
-    listing.abort();
     parent.removeEventListener('abort', onAbort);
+    // A listing started early outlives the watch until its caller has what it needs (release).
+    if (!early || listed === false) release();
   };
   // Once stopped for any reason it lists nothing more, so a listing never keeps the process alive.
   controller.signal.addEventListener('abort', stop, { once: true });
-  return { signal: controller.signal, orphaned: () => orphaned, stop, started: start };
+  if (early) look();
+  return {
+    signal: controller.signal,
+    orphaned: () => orphaned,
+    stop,
+    started: start,
+    harness: harness.promise,
+    harnessKnown: known.promise,
+    harnessStarted: started.promise,
+    harnessAbove: above.promise,
+    release,
+  };
 }

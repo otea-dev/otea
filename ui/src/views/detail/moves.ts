@@ -110,6 +110,7 @@ export function moveSaysOf(
           unmerged?: true;
           unpushed?: string;
           unchanged?: true;
+          local?: true;
         })
       | undefined;
   },
@@ -145,6 +146,11 @@ export function moveSaysOf(
     // change, which leaves it nothing to push (P2S-R3-3).
     if (lands?.lands !== undefined && kind === 'approve' && lands.unchanged)
       tail = t('sheet.says.unchanged');
+    // A repo with no remote has nothing to push: approving brings it into the person's folder.
+    else if (lands?.lands && lands.local)
+      tail = lands.own
+        ? t('sheet.says.landsOwnLocal', { base: lands.lands })
+        : t('sheet.says.landsLocal', { base: lands.lands, step: lands.landStep ?? '' });
     else if (lands?.lands && lands.own) tail = t('sheet.says.landsOwn', { base: lands.lands });
     else if (lands?.lands !== undefined) {
       // A land step that pushes says so: approving lets the agent push (P5-R3-14).

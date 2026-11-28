@@ -1,0 +1,227 @@
+import { useApp } from '../../app/context.tsx';
+import {
+  type Card,
+  type Chip,
+  type Filter,
+  type MessageKind,
+  messageSnippet,
+} from '../../conversation.ts';
+import { useConversationHits } from '../../conversation-search.ts';
+import { t } from '../../i18n/i18n.ts';
+import { AgentMark, Seg } from '../../kit/index.ts';
+import { NodeGlyph } from '../../lanes/NodeGlyph.tsx';
+import { noteTime } from '../detail/notes.ts';
+import { Bandeja, type BandejaProps } from './Bandeja.tsx';
+
+// «Lo que salió»: what the conversation produced, a card each. A request lists its items with how
+// each stands (and says «te pregunta» when an agent waits for your answer); a consultation shows
+// the question and its answer in a line. A card takes you back to its moment in the conversation.
+
+function Kid({ chip }: { chip: Chip }) {
+  const app = useApp();
+  const body = (
+    <>
+      {chip.look ? (
+        <NodeGlyph look={chip.look} size={22} />
+      ) : (
+        <i className="hb-draft" aria-hidden="true" />
+      )}
+      <span className="hb-id">{chip.id}</span>
+      {chip.title ? (
+        <span className="hb-kt" data-tip={chip.title}>
+          {chip.title}
+        </span>
+      ) : null}
+      <span className="hb-kst" data-state={chip.state}>
+        {chip.agent ? <AgentMark name={chip.agent} decorative /> : null}
+        {t(chip.state, { first: chip.first ?? '' })}
+      </span>
+    </>
+  );
+  return chip.look ? (
+    <button type="button" className="hb-kid" onClick={() => app.openItem(chip.id)}>
+      {body}
+    </button>
+  ) : (
+    <div className="hb-kid">{body}</div>
+  );
+}
+
+function CardView({
+  card,
+  now,
+  onGo,
+  onKind,
+}: {
+  card: Card;
+  now: number;
+  onGo: (root: number) => void;
+  onKind: (root: number, kind: MessageKind) => void;
+}) {
+  return (
+    <article className="hb-card" data-kind={card.kind ?? 'none'} data-asks={card.asks || undefined}>
+      <div className="hb-meta">
+        {card.kind ? (
+          <span className="hb-kind static" data-kind={card.kind}>
+            {t(`hablar.kind.${card.kind}`)}
+          </span>
+        ) : (
+          <span className="hb-kind static" data-kind="none">
+            {t('hablar.kind.none')}
+          </span>
+        )}
+        <time dateTime={card.at}>{noteTime(card.at, now)}</time>
+      </div>
+      <button
+        type="button"
+        className="hb-ct"
+        aria-label={`${t('hablar.out.go')}: ${card.title}`}
+        onClick={() => onGo(card.root)}
+      >
+        {card.title}
+      </button>
+      {card.answer ? <p className="hb-ans">{card.answer}</p> : null}
+      {card.outcome === 'done' || card.outcome === 'none' ? (
+        <p className="hb-outcome" data-outcome={card.outcome}>
+          {t(`hablar.outcome.${card.outcome}`)}
+        </p>
+      ) : null}
+      {card.taking ? <p className="hb-taking">{t('hablar.out.taking')}</p> : null}
+      {card.leftover ? <p className="hb-taking">{t('hablar.out.leftover')}</p> : null}
+      {card.kind === null ? (
+        <div className="hb-sort">
+          {(['request', 'consultation'] as const).map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              className="hb-kind"
+              data-kind={kind}
+              aria-label={t('hablar.kind.make', {
+                kind: t(`hablar.kind.${kind}`),
+                snippet: messageSnippet(card.title, 50),
+              })}
+              onClick={() => onKind(card.root, kind)}
+            >
+              <span>{t(`hablar.kind.${kind}`)}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {card.chips.length > 0 ? (
+        <div className="hb-kids">
+          {card.chips.map((chip) => (
+            <Kid key={chip.id} chip={chip} />
+          ))}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+export function Side({
+  cards,
+  counts,
+  filter,
+  onFilter,
+  onGo,
+  onHit,
+  onKind,
+  now,
+  bandeja,
+  search,
+  onSearch,
+}: {
+  cards: readonly Card[];
+  counts: Record<Filter, number>;
+  filter: Filter;
+  onFilter: (filter: Filter) => void;
+  onGo: (root: number) => void;
+  // Opens a turn the search found: it may be on an earlier page than the one read.
+  onHit: (root: number) => void;
+  // One tap on a card nobody classified: it is a request or a consultation.
+  onKind: (root: number, kind: MessageKind) => void;
+  now: number;
+  // The Bandeja's notes as the page read them, and the one lit by a link.
+  bandeja: BandejaProps;
+  // The words searched in what was said (a consultation too), and what it is typed in.
+  search: string;
+  onSearch: (search: string) => void;
+}) {
+  const { hits, state } = useConversationHits(search);
+  const searching = search.trim() !== '';
+  return (
+    <div className="hb-out">
+      <h2 className="hb-h">{t('hablar.out')}</h2>
+      <p className="hb-hdek">{t('hablar.out.dek')}</p>
+      <Bandeja {...bandeja} />
+      <label className="hb-search">
+        <input
+          type="search"
+          value={search}
+          placeholder={t('hablar.search')}
+          aria-label={t('hablar.search')}
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(event) => onSearch(event.target.value)}
+        />
+      </label>
+      {searching ? (
+        hits.length === 0 ? (
+          <p className="hb-none" role="status">
+            {state === 'ready'
+              ? t('hablar.search.none', { search: search.trim() })
+              : t(state === 'failed' ? 'hablar.search.failed' : 'hablar.search.searching')}
+          </p>
+        ) : (
+          <ul className="hb-hits">
+            {hits.map((hit) => (
+              <li key={hit.root} className="hb-hit">
+                <button type="button" onClick={() => onHit(hit.root)}>
+                  <span className="hb-meta">
+                    {hit.kind ? (
+                      <span className="hb-kind static" data-kind={hit.kind}>
+                        {t(`hablar.kind.${hit.kind}`)}
+                      </span>
+                    ) : null}
+                    <time dateTime={hit.at}>{noteTime(hit.at, now)}</time>
+                  </span>
+                  <span className="hb-hit-text">{hit.text}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : null}
+      {searching ? null : (
+        <>
+          <Seg
+            className="hb-filter"
+            label={t('hablar.filter')}
+            value={filter}
+            onChange={onFilter}
+            options={(['all', 'request', 'consultation'] as const).map((value) => ({
+              value,
+              label: (
+                <>
+                  {t(`hablar.filter.${value}`)}
+                  <small>{counts[value]}</small>
+                </>
+              ),
+            }))}
+          />
+          {cards.length === 0 ? (
+            <p className="hb-none">
+              {t(filter === 'all' ? 'hablar.out.empty' : 'hablar.out.none')}
+            </p>
+          ) : (
+            <div className="hb-cards">
+              {cards.map((card) => (
+                <CardView key={card.root} card={card} now={now} onGo={onGo} onKind={onKind} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

@@ -384,6 +384,56 @@ describe('a board reading in the history', () => {
   });
 });
 
+// D-eb906c (s-real2): the assistant's note and Otea's own diff were read as «you» by the person,
+// who never wrote either. An agent's act, or Otea's, is never labelled as the person's.
+describe('what was written or done for you, never as you', () => {
+  afterEach(() => setLanguage('en'));
+  const sol = { kind: 'agent', name: 'sol' } as const;
+  const otea = { kind: 'otea', name: 'otea' } as const;
+  const left = (data: Record<string, unknown>) =>
+    ev('note_left', sol, { note: 1, text: 'Quick, not slow.', step: 'fix', round: 1, ...data }, 5);
+
+  it('says the assistant left a note for you, in both languages', () => {
+    const events = [left({ relayed: true, role: 'assistant' })];
+    const [line] = historyOf(events, bug, word, NOW);
+    expect(line).toMatchObject({
+      text: 'The assistant, for you, left it a note',
+      quote: 'Quick, not slow.',
+      dot: 'relay',
+    });
+    setLanguage('es');
+    expect(historyOf(events, bug, word, NOW)[0]?.text).toBe(
+      'Tu asistente, de tu parte, le dejó una nota',
+    );
+  });
+
+  it('names the agent when the one that relayed it is not the assistant', () => {
+    const [line] = historyOf([left({ relayed: true })], bug, word, NOW);
+    expect(line?.text).toBe('sol, for you, left it a note');
+  });
+
+  it('still says «you left it a note» for a note the person wrote', () => {
+    const [line] = historyOf(
+      [ev('note_left', you, { note: 1, text: 'Mine', step: 'fix', round: 1 }, 5)],
+      bug,
+      word,
+      NOW,
+    );
+    expect(line).toMatchObject({ text: 'You left it a note', dot: 'note' });
+  });
+
+  it('says Otea attached the diff it computed, not you', () => {
+    const [line] = historyOf(
+      [ev('evidence_added', otea, { filename: 'otea-branch-abc1234.diff' }, 5)],
+      bug,
+      word,
+      NOW,
+    );
+    expect(line).toMatchObject({ text: 'Attached otea-branch-abc1234.diff', who: 'Otea' });
+    expect(line?.dot).toBe('agent');
+  });
+});
+
 describe('a step deleted since', () => {
   const board = {
     ...bug,
@@ -662,7 +712,7 @@ describe('who did what on a board, in the history', () => {
       NOW,
       def,
     );
-    expect(line?.text).toBe('Registró que feat/x se fusionó');
+    expect(line?.text).toBe('Registró que feat/x se integró');
   });
 });
 

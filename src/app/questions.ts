@@ -10,15 +10,17 @@ import {
   type ItemQuestion,
   QUESTION_ANSWERED,
   QUESTION_ASKED,
+  QUESTION_UNANSWERED,
   questionsOf,
   waitAnswerText,
 } from '../core/board/questions.ts';
 import { OteaError } from '../core/errors.ts';
 import type { Actor } from '../core/item.ts';
-import { activeLease } from '../core/lease.ts';
+import { activeLease, DEFAULT_LEASE_TTL_MS } from '../core/lease.ts';
 import { transaction } from '../store/database.ts';
 import {
   appendEvent,
+  findAgent,
   type ItemRecord,
   selectEvents,
   selectEventsOfTypes,
@@ -26,12 +28,14 @@ import {
   selectStateEntries,
 } from '../store/queries.ts';
 import { askingItems } from './asking.ts';
+import { assistantName } from './assistant.ts';
 import type { Context } from './context.ts';
+import { dropTraceOf, RETRACT_ANSWER_MS, traceAnswer } from './conversation.ts';
 import { requireItem, requireWritableItem, systemClock } from './items.ts';
 import { assertMayWriteItem, takeItem } from './lease-take.ts';
 import { itemOnBoard, type LiveBoard, liveBoardOf, relayAllowed } from './next.ts';
 import { sessionAlive } from './presence.ts';
-import { RELAYED_HUMAN } from './relay.ts';
+import { assertSaidInHablar, RELAYED_HUMAN } from './relay.ts';
 import { liftSetAside, SET_ASIDE_LIFTED } from './set-aside.ts';
 
 // An agent's question to the person (core/board/questions.ts): the agent asks while it does a step,
@@ -43,11 +47,14 @@ type Why =
   | 'not_agent'
   | 'not_person'
   | 'empty'
+  | 'too_long'
   | 'not_working'
   | 'asking'
   | 'none_open'
   | 'options'
+  | 'option_text'
   | 'no_option'
+  | 'not_asker'
   | 'stale';
 
 function refuse(
@@ -66,11 +73,16 @@ export type AskInput = {
   text: string;
   options?: readonly string[];
   recommended?: number;
+  // The numbers (from 1) of the options that need the person's own words (ask --option-text).
+  optionText?: readonly number[];
   actor: Actor;
   channel: Channel;
 };
 
 export type AskResult = { question: ItemQuestion; text: string };
+
+// A question is read by the person, the assistant and the next agent: a few lines, never a wall.
+export const MAX_QUESTION_CHARS = 2000;
 
 // The board and the step an agent is doing on the item, or the refusal of a question on it.
 function doing(ctx: Context, item: ItemRecord): { board: LiveBoard; step: string } {
@@ -90,6 +102,26 @@ function doing(ctx: Context, item: ItemRecord): { board: LiveBoard; step: string
   return { board, step: step.id };
 }
 
+// The options marked as needing the person's own words: numbers of options that exist, once each.
+export function checkedOptionText(
+  given: readonly number[] | undefined,
+  count: number,
+  id: string,
+): number[] {
+  const numbers = [...new Set(given ?? [])].sort((a, b) => a - b);
+  for (const number of numbers) {
+    if (!Number.isInteger(number) || number < 1 || number > count) {
+      refuse(
+        'invalid_fields',
+        id,
+        'option_text',
+        `Not asked on ${id}: --option-text ${number} names no option (${count} given, numbered from 1)`,
+      );
+    }
+  }
+  return numbers;
+}
+
 // The agent doing the item's step asks the person: one question at a time, while no other agent
 // holds the item. The question keeps the step and round it was asked in.
 export function askQuestion(ctx: Context, input: AskInput, now = systemClock): AskResult {
@@ -98,9 +130,17 @@ export function askQuestion(ctx: Context, input: AskInput, now = systemClock): A
     refuse('forbidden', id, 'not_agent', `Not asked: only an agent asks the person on ${id}`);
   const text = input.text.trim();
   if (text === '') refuse('reason_required', id, 'empty', `Not asked on ${id}: say your question`);
+  if (text.length > MAX_QUESTION_CHARS)
+    refuse(
+      'invalid_fields',
+      id,
+      'too_long',
+      `Not asked on ${id}: ${MAX_QUESTION_CHARS} characters at most, the question first; the rest goes on the item`,
+    );
   const checked = checkOptions(input.options, input.recommended);
   if ('problem' in checked)
     refuse('invalid_fields', id, 'options', `Not asked on ${id}: ${checked.problem}`);
+  const optionText = checkedOptionText(input.optionText, checked.options.length, id);
   return transaction(ctx.db, () => {
     const item = requireWritableItem(ctx.db, id);
     const at = now();
@@ -132,6 +172,7 @@ export function askQuestion(ctx: Context, input: AskInput, now = systemClock): A
           : {
               options: checked.options,
               ...(checked.recommended === undefined ? {} : { recommended: checked.recommended }),
+              ...(optionText.length === 0 ? {} : { optionText }),
             }),
       },
     });
@@ -166,6 +207,91 @@ export function answerQuestion(ctx: Context, input: PersonAnswer, now = systemCl
     channel: input.channel,
     ...(input.question === undefined ? {} : { question: input.question }),
   };
+  const answered = answeredQuestion(ctx, input, base, now);
+  // What they chose stays in the conversation, where they will look for it.
+  const { answer } = answered;
+  if (answer)
+    traceAnswer(
+      ctx,
+      {
+        about: id,
+        asked: answered.text,
+        text: answer.text,
+        mode: answer.mode,
+        option: answer.option,
+        by: input.actor.name,
+      },
+      now,
+    );
+  return answered;
+}
+
+// How long the person may take back a tap on an agent's question (Deshacer).
+const RETRACT_ITEM_ANSWER_MS = RETRACT_ANSWER_MS;
+
+// The person takes back the tap they just gave on an option of an agent's question: the question
+// waits for them again. The assistant's questions have the same rule (conversation.ts
+// retractAnswer): only the person, within 30 seconds, only a tapped option (not words, not leaving
+// it to the agent, not an answer an agent noted from the chat), and only while the agent has not
+// acted on it. Both events are dropped from the item's history (`undoes`).
+export function retractItemAnswer(
+  ctx: Context,
+  input: { id: string; actor: Actor },
+  now = systemClock,
+): ItemQuestion {
+  const { id } = input;
+  if (input.actor.kind !== 'human')
+    refuse('forbidden', id, 'not_person', `Not taken back: the person answers questions on ${id}`);
+  const undoable = (why: string): never => {
+    throw new OteaError('not_undoable', `${id}: ${why}`);
+  };
+  return transaction(ctx.db, () => {
+    const item = requireWritableItem(ctx.db, id);
+    const events = selectEvents(ctx.db, item.id);
+    const answered = questionsOf(events).findLast((each) => each.answer !== undefined);
+    const answer = answered?.answer;
+    const event = events.findLast(
+      ({ type, data }) => type === QUESTION_ANSWERED && data.question === answered?.question,
+    );
+    if (!answered || !answer || event?.id === undefined)
+      return undoable('there is no answer to take back');
+    if (answer.mode !== 'option' || answer.via !== undefined)
+      return undoable('only a tap on one of its options is taken back, not words you wrote');
+    // Whatever came after the tap that the agent or the desk did on its own: the item moved, or the
+    // agent called Otea since (it may have read the answer).
+    const after = events.filter(({ id: at }) => (at ?? 0) > (event.id ?? 0));
+    const quiet = new Set(['claimed', SET_ASIDE_LIFTED, 'question_unanswered']);
+    if (after.some(({ type }) => !quiet.has(type)))
+      return undoable('the agent already went on with your answer');
+    const acted = findAgent(ctx.db, answered.by)?.actedAt;
+    if (acted !== undefined && acted !== null && acted >= answer.at)
+      return undoable('the agent already has your answer');
+    if (Date.parse(now()) - Date.parse(answer.at) > RETRACT_ITEM_ANSWER_MS)
+      return undoable('the answer is too old to take back');
+    appendEvent(ctx.db, {
+      itemId: item.id,
+      type: QUESTION_UNANSWERED,
+      actor: input.actor,
+      at: now(),
+      data: { question: answered.question, undoes: event.id },
+    });
+    // The trace of the tap in the conversation goes with it.
+    dropTraceOf(ctx, item.id);
+    const back = questionsOf(selectEvents(ctx.db, item.id)).find(
+      ({ question }) => question === answered.question,
+    );
+    if (!back) throw new Error(`question ${answered.question} on ${item.id} was not kept`);
+    return back;
+  });
+}
+
+function answeredQuestion(
+  ctx: Context,
+  input: PersonAnswer,
+  base: Omit<AnswerInput, 'text'> & { question?: number },
+  now: () => string,
+): ItemQuestion {
+  const { id } = input;
   if (input.delegate)
     return recordAnswer(ctx, { ...base, text: DELEGATED }, {}, now, () => ({
       text: DELEGATED,
@@ -204,10 +330,12 @@ export type ChatAnswerResult = { question: ItemQuestion; text: string };
 
 // The answer the person gave in the chat instead of in Otea, put on the question by an agent (otea
 // answer, P4-R2-2): it is the person's, as a relayed decision is, marked as noted by that agent,
-// and hands the turn back as an answer given in Otea does.
+// and hands the turn back as an answer given in Otea does. Only the agent that asked notes it (the
+// person is in its chat), or the assistant with the person's own message from Talk: any other agent
+// would be answering in the person's name (D-816632).
 export function noteChatAnswer(
   ctx: Context,
-  input: AnswerInput,
+  input: AnswerInput & { fromMessage?: number },
   now = systemClock,
 ): ChatAnswerResult {
   const { id, actor } = input;
@@ -236,6 +364,18 @@ export function noteChatAnswer(
     data,
     now,
     (open) => {
+      if (open.by !== actor.name) {
+        if (assistantName(ctx.db) !== actor.name)
+          refuse(
+            'forbidden',
+            id,
+            'not_asker',
+            `Not noted on ${id}: only ${open.by}, who asked it, notes what the person said in its chat; they answer it on the desk or the phone, or tell the assistant in Talk. Never answer for the person.`,
+          );
+        // The assistant notes only words the person wrote in Talk, as a relay does.
+        const from = input.fromMessage === undefined ? {} : { fromMessage: input.fromMessage };
+        assertSaidInHablar(ctx, { id, via: actor.name, ...from }, text, now());
+      }
       const option = optionSaid(open, text);
       return option === undefined
         ? { text, data: { mode: 'text' } }
@@ -305,7 +445,13 @@ function recordAnswer(
     const lease = activeLease(item.lease, at);
     // The agent that asked, noting the answer from its own chat, is at work this moment.
     const gone = extra.via !== open.by && !sessionAlive(ctx.db, open.by, () => at);
-    if (!lease && !gone) takeItem(ctx.db, item, { kind: 'agent', name: open.by }, at);
+    // A lease it still holds with less than a third of a default lease left is renewed too: the
+    // answer comes back to it, and a lease that ends right after the tap would turn the item
+    // «atascado» while it picks it up. One with more left is left alone (no write per answer).
+    const renew =
+      lease?.holder === open.by &&
+      Date.parse(lease.expiresAt) - Date.parse(at) < DEFAULT_LEASE_TTL_MS / 3;
+    if ((!lease || renew) && !gone) takeItem(ctx.db, item, { kind: 'agent', name: open.by }, at);
     return { question: answered, gone };
   });
 }

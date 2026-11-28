@@ -191,8 +191,60 @@ describe('reviewing an item on the phone', () => {
     expect(at('Ya cruzan.')).toBeLessThan(at('puente.png'));
     expect(at('puente.png')).toBeLessThan(at('El último se queda.'));
     // Who, type, board and the rest fold under Detalles, after the delivery.
-    expect(at('Detalles')).toBeGreaterThan(at('El último se queda.'));
+    expect(html.lastIndexOf('Detalles')).toBeGreaterThan(at('El último se queda.'));
     expect(html).toMatch(/class="p-more"[^>]*aria-expanded="false"/);
+    // H3: the picture comes first; the code file waits behind «Detalles técnicos», closed.
+    expect(at('Detalles técnicos')).toBeGreaterThan(at('puente.png'));
+    expect(at('wolf.ts')).toBeGreaterThan(at('Detalles técnicos'));
+    expect(html).toContain('<details class="tech"');
+    expect(html).not.toContain('<details class="tech" open');
+  });
+
+  // Field study 6 (u5): on a code board the diff is what is reviewed, and a phone hid it under a
+  // closed «Detalles técnicos». The diff reads with the pictures; the logs, the files and the
+  // branch stay folded.
+  it('keeps the diff of a code board in sight, and folds only the rest of the technical', () => {
+    setLanguage('es');
+    const withDiff: ItemView = {
+      ...review,
+      evidence: [
+        ...review.evidence,
+        { ...shot(4, 'cambio.diff', 50), kind: 'diff' as const },
+        { ...shot(5, 'pruebas.log', 40), kind: 'log' as const },
+      ],
+    };
+    const html = render(withDiff);
+    const at = (s: string) => html.indexOf(s);
+    expect(at('Detalles técnicos')).toBeGreaterThan(-1);
+    expect(at('cambio.diff')).toBeGreaterThan(-1);
+    // The diff is before the fold; the log and the file are after it.
+    expect(at('cambio.diff')).toBeLessThan(at('Detalles técnicos'));
+    expect(at('pruebas.log')).toBeGreaterThan(at('Detalles técnicos'));
+    expect(at('wolf.ts')).toBeGreaterThan(at('Detalles técnicos'));
+  });
+
+  // Field study 3: the handoff note was one long paragraph in the big serif, with the evidence
+  // far under it. It leads with its first sentence; the rest waits behind «ver más».
+  it('sets a long handoff note as a conclusion with the rest folded', () => {
+    setLanguage('es');
+    const long = [
+      'Ya cruzan: el lobo toma el puente de cuerda.',
+      'Cambié el pathfinding para que acepte aristas con peso.',
+      'Revisé los cuatro mapas viejos y ninguno se rompe con el cambio de pesos.',
+      'Dejé el commit 2fda019 en la rama de trabajo con las pruebas que corrí a mano.',
+      'Queda pendiente medir el costo en el mapa grande, que no pude probar en esta máquina.',
+    ].join(' ');
+    const last = review.events.length - 1;
+    const note: ItemView = {
+      ...review,
+      events: review.events.map((e, i) =>
+        i === last ? { ...e, data: { ...e.data, reason: long } } : e,
+      ),
+    };
+    const html = render(note);
+    expect(html).toContain('Ya cruzan: el lobo toma el puente de cuerda.');
+    expect(html).not.toContain('Queda pendiente medir');
+    expect(html).toContain('ver más');
   });
 
   it('docks Devolver and Aprobar at the bottom, without Descartar', () => {

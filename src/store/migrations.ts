@@ -483,6 +483,242 @@ export const MIGRATIONS = [
   `
   ALTER TABLE project ADD COLUMN lang TEXT;
   `,
+  // The secretary (0.8): the role an agent declared (at most one agent of the project has
+  // 'secretary', kept by app/secretary.ts), the signals that wake its wait (a message from the
+  // person, a Bandeja capture, an escalated question: returned once, then taken), and when each
+  // stretch of unheard board work began, so the grace holds across waits (app/secretary.ts).
+  `
+  ALTER TABLE agents ADD COLUMN role TEXT;
+
+  CREATE TABLE secretary_signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    ref TEXT,
+    text TEXT,
+    at TEXT NOT NULL,
+    taken_at TEXT
+  );
+
+  CREATE TABLE unheard_stretches (
+    key TEXT PRIMARY KEY,
+    since INTEGER NOT NULL,
+    told_at TEXT
+  );
+  `,
+  // The secretary's signals and stretches are returned by a wait and acked once it acted: until
+  // then the next wait returns them again, so one lost with a killed wait is not lost. A stretch
+  // also notes when a look last found it unheard, so one nobody watched for long begins again.
+  `
+  ALTER TABLE secretary_signals ADD COLUMN deliveries INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE secretary_signals ADD COLUMN acked_at TEXT;
+  ALTER TABLE unheard_stretches ADD COLUMN tells INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE unheard_stretches ADD COLUMN acked_at TEXT;
+  ALTER TABLE unheard_stretches ADD COLUMN seen_at INTEGER;
+  `,
+  // The conversation (0.8): the messages between the person and the secretary, ordered by id; the
+  // files that came with them (stored once under evidence/, by hash); and the items each turn
+  // produced (message_id is the turn's first message, its root). A person's message has read_at
+  // null until the secretary read it. client_key (kept per client_scope, the device or the desk's
+  // session, with a digest of what was sent) lets a phone send again what it never heard back about
+  // without a second message; the same key with other content is refused.
+  `
+  CREATE TABLE conversation_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    author TEXT NOT NULL,
+    author_name TEXT NOT NULL,
+    text TEXT NOT NULL,
+    at TEXT NOT NULL,
+    reply_to INTEGER REFERENCES conversation_messages (id),
+    root INTEGER,
+    kind TEXT,
+    kind_by TEXT,
+    read_at TEXT,
+    topic TEXT,
+    client_scope TEXT,
+    client_key TEXT,
+    client_digest TEXT,
+    UNIQUE (client_scope, client_key)
+  );
+  CREATE INDEX conversation_unread ON conversation_messages (author, read_at);
+  CREATE INDEX conversation_topic ON conversation_messages (topic);
+  CREATE INDEX conversation_root ON conversation_messages (root);
+
+  CREATE TABLE conversation_attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL REFERENCES conversation_messages (id),
+    filename TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    sha256 TEXT NOT NULL
+  );
+  CREATE INDEX conversation_attachments_message ON conversation_attachments (message_id);
+
+  CREATE TABLE conversation_links (
+    message_id INTEGER NOT NULL REFERENCES conversation_messages (id),
+    item_id TEXT NOT NULL,
+    at TEXT NOT NULL,
+    PRIMARY KEY (message_id, item_id)
+  );
+  CREATE INDEX conversation_links_item ON conversation_links (item_id);
+  `,
+  // The Bandeja (0.8): rough notes the person captured (text and files, no board form) that wait
+  // for a refiner to turn them into items. An entry is held by one refiner at a time (claimed_by
+  // until claim_until, a lease), may carry questions the refiner asked the person with options
+  // (bandeja_questions, answered from the desk), and ends filed under the item it became (item_id).
+  // Files are stored once by hash under evidence/, as the conversation's are. client_key works as
+  // the conversation's: a phone sending again what it never heard back makes one entry.
+  `
+  CREATE TABLE bandeja_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    author_name TEXT NOT NULL,
+    text TEXT NOT NULL,
+    at TEXT NOT NULL,
+    claimed_by TEXT,
+    claimed_at TEXT,
+    claim_until TEXT,
+    item_id TEXT,
+    filed_by TEXT,
+    filed_at TEXT,
+    client_scope TEXT,
+    client_key TEXT,
+    client_digest TEXT,
+    UNIQUE (client_scope, client_key)
+  );
+  CREATE INDEX bandeja_open ON bandeja_entries (filed_at, claimed_by);
+  CREATE INDEX bandeja_item ON bandeja_entries (item_id);
+
+  CREATE TABLE bandeja_attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_id INTEGER NOT NULL REFERENCES bandeja_entries (id),
+    filename TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    sha256 TEXT NOT NULL
+  );
+  CREATE INDEX bandeja_attachments_entry ON bandeja_attachments (entry_id);
+
+  CREATE TABLE bandeja_questions (
+    entry_id INTEGER NOT NULL REFERENCES bandeja_entries (id),
+    n INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    options TEXT,
+    recommended INTEGER,
+    asked_by TEXT NOT NULL,
+    at TEXT NOT NULL,
+    answer_text TEXT,
+    answer_mode TEXT,
+    answer_option INTEGER,
+    answered_at TEXT,
+    PRIMARY KEY (entry_id, n)
+  );
+  `,
+  // The conversation as a thread (0.8 fix round): a secretary message may carry a question with
+  // options to tap (options, a JSON list, and recommended); the person's answer to a question is a
+  // message of theirs (choice: how they answered; about and asked when it records an answer given
+  // to an agent's question on an item or a Bandeja entry, which wakes nobody); heard_at is when the
+  // secretary's wait returned the message (before it read it); kind_news is a kind the person
+  // changed that the secretary has not read yet.
+  `
+  ALTER TABLE conversation_messages ADD COLUMN options TEXT;
+  ALTER TABLE conversation_messages ADD COLUMN recommended INTEGER;
+  ALTER TABLE conversation_messages ADD COLUMN choice TEXT;
+  ALTER TABLE conversation_messages ADD COLUMN choice_option INTEGER;
+  ALTER TABLE conversation_messages ADD COLUMN about TEXT;
+  ALTER TABLE conversation_messages ADD COLUMN asked TEXT;
+  ALTER TABLE conversation_messages ADD COLUMN heard_at TEXT;
+  ALTER TABLE conversation_messages ADD COLUMN kind_news INTEGER NOT NULL DEFAULT 0;
+  `,
+  // A Bandeja entry the secretary or its refiner closed with a reason (a duplicate, nothing to
+  // do): it waits for nobody, shows as closed, and the person may reopen it.
+  `
+  ALTER TABLE bandeja_entries ADD COLUMN closed_at TEXT;
+  ALTER TABLE bandeja_entries ADD COLUMN closed_by TEXT;
+  ALTER TABLE bandeja_entries ADD COLUMN close_reason TEXT;
+  `,
+  // What answers a message: isAnswered and the open questions look for a person's message by the
+  // one it replies to, which scanned the whole conversation.
+  `
+  CREATE INDEX conversation_reply_to ON conversation_messages (reply_to);
+  `,
+  // A question of the secretary's that carries an action the person's tap performs (field study 4:
+  // a change of mind on an item in review): a JSON object, performed as the person on the first
+  // option, never by the secretary.
+  `
+  ALTER TABLE conversation_messages ADD COLUMN action TEXT;
+  `,
+  // Security and trust (field study 4, U8): a secretary message whose session Otea could not tie to
+  // the one noted for the secretary (unverified, which the desk marks), the options of a question
+  // that need the person's own words (option_text, a JSON list of option numbers), and a question
+  // that stopped being asked, by the secretary withdrawing it or because what it asked was settled
+  // elsewhere (closed_at, closed_why).
+  `
+  ALTER TABLE conversation_messages ADD COLUMN unverified INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE conversation_messages ADD COLUMN option_text TEXT;
+  ALTER TABLE conversation_messages ADD COLUMN closed_at TEXT;
+  ALTER TABLE conversation_messages ADD COLUMN closed_why TEXT;
+  `,
+  // The start time (epoch ms, to the second) of the harness process noted for an agent, kept with
+  // its id: a process id the system hands out again is another process, and the binding of a name
+  // to its session (adversarial review of S) compares both.
+  `
+  ALTER TABLE agents ADD COLUMN listening_harness_started INTEGER;
+  `,
+  // Read is not answered (field study 4, U6): how many times a message the secretary read and did
+  // not answer was brought back to its waits. A restarted secretary starts the count again.
+  `
+  ALTER TABLE conversation_messages ADD COLUMN owed_returns INTEGER NOT NULL DEFAULT 0;
+  `,
+  // The options of a refiner's question on a Bandeja note that need the person's own words (field
+  // study 5: «te escribo…» was sent as it read): a JSON list of option numbers, as the secretary's.
+  `
+  ALTER TABLE bandeja_questions ADD COLUMN option_text TEXT;
+  `,
+  // What a write of the person answered, kept under the Idempotency-Key it came with (field study 4,
+  // T1b): a tap, an answer, an undo or a reopen sent again gives that result, never a refusal that
+  // reads as a failure, and the same key with other content is refused. A key is one client's (the
+  // device or the desk's browser) and one route's.
+  `
+  CREATE TABLE replays (
+    scope TEXT NOT NULL,
+    key TEXT NOT NULL,
+    route TEXT NOT NULL,
+    digest TEXT NOT NULL,
+    status INTEGER NOT NULL,
+    body TEXT NOT NULL,
+    at TEXT NOT NULL,
+    PRIMARY KEY (scope, key, route)
+  );
+  `,
+  // A turn's link says whether the item was made from the turn (create --from-message, or an item
+  // created after the turn the secretary links) or only mentioned by it (D-274c07): «Lo que salió»
+  // reads a request done only when what was made from it is. The links that exist read as the same
+  // rule does: made when the item was created after the turn began.
+  `
+  ALTER TABLE conversation_links ADD COLUMN made INTEGER NOT NULL DEFAULT 0;
+  UPDATE conversation_links SET made = 1
+   WHERE EXISTS (
+     SELECT 1 FROM items i
+       WHERE i.id = conversation_links.item_id
+         AND i.created_at >= (SELECT m.at FROM conversation_messages m WHERE m.id = conversation_links.message_id));
+  `,
+  // The project's assistant was called "the secretary" while 0.8 was built: what was stored under
+  // that word is rewritten, never read through a mapping. The signals' table, the role an agent
+  // declared, who wrote a message and who set a turn's kind, and the role a relayed note records
+  // in its event (the one place a row of the append-only log is rewritten: its trigger is put back).
+  `
+  ALTER TABLE secretary_signals RENAME TO assistant_signals;
+  UPDATE agents SET role = 'assistant' WHERE role = 'secretary';
+  UPDATE conversation_messages SET author = 'assistant' WHERE author = 'secretary';
+  UPDATE conversation_messages SET kind_by = 'assistant' WHERE kind_by = 'secretary';
+
+  DROP TRIGGER events_no_update;
+  UPDATE events SET data = json_set(data, '$.role', 'assistant')
+   WHERE json_valid(data) AND json_extract(data, '$.role') = 'secretary';
+  CREATE TRIGGER events_no_update BEFORE UPDATE ON events
+  BEGIN SELECT RAISE(ABORT, 'events are append-only'); END;
+  `,
 ];
 
 function userVersion(db: DatabaseSync): number {
@@ -502,9 +738,13 @@ export function applyMigrations(
     );
   }
   for (const [offset, sql] of migrations.slice(current, target).entries()) {
+    const done = current + offset + 1;
     transaction(db, () => {
+      // The version was read before the lock: another process (the desk, an agent's command) may have
+      // run this one since, and running it twice fails on the table or column it made.
+      if (userVersion(db) >= done) return;
       db.exec(sql);
-      db.exec(`PRAGMA user_version = ${current + offset + 1}`);
+      db.exec(`PRAGMA user_version = ${done}`);
     });
   }
 }

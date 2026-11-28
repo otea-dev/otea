@@ -1,3 +1,4 @@
+import type { LocalBehind } from '../../../../src/cli/local-behind.ts';
 import type { MergedOutside } from '../../../../src/cli/merged-outside.ts';
 import type { ItemChoice } from '../../../../src/core/board/choices.ts';
 import {
@@ -45,6 +46,7 @@ import { type BoardSpeech, boardSpeech, capital } from '../../board-words.ts';
 import { relayOf } from '../../format.ts';
 import { listOf, listOr, quoted, t } from '../../i18n/i18n.ts';
 import type { Look } from '../../lanes/looks.ts';
+import { mergeReturnTimes } from '../../merge-round.ts';
 import type { AgentProfile } from '../../presence.ts';
 import { keptStateWord } from '../../preset-words.ts';
 import type { Evidence, ItemEvent, RelatedItem } from '../../types.ts';
@@ -106,6 +108,8 @@ export function boardItemOf(
   def: BoardDefinition,
   item: ItemLike,
   words: RouteWords,
+  // The agent's taking the item back after its approval (`item.bounced`): that loop is no send-back.
+  bounced?: { at: string },
 ): BoardItem | null {
   const position = positionOf(item.state);
   if (isClosed(position) ? position.closed !== DONE : !stepById(def, position.step)) return null;
@@ -116,7 +120,17 @@ export function boardItemOf(
   const round = isClosed(position) ? 0 : (rounds.rounds[position.step] ?? 1);
   const at = isClosed(position) ? DONE : { step: position.step, phase: position.phase };
   const drawn = leadRoute(def, position, item.fields ?? {}, rounds.rounds);
-  const out: BoardItem = { agent, round, route: definitionRoute(drawn, at, rounds.dips, words) };
+  // An agent's return to merge main into approved work is no send-back, whether or not the item is
+  // still on its way back (a merge round).
+  const merges = mergeReturnTimes(item.events);
+  const dips = rounds.dips.map((dip) =>
+    merges.has(dip.at)
+      ? { ...dip, merged: true as const }
+      : bounced && dip.at === bounced.at
+        ? { ...dip, bounced: true as const }
+        : dip,
+  );
+  const out: BoardItem = { agent, round, route: definitionRoute(drawn, at, dips, words) };
   if (!isClosed(position) && position.phase === 'doing') {
     const index = reopenedAt(history.moves, position.step);
     const move = history.moves[index];
@@ -359,14 +373,19 @@ export type BranchStrip = {
   base?: string;
   // Its branch is the base itself (a main-only board): an agent pushes it, nothing is merged.
   own?: true;
+  // The repo has no remote: nothing is pushed, what lands is the person's own folder.
+  local?: true;
 };
+
+// Whether the handoff the review approves was made in a repo with no remote.
+export const noRemoteOf = (item: ItemLike): boolean => handedTip(item)?.local === true;
 
 export function branchStrip(
   def: BoardDefinition,
   state: string,
   fields: Readonly<Record<string, string>>,
-  // Whether its branch was marked merged once Done (otea merged).
-  o: { merged?: boolean } = {},
+  // Whether its branch was marked merged once Done (otea merged), and whether the repo has no remote.
+  o: { merged?: boolean; local?: boolean } = {},
 ): BranchStrip | null {
   const branch = guardedBranch(def);
   const value = branch ? fields[branch.id]?.trim() : undefined;
@@ -390,10 +409,42 @@ export function branchStrip(
   if (position.phase !== 'doing') return { tone: 'frozen', key: 'frozen', value, ...repo, step };
   // In the land step an agent merges it and pushes the base, which the page says before it does.
   if (isLandStep(def, position.step) && branch.guard.base)
-    return { tone: 'ok', key: 'landing', value, ...repo, step, base: branch.guard.base };
+    return {
+      tone: 'ok',
+      key: 'landing',
+      value,
+      ...repo,
+      step,
+      base: branch.guard.base,
+      ...(o.local ? { local: true as const } : {}),
+    };
   return gateAt(def, position, 'push').allowed
     ? { tone: 'ok', key: 'push', value, ...repo, step }
     : { tone: 'off', key: 'noPush', value, ...repo, step };
+}
+
+// A Done item whose work landed on the remote's base while the person's local one stayed behind
+// (an agent pushed from a worktree): says so, with the way to catch up.
+export function localBehindSaid(behind: LocalBehind): string {
+  const { remote, base, checkout } = behind;
+  const count = behind.behind;
+  // No remote: the work landed in its branch, nothing was pushed.
+  if (behind.local)
+    return t(`bi.branch.behindLocal.${behind.state}`, {
+      base,
+      checkout,
+      on: behind.on ?? '',
+      paths: (behind.paths ?? []).join(', '),
+    });
+  if (behind.state === 'elsewhere')
+    return t('bi.branch.behind.elsewhere', { count, remote, base, checkout, on: behind.on ?? '' });
+  return t(`bi.branch.behind.${behind.state}`, {
+    count,
+    remote,
+    base,
+    checkout,
+    paths: (behind.paths ?? []).join(', '),
+  });
 }
 
 // The branch line's words after the branch: may it be pushed, is it held in review, how it lands
@@ -411,7 +462,9 @@ export function branchSaid(strip: BranchStrip, outside?: MergedOutside | null): 
     return t('bi.branch.mergedOutside', { base: outside.base, step: outside.land ?? step });
   if (strip.key === 'landing')
     return strip.own
-      ? t('bi.branch.landingOwn', { base: strip.base ?? '' })
+      ? t(strip.local ? 'bi.branch.landingOwnLocal' : 'bi.branch.landingOwn', {
+          base: strip.base ?? '',
+        })
       : t('bi.branch.landing', { base: strip.base ?? '', step });
   if (strip.key === 'landed' && strip.own) return t('bi.branch.landedOwn', { step });
   if (strip.key === 'noPush' || strip.key === 'landed')
@@ -434,6 +487,8 @@ export type RoundNote = {
   reopened?: true;
   // The agent that relayed it as the person's word: `person` is false, `by` is that agent.
   relayedBy?: string;
+  // A `back` note that opened a round which only merges main into approved work: no send-back.
+  merged?: true;
 };
 // `doer`: the agent that did the round, with the profile it did it with (agents mock §5).
 export type Round = {
@@ -483,6 +538,7 @@ export function roundNotes(
   const history = historyFor(def, events, created);
   const starts = roundsOfStep(def, history, stepId);
   const doers = roundDoers(stepId, starts, events);
+  const merges = mergeReturnTimes(events);
   const rounds: Round[] = starts.map(({ round, back }, i) => ({
     round,
     notes: back?.said.text
@@ -495,6 +551,7 @@ export function roundNotes(
             ...(back.said.relayedBy === undefined ? {} : { relayedBy: back.said.relayedBy }),
             at: back.at,
             ...(back.reopened ? { reopened: true as const } : {}),
+            ...(merges.has(back.at) ? { merged: true as const } : {}),
           },
         ]
       : [],
@@ -521,7 +578,7 @@ export function roundNotes(
 // How the item last left a step: moved on after a review (approved), moved on by its doer
 // (handed), moved on after a send-back into it (reworked), back to an earlier step, or closed.
 export type StepOutcome =
-  | { kind: 'approved' | 'handed' | 'reworked' | 'done' | 'dropped' | 'relayed' }
+  | { kind: 'approved' | 'handed' | 'reworked' | 'merged' | 'done' | 'dropped' | 'relayed' }
   | { kind: 'back'; to: string };
 
 // One step the item went through with its rounds (roundNotes). `current`: the step it is on;
@@ -575,6 +632,7 @@ export function stepRounds(
     if (isClosed(from) || (!isClosed(to) && to.step === from.step)) continue;
     left.set(from.step, move);
   }
+  const merges = mergeReturnTimes(events);
   const closing = history.moves.findLast(({ to, quiet }) => !quiet && isClosed(positionOf(to)));
   const closingFrom = closing ? positionOf(closing.from) : undefined;
   // A closed item opens on the last step whose rounds said something (the step it closed from first),
@@ -602,7 +660,10 @@ export function stepRounds(
     if (isClosed(to)) return { kind: to.closed === DONE ? 'done' : 'dropped' };
     if (stepIndex(def, to.step) < stepIndex(def, id))
       return { kind: 'back', to: stepWord(def, to.step, events) };
-    if (engine.dips.some((dip) => dip.to === id)) return { kind: 'reworked' };
+    const into = engine.dips.filter((dip) => dip.to === id);
+    // Taken back only to merge main into it, never sent back: not «sent back and redone».
+    if (into.length > 0 && into.every((dip) => merges.has(dip.at))) return { kind: 'merged' };
+    if (into.length > 0) return { kind: 'reworked' };
     const from = positionOf(move.from);
     return { kind: !isClosed(from) && from.phase !== 'doing' ? 'approved' : 'handed' };
   };
@@ -672,6 +733,8 @@ export function backOf(
   unmerged?: true;
   unpushed?: string;
   unchanged?: true;
+  // The repo has no remote: landing pushes nothing, and the footnote never says it does.
+  local?: true;
 } {
   const target = positionOf(to);
   // Only an item that names its branch has one to merge (P5-R2-5, P4-R2-4): one that left it empty
@@ -684,6 +747,7 @@ export function backOf(
   const warn = {
     ...(unpushed === undefined ? {} : { unpushed }),
     ...(handedTip(item)?.unchanged === true ? { unchanged: true as const } : {}),
+    ...(handedTip(item)?.local === true ? { local: true as const } : {}),
   };
   if (isClosed(target))
     return target.closed === DONE && branch && !land
@@ -716,7 +780,7 @@ export function backOf(
 // The tip the last handoff into a review recorded of the protected branch.
 function handedTip(
   item: ItemLike,
-): { branch?: unknown; pushed?: unknown; unchanged?: unknown } | undefined {
+): { branch?: unknown; pushed?: unknown; unchanged?: unknown; local?: unknown } | undefined {
   const handed = item.events.findLast(({ type, data }) => {
     if (type !== 'transitioned') return false;
     const to = positionOf(String(data.to));

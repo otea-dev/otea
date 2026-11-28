@@ -16,9 +16,12 @@ export const phone = {
   'phone.search': 'Buscar',
   'phone.search.field': 'Buscar ítems',
   'phone.search.placeholder': 'Un título, un id o una palabra',
-  'phone.search.hint': 'Busca en los títulos, los ids y lo que dicen los campos de cada ítem.',
+  'phone.search.hint':
+    'Busca en los títulos, los ids y lo que dicen los campos de cada ítem, y en lo que se dijo en Hablar.',
+  'phone.search.talk': 'En Hablar',
   'phone.search.none': 'Ningún ítem dice «{search}».',
   'phone.search.count': { one: '{count} ítem', other: '{count} ítems' },
+  'phone.search.countTalk': '{count} en Hablar',
   // Captura rápida (mock, pantalla 3)
   'phone.capture.board': 'Tablero: {board}. Cambiarlo',
   'phone.capture.here': 'este tablero',
@@ -72,12 +75,15 @@ export const phone = {
   'phone.r.yours': 'tu veredicto',
   'phone.r.sentBack': 'devuelta',
   'phone.r.approved': 'aprobada',
-  'phone.r.relayed': 'relayada por un agente',
+  'phone.r.relayed': 'transmitida por un agente',
   'phone.r.closed': 'cerrada',
   'phone.r.delivered': 'Lo que entregó',
   'phone.r.newIn': 'nuevo en la ronda {n}',
   'phone.r.noNote': 'No dejó nota.',
-  'phone.r.unopened': 'Sin abrir: {n} de {total} archivos',
+  'phone.r.unopened': {
+    one: 'Sin abrir: {n} de {total} archivo',
+    other: 'Sin abrir: {n} de {total} archivos',
+  },
   'phone.r.noEvidence': 'Sin archivos en esta ronda.',
   'phone.r.pictures': 'Imágenes',
   'phone.r.noPicture': 'sin imagen',
@@ -91,7 +97,7 @@ export const phone = {
   'phone.r.same': 'igual',
   'phone.r.changedFile': 'cambió',
   'phone.r.read': 'Ver {file}',
-  'phone.r.reader': 'Archivos',
+  'phone.r.reader': 'Lector',
   'phone.r.details': 'Detalles',
   'phone.r.request': 'Lo pedido',
   'phone.r.dock': 'Tu veredicto',
@@ -241,17 +247,22 @@ export const phone = {
   'phone.ts.ledger':
     'El certificado HTTPS es público: el nombre {host} queda en los registros de Certificate Transparency, que cualquiera puede leer.',
   // La app instalada por HTTPS: sin el equipo, la cola, las actualizaciones (offline/)
-  'offline.noReach': 'No llego a tu equipo.',
+  // One word for being without the computer: «Sin conexión» (the pill, the line, each page's
+  // notes). What changes is the cause, which follows, and what can still be done.
+  'offline.head': 'Sin conexión',
+  'offline.askLocal': 'Otea no responde en este equipo.',
   'offline.askTailscale':
     '¿Tailscale está conectado en este teléfono? ¿Otea está abierto en tu equipo?',
   'offline.askLan':
     '¿Este teléfono está en la misma wifi que tu equipo? ¿Otea está abierto en tu equipo?',
-  'offline.closed': 'Otea no está abierto en tu equipo.',
-  'offline.askClosed': 'Ábrelo allí: la app de escritorio u otea serve.',
+  'offline.askClosed':
+    'Otea no está abierto en tu equipo. Ábrelo allí: la app de escritorio u otea serve.',
   'offline.nothingSaved': 'este teléfono todavía no guardó nada de este proyecto',
-  'offline.readQueue': 'solo lectura · lo nuevo queda en cola',
+  'offline.noData': 'sin datos',
+  // What can be done without the computer: read; what is captured (Nuevo, a note) waits in the
+  // queue. A message to the assistant is not captured: Hablar writes again once the PC is back.
+  'offline.readQueue': 'solo lectura · lo que captures queda en cola',
   'offline.retry': 'Reintentar',
-  'offline.oteaDown': 'Otea no responde',
   'offline.synced': 'última sincronización {time}',
   'offline.readOnly': 'solo lectura',
   'offline.updated': 'Otea se actualizó',
@@ -299,9 +310,16 @@ export const phone = {
   'notify.stuckHint': 'un agente dejó de dar señales con él',
   'notify.ask': 'Un agente te pregunta',
   'notify.aside': 'Un agente dejó algo para después',
-  'notify.askText': 'Mostrar el texto de la pregunta',
-  'notify.askTextHint': 'la pantalla bloqueada lo enseña a quien la mire',
-  'notify.unheard': 'Hay trabajo para un agente y nadie escucha',
+  'notify.askText': 'Mostrar el texto en el aviso',
+  'notify.askTextHint':
+    'la pregunta o la respuesta del asistente; la pantalla bloqueada lo enseña a quien la mire',
+  'notify.assistantReply': 'Tu asistente te responde',
+  'notify.assistantReplyHint': 'en Hablar',
+  'notify.assistantOffline': 'Tu asistente está desconectado y te esperan mensajes',
+  'notify.assistantOfflineHint': 'tras 10 minutos esperando; un aviso por desconexión',
+  'notify.short.assistant_reply': 'asistente responde',
+  'notify.short.assistant_offline': 'asistente desconectado',
+  'notify.unheard': 'Hay trabajo esperando y ningún agente conectado',
   'notify.unheardHint': 'ningún agente espera ni trabaja',
   'notify.projects': 'proyectos',
   'notify.short.turn': 'revisiones',
@@ -309,7 +327,7 @@ export const phone = {
   'notify.short.replied': 'respuestas',
   'notify.short.stuck': 'atascos',
   'notify.short.aside': 'apartados',
-  'notify.short.unheard': 'nadie escucha',
+  'notify.short.unheard': 'ningún agente conectado',
   'notify.summary.off': 'Avisos apagados',
   'notify.summary.none': 'Avisos activados, pero ningún tipo elegido',
   'notify.summary.on': 'Avisos: {what}',
@@ -337,6 +355,8 @@ export const phone = {
   'notify.needsHome':
     'En iPhone, los avisos llegan a Otea solo cuando está en la pantalla de inicio (arriba) y la abres desde ahí.',
   'notify.unsupported': 'Este navegador no recibe avisos.',
+  'notify.onPhone':
+    'Los avisos llegan al teléfono: instala Otea en él (pantalla de inicio) y actívalos desde sus Preferencias.',
   'notify.blocked':
     'Los avisos de Otea están bloqueados. Permítelos en los ajustes de este navegador para este sitio.',
   'notify.failed': 'No se pudieron activar. Vuelve a intentarlo.',

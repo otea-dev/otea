@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sequenceIds } from '../../../src/core/board/ids.ts';
 import { instantiate, requireTemplate } from '../../../src/core/board/templates.ts';
 import type { FeedEvent } from '../activity.ts';
+import { waitingTotal } from '../pending.ts';
 import type { Item } from '../types.ts';
 import { agent, ago, inMinutes, item, moved, NOW, officialType, you } from './fixtures.ts';
 import {
@@ -11,7 +12,6 @@ import {
   boardThen,
   handedNote,
   stuckCount,
-  tocaCount,
   tocaSection,
 } from './toca.ts';
 
@@ -95,13 +95,14 @@ describe('the counts of Te toca', () => {
   ];
 
   it('counts what is on your turn and what is stuck', () => {
-    expect(tocaCount(items, ctx())).toBe(3);
+    expect(waitingTotal(items, NOW, 0)).toBe(3);
     expect(stuckCount(items, ctx())).toBe(1);
   });
 
-  it('counts a board’s items on your turn and its open ones', () => {
-    expect(boardCounts(items, 'Errores')).toEqual({ yours: 2, open: 3 });
-    expect(boardCounts(items, 'Arte')).toEqual({ yours: 0, open: 1 });
+  // What waits for you on a board is what Te toca counts: your turn, and what got stuck.
+  it('counts a board’s items that wait for you (the stuck one too) and its open ones', () => {
+    expect(boardCounts(items, 'Errores', NOW)).toEqual({ yours: 3, open: 3 });
+    expect(boardCounts(items, 'Arte', NOW)).toEqual({ yours: 0, open: 1 });
   });
 });
 

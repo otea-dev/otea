@@ -9,6 +9,8 @@ export const toca = {
   'toca.sec.preguntas': 'Preguntas para ti',
   'toca.sec.revisiones': 'Revisiones',
   'toca.sec.propios': 'Tus propios pasos',
+  'toca.sec.avisos': 'Avisos de los agentes',
+  'toca.sec.sinagente': 'Tableros sin agente',
   'toca.sec.encamino': 'En camino',
   'toca.sec.cerrados': 'Cerrados',
   'toca.gloss.encamino': 'con los agentes por ahora',
@@ -24,10 +26,10 @@ export const toca = {
   // El dek
   'toca.numbers': 'cero|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece',
   'toca.dek.waiting': {
-    one: '{n} cosa espera por ti {since}.',
-    other: '{n} cosas esperan por ti; la más antigua, {since}.',
+    one: '{n} cosa te espera {since}.',
+    other: '{n} cosas te esperan; la más antigua, {since}.',
   },
-  'toca.dek.none': 'Nada espera por ti.',
+  'toca.dek.none': 'Nada te espera.',
   'toca.dek.handed': 'Los agentes entregaron {n} hoy.',
   'toca.dek.handedNone': 'Los agentes no entregaron nada hoy.',
   'toca.since.now': 'desde hace un momento',
@@ -39,7 +41,7 @@ export const toca = {
     one: '{n} cosa se quedó quieta: ',
     other: '{n} cosas se quedaron quietas: ',
   },
-  'toca.dekStuck.agent': '{agent} no da señales desde hace {time}',
+  'toca.dekStuck.agent': '{agent} lleva {time} sin avisar',
   'toca.dekStuck.none': 'Nada parado: los agentes siguen dando señales.',
 
   // La llamada a actuar de una fila y su línea pequeña
@@ -62,21 +64,39 @@ export const toca = {
   'toca.sub.thenAgent': 'después lo toma un agente',
   'toca.sub.thenClose': 'después se cierra',
   'toca.sub.does': 'lo hace {agent}',
-  'toca.sub.silent': '{agent} no da señales',
+  'toca.sub.silent': '{agent} lleva rato sin avisar',
   'toca.sub.waitsFor': 'espera a {agent}',
   'toca.sub.waitsAgent': 'espera a un agente',
-  'toca.sub.waitsKids': 'espera a sus hijos',
+  'toca.sub.waitsKids': 'espera a sus subítems',
   'toca.sub.landsAfter': 'se integra después de {agent}',
   'toca.sub.setAside': '{agent} lo dejó para más adelante',
+  'toca.sub.bounced': 'volvió: chocó con otro cambio ya integrado',
+  'toca.sub.merging':
+    'su agente integra main en él tras {agent}; revisas esa integración una sola vez',
   'toca.sub.didIt': 'lo hizo {agent}',
   'toca.sub.closedBy': 'lo cerró {agent}',
   'toca.sub.closedByYou': 'cerrado por ti',
-  'toca.sub.closedRelayed': 'cerrado, relayada por {agent}',
-  // La columna de la derecha ya dice «reserva vencida»: aquí, quién y desde cuándo, corto para
+  'toca.sub.closedRelayed': 'cerrado, transmitido por {agent}',
+  // La columna de la derecha ya dice «sin señales»: aquí, quién y desde cuándo, corto para
   // que la fila no corte el texto.
   'toca.quiet': '{agent} · hace {time}',
   'toca.replied': '{agent} contestó',
   'toca.round': 'ronda {n}',
+
+  // Lo que te espera y no es un ítem: una pregunta en una nota de la Bandeja, una del asistente
+  'toca.off.bandeja': 'Nota de la Bandeja',
+  'toca.off.assistant': 'asistente',
+  'toca.off.inHablar': 'en Hablar',
+  'toca.off.report': 'Aviso',
+  'toca.act.report': 'Leer',
+  'toca.off.worker': 'Tablero sin agente',
+  'toca.act.worker': 'Abre una sesión',
+  'toca.sub.reports': '{agent} avisa',
+
+  // El asistente está desconectado y le esperan cosas
+  'toca.secOff.title': '{name} está desconectado',
+  'toca.secOff.waiting': 'Lo espera: {what}.',
+  'toca.secOff.go': 'Abrir Hablar para traerlo de vuelta',
 
   // Tras el primer ítem terminado del proyecto: lo que suele venir después (una vez, y se va)
   'next.label': 'Qué hacer ahora',

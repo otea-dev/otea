@@ -2,7 +2,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { AgentChannel } from '../core/authority.ts';
 import { OteaError } from '../core/errors.ts';
 import { assertProfileValue, type Profile, profileLine } from '../core/profile.ts';
-import { transaction } from '../store/database.ts';
+import { joinTransaction, transaction } from '../store/database.ts';
 import {
   findAgent,
   findProfile,
@@ -60,7 +60,7 @@ export function declareProfile(
   const model = assertProfileValue('model', input.model);
   const effort = assertProfileValue('effort', input.effort);
   if (input.given !== undefined) assertProfileValue('harness', input.given);
-  return transaction(db, () => {
+  return joinTransaction(db, () => {
     const harness = harnessOf(db, input);
     if (harness === undefined) {
       throw new OteaError(

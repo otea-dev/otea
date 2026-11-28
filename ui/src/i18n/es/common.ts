@@ -62,10 +62,10 @@ export const common = {
   'ago.now': 'ahora mismo',
   'ago.time': 'hace {time}',
   'lease.left': 'quedan {time}',
-  'lease.expired': 'reserva vencida',
+  'lease.expired': 'sin señales',
   'lease.heldBy': 'en manos de {holder}',
   'lease.heldUntil': 'en manos de {holder} hasta {time}',
-  'lease.heldExpired': 'en manos de {holder}; su reserva venció ({time})',
+  'lease.heldExpired': 'en manos de {holder}, que dejó de dar señales ({time})',
   'listen.none': 'nadie está escuchando',
   'listen.setAside': 'apartado por {agent}',
   'listen.lead': 'Nadie está escuchando.',
@@ -82,7 +82,7 @@ export const common = {
   'agent.status.working': 'trabajando',
   'agent.status.listening': 'escuchando',
   'agent.status.connected': 'conectado',
-  'agent.status.silent': 'sin señal',
+  'agent.status.silent': 'sin novedades',
   'agent.status.away': 'ausente',
   'listen.noAgents': 'ningún agente conectado',
   'listen.noAgentsLead': 'Ningún agente conectado.',
@@ -115,8 +115,8 @@ export const common = {
   'move.more': { one: '{count} más', other: '{count} más' },
   'move.moreTitle': 'Más acciones',
   'move.waits': {
-    one: 'espera a {count} hijo abierto',
-    other: 'espera a {count} hijos abiertos',
+    one: 'espera a {count} subítem abierto',
+    other: 'espera a {count} subítems abiertos',
   },
   'move.waitsBlockers': {
     one: 'espera a {count} bloqueante abierto',
@@ -128,8 +128,8 @@ export const common = {
   },
   'move.closesAs': 'cierra el ítem como {as}',
   'move.closes': 'cierra el ítem',
-  'move.leaves': 'sale de Te esperan',
-  'move.comes': 'pasa a Te esperan',
+  'move.leaves': 'sale de Te toca',
+  'move.comes': 'pasa a Te toca',
   'move.asksReason': 'pide un motivo antes',
 
   // Cuándo, como lo dice una fila
@@ -137,7 +137,8 @@ export const common = {
   'when.hoursMinutes': '{hours} h {minutes} min',
   'when.hours': '{hours} h',
   'when.minutes': '{minutes} min',
-  'when.expired': 'reserva vencida',
+  'when.expired': 'sin señales',
+  'when.lapsed': 'se le acabó el tiempo · vuelve a la cola',
   'when.now': 'ahora',
   'when.yesterday': 'ayer',
   'when.days': { one: '{count} día', other: '{count} días' },
@@ -147,6 +148,8 @@ export const common = {
   // Marcas y avisos (kit)
   'mark.you': 'tú',
   'toast.undo': 'Deshacer',
+  // Se dice una vez a un lector de pantalla con un aviso que ofrece un paso: la tecla que lo alcanza.
+  'toast.reach': 'Pulsa Alt+Mayús+Z para ir a «{move}».',
   // Un rechazo del servidor, dicho desde su código y sus datos (ui/src/refusals.ts); el mensaje en
   // inglés del servidor es para los agentes y la CLI.
   'refusal.itemMissing': 'No existe el ítem {item}.',
@@ -165,8 +168,8 @@ export const common = {
   'refusal.why.note': 'una nota',
   'refusal.why.part': 'su parte {list} sigue sin terminar',
   'refusal.why.partsUnmerged': {
-    one: 'su parte {list} aún no se fusionó',
-    other: 'sus partes {list} aún no se fusionaron',
+    one: 'su parte {list} aún no se integró',
+    other: 'sus partes {list} aún no se integraron',
   },
   'refusal.why.allParts': {
     one: 'su {count} parte sigue sin terminar: {list}',
@@ -181,10 +184,10 @@ export const common = {
     other: '{list} lo frenan y siguen sin terminar',
   },
   'refusal.why.blockersUnmerged': {
-    one: '{list} lo frena y aún no se fusionó',
-    other: '{list} lo frenan y aún no se fusionaron',
+    one: '{list} lo frena y aún no se integró',
+    other: '{list} lo frenan y aún no se integraron',
   },
-  'link.unmerged': 'Hecho, sin fusionar',
+  'link.unmerged': 'Hecho, falta integrar',
   'refusal.drop': 'No se descartó {item}: {why}.',
   'refusal.drop.notOpen': 'ya terminó',
   'refusal.drop.reason': 'di por qué',
@@ -225,7 +228,7 @@ export const common = {
   'refusal.undo.releaseTooOld': 'ya pasó demasiado tiempo',
   'refusal.undo.leaseLost': 'su reserva ya no se puede devolver',
   'refusal.notStuck': '{item} no está atascado: {holder} lo tiene reservado.',
-  'refusal.notStuckFree': '{item} no está atascado: no le venció ninguna reserva.',
+  'refusal.notStuckFree': '{item} no está atascado: ningún agente dejó de dar señales.',
   'refusal.notSetAside': '{item} ya no está apartado.',
   'refusal.agentName':
     '«{name}» no sirve como nombre de agente: usa hasta 40 minúsculas, cifras y guiones sueltos, empezando por una letra (no «you» ni «human»).',
@@ -234,8 +237,8 @@ export const common = {
   'refusal.move.notAllowed': 'No puedes hacer este movimiento.',
   'refusal.fieldsMissing': { one: 'Antes, rellena {list}.', other: 'Antes, rellena {list}.' },
   'refusal.childrenOpen': {
-    one: '{item} no puede avanzar: {count} de sus {total} hijos sigue abierto: {list}.',
-    other: '{item} no puede avanzar: {count} de sus {total} hijos siguen abiertos: {list}.',
+    one: '{item} no puede avanzar: {count} de sus {total} subítems sigue abierto: {list}.',
+    other: '{item} no puede avanzar: {count} de sus {total} subítems siguen abiertos: {list}.',
   },
   'refusal.blockersOpen': {
     one: '{item} no puede avanzar: {list} lo frena y sigue abierto.',

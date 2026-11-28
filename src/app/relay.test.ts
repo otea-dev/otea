@@ -16,35 +16,41 @@ const T5 = '2026-01-01T00:05:00.000Z';
 
 const at = (time: string) => () => time;
 
+// A relay is words an agent says the person said: it moves nothing that cannot be taken back (it
+// never drops, finishes or approves). Bug triage's verify step is the person's, and sending a fix
+// back to fixing is one such move.
 describe('relayDecision', () => {
   let ctx: Context;
 
-  const item = () => getItem(ctx, 'TASKS-1', at(T5));
+  const item = () => getItem(ctx, 'BUGS-1', at(T5));
   const relay = (input: Partial<RelayInput> = {}) =>
     relayDecision(
       ctx,
       {
-        id: 'TASKS-1',
-        to: 'discarded',
+        id: 'BUGS-1',
+        to: 'fixing',
         via: 'claude',
         channel: 'cli',
-        quote: 'Drop it, we no longer need it',
-        reason: 'No longer needed',
+        quote: 'Send it back, it still crashes',
+        reason: 'Still crashes',
         ...input,
       },
       at(T5),
     );
-  const move = (to: string, actor = claude) =>
-    moveItem(ctx, { id: 'TASKS-1', to, actor, channel: 'cli' }, at(T0));
+  const move = (to: string, actor = claude, reason?: string) =>
+    moveItem(
+      ctx,
+      { id: 'BUGS-1', to, actor, channel: 'cli', ...(reason ? { reason } : {}) },
+      at(T0),
+    );
 
   beforeEach(() => {
     ctx = memoryContext();
-    addCollection(ctx, { name: 'tasks' });
-    const fields = { description: 'Details' };
-    createItem(ctx, { collection: 'tasks', title: 'First', fields, actor: claude }, at(T0));
+    addCollection(ctx, { name: 'bugs', preset: 'bug-triage' });
+    createItem(ctx, { collection: 'bugs', title: 'First', actor: claude }, at(T0));
     // Another agent did the work: an agent relays only decisions on work it did not do itself.
-    move('in_progress', codex);
-    move('review', codex);
+    ctx.db.exec("UPDATE items SET state = 'fixing'");
+    move('verify', codex, 'Fixed');
   });
 
   afterEach(() => ctx.db.close());
@@ -52,19 +58,19 @@ describe('relayDecision', () => {
   it('moves the item as the human, recording the relaying agent, the source and the quote', () => {
     const moved = relay();
 
-    expect(moved).toMatchObject({ state: 'discarded', turn: 'none', updatedAt: T5 });
+    expect(moved).toMatchObject({ state: 'fixing', turn: 'agent', updatedAt: T5 });
     expect(item().events.at(-1)).toMatchObject({
       type: 'transitioned',
       actor: human,
       at: T5,
       data: {
-        from: 'review',
-        to: 'discarded',
-        reason: 'No longer needed',
+        from: 'verify',
+        to: 'fixing',
+        reason: 'Still crashes',
         channel: 'cli',
         via: 'claude',
         source: 'conversation',
-        quote: 'Drop it, we no longer need it',
+        quote: 'Send it back, it still crashes',
       },
     });
   });
@@ -73,11 +79,11 @@ describe('relayDecision', () => {
     expect(() => relay({ via: 'codex' })).toThrow(
       expect.objectContaining({
         code: 'forbidden',
-        details: { kind: 'own_step', item: 'TASKS-1', step: 'in_progress', who: 'codex' },
+        details: { kind: 'own_step', item: 'BUGS-1', step: 'fixing', who: 'codex' },
       }),
     );
-    expect(item().state).toBe('review');
-    expect(relay()).toMatchObject({ state: 'discarded' });
+    expect(item().state).toBe('verify');
+    expect(relay()).toMatchObject({ state: 'fixing' });
   });
 
   it('records the channel the relaying agent used', () => {
@@ -87,74 +93,76 @@ describe('relayDecision', () => {
   });
 
   it('trims the quote it records', () => {
-    relay({ quote: '  yes, discard it \n' });
+    relay({ quote: '  yes, send it back \n' });
 
-    expect(item().events.at(-1)?.data.quote).toBe('yes, discard it');
+    expect(item().events.at(-1)?.data.quote).toBe('yes, send it back');
   });
 
   it.each(['', '   '])('requires a quote (%j) with quote_required, writing nothing', (quote) => {
     expect(() => relay({ quote })).toThrow(expect.objectContaining({ code: 'quote_required' }));
-    expect(item()).toMatchObject({ state: 'review', updatedAt: T0 });
+    expect(item()).toMatchObject({ state: 'verify', updatedAt: T0 });
+  });
+
+  it('requires two words in the quote: a bare yes is no decision', () => {
+    expect(() => relay({ quote: 'yes' })).toThrow(
+      expect.objectContaining({ code: 'quote_required' }),
+    );
+    expect(item().state).toBe('verify');
   });
 
   it('requires a reason when the transition does; the quote does not stand in for it', () => {
     expect(() => relay({ reason: '' })).toThrow(
       expect.objectContaining({ code: 'reason_required' }),
     );
-    expect(item().state).toBe('review');
+    expect(item().state).toBe('verify');
   });
 
   it('refuses a human-ui transition with forbidden, writing nothing', () => {
-    expect(() => relay({ to: 'done' })).toThrow(expect.objectContaining({ code: 'forbidden' }));
-    expect(item().events).toHaveLength(3);
+    expect(() => relay({ to: 'fixed' })).toThrow(expect.objectContaining({ code: 'forbidden' }));
+    expect(item().events).toHaveLength(2);
   });
 
   it('refuses an agent transition with not_relayable', () => {
-    ctx.db.exec("UPDATE items SET state = 'todo'");
+    ctx.db.exec("UPDATE items SET state = 'accepted'");
 
-    expect(() => relay({ to: 'in_progress' })).toThrow(
+    expect(() => relay({ to: 'fixing' })).toThrow(
       expect.objectContaining({ code: 'not_relayable' }),
     );
   });
 
   it('rejects an undeclared transition and an unknown item', () => {
-    expect(() => relay({ to: 'in_progress' })).toThrow(
+    expect(() => relay({ to: 'reported' })).toThrow(
       expect.objectContaining({ code: 'invalid_transition' }),
     );
-    expect(() => relay({ id: 'TASKS-9' })).toThrow(expect.objectContaining({ code: 'not_found' }));
+    expect(() => relay({ id: 'BUGS-9' })).toThrow(expect.objectContaining({ code: 'not_found' }));
   });
 
-  it('relays from incomplete on the human transition, not the agent one', () => {
-    createItem(ctx, { collection: 'tasks', title: 'Vague', actor: claude }, at(T0));
-    ctx.db.exec(`UPDATE items SET state = 'incomplete' WHERE id = 'TASKS-2'`);
+  it('relays from reported on the human transition, not the agent one', () => {
+    createItem(ctx, { collection: 'bugs', title: 'Vague', actor: claude }, at(T0));
+    ctx.db.exec(`UPDATE items SET state = 'reported' WHERE id = 'BUGS-2'`);
 
-    relay({ id: 'TASKS-2' });
+    relay({ id: 'BUGS-2', to: 'accepted' });
 
-    expect(getItem(ctx, 'TASKS-2', at(T5)).events.at(-1)?.actor).toEqual(human);
+    expect(getItem(ctx, 'BUGS-2', at(T5)).events.at(-1)?.actor).toEqual(human);
   });
 
   describe('on an item another agent holds', () => {
     beforeEach(() => {
-      createItem(
-        ctx,
-        { collection: 'tasks', title: 'Held', fields: { description: 'D' }, actor: claude },
-        at(T0),
-      );
-      claimItem(ctx, { id: 'TASKS-2', actor: codex }, at(T0));
+      createItem(ctx, { collection: 'bugs', title: 'Held', actor: claude }, at(T0));
+      ctx.db.exec(`UPDATE items SET state = 'accepted' WHERE id = 'BUGS-2'`);
+      claimItem(ctx, { id: 'BUGS-2', actor: codex }, at(T0));
+      ctx.db.exec(`UPDATE items SET state = 'reported' WHERE id = 'BUGS-2'`);
     });
 
-    it('is not blocked, like the human in the ui, and releases the lease on handoff', () => {
-      const moved = relay({ id: 'TASKS-2' });
+    it('is not blocked, like the human in the ui', () => {
+      const moved = relay({ id: 'BUGS-2', to: 'accepted', reason: 'Fine' });
 
-      expect(moved).toMatchObject({ state: 'discarded', lease: null });
-      expect(getItem(ctx, 'TASKS-2', at(T5)).events.slice(-2)).toMatchObject([
-        { type: 'transitioned', actor: human, data: { via: 'claude', source: 'conversation' } },
-        {
-          type: 'released',
-          actor: human,
-          data: { holder: 'codex', cause: 'handoff', via: 'claude' },
-        },
-      ]);
+      expect(moved).toMatchObject({ state: 'accepted' });
+      expect(getItem(ctx, 'BUGS-2', at(T5)).events.at(-1)).toMatchObject({
+        type: 'transitioned',
+        actor: human,
+        data: { via: 'claude', source: 'conversation' },
+      });
     });
   });
 });

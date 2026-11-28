@@ -58,6 +58,34 @@ describe('the topbar', () => {
     );
   });
 
+  // Field study 3: «1 más te espera en 1 proyecto» was hidden on the phone, and a question of
+  // another project waited 20 minutes. The project pill carries the count there.
+  it('says on the phone, on the project pill, that something waits in another project', () => {
+    setLanguage('es');
+    const projects = [
+      overview({ id: 'hm', current: true }),
+      overview({ id: 'a', waiting: waiting(2) }),
+    ];
+    const html = topbar({ projects, phone: true });
+    expect(html).toMatch(/class="pelse"[^>]*>2</);
+    expect(html).toContain('2 más te esperan en 1 proyecto');
+    expect(
+      topbar({ projects: [overview({ id: 'hm', current: true })], phone: true }),
+    ).not.toContain('class="pelse"');
+  });
+
+  it('keeps you in Hablar when you switch project', () => {
+    const projects = [
+      overview({ id: 'hm', current: true }),
+      overview({ id: 'other', name: 'Other' }),
+    ];
+    const here = { id: 'hm', name: 'Hollowmere' } as Parameters<typeof projectRows>[0];
+    const stay = projectRows(here, projects, 0, true, '#/hablar').rows.find((r) => !r.current);
+    expect(stay?.href).toBe('/p/other/#/hablar');
+    const plain = projectRows(here, projects, 0, true).rows.find((r) => !r.current);
+    expect(plain?.href).toBe('/p/other/#/');
+  });
+
   it('fills the mark’s o while something is yours, and turns its orbit while an agent works', () => {
     const quiet = topbar({ all: [item({ id: 'A', turn: 'agent' })] });
     expect(quiet).toContain('class="brand"');
@@ -89,7 +117,10 @@ describe('the topbar', () => {
 
   // An agent on a long command-line step gave no sign for a while: the pill said «Sin agentes»
   // over a menu that did not list it. Through the real wiring, pill and menu now say the same.
-  it('says «sin señal» on the pill and in the menu for an agent holding a lease that went silent', () => {
+  // R2 (field study 4, design): «sin señal» in warn read as a dead agent when the process was most
+  // likely at a long step. The pill and the menu say it softly («sin novedades», the words of «sin
+  // novedades hace N min»), in ink, never the warn colour: that is for an item stuck.
+  it('says «sin novedades» softly on the pill and in the menu for an agent holding a lease that went silent', () => {
     setLanguage('es');
     const silent = agent('Mender', {
       live: false,
@@ -98,8 +129,16 @@ describe('the topbar', () => {
       profile: opus,
     });
     const html = topbar({ agents: [silent] });
-    expect(html).toContain('<span>1 sin señal</span>');
+    expect(html).toContain('<span>1 sin novedades</span>');
+    expect(html).not.toContain('sin señal');
     expect(html).not.toContain('Sin agentes');
+    // Beside a working agent it is the small grey datum, never in warn.
+    const busy = topbar({
+      agents: [silent, agent('Scout', { holding: ['X'], profile: opus })],
+      all: [item({ id: 'X', turn: 'agent', lease: { holder: 'Scout', expiresAt: inMinutes(20) } })],
+    });
+    expect(busy).toContain('<small class="wl">1 sin novedades</small>');
+    expect(busy).not.toContain('warn-t');
 
     const rows = agentRows([silent], [], NOW);
     const menu = renderIn(
@@ -116,8 +155,12 @@ describe('the topbar', () => {
       }),
     );
     expect(menu).toContain('data-agent="Mender"');
-    expect(menu).toContain('<span class="verb">sin señal en</span><span class="id">ERR-231</span>');
-    expect(menu).toContain('1 sin señal');
+    expect(menu).toContain(
+      '<span class="verb">sin novedades en</span><span class="id">ERR-231</span>',
+    );
+    expect(menu).toContain('1 sin novedades');
+    expect(menu).not.toContain('sin señal');
+    expect(menu).not.toContain('warn');
     expect(menu).not.toContain('Todavía no hay agentes conectados');
   });
 
@@ -138,6 +181,27 @@ describe('the topbar', () => {
     const html = topbar({ connection: 'reconnecting', agents: [agent('Scout')] });
     expect(html).toContain('Sin conexión');
     expect(html).toMatch(/class="apill"[^>]*disabled=""/);
+  });
+
+  // Field study 7: on the phone the line under the bar said «Sin conexión» (with the hour and
+  // Reintentar) and the pill above it said the same: the pill gives way and keeps the agents as they
+  // were last known, dimmed. The desk has no such line, so its pill keeps saying it.
+  it('gives the pill’s «Sin conexión» to the offline line on the phone, keeping the agents dimmed', () => {
+    setLanguage('es');
+    const down = {
+      connection: 'reconnecting' as const,
+      sync: { offline: true, syncedAt: NOW },
+      agents: [agent('Scout', { profile: opus, holding: ['X'] })],
+      all: [item({ id: 'X', turn: 'agent', lease: { holder: 'Scout', expiresAt: inMinutes(20) } })],
+    };
+    const phone = topbar({ ...down, phone: true });
+    expect(phone).not.toContain('Sin conexión');
+    expect(phone).toContain('1 trabajando');
+    expect(phone).toMatch(/class="apill"[^>]*data-stale="true"/);
+    expect(phone).toMatch(/class="apill"[^>]*disabled=""/);
+    // Never before the server has said who is there.
+    expect(topbar({ ...down, agents: undefined, phone: true })).not.toContain('apill');
+    expect(topbar({ ...down, phone: false })).toContain('Sin conexión');
   });
 
   // P1-R2-8: the header said «Sin conexión» for the first seconds of every page load.
@@ -190,7 +254,7 @@ describe('the project menu', () => {
   it('leads with Todos los proyectos and the total waiting', () => {
     const html = menu();
     expect(html).toContain('Todos los proyectos');
-    expect(html).toContain('lo que te espera, en todos lados');
+    expect(html).toContain('lo que te toca, en todos lados');
     expect(html).toMatch(/<span class="pw"><i class="dot"><\/i>5<\/span>/);
   });
 
@@ -431,13 +495,13 @@ describe('the agents menu', () => {
     const connected = agent('Kiln', { status: 'connected', waiting: false, profile: opus });
     const html = body(agentRows([connected], items, NOW));
     expect(html).toContain(
-      '<span class="verb">conectado · su reserva de CRE-44 venció</span><span class="tx">Tortuga musgosa</span>',
+      '<span class="verb">conectado · se acabó su tiempo en CRE-44</span><span class="tx">Tortuga musgosa</span>',
     );
     expect(html).not.toContain('libre');
     expect(html).not.toContain('sin señal');
     const listening = { ...connected, status: 'listening' as const, waiting: true };
     expect(body(agentRows([listening], items, NOW))).toContain(
-      '<span class="verb">escuchando · su reserva de CRE-44 venció</span>',
+      '<span class="verb">escuchando · se acabó su tiempo en CRE-44</span>',
     );
     setLanguage('en');
     expect(body(agentRows([connected], items, NOW))).toContain(

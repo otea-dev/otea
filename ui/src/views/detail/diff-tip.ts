@@ -55,6 +55,8 @@ function filesList(files: readonly string[]): string {
 }
 
 export function diffFilesText(off: DiffFilesOff): string {
+  // The same files with other lines (D-492953): the attached file is the agent's, not the branch's.
+  if (off.lines) return t('bi.branch.diffLines', { files: filesList(off.landed) });
   const diff =
     off.diff.length === 0
       ? t('bi.branch.diffFilesNone')

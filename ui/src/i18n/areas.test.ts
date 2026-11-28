@@ -4,6 +4,7 @@ import { boardStudio as enBoardStudio } from './en/board-studio.ts';
 import { catalog as enCatalog } from './en/catalog.ts';
 import { common as enCommon } from './en/common.ts';
 import { detail as enDetail } from './en/detail.ts';
+import { hablar as enHablar } from './en/hablar.ts';
 import { phone as enPhone } from './en/phone.ts';
 import { shell as enShell } from './en/shell.ts';
 import { studioEditor as enStudioEditor } from './en/studio-editor.ts';
@@ -17,6 +18,7 @@ import { boardStudio as esBoardStudio } from './es/board-studio.ts';
 import { catalog as esCatalog } from './es/catalog.ts';
 import { common as esCommon } from './es/common.ts';
 import { detail as esDetail } from './es/detail.ts';
+import { hablar as esHablar } from './es/hablar.ts';
 import { phone as esPhone } from './es/phone.ts';
 import { shell as esShell } from './es/shell.ts';
 import { studioEditor as esStudioEditor } from './es/studio-editor.ts';
@@ -37,6 +39,7 @@ const AREAS = {
   surfaces: [enSurfaces, esSurfaces],
   catalog: [enCatalog, esCatalog],
   phone: [enPhone, esPhone],
+  hablar: [enHablar, esHablar],
   studioPreview: [enStudioPreview, esStudioPreview],
   studioEditor: [enStudioEditor, esStudioEditor],
   studioHome: [enStudioHome, esStudioHome],

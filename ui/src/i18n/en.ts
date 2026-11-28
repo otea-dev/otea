@@ -3,6 +3,7 @@ import { boardStudio } from './en/board-studio.ts';
 import { catalog } from './en/catalog.ts';
 import { common } from './en/common.ts';
 import { detail } from './en/detail.ts';
+import { hablar } from './en/hablar.ts';
 import { phone } from './en/phone.ts';
 import { shell } from './en/shell.ts';
 import { studioEditor } from './en/studio-editor.ts';
@@ -26,4 +27,5 @@ export const en = {
   ...studioEditor,
   ...studioPreview,
   ...phone,
+  ...hablar,
 } as const;

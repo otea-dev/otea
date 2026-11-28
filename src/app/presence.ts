@@ -1,10 +1,21 @@
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
-import { type AgentStatus, agentStatus, LISTEN_WINDOW_MS } from '../core/agent-status.ts';
+import {
+  type AgentStatus,
+  agentStatus,
+  LISTEN_WINDOW_MS,
+  THERE_FOR_MS,
+} from '../core/agent-status.ts';
+import type { AgentRole } from '../core/assistant.ts';
 import type { AgentChannel } from '../core/authority.ts';
 import { OteaError } from '../core/errors.ts';
 import { isAgentName } from '../core/item.ts';
 import { activeLease, DEFAULT_LEASE_TTL_MS, leaseExpiry } from '../core/lease.ts';
 import { pathKey } from '../core/path-key.ts';
+import { clearStretchesFor, selectRoles } from '../store/assistant.ts';
+import { resetOwed } from '../store/conversation.ts';
+import { joinTransaction } from '../store/database.ts';
 import {
   clearListening,
   clearWaiter,
@@ -12,11 +23,15 @@ import {
   deleteProcessBeat,
   findAgent,
   findProfile,
+  forgetHarness,
+  type ListenerProcesses,
   markListening,
   markWaiting,
   type NameOffer,
   type ProfileView,
   profileView,
+  renewLease,
+  saveHarness,
   saveMcpLoad,
   saveNameOffer,
   saveProcessBeat,
@@ -24,6 +39,7 @@ import {
   saveProcessStart,
   saveProfile,
   selectAgents,
+  selectEvents,
   selectLastReleases,
   selectLatestStartBesides,
   selectLeases,
@@ -105,6 +121,9 @@ export type AgentPresence = {
   // When it last ran an otea command, through the command line or MCP (null if never): a
   // listener's beat is none.
   actedAt: string | null;
+  // When it was last heard listening (a beat of its wait or MCP server), null if never: beats come
+  // oftener than a sighting is written.
+  heardAt: string | null;
   // Connected: it listens, or ran an otea command within LISTEN_WINDOW_MS; never for a lease alone.
   live: boolean;
   // What it is doing now, the one word every surface uses (core/agent-status.ts).
@@ -112,11 +131,20 @@ export type AgentPresence = {
   // Every process it was heard listening through (its MCP server, its wait) has ended: Otea knows
   // its session ended. Never for one heard through none, such as one at the command line.
   sessionEnded: boolean;
+  // The session it runs under runs now and gave a sign within THERE_FOR_MS: whatever it holds, it
+  // is at (a long step makes no otea call).
+  there: boolean;
   // Heard listening within LISTEN_WINDOW_MS.
   listening: boolean;
   // Heard waiting in otea wait within LISTEN_WINDOW_MS: what the person does on the desk reaches
-  // it. An agent idle in its chat with its MCP server open listens, but hears nothing.
+  // it. An agent idle in its chat with its MCP server open listens, but hears nothing. Never the
+  // assistant: it waits for the person and for what the boards leave unheard, and is no listener
+  // on the boards, so the desk and the notifier do not count it (`attending`).
   waiting: boolean;
+  // Heard waiting in otea wait, whatever it waits for: `waiting`, or the assistant in its wait.
+  attending: boolean;
+  // The role it declared (otea profile --role), or null: an agent like any other.
+  role: AgentRole | null;
   profile: ProfileView | null;
   profileConfirmed: boolean;
   profileChangedAt: string | null;
@@ -197,6 +225,67 @@ export function hearAgent(db: DatabaseSync, sighting: Sighting, now: Clock = sys
   return at;
 }
 
+// The harness session a command-line agent's wait runs under (its process, above the shells that
+// run its commands), for as long as that session lives: when it is gone the agent's session is over
+// though no process of Otea's runs, which is what an assistant between two waits looks like.
+export function noteHarness(
+  db: DatabaseSync,
+  agent: string,
+  pid: number,
+  now: Clock = systemClock,
+  // A harness known by name (claude, codex...): the session itself, trusted at the first find.
+  known = false,
+  // When that process started (epoch ms), kept with its id.
+  started?: number,
+  alive: (pid: number) => boolean = processAlive,
+  // The processes above this harness: the one noted among them is the session this harness is a
+  // part of (a helper it started), so this wait is the session's, not another's.
+  above: readonly number[] = [],
+): boolean {
+  // Read and written under one lock: sessions that start together under one name (four waits at
+  // once) must find one winner, not each its own turn at an empty binding.
+  return joinTransaction(db, () => {
+    // The harness noted for a name that runs is not replaced by another's: a session that waits under
+    // the name of another live one (an impersonator's first wait) leaves the binding as it is, and is
+    // refused at its acts (cli/session-guard.ts). A new session takes over once that one is gone.
+    // Says whether this harness is the one noted: false for the session that lost.
+    const bound = selectListenerProcesses(db).get(agent)?.harness ?? null;
+    if (bound !== null && bound !== pid && alive(bound)) {
+      if (!above.includes(bound)) return false;
+      beatProcess(db, bound, now);
+      return true;
+    }
+    saveHarness(db, agent, pid, known, started);
+    beatProcess(db, pid, now);
+    // The assistant's session is another one: the messages the earlier sessions read and left
+    // unanswered are owed to it again, however many times they were told (a session that never
+    // declares the role again would otherwise find the returns used up).
+    if (bound !== pid && selectRoles(db).get(agent) === 'assistant') resetOwed(db);
+    return true;
+  });
+}
+
+// An agent speaks again: the harness noted for it that ended means another session of it (the same
+// name after a restart), so the old one no longer counts against it, and its next wait notes its
+// own; one that runs is noted as running (HARNESS_BEAT_MS), at most every SEEN_PRECISION_MS.
+export function forgetGoneHarness(
+  db: DatabaseSync,
+  agent: string,
+  alive: (pid: number) => boolean = processAlive,
+  now: Clock = systemClock,
+): void {
+  const harness = selectListenerProcesses(db).get(agent)?.harness ?? null;
+  if (harness === null) return;
+  if (!alive(harness)) {
+    forgetHarness(db, agent, harness);
+    return;
+  }
+  const beat = selectProcessBeats(db).get(harness);
+  if (beat === undefined || Date.parse(now()) - Date.parse(beat) >= SEEN_PRECISION_MS) {
+    beatProcess(db, harness, now);
+  }
+}
+
 // A listener that ends (an MCP server whose client closed it, a wait whose session ended) stops
 // counting its agent as listening at once, not a listening window later: unless another one heard
 // the agent after its last beat (`heardAt`, what hearAgent returned). An MCP server that ends
@@ -212,13 +301,77 @@ export function endListening(
 
 // Whether a process still runs on this computer, where every MCP server of the project runs, as
 // the system tells it by its id alone.
-export function processAlive(pid: number): boolean {
+// A zombie (ended, its parent not yet told) still answers a signal: a Linux container without an
+// init never reaps its children, so `otea serve stop` said «did not end» of a server that was down
+// (field study 7). The process state says it: Z is gone.
+export type ProcessProbe = {
+  platform: NodeJS.Platform;
+  // The text of /proc/<pid>/stat (Linux), or undefined.
+  stat: (pid: number) => string | undefined;
+  // What `ps -o stat= -p <pid>` prints (macOS and the BSDs), or undefined.
+  ps: (pid: number) => string | undefined;
+};
+
+// Where the state of a process is: the letter after the command's closing parenthesis, which the
+// command itself may contain.
+function procState(stat: string): string | undefined {
+  const at = stat.lastIndexOf(')');
+  return at < 0 ? undefined : stat.slice(at + 1).trim()[0];
+}
+
+// How long a `ps` answer is kept: the desk looks at every process of every agent on a timer, and a
+// `ps` per look would be a process spawned per agent.
+const PS_KEPT_MS = 1000;
+const psKept = new Map<number, { at: number; state: string | undefined }>();
+
+const SYSTEM_PROBE: ProcessProbe = {
+  platform: process.platform,
+  stat: (pid) => {
+    try {
+      return readFileSync(`/proc/${pid}/stat`, 'utf8');
+    } catch {
+      return undefined;
+    }
+  },
+  ps: (pid) => {
+    const at = Date.now();
+    const kept = psKept.get(pid);
+    if (kept && at - kept.at < PS_KEPT_MS) return kept.state;
+    let state: string | undefined;
+    try {
+      state = execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], {
+        encoding: 'utf8',
+        timeout: 2000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+    } catch {
+      state = undefined;
+    }
+    psKept.set(pid, { at, state });
+    return state;
+  },
+};
+
+function isZombie(pid: number, probe: ProcessProbe): boolean {
+  if (probe.platform === 'linux') {
+    const stat = probe.stat(pid);
+    return stat !== undefined && procState(stat) === 'Z';
+  }
+  if (probe.platform === 'darwin' || probe.platform.endsWith('bsd')) {
+    return probe.ps(pid)?.trim().startsWith('Z') === true;
+  }
+  return false;
+}
+
+export function processAlive(pid: number, given?: ProcessProbe | number): boolean {
+  // Passed straight to every/some/filter, the second argument is the array index, not a probe.
+  const probe = typeof given === 'object' && given !== null ? given : SYSTEM_PROBE;
   try {
     process.kill(pid, 0);
-    return true;
   } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
+    if ((error as NodeJS.ErrnoException).code !== 'EPERM') return false;
   }
+  return !isZombie(pid, probe);
 }
 
 // Long past any listening window: the rows of processes killed before they could say they ended.
@@ -276,14 +429,22 @@ export function runningProcesses(
   db: DatabaseSync,
   now: Clock = systemClock,
   alive: (pid: number) => boolean = processAlive,
+  windowMs: number = LISTEN_WINDOW_MS,
 ): (pid: number) => boolean {
   const at = Date.parse(now());
   const beats = selectProcessBeats(db);
   return (pid) => {
     const beat = beats.get(pid);
-    return beat !== undefined && at - Date.parse(beat) <= LISTEN_WINDOW_MS && alive(pid);
+    return beat !== undefined && at - Date.parse(beat) <= windowMs && alive(pid);
   };
 }
+
+// A harness session is no Otea process, so nothing of Otea beats for it, but what the assistant
+// does keeps noting it as running (a wait's beat every minute, each command it runs): its id means
+// the session while it was noted lately, and only then. Past the assistant's held time with no
+// sign of it, an id that still runs may be another process's, as Windows hands them out within
+// seconds of one ending.
+export const HARNESS_BEAT_MS = THERE_FOR_MS;
 
 // An MCP session (`session`, its server's process id) takes an agent name only while no other open
 // session works under it: two sessions under one name would take one item twice and hand off each
@@ -370,7 +531,11 @@ export function sessionEnded(
   now: Clock = systemClock,
   alive: (pid: number) => boolean = processAlive,
 ): boolean {
-  return listenersEnded(selectListenerProcesses(db).get(agent), runningProcesses(db, now, alive));
+  return listenersEnded(
+    selectListenerProcesses(db).get(agent),
+    runningProcesses(db, now, alive),
+    runningProcesses(db, now, alive, HARNESS_BEAT_MS),
+  );
 }
 
 // Whether the agent's session runs now: some process it was heard listening through (its MCP
@@ -385,7 +550,11 @@ export function sessionRuns(
 ): boolean {
   const processes = selectListenerProcesses(db).get(agent);
   if (!processes) return false;
-  return !listenersEnded(processes, runningProcesses(db, now, alive));
+  return !listenersEnded(
+    processes,
+    runningProcesses(db, now, alive),
+    runningProcesses(db, now, alive, HARNESS_BEAT_MS),
+  );
 }
 
 // Whether the agent's session is alive now (P7-R3-11): a process it listens through (its MCP
@@ -427,12 +596,29 @@ export function renewLeases(db: DatabaseSync, agent: string, now: Clock = system
 // Whether every process an agent was heard listening through (its MCP server, its wait) has ended;
 // never for one heard through none.
 function listenersEnded(
-  processes: { session: number | null; waiter: number | null } | undefined,
+  processes: ListenerProcesses | undefined,
+  alive: (pid: number) => boolean,
+  // Whether the harness session still runs (runningProcesses with HARNESS_BEAT_MS). Without it
+  // the harness is not looked at.
+  exists?: (pid: number) => boolean,
+): boolean {
+  const { session = null, waiter = null, harness = null } = processes ?? {};
+  // A listener that runs is the session: nothing about another process overrides it.
+  if ((session !== null && alive(session)) || (waiter !== null && alive(waiter))) return false;
+  // None runs. The harness session its waits ran under is gone, and every process of the session
+  // with it, whether a wait runs now or not.
+  if (harness !== null && exists && !exists(harness)) return true;
+  if (session === null && waiter === null) return false;
+  return true;
+}
+
+// Whether a listener process of the agent runs (its MCP server, its wait).
+function listenerRuns(
+  processes: ListenerProcesses | undefined,
   alive: (pid: number) => boolean,
 ): boolean {
   const { session = null, waiter = null } = processes ?? {};
-  if (session === null && waiter === null) return false;
-  return !(session !== null && alive(session)) && !(waiter !== null && alive(waiter));
+  return (session !== null && alive(session)) || (waiter !== null && alive(waiter));
 }
 
 // A name of the same stem as `base` that no agent ever used and no other session was handed:
@@ -468,14 +654,105 @@ export function waitBeat(
   db: DatabaseSync,
   { newSession: _, ...sighting }: Sighting,
   now: Clock = systemClock,
+  // false: the wait is for something other than the boards' work (the refiner's for the Bandeja):
+  // the agent is heard, but it is no listener on the boards.
+  boards = true,
 ): { everyMs: number; run: () => string } {
   const run = () => {
     const at = hearAgent(db, sighting, now);
-    markWaiting(db, sighting.agent, at);
+    if (boards) {
+      markWaiting(db, sighting.agent, at);
+      // A listener on the boards ends every stretch of work nobody heard (the assistant is none).
+      clearStretchesFor(db, sighting.agent);
+    }
+    // The harness its wait was noted under still runs: noted again, a minute at a time.
+    const harness = selectListenerProcesses(db).get(sighting.agent)?.harness ?? null;
+    if (harness !== null) beatProcess(db, harness, () => at);
     keepLeases(db, sighting.agent, at);
     return at;
   };
   return { everyMs: LISTEN_BEAT_MS, run };
+}
+
+// A lease within this of running out (or already out) of a holder that is there is extended.
+export const LEASE_RENEW_AHEAD_MS = 3 * 60_000;
+
+// What the last look at the leases found per project: the holders it left alone, and when, so a
+// really stuck item does not make every read list the agents again.
+const lookedAt = new WeakMap<DatabaseSync, { key: string; at: number }>();
+
+// A worker at a long step makes no otea call, so its lease runs out while it works: its session is
+// the sign it is there (a harness noted by its commands, a listener of it), and the lease is the
+// promise it works (H2, field study 4). Each lease about to run out, or out, of a holder that is
+// there (its session runs and gave a sign within THERE_FOR_MS) is extended to a default lease from
+// now, never shortened, so the item is not «atascado» for a worker that is at it. A holder whose
+// session is gone, or that has been quiet for long, keeps no lease: that is the stuck item. Cheap
+// when no lease is near its end, and the agents are read only then.
+export function keepLeasesOfAgentsThere(
+  db: DatabaseSync,
+  now: Clock = systemClock,
+  processes: (pid: number) => boolean = processAlive,
+): void {
+  // A read is no reason to fail: a handle that cannot write (read-only, busy) skips the renewal.
+  try {
+    renewLapsingLeases(db, now, processes);
+  } catch {
+    // Nothing to renew now; the next look tries again.
+  }
+}
+
+function renewLapsingLeases(
+  db: DatabaseSync,
+  now: Clock,
+  processes: (pid: number) => boolean,
+): void {
+  const at = now();
+  const soon = leaseExpiry(at, LEASE_RENEW_AHEAD_MS);
+  const due = selectLeases(db).filter(({ lease }) => lease.expiresAt < soon);
+  if (due.length === 0) return;
+  const key = JSON.stringify(due.map(({ id, lease }) => [id, lease.holder, lease.expiresAt]));
+  const last = lookedAt.get(db);
+  const stamp = Date.parse(at);
+  if (last && last.key === key && Math.abs(stamp - last.at) < LOOK_AGAIN_MS) return;
+  // Each holder that is there, with when its silence began: its last sign.
+  const there = new Map<string, number>();
+  for (const agent of listAgents(db, () => at, processes)) {
+    if (!agent.there || agent.role === 'assistant') continue;
+    there.set(
+      agent.name,
+      Math.max(Date.parse(agent.lastSeen), Date.parse(agent.actedAt ?? agent.lastSeen)),
+    );
+  }
+  let left = 0;
+  for (const { id, lease } of due) {
+    const silentSince = there.get(lease.holder);
+    if (silentSince === undefined || grantedFor(db, id, lease.holder) < LEASE_RENEW_AHEAD_MS) {
+      left += 1;
+      continue;
+    }
+    // A default lease from now, never past the silence the desk tolerates (THERE_FOR_MS after the
+    // holder's last sign), so a session that hangs does not hold the item for ever.
+    const until = new Date(
+      Math.min(stamp + DEFAULT_LEASE_TTL_MS, silentSince + THERE_FOR_MS),
+    ).toISOString();
+    // Written only if the lease is still the one read: a release or a take since wins.
+    if (!renewLease(db, id, lease, until)) left += 1;
+  }
+  if (left > 0) lookedAt.set(db, { key, at: stamp });
+  else lookedAt.delete(db);
+}
+
+const LOOK_AGAIN_MS = 5_000;
+
+// How long the holder's claim granted the lease for (its `claimed` event: when, and until when).
+// Unknown (no such event) counts as the default lease, so an older record is still renewed.
+function grantedFor(db: DatabaseSync, id: string, holder: string): number {
+  const claimed = selectEvents(db, id).findLast(
+    (event) => event.type === 'claimed' && event.data.holder === holder,
+  );
+  const until = Date.parse(String(claimed?.data.expiresAt ?? ''));
+  const from = Date.parse(claimed?.at ?? '');
+  return Number.isNaN(until) || Number.isNaN(from) ? DEFAULT_LEASE_TTL_MS : until - from;
 }
 
 // A waiting agent is alive: a parent waiting on its children, or on the person's answer, keeps
@@ -576,12 +853,25 @@ export function listAgents(
   }
   const heard = selectListening(db);
   const waits = selectWaiting(db);
+  const roles = selectRoles(db);
   const listeners = selectListenerProcesses(db);
   const since = (last: string | undefined, window: number) =>
     last !== undefined && Date.parse(at) - Date.parse(last) <= window;
   const within = (last: string | undefined) => since(last, LISTEN_WINDOW_MS);
   // Every listener process it was heard through has ended.
-  const silenced = (name: string) => listenersEnded(listeners.get(name), alive);
+  const harnessRuns = runningProcesses(db, () => at, processes, HARNESS_BEAT_MS);
+  const silenced = (name: string) => listenersEnded(listeners.get(name), alive, harnessRuns);
+  // The harness session it was heard through is gone and no listener of it runs: nothing of it
+  // can still be acting. A listener that runs is never overridden by another process.
+  const harnessGone = (name: string) => {
+    const harness = listeners.get(name)?.harness ?? null;
+    return harness !== null && !harnessRuns(harness) && !listenerRuns(listeners.get(name), alive);
+  };
+  // The harness session it was heard through runs now and was noted lately.
+  const harnessThere = (name: string) => {
+    const harness = listeners.get(name)?.harness ?? null;
+    return harness !== null && harnessRuns(harness);
+  };
   const records = selectAgents(db);
   const released = selectLastReleases(db);
   // Whoever has a question of its own waiting for the person: it waits for the answer, not at work.
@@ -636,12 +926,16 @@ export function listAgents(
     const held = holding.get(name) ?? [];
     const heardAt = heard.get(name);
     const done = finished(record, held);
-    const gone = done || (heardAt !== undefined && silenced(name));
+    const orphan = harnessGone(name);
+    const gone = done || orphan || (heardAt !== undefined && silenced(name));
     const listening = within(heardAt) && !gone;
     // Its session ended: it was last heard through a listener now gone, and did nothing since; or
-    // it is a subagent that finished.
+    // it is a subagent that finished; or the harness session it ran under is gone, which no later
+    // command of its own undoes (a new session notes its own, forgetHarness).
     const ended =
-      done || (gone && heardAt !== undefined && Date.parse(lastSeen) <= Date.parse(heardAt));
+      done ||
+      orphan ||
+      (gone && heardAt !== undefined && Date.parse(lastSeen) <= Date.parse(heardAt));
     // It was seen lately (a command-line agent between its commands); a profile given for it by
     // the person, with no sighting of its own, is no act.
     const active = connectedAt !== null && since(lastSeen, ACTIVE_WINDOW_MS);
@@ -651,8 +945,20 @@ export function listAgents(
     const declared = declaredOf.get(name);
     const mcp = mcpOf(record);
     const live = !ended && (listening || active || called);
-    const waiting = within(waits.get(name)) && !gone;
+    const attending = within(waits.get(name)) && !gone;
+    const role = roles.get(name) ?? null;
+    // The assistant's wait hears the person, not the boards' desk: it is never a board listener.
+    const waiting = attending && role !== 'assistant';
     const sessionEnded = silenced(name);
+    const quietMs =
+      Date.parse(at) - Math.max(Date.parse(lastSeen), Date.parse(record.actedAt ?? lastSeen));
+    // The session it runs under runs now (its harness noted by the commands it ran, or a listener
+    // of it) and it gave a sign lately: a long step with no otea call is no silence.
+    const there =
+      !sessionEnded &&
+      !ended &&
+      quietMs < THERE_FOR_MS &&
+      (listenerRuns(listeners.get(name), alive) || harnessThere(name));
     return {
       name,
       harness,
@@ -661,17 +967,26 @@ export function listAgents(
       holding: held,
       lastSeen,
       actedAt: record.actedAt ?? null,
+      heardAt: heardAt ?? null,
       live,
       status: agentStatus({
         live,
-        holding: held.length,
+        // The assistant talks and keeps others at work: whatever it holds (a note of the Bandeja it
+        // refines itself, an item it made) is never the work the person counts as «trabajando»
+        // (field study 4, U7: with it dead, the top bar still said «1 trabajando»).
+        holding: role === 'assistant' ? 0 : held.length,
         waiting,
         asking: askers.has(name),
         sessionEnded: sessionEnded || ended,
+        quietMs,
+        there,
       }),
       sessionEnded,
+      there,
       listening,
       waiting,
+      attending,
+      role,
       profile: declared ? profileView(declared.profile) : null,
       profileConfirmed: declared?.confirmed ?? false,
       profileChangedAt: profileChangedAt(db, name),
@@ -700,19 +1015,28 @@ export function isSubagent(name: string, names: readonly string[]): boolean {
 }
 
 // What changes when an agent's presence does, leaving out `live`, which only time changes: the
-// stream tells the UI to read the agents again when it differs.
+// stream tells the UI to read the agents again when it differs. What time alone changes is
+// livenessSignature's.
 export function presenceSignature(db: DatabaseSync, now: Clock = systemClock): string {
-  const agents = listAgents(db, now).sort((a, b) => a.name.localeCompare(b.name));
+  return presenceSignatureOf(listAgents(db, now));
+}
+
+// The same, of agents already read: a caller that also needs them for something else reads them
+// once.
+export function presenceSignatureOf(agents: readonly AgentPresence[]): string {
+  const sorted = [...agents].sort((a, b) => a.name.localeCompare(b.name));
   return JSON.stringify(
-    agents.map(({ name, harness, holding, lastSeen, profile, profileConfirmed, waiting, mcp }) => [
-      name,
-      harness,
-      holding,
-      lastSeen,
-      profile,
-      profileConfirmed,
-      waiting,
-      mcp,
+    sorted.map((agent) => [
+      agent.name,
+      agent.harness,
+      agent.holding,
+      agent.lastSeen,
+      agent.profile,
+      agent.profileConfirmed,
+      agent.waiting,
+      agent.attending,
+      agent.role,
+      agent.mcp,
     ]),
   );
 }
@@ -804,7 +1128,9 @@ export function nameFor(
   // Its session ended: every process it was heard listening through is gone (P4-R3-2). Its
   // lease is then the returning session's to carry on, and its last acts no other terminal's.
   const listeners = selectListenerProcesses(db);
-  const ended = (agent: AgentPresence) => listenersEnded(listeners.get(agent.name), alive);
+  const harnessRuns = runningProcesses(db, now, processes, HARNESS_BEAT_MS);
+  const ended = (agent: AgentPresence) =>
+    listenersEnded(listeners.get(agent.name), alive, harnessRuns);
   // A lease keeps a name busy only while its session is alive: one heard through nothing that
   // runs, quiet past the listening window, left it to whoever comes back under it (P7-R3-11).
   const holds = (agent: AgentPresence) =>

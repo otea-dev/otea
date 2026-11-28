@@ -26,6 +26,16 @@ import {
 
 const MAIN = fileURLToPath(new URL('./main.ts', import.meta.url));
 
+// Ends a process the test started. Checking it runs and then killing it races its own exit (macOS
+// CI: kill ESRCH), so this kills once and takes «no such process» as done.
+function stop(pid: number): void {
+  try {
+    process.kill(pid);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+  }
+}
+
 // Whether no process holds the folder any more: it can be renamed, and is put back.
 function released(dir: string): boolean {
   try {
@@ -39,7 +49,7 @@ function released(dir: string): boolean {
 const GIT_BASH = 'C:\\Program Files\\Git\\bin\\bash.exe';
 
 const USAGE =
-  'Usage: otea wait --turn <agent|human> [--collection <collection>] [--unclaimed] [--timeout <duration>]';
+  'Usage: otea wait [--turn <agent|human>] [--collection <collection>] [--unclaimed] [--assistant] [--timeout <duration>]';
 
 describe('wait', () => {
   let repo: TempRepo;
@@ -464,7 +474,7 @@ describe('wait', () => {
       }
     } finally {
       parent.kill();
-      if (processAlive(pid)) process.kill(pid);
+      stop(pid);
       // Windows holds the folder of processes that just ended a moment longer, under load longer
       // than the cleanup retries: wait until it lets go.
       await until(() => released(repo.dir), 20_000);
@@ -531,7 +541,7 @@ describe('wait', () => {
         await until(() => existsSync(done), 60_000);
       } finally {
         session.kill();
-        if (wait && processAlive(wait.pid)) process.kill(wait.pid);
+        if (wait) stop(wait.pid);
       }
     },
     150_000,
@@ -627,7 +637,7 @@ describe('wait', () => {
       expect(said).toContain('`&`');
     } finally {
       parent.kill();
-      if (processAlive(pid)) process.kill(pid);
+      stop(pid);
       await until(() => released(repo.dir), 20_000);
     }
   }, 60_000);

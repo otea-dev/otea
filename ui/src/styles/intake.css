@@ -69,7 +69,7 @@
 }
 .ffield > label,
 .ffield > .flab {
-  font: 600 10px / 1.3 var(--sans);
+  font: 600 11px / 1.3 var(--sans);
   letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -77,13 +77,13 @@
 }
 .ffield > .flab small {
   display: block;
-  font: 400 10.5px / 1.3 var(--mono);
+  font: 400 11px / 1.3 var(--mono);
   letter-spacing: 0;
   text-transform: none;
   margin-top: 3px;
 }
 .ffield .required {
-  font: 400 10.5px / 1 var(--mono);
+  font: 400 11px / 1 var(--mono);
   letter-spacing: 0;
   text-transform: none;
   color: var(--ink-3);
@@ -233,7 +233,7 @@
   display: grid;
   place-items: center;
   background: var(--well);
-  font: 400 10px / 1 var(--mono);
+  font: 400 11px / 1 var(--mono);
   color: var(--ink-3);
 }
 .intake-thumb img {

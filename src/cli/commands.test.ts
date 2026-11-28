@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   type Cli,
   cliAt,
+  dropItemDirectly,
   presetCollection,
   seedOnce,
   type TempRepo,
@@ -389,19 +390,13 @@ describe('commands', () => {
         });
 
         it('lists the human decisions the agent may relay', async () => {
+          // Never a drop: that is the person's tap.
           expect((await otea('show', 'BUGS-1')).out).toContain(
-            'Agent can relay to: Hacerlo (reason required), Dropped (reason required)',
+            'Agent can relay to: Hacerlo (reason required)',
           );
+          expect((await otea('show', 'BUGS-1')).out).not.toContain('Dropped (reason required)');
           expect((await json('show', 'BUGS-1')).relayable).toEqual([
             { to: 'todo', toName: 'Hacerlo', by: 'human', reasonRequired: true, turn: 'agent' },
-            {
-              to: 'dropped',
-              toName: 'Dropped',
-              by: 'human',
-              reasonRequired: true,
-              turn: 'none',
-              closes: 'discarded',
-            },
           ]);
         });
 
@@ -455,7 +450,7 @@ describe('commands', () => {
         });
 
         it('rejects updating a closed item', async () => {
-          await otea('relay', 'TASKS-2', 'dropped', '--quote', 'drop it', '--reason', 'Duplicate');
+          dropItemDirectly(repo.dir, 'TASKS-2');
 
           const { code, err } = await otea('update', 'TASKS-2', '--description', 'Late');
 
@@ -530,7 +525,7 @@ describe('commands', () => {
         });
 
         it('requires a reason when the transition does, with the usage', async () => {
-          const { code, err } = await otea('relay', 'BUGS-1', 'todo', '--quote', 'redo');
+          const { code, err } = await otea('relay', 'BUGS-1', 'todo', '--quote', 'redo it');
 
           expect(code).toBe(2);
           expect(err).toContain(
@@ -543,7 +538,7 @@ describe('commands', () => {
                 'BUGS-1',
                 'todo',
                 '--quote',
-                'redo',
+                'redo it',
                 '--reason',
                 'R',
                 '--as',

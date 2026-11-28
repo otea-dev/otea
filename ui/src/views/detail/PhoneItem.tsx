@@ -20,12 +20,14 @@ import {
 import { pickableOn, type ReaderPick } from '../../components/evidence/reader-pick.ts';
 import { NoteText } from '../../components/NoteText.tsx';
 import { OptionTrade } from '../../components/OptionsModule.tsx';
+import { ShortText } from '../../components/ShortText.tsx';
 import { Unheard } from '../../components/Unheard.tsx';
 import { agoText } from '../../derive/when.ts';
-import { blindPartsOf } from '../../evidence.ts';
+import { blindPartsOf, diffOrigin } from '../../evidence.ts';
 import { t, tx } from '../../i18n/i18n.ts';
 import { AgentMark, Button, Icon, StepPill } from '../../kit/index.ts';
 import { itemOpened } from '../../kit/pop/toast.tsx';
+import { SEND_KEYS, sendsOnCtrlEnter } from '../../kit/send-keys.ts';
 import type { Look } from '../../lanes/looks.ts';
 import { handsToAgent, hearing } from '../../listening.ts';
 import { OfflineBar } from '../../offline/OfflineBar.tsx';
@@ -37,6 +39,7 @@ import { roundsOf } from '../../rounds.ts';
 import type { Evidence, ItemView, TypeView } from '../../types.ts';
 import { evidenceWords } from '../toca/phone.ts';
 import { Acts, type ActsMode } from './Acts.tsx';
+import { Body, type Sec } from './Body.tsx';
 import { evidenceGaps, type EvidenceGaps as Gaps } from './board-item.ts';
 import { cautionKeyOf, useCaution } from './caution.ts';
 import type { Facts } from './facts.ts';
@@ -63,6 +66,9 @@ import {
 } from './phone-review.ts';
 import type { Pick } from './pick.ts';
 import { takePick } from './pick-intent.ts';
+import { ReviewNotices } from './ReviewNotices.tsx';
+import type { ReviewNotice } from './review-notices.ts';
+import { TechDetails } from './TechDetails.tsx';
 
 // Reviewing an item on the phone (mobile mock 2, 2b): what was delivered first (the round's note,
 // its evidence, what you asked the round before), the rounds of the step as one segment (Ronda N ·
@@ -70,6 +76,9 @@ import { takePick } from './pick-intent.ts';
 // the bottom at 48 px. Devolver… opens a sheet from below with the note focused; it leaves the way
 // it came. An item that is not on your turn is read only: the stuck one keeps Retomar and
 // Reasignar, one an agent set aside keeps Retomar, nothing closes or discards it here.
+
+// A part of the item an agent filled in, by the board's part id.
+export type WorkedSec = Sec & { ref: string };
 
 type PhoneItemProps = {
   item: ItemView;
@@ -85,8 +94,17 @@ type PhoneItemProps = {
   // The route, the hand and wait checklists: drawn by the sheet, placed here.
   route: ReactNode;
   checks: ReactNode;
+  // The branch and what Otea says of it: folded with the diff and the test output behind
+  // «Detalles técnicos» under the delivery, and how many notices wait in it.
+  technical?: ReactNode;
+  technicalNotices?: number;
+  // What the person should know before Aprobar, said in the page just above the dock, never folded.
+  notices?: readonly ReviewNotice[] | undefined;
   details: ReactNode;
   detailsSummary: string;
+  // On a board, the fields the agents filled in (findings, options, sources), drawn as the desk
+  // draws them; the ones the round under review hands in are shown with that round instead.
+  worked?: readonly WorkedSec[] | undefined;
   request: ReactNode;
   requestSummary: string;
   // What holds it back, what it holds back, implements or relates to, in any board (read only).
@@ -193,6 +211,7 @@ function Files({
   decide,
   comment,
   onSeen,
+  seen,
 }: {
   evidence: readonly Evidence[];
   // While you review: a comment left from the reader (it goes with a send-back).
@@ -205,6 +224,8 @@ function Files({
   marks?: ReadonlyMap<number, Mark> | undefined;
   // A file shown in the reader, opened or stepped to.
   onSeen?: ((id: number) => void) | undefined;
+  // The files opened in the reader: the lane draws them as discs.
+  seen?: ReadonlySet<number> | undefined;
 }) {
   const roleWord = useSideWord();
   const { images, files } = splitEvidence(evidence);
@@ -297,6 +318,9 @@ function Files({
                 {(e.module === null ? undefined : parts?.get(e.module)) ??
                   t(`evidence.kind.${e.kind}`)}
                 {roleWord(e) ? ` · ${roleWord(e)}` : ''}
+                {diffOrigin(e, files)
+                  ? ` · ${t(diffOrigin(e, files) === 'branch' ? 'evidence.branchDiff' : 'evidence.agentFile')}`
+                  : ''}
               </span>
               {mark(e)}
               <Pin count={noted?.get(e.id)} />
@@ -335,6 +359,7 @@ function Files({
               at={at}
               onAt={setAt}
               phone
+              seen={seen}
               decide={deciding}
               note={comment}
               draft={draft}
@@ -378,7 +403,7 @@ export function HandedList({
             </dd>
           ) : f.long ? (
             <dd>
-              <NoteText className="p-text" text={f.value} />
+              <ShortText markdown leadClass="p-text" text={f.value} />
             </dd>
           ) : (
             <dd>{f.value}</dd>
@@ -466,11 +491,18 @@ function RoundView({
   decide,
   comment,
   onSeen,
+  seen,
   handed,
   blind,
   gaps,
+  technical,
+  technicalNotices,
 }: {
   r: PhoneRound;
+  // The branch and what Otea says of it (the newest round's), for the fold of technical details,
+  // with how many notices wait in it.
+  technical?: ReactNode;
+  technicalNotices?: number | undefined;
   // What the step asks of its evidence that is not attached, on the newest round only.
   gaps?: Gaps | undefined;
   // The compare parts judged blind, by module id: their files are never marked (P5-R2-2).
@@ -486,17 +518,27 @@ function RoundView({
   now: number;
   notes?: PhoneNotes | undefined;
   onSeen?: ((id: number) => void) | undefined;
+  seen?: ReadonlySet<number> | undefined;
 }) {
   const { images, files } = splitEvidence(r.evidence);
+  // What a person judges leads: a text the step handed in (a draft, the options, the findings) is
+  // read here, right under the delivery note; only the plain values (the branch, a commit) wait
+  // behind «Detalles técnicos».
+  const lead = handed?.filter((f) => f.long) ?? [];
+  const plain = handed?.filter((f) => !f.long) ?? [];
+  // On a code board the diff is what is reviewed: it reads with the pictures, never behind the fold
+  // (field study 6). The logs and the other files, the branch and the commit stay folded.
+  const diffs = files.filter((e) => e.kind === 'diff');
+  const folded = files.filter((e) => e.kind !== 'diff');
+  const judged = [...images, ...diffs];
   return (
     <>
       <section className="p-part" data-c>
         <Lab x={newest && r.n > 1 ? t('phone.r.newIn', { n: r.n }) : t('toca.round', { n: r.n })}>
           {t('phone.r.delivered')}
         </Lab>
-        {handed?.length ? <HandedList fields={handed} agent={r.by} /> : null}
         {r.note ? (
-          <NoteText className="p-text" text={r.note} />
+          <ShortText markdown leadClass="p-text" text={r.note} />
         ) : handed?.length ? null : (
           <p className="p-text none">{t('phone.r.noNote')}</p>
         )}
@@ -505,6 +547,11 @@ function RoundView({
           {r.by} · {agoText(r.at, now)}
         </div>
       </section>
+      {lead.length > 0 ? (
+        <section className="p-part p-lead" data-c>
+          <HandedList fields={lead} agent={r.by} />
+        </section>
+      ) : null}
       {notes ? (
         <RoundThread
           key={r.n}
@@ -516,17 +563,43 @@ function RoundView({
       ) : null}
       <section className="p-part" data-c>
         <Lab x={evidenceWords(images.length, files.length) || '—'}>{t('sheet.evidence')}</Lab>
-        <Files
-          evidence={r.evidence}
-          noted={notes?.noted}
-          marks={prior ? fileMarks(prior.evidence, r.evidence, blind) : undefined}
-          parts={parts}
-          decide={decide}
-          comment={comment}
-          onSeen={onSeen}
-        />
+        {/* What a person judges comes first (the pictures, and the diff of a code board); the test
+            output and the files that only a reader of code uses are folded behind «Detalles
+            técnicos». */}
+        {judged.length > 0 || files.length === 0 ? (
+          <Files
+            evidence={judged}
+            noted={notes?.noted}
+            marks={prior ? fileMarks(prior.evidence, r.evidence, blind) : undefined}
+            parts={parts}
+            decide={decide}
+            comment={comment}
+            onSeen={onSeen}
+            seen={seen}
+          />
+        ) : null}
         {gaps ? <EvidenceGaps gaps={gaps} required /> : null}
       </section>
+      {/* One fold for what only a reader of code uses: the branch and what Otea says of it, the
+          fields the step handed off (the branch, the commit), the test output and the other files. */}
+      {technical || plain.length > 0 || folded.length > 0 ? (
+        <TechDetails notices={technicalNotices}>
+          {technical}
+          {plain.length > 0 ? <HandedList fields={plain} agent={r.by} /> : null}
+          {folded.length > 0 ? (
+            <Files
+              evidence={folded}
+              noted={notes?.noted}
+              marks={prior ? fileMarks(prior.evidence, r.evidence, blind) : undefined}
+              parts={parts}
+              decide={decide}
+              comment={comment}
+              onSeen={onSeen}
+              seen={seen}
+            />
+          ) : null}
+        </TechDetails>
+      ) : null}
       {r.asked ? (
         <section className="p-part" data-c>
           <Lab>{t('phone.r.asked', { n: r.asked.n })}</Lab>
@@ -704,6 +777,8 @@ export function PhoneItem(p: PhoneItemProps) {
     () => (p.board ? evidenceGaps(p.board.def, item) : undefined),
     [p.board, item],
   );
+  // What the round under review hands in is drawn with the round; the rest is shown here.
+  const work = (p.worked ?? []).filter(({ ref }) => !handed.some((h) => h.ref === ref));
   const [pick, setPick] = useState<number | 'compare' | null>(null);
   const shown = pick === 'compare' ? null : (rounds.find((r) => r.n === pick) ?? rounds[0] ?? null);
   const newest = rounds[0];
@@ -727,7 +802,7 @@ export function PhoneItem(p: PhoneItemProps) {
   // stays on the desk, as the phone's review always had it. Triage offers the same (otherMoves).
   const moreMoves = dock ? otherMoves(plan) : [];
   // Whether what is handed to an agent here is heard (P7-R2-9): said beside the move that does it.
-  const heard = hearing(app.agents, app.all, now);
+  const heard = hearing(app.agents, app.all, now, item.collection);
   const [pickOpen, setPickOpen] = useState(false);
   const pickBtn = useRef<HTMLButtonElement>(null);
   // Opened from Triage to pick: the sheet opens as soon as the pick is known.
@@ -830,6 +905,7 @@ export function PhoneItem(p: PhoneItemProps) {
               }
             : undefined,
           warn: careful.line || undefined,
+          notices: (p.notices ?? []).map(({ text }) => text),
         }
       : undefined;
   // A send-back with your review's comments goes with them: words of its own are optional (P4-7).
@@ -993,11 +1069,16 @@ export function PhoneItem(p: PhoneItemProps) {
           decide={shown === newest ? readerDecide : undefined}
           comment={shown === newest ? p.notes?.review?.reader : undefined}
           onSeen={markSeen}
+          seen={seen}
           handed={shown === newest ? handed : undefined}
           gaps={shown === newest ? gaps : undefined}
+          technical={shown === newest ? p.technical : undefined}
+          technicalNotices={shown === newest ? p.technicalNotices : undefined}
           blind={blind}
         />
       ) : null}
+
+      {work.length ? <Body id={item.id} sections={work} /> : null}
 
       <Fold
         label={t('phone.r.details')}
@@ -1066,6 +1147,9 @@ export function PhoneItem(p: PhoneItemProps) {
         </section>
       ) : docked ? (
         <>
+          {primary || picking ? (
+            <ReviewNotices item={item.id} notices={p.notices ?? []} className="p-rvn" />
+          ) : null}
           {/* What Aprobar does, in the page just above the dock: kept inside it, three lines of the
             sticky bar's quarter of the screen went to words that are read once. */}
           {!refused && says ? (
@@ -1126,7 +1210,11 @@ export function PhoneItem(p: PhoneItemProps) {
             ) : null}
             {(primary || picking) && unseen.unopened > 0 && !refused ? (
               <p className="hint unseen">
-                {t('phone.r.unopened', { n: unseen.unopened, total: unseen.total })}
+                {t('phone.r.unopened', {
+                  count: unseen.total,
+                  n: unseen.unopened,
+                  total: unseen.total,
+                })}
               </p>
             ) : null}
             {refused ? (
@@ -1169,7 +1257,9 @@ export function PhoneItem(p: PhoneItemProps) {
             aria-label={t('notes.form.aria', { agent: leave.to ?? t('notes.anyAgent') })}
             placeholder={t('notes.form.placeholder')}
             value={noteText}
+            aria-keyshortcuts={SEND_KEYS}
             onChange={(e) => setNoteText(e.target.value)}
+            onKeyDown={(e) => sendsOnCtrlEnter(e, sendNote)}
           />
           {leave.pieces.length ? (
             <div className="nt-pstrip" data-i="">
@@ -1290,7 +1380,9 @@ export function PhoneItem(p: PhoneItemProps) {
           aria-label={t('phone.sb.note')}
           placeholder={bare ? t('notes.review.optional') : t('phone.sb.placeholder')}
           value={text}
+          aria-keyshortcuts={SEND_KEYS}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => sendsOnCtrlEnter(e, send)}
         />
         <div className="p-sb-acts" data-i="">
           <Button variant="quiet" onClick={() => setAsking((a) => (a ? { ...a, open: false } : a))}>

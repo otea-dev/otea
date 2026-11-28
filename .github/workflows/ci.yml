@@ -18,24 +18,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # Windows has its own jobs below: it takes about three times as long as Linux.
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    # A run takes under 5 minutes; a hang should fail long before the 6-hour default.
-    timeout-minutes: 15
+    # A run takes 5 minutes on Linux; a hang should fail long before the 6-hour default.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
-      # On Windows, TEMP is on the OS disk (C:), where the small-file I/O of the tests' temp git
-      # repos made the tests take twice as long; the runner's own temp folder is on its local disk
-      # (D:).
-      - if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
-          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
       - run: npm ci
       - run: npm run check
       # What npm would publish, installed into an empty folder and tried: the bundle must find its
@@ -46,6 +39,68 @@ jobs:
           mkdir -p "$RUNNER_TEMP/pack"
           npm pack --pack-destination "$RUNNER_TEMP/pack"
           node scripts/try-package.mjs "$RUNNER_TEMP/pack"
+
+  # The same check on Windows, in two parallel jobs: the suites that spawn processes (vitest's
+  # `processes` project, most of the run) are split in halves with --shard, and what runs once
+  # rides with one of them: the unit project with the first (it takes about as long as the half of
+  # the second that lint, types, the builds and the packed package leave), the rest with the
+  # second. Together they run exactly what `npm run check` runs.
+  check-windows:
+    name: check (windows-latest, part ${{ matrix.shard }} of 2)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      # TEMP is on the OS disk (C:), where the small-file I/O of the tests' temp git repos made the
+      # tests take twice as long; the runner's own temp folder is on its local disk (D:).
+      - shell: pwsh
+        run: |
+          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+      - run: npm ci
+      - if: matrix.shard == 2
+        run: npm run lint
+      - if: matrix.shard == 2
+        run: npm run typecheck
+      # The unit project first and on its own, as in vitest.config.ts: beside the suites that spawn
+      # processes it would be starved.
+      - if: matrix.shard == 1
+        run: npx vitest run --project unit
+      - run: npx vitest run --project processes --shard=${{ matrix.shard }}/2
+      - if: matrix.shard == 2
+        run: npm run build:ui
+      - if: matrix.shard == 2
+        run: npm run build
+      - name: Try the packed package
+        if: matrix.shard == 2
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/pack"
+          npm pack --pack-destination "$RUNNER_TEMP/pack"
+          node scripts/try-package.mjs "$RUNNER_TEMP/pack"
+
+  # The required check is named `check (windows-latest)`: this job keeps that name and is green
+  # only when both halves are. Do not rename it (the repository ruleset requires the name).
+  check-windows-gate:
+    name: check (windows-latest)
+    needs: check-windows
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      RESULT: ${{ needs.check-windows.result }}
+    steps:
+      - run: |
+          echo "check-windows: $RESULT"
+          test "$RESULT" = "success"
 
   # package.json engines says node >=22.18, so the oldest supported Node runs on every pull request
   # too. Ubuntu only, to keep the cost low. Not a required check.

@@ -9,7 +9,7 @@ export function lookOf(item: Item, now: number): Look {
   if (item.turn === 'human') return 'yours';
   if (item.turn === 'none') return item.closes === 'discarded' ? 'dropped' : 'done';
   if (activeLease(item.lease, now)) return 'working';
-  if (item.expiredLease) return 'stuck';
+  if (item.expiredLease && !item.expiredLease.connected) return 'stuck';
   if ((item.children?.open ?? 0) > 0) return 'waiting';
   return 'queued';
 }

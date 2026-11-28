@@ -35,6 +35,47 @@ describe('the default language', () => {
     expect(systemLanguage({ LC_ALL: 'POSIX', LANG: 'es_ES' }, nothing)).toBe('es');
   });
 
+  // Field study 3: init before the desk opened made the project in English for a Spanish user:
+  // their computer is Spanish and the shell an agent runs in carried LANG=en_US.UTF-8 (set by the
+  // program that started it, never by the person). LC_ALL and LC_MESSAGES are choices; LANG is a
+  // default the computer's own language outranks.
+  it('on Windows puts the computer language over a bare LANG, and a deliberate LC_ALL over both', () => {
+    const os = (locale: string) => () => locale;
+    expect(systemLanguage({ LANG: 'en_US.UTF-8' }, os('es-ES'), 'win32')).toBe('es');
+    expect(systemLanguage({ LANG: 'es_ES.UTF-8' }, os('en-US'), 'win32')).toBe('en');
+    expect(systemLanguage({ LC_ALL: 'en_US.UTF-8', LANG: 'es_ES' }, os('es-ES'), 'win32')).toBe(
+      'en',
+    );
+    expect(systemLanguage({ LC_MESSAGES: 'es_ES', LANG: 'en_US' }, os('en-US'), 'win32')).toBe(
+      'es',
+    );
+    // No variable at all: the computer's.
+    expect(systemLanguage({}, os('es-ES'), 'win32')).toBe('es');
+  });
+
+  // On POSIX the variables are the locale the system reports: they keep their order, a set LC_ALL
+  // wins over the rest, and C and POSIX say nothing, so the next one speaks.
+  it('on POSIX keeps LC_ALL, LC_MESSAGES, LANG in that order, and C as unset', () => {
+    const os = (locale: string) => () => locale;
+    for (const platform of ['linux', 'darwin'] as const) {
+      expect(systemLanguage({ LC_ALL: 'C', LANG: 'es_ES.UTF-8' }, os('en-US'), platform)).toBe(
+        'es',
+      );
+      expect(systemLanguage({ LC_ALL: 'POSIX', LANG: 'es_ES' }, os('en-US'), platform)).toBe('es');
+      expect(systemLanguage({ LC_ALL: 'en_US.UTF-8', LANG: 'es_ES' }, os('es-ES'), platform)).toBe(
+        'en',
+      );
+      // A set LANG beats the system's own report, as it is where that report comes from.
+      expect(systemLanguage({ LANG: 'en_US.UTF-8' }, os('es-ES'), platform)).toBe('en');
+      expect(systemLanguage({ LC_MESSAGES: 'es_ES', LANG: 'en_US' }, os('en-US'), platform)).toBe(
+        'es',
+      );
+      // None set: the system's.
+      expect(systemLanguage({ LANG: 'C' }, os('es-ES'), platform)).toBe('es');
+      expect(systemLanguage({}, os('es-ES'), platform)).toBe('es');
+    }
+  });
+
   it('does not take a language that merely begins with es for Spanish', () => {
     expect(systemLanguage({ LANG: 'est_EE' }, nothing)).toBe('en');
   });

@@ -7,9 +7,22 @@
 // - stuck: an agent's lease ran out with nobody releasing it or taking the item again;
 // - aside: an agent set the item aside for later (otea release --later);
 // - unheard: the item waits for an agent and none is listening or at work (the desk's «nadie está
-//   escuchando», core/agent-status.ts itemUnheard).
+//   escuchando», core/agent-status.ts itemUnheard);
+// - assistant_reply: the assistant answered the person in Hablar (assistantSignalsOf);
+// - assistant_offline: the assistant is offline and the person's messages have waited long.
 
-export const NOTIFY_KINDS = ['turn', 'ask', 'replied', 'stuck', 'aside', 'unheard'] as const;
+import { isStuck } from '../waiting.ts';
+
+export const NOTIFY_KINDS = [
+  'turn',
+  'ask',
+  'replied',
+  'stuck',
+  'aside',
+  'unheard',
+  'assistant_reply',
+  'assistant_offline',
+] as const;
 
 export type NotifyKind = (typeof NOTIFY_KINDS)[number];
 
@@ -23,7 +36,7 @@ export type NotifyFacts = {
   turn: 'human' | 'agent' | 'none';
   round?: number;
   lease: Lease | null;
-  expiredLease?: Lease;
+  expiredLease?: Lease & { connected?: true };
   asks?: { question: number; by: string; text?: string; options?: string[] };
   notes?: { replied?: { note: number; by: string; at: string } };
   // Set aside for later by an agent, while nothing lifted it (app/set-aside.ts).
@@ -42,10 +55,107 @@ export type Signal = {
   // The question, for an ask, and the options it offers to pick.
   text?: string;
   options?: string[];
+  // assistant_reply: the turn in Hablar the notice opens. assistant_offline: how many messages wait.
+  turn?: number;
+  count?: number;
+  // `item` is a Bandeja note (B-3), not an item: a 0.7 board named B has items B-1 too, so the id
+  // alone does not say which it is.
+  bandeja?: true;
 };
 
-const active = (lease: Lease | null, now: number) =>
-  lease !== null && Date.parse(lease.expiresAt) > now;
+// How long the person's messages must wait for an offline assistant before it is told.
+export const ASSISTANT_WAIT_MS = 10 * 60_000;
+
+// How long after it was said an assistant's reply may still be told: a reply held back by the
+// spacing or an item's cooldown goes if it still holds, but never hours later.
+export const REPLY_WINDOW_MS = 15 * 60_000;
+
+// What the assistant and the conversation say, as the notifier reads it.
+export type AssistantFacts = {
+  name: string;
+  state: 'listening' | 'connected' | 'offline';
+  // When it was last heard, while offline.
+  since: string | null;
+  // The assistant's replies to the person from the last REPLY_WINDOW_MS: `turn` is the person's
+  // message that began the turn, `text` the reply's first line.
+  replies: { id: number; turn: number; by: string; text: string }[];
+  // Its questions with options to tap that the person has not answered: an agent's question, told
+  // as an item's is (not its plain notices, nor the replies above). `turn` is the turn they sit in.
+  questions?: { id: number; turn: number; by: string; text: string; options: string[] }[];
+  // What waits for the assistant unattended: the person's messages not read yet (and, with the
+  // Bandeja, the captures not taken), and the oldest one's time.
+  waiting: { count: number; since: string | null };
+};
+
+export function assistantSignalsOf(facts: AssistantFacts | undefined, now: number): Signal[] {
+  if (!facts) return [];
+  const out: Signal[] = facts.replies.map(({ id, turn, by, text }) => ({
+    key: `assistant_reply:${id}`,
+    kind: 'assistant_reply',
+    item: `hablar:${turn}`,
+    title: '',
+    by,
+    turn,
+    ...(text === '' ? {} : { text }),
+  }));
+  for (const { id, turn, by, text, options } of facts.questions ?? []) {
+    out.push({
+      key: `assistant_ask:${id}`,
+      kind: 'ask',
+      item: `hablar:${turn}`,
+      title: '',
+      by,
+      ...(text === '' ? {} : { text }),
+      options,
+      turn,
+    });
+  }
+  const { waiting } = facts;
+  // The key holds the time it was last heard: once it is back and goes offline again it is a new
+  // stretch, and told anew; within one stretch it is told once.
+  if (
+    facts.state === 'offline' &&
+    waiting.count > 0 &&
+    waiting.since !== null &&
+    now - Date.parse(waiting.since) >= ASSISTANT_WAIT_MS
+  ) {
+    out.push({
+      key: `assistant_offline:${facts.name}:${facts.since ?? ''}`,
+      kind: 'assistant_offline',
+      item: 'hablar:offline',
+      title: '',
+      by: facts.name,
+      count: waiting.count,
+    });
+  }
+  return out;
+}
+
+// A question a refiner asked the person on a Bandeja entry (otea ask B-3), still unanswered. It is
+// told as an item's question is: the same `ask` kind, so the person's switch, the text preference,
+// quiet hours and muting apply; its `item` is the entry's ref (B-3), and it opens Hablar's Bandeja.
+export type BandejaAskFacts = {
+  ref: string;
+  // The first line of the note captured.
+  snippet: string;
+  question: number;
+  by: string;
+  text: string;
+  options?: string[] | undefined;
+};
+
+export function bandejaSignalsOf(asks: readonly BandejaAskFacts[]): Signal[] {
+  return asks.map(({ ref, snippet, question, by, text, options }) => ({
+    key: `bandeja:${ref}:q${question}`,
+    kind: 'ask',
+    item: ref,
+    bandeja: true,
+    title: snippet,
+    by,
+    ...(text === '' ? {} : { text }),
+    ...(options === undefined || options.length === 0 ? {} : { options }),
+  }));
+}
 
 export function signalsOf(items: readonly NotifyFacts[], now: number): Signal[] {
   const out: Signal[] = [];
@@ -67,8 +177,9 @@ export function signalsOf(items: readonly NotifyFacts[], now: number): Signal[] 
           : { key: base, kind: 'turn', item, title },
       );
     }
+    // Stuck as the desk counts it (core/waiting.ts): never a push for a lapse the desk calls calm.
     const quiet = facts.expiredLease;
-    if (facts.turn === 'agent' && quiet && !active(facts.lease, now)) {
+    if (quiet && isStuck(facts, now)) {
       out.push({
         key: `stuck:${item}:${quiet.holder}:${quiet.expiresAt}`,
         kind: 'stuck',

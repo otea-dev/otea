@@ -110,6 +110,21 @@
   pointer-events: none;
 }
 
+/* A before/after label sits outside the picture, on its own line above it: inside, it covered the
+   corner that changed (s-real D-5ccd20). */
+.ev-tag.out {
+  position: static;
+  justify-self: start;
+  height: 22px;
+  background: var(--well);
+}
+
+.ev-sides {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .ev-tag.l {
   left: 10px;
 }
@@ -152,6 +167,14 @@
   justify-content: flex-end;
   gap: 8px;
   margin-top: 8px;
+}
+/* A fieldset is as wide as its content unless told otherwise: two long file names side by side made
+   the item's panel 647 px wide in a 464 px sheet and cut Aprobar off (s-real D-bf48e5, D-c8b9f3). */
+.ev-picker {
+  flex-wrap: wrap;
+  min-width: 0;
+  padding: 0;
+  border: 0;
 }
 /* A round that holds the very file of the round before (P5-F1). */
 .ev-same {
@@ -311,6 +334,18 @@
   gap: 10px;
 }
 
+/* A picture that did not load: its file's name, and the way to ask again, where it should be. */
+.ev-broken {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 8px;
+  min-height: 120px;
+  padding: 12px;
+  text-align: center;
+  color: var(--ink-3);
+}
+
 .ev-missing {
   display: grid;
   place-items: center;
@@ -322,6 +357,13 @@
 }
 
 @container (max-width: 30rem) {
+  .ev-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The phone stacks them whatever the column holds. */
+@media (max-width: 720px) {
   .ev-pair {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -402,7 +444,7 @@
   padding: 1px 5px;
   border-radius: 999px;
   background: color-mix(in oklch, var(--sheet) 88%, transparent);
-  font: 400 10.5px / 1.3 var(--mono);
+  font: 400 11px / 1.3 var(--mono);
   color: var(--ink);
   pointer-events: none;
 }
@@ -537,6 +579,17 @@
   --tint: transparent;
   display: flex;
   background: var(--tint);
+}
+
+/* A box that scrolls is reached with the keys: its ring stays inside it, or the box cuts it. */
+.ev-code:focus-visible {
+  outline-offset: -2px;
+}
+/* A line a note can be left on is reached with the keys: its ring stays inside the box, which
+   scrolls and would cut it. */
+.ev-line[tabindex]:focus-visible {
+  outline-offset: -2px;
+  border-radius: 0;
 }
 
 .ev-line[data-kind="add"] {
@@ -695,7 +748,7 @@
   color: var(--ink-2);
 }
 .sheet figcaption b {
-  font: 600 10px / 1 var(--sans);
+  font: 600 11px / 1 var(--sans);
   font-style: normal;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -707,7 +760,7 @@
   border-radius: 4px;
 }
 .sheet .ev-head .t-label {
-  font: 600 10px / 1 var(--sans);
+  font: 600 11px / 1 var(--sans);
   letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--ink);
@@ -1173,6 +1226,14 @@
 .ev-reader-pair > span:first-child {
   margin-right: auto;
 }
+/* the pair of tools and the zoom lay out as separate rows here; the phone makes them one row
+   (phone.css), and wears the compare button as an icon */
+.ev-reader-tools {
+  display: contents;
+}
+.ev-compare-btn .ic {
+  display: none;
+}
 .ev-reader-decide {
   display: flex;
   align-items: center;
@@ -1333,6 +1394,102 @@
 .rd-main .ev-reader-view .ev-media,
 .rd-main .ev-reader-view .ev-img {
   max-height: max(160px, calc(var(--fit-h, 100cqh) - 24px));
+}
+/* A whole-page capture (taller than three times its width) fits the width and the view scrolls down
+   it: fitted to the height it was a sliver nobody could read (field study 4). */
+.rd-main .ev-reader-view .ev-img[data-tall] {
+  max-height: none;
+}
+
+/* The desk reader in Otea's own look (field study 4: a plain modal with a list of file names). The
+   title and the file's name are set in the serif, the files hang on a lane of nodes (ring: not
+   opened, grey disc: opened, blue disc: the one shown), the file lies on the dotted ground, and
+   what is empty says so in italics. */
+.rd-head {
+  align-items: baseline;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+}
+.rd-title {
+  font: 500 26px / 1.1 var(--serif);
+  font-variation-settings: "opsz" 36;
+  letter-spacing: -0.01em;
+}
+.rd-list {
+  position: relative;
+  gap: 4px;
+  padding-block: 4px;
+}
+/* the lane the files hang on: it runs the whole list, scrolling with it */
+.rd-list {
+  background: linear-gradient(var(--lane), var(--lane)) no-repeat 15px 0 / 1px 100%;
+  background-attachment: local;
+}
+.rd-file {
+  position: relative;
+  padding-left: 34px;
+  z-index: 1;
+}
+.rd-file::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 13px;
+  width: 9px;
+  height: 9px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.3px solid var(--ink-3);
+  background: var(--sheet);
+  box-shadow: 0 0 0 4px var(--sheet);
+}
+.rd-file[data-seen="true"]::before {
+  border-color: var(--closed);
+  background: var(--closed);
+}
+.rd-file[aria-current="true"]::before {
+  border-color: var(--you);
+  background: var(--you);
+  box-shadow:
+    0 0 0 4px var(--sheet),
+    0 0 9px 1px color-mix(in oklch, var(--you) 55%, transparent);
+}
+/* the dot that said «opened» is the node now; its words stay for a reader of the page */
+.rd-seen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.rd-fn {
+  font-size: 12px;
+}
+.rd-main .ev-reader-where b {
+  font: 400 11.5px / 1.3 var(--mono);
+  color: var(--ink-3);
+}
+.rd-main .ev-reader-name {
+  font: 500 18px / 1.25 var(--serif);
+  font-variation-settings: "opsz" 20;
+  color: var(--ink);
+}
+.rd-main .ev-reader > .ev-reader-view {
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background-color: var(--ground);
+  background-image: radial-gradient(circle at 1px 1px, var(--dot) 0.9px, transparent 1.15px);
+  background-size: 22px 22px;
+}
+.rd-main .ev-left-head,
+.rd-main .ev-reader-on b {
+  font: 500 15px / 1.3 var(--serif);
+  font-variation-settings: "opsz" 18;
+  letter-spacing: 0;
+}
+.rd-main .ev-left-none p {
+  font: 400 italic 14.5px / 1.4 var(--serif);
+  color: var(--ink-3);
 }
 @media (max-width: 760px) {
   .rd-pane {
@@ -1807,4 +1964,126 @@
   .ev-left-acts .btn {
     min-height: 36px;
   }
+}
+
+/* The phone's reader in the desk reader's look (field study 4, design): the file's name set in the
+   serif, the files on a lane of nodes under the bar (ring: not opened, grey disc: opened, blue
+   disc: the one shown), the file on the dotted ground, what is empty said in italics. The lane
+   scrolls sideways within itself, so a long round never widens the sheet. */
+.p-read .ev-reader-where b {
+  font: 400 11.5px / 1.3 var(--mono);
+  color: var(--ink-3);
+}
+.p-read .ev-reader-name {
+  font: 500 17px / 1.25 var(--serif);
+  font-variation-settings: "opsz" 20;
+  font-family: var(--serif);
+  color: var(--ink);
+}
+.p-read .ev-lane {
+  display: flex;
+  min-width: 0;
+  height: 44px;
+  padding-inline: 14px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  /* the lane the files hang on is drawn by the nodes themselves (below), first dot to last, so it
+     never runs on past the last one */
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 14px,
+    #000 calc(100% - 14px),
+    transparent
+  );
+  mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+}
+.p-read .ev-lane::-webkit-scrollbar {
+  display: none;
+}
+.p-read .ev-node {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 44px;
+}
+.p-read .ev-node::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--lane);
+}
+.p-read .ev-node:first-child::after {
+  left: 50%;
+}
+.p-read .ev-node:last-child::after {
+  right: 50%;
+}
+.p-read .ev-node::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  box-sizing: border-box;
+  translate: -50% -50%;
+  border-radius: 50%;
+  border: 1.3px solid var(--ink-3);
+  background: var(--sheet);
+  box-shadow: 0 0 0 4px var(--sheet);
+  transition:
+    background-color 240ms var(--o-drift),
+    border-color 240ms var(--o-drift),
+    box-shadow 240ms var(--o-drift);
+}
+.p-read .ev-node[data-seen="true"]::before {
+  border-color: var(--closed);
+  background: var(--closed);
+}
+.p-read .ev-node[aria-current="true"]::before {
+  border-color: var(--you);
+  background: var(--you);
+  box-shadow:
+    0 0 0 4px var(--sheet),
+    0 0 9px 1px color-mix(in oklch, var(--you) 55%, transparent);
+}
+.p-read .ev-reader > .ev-reader-view {
+  padding: 6px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background-color: var(--ground);
+  background-image: radial-gradient(circle at 1px 1px, var(--dot) 0.9px, transparent 1.15px);
+  background-size: 22px 22px;
+  /* A short file is a picture on a well that takes the room between the tools and the foot, the
+     picture in the middle of it: the foot stands at the bottom, and what lay empty under a short
+     file (75 px, field study 7) is the well's own ground. */
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+/* its name is the head's already (once, over the dots), so the line under the picture is only a
+   caption of the agent's, when it wrote one */
+.p-read .ev-reader-view .ev-meta .ev-file {
+  display: none;
+}
+.p-read .ev-reader-view figcaption:not(:has(.t-small)) {
+  display: none;
+}
+.p-read .ev-left-head,
+.p-read .ev-reader-on b {
+  font: 500 15px / 1.3 var(--serif);
+  font-variation-settings: "opsz" 18;
+  letter-spacing: 0;
+}
+.p-read .ev-left-none p {
+  font: 400 italic 14.5px / 1.4 var(--serif);
+  color: var(--ink-3);
 }

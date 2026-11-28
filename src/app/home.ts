@@ -8,6 +8,7 @@ import { longestContaining, pathKey } from '../core/path-key.ts';
 import { compareRepos, type RepoFingerprint, type RepoMatch } from '../core/repo.ts';
 import { openWithSetup, transaction } from '../store/database.ts';
 import {
+  anchorDataDir,
   deleteProjectPath,
   insertProjectPath,
   insertRegisteredProject,
@@ -15,16 +16,21 @@ import {
   type PathKind,
   type ProjectPath,
   type RegisteredProject,
+  rememberHome,
   selectProjectPaths,
   selectRegisteredProject,
   selectRegisteredProjects,
   updateProjectPath,
+  wholeDataDirs,
 } from '../store/registry.ts';
+import { msysDrive } from './msys-path.ts';
 import type { Env } from './project.ts';
 
 // The user-level Otea folder: OTEA_HOME, or ~/.otea on every OS.
 export function oteaHome(env: Env = process.env): string {
-  return env.OTEA_HOME ? resolve(env.OTEA_HOME) : join(homedir(), '.otea');
+  return env.OTEA_HOME
+    ? resolve(msysDrive(env.OTEA_HOME) ?? env.OTEA_HOME)
+    : join(homedir(), '.otea');
 }
 
 function registryPath(env: Env): string {
@@ -34,9 +40,26 @@ function registryPath(env: Env): string {
 export function openRegistry(env: Env = process.env): DatabaseSync {
   mkdirSync(oteaHome(env), { recursive: true });
   return openWithSetup(registryPath(env), (db) => {
+    rememberHome(db, oteaHome(env));
     migrateRegistry(db);
+    anchorDataDirs(db, oteaHome(env));
     return db;
   });
+}
+
+// A registry an older Otea wrote holds the whole path of each project's data, so a home that was
+// copied or moved went on using the folder it came from. A path that ends in data/<the project's id>
+// is read as that folder of this home, once it is there; whatever points elsewhere is left alone.
+function anchorDataDirs(db: DatabaseSync, home: string): void {
+  const whole = wholeDataDirs(db);
+  if (whole.length === 0) return;
+  for (const { id, dataDir } of whole) {
+    const tail = `/data/${id}`;
+    const same = (path: string) => path.replaceAll('\\', '/').toLowerCase();
+    if (!same(dataDir).endsWith(tail.toLowerCase())) continue;
+    if (!existsSync(join(home, 'data', id))) continue;
+    anchorDataDir(db, id, dataDir, `data/${id}`);
+  }
 }
 
 // Runs `use` on the registry, or returns undefined without creating it when there is none yet.

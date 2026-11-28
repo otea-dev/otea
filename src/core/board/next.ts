@@ -1,4 +1,4 @@
-import { PERSON_READER } from '../item.ts';
+import { type Actor, PERSON_READER } from '../item.ts';
 import { timeText } from '../time.ts';
 import { mappedScales, rolePart, viewsOf } from './analysis.ts';
 import { choiceLines, type ItemChoice } from './choices.ts';
@@ -62,7 +62,7 @@ export const DROPPED_NAME = 'Dropped';
 // `note` the reason), not with a send-back from a review.
 export type SentBack = {
   note: string;
-  by: { kind: 'human' | 'agent'; name: string };
+  by: Actor;
   at: string;
   step: string;
   round: number;
@@ -109,7 +109,8 @@ export type NextInput = {
   // The commit of the protected branch the person approved, as its handoff recorded it (short id).
   approvedTip?: string;
   // The agent holding the item's live lease, and until when.
-  holder?: { name: string; expiresAt: string };
+  // `ended`: its session is over, so nobody works the item although its lease still runs.
+  holder?: { name: string; expiresAt: string; ended?: true };
   // The agent the person left a stuck item for (Reasignar), until an agent claims or moves it.
   leftFor?: string;
   // The notes the person left in this round of the step, oldest first.
@@ -152,6 +153,16 @@ export type NextInput = {
   startsAs?: 'json' | 'none';
 };
 
+// Who holds the item and until when. A holder whose session ended works nothing: a reader who says
+// someone is on it, from this line alone, would be wrong (field study 5, V7: «un trabajador lo tiene
+// en marcha» about a worker that had died), so it says the session ended.
+function heldLine(holder: NonNullable<NextInput['holder']>): string {
+  const until = `Held by ${holder.name} until ${timeText(holder.expiresAt)}`;
+  return holder.ended
+    ? `${until}, but ${holder.name}'s session ended: nobody is working on it now, and any agent may take it over (otea claim).`
+    : `${until}.`;
+}
+
 // Another agent's say on the item keeps the asking agent off it: a live lease it does not hold, or
 // a stuck item the person left for someone else.
 function heldElsewhere(input: NextInput): string | undefined {
@@ -159,8 +170,11 @@ function heldElsewhere(input: NextInput): string | undefined {
   if (me === undefined) return undefined;
   if (plannedBy)
     return `Waits for ${plannedBy.id}, which planned it, to leave ${plannedBy.step}: pick another item.`;
-  if (holder && holder.name !== me)
-    return `Held by ${holder.name} until ${timeText(holder.expiresAt)}: pick another item.`;
+  if (holder && holder.name !== me) {
+    return holder.ended
+      ? heldLine(holder)
+      : `Held by ${holder.name} until ${timeText(holder.expiresAt)}: pick another item.`;
+  }
   if (!holder && leftFor !== undefined && leftFor !== me)
     return `Left for ${leftFor}: pick another item.`;
   return undefined;
@@ -173,7 +187,7 @@ function holdLine({ id, holder, me, brief }: NextInput): string {
     return `You hold it until ${timeText(holder.expiresAt)}.`;
   if (holder && holder.name === me)
     return `You hold it until ${timeText(holder.expiresAt)}; your otea calls keep it, and on a long step with none (a rebase, a test run), otea heartbeat ${id} every 90 seconds.`;
-  if (holder) return `Held by ${holder.name} until ${timeText(holder.expiresAt)}.`;
+  if (holder) return heldLine(holder);
   return `Claim it first: otea claim ${id} (otea next --claim takes and claims the next in one call).`;
 }
 
@@ -747,6 +761,10 @@ function orderLine(order: { pin?: number; rank?: number }): string {
   return `It is number ${order.rank} in the order the person fixed on the Matrix.`;
 }
 
+// The one heading of a step's text that is the board's own words said back: the step's last
+// instructions, in the language the board speaks (the others name Otea's own commands and fields).
+export const BEFORE_HAND_IN = { en: 'Before you hand it off', es: 'Antes de entregarlo' } as const;
+
 function section(title: string, lines: readonly string[]): string[] {
   return lines.length === 0 ? [] : ['', title, ...lines];
 }
@@ -846,8 +864,7 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
   if (!input.holder && input.leftFor !== undefined && input.leftFor === input.me)
     lines.push('The person left it for you.');
   if (!person) lines.push(holdLine(input));
-  else if (input.holder)
-    lines.push(`Held by ${input.holder.name} until ${timeText(input.holder.expiresAt)}.`);
+  else if (input.holder) lines.push(heldLine(input.holder));
   if (reviewing && input.handed?.note.trim())
     lines.push(
       '',
@@ -910,7 +927,7 @@ export function nextText(def: BoardDefinition, input: NextInput): string {
   lines.push(...section('Branch', branchLines(def, step, position, input)));
   if (!reviewing && !input.brief)
     lines.push(
-      ...section('Before you hand it off', [
+      ...section(BEFORE_HAND_IN[langOf(def)], [
         ...indent(mentionText(def, step.instructions.before)),
         ...groupRules(def, step, input),
       ]),
@@ -1145,9 +1162,8 @@ export function takenBackText(
 // agent: the exact relay, so an agent the person told in the chat never dead-ends (P1-R3-4).
 function relayDropText(def: BoardDefinition, id: string): string {
   if (def.drop.by === 'page') return '';
-  if (!def.relay)
-    return ` ${def.name} does not take a decision relayed through an agent: if the person may want it dropped, ask them with otea ask ${id} "<your question>".`;
-  return ` If the person told you to drop it, relay their decision in their words: otea relay ${id} ${DROPPED_NAME} --quote "<the person's words>" --reason "<why>"${motiveFlag(def)}`;
+  // A relay never drops (adversarial review of S): the person's own tap does, or the desk.
+  return ` If the person may want it dropped, ask them with otea ask ${id} "<your question>"; the assistant offers them a card to tap (otea say --drop ${id}), and a relayed sentence never drops an item.`;
 }
 
 // Why a discard was refused (engine drop codes), in the agent's words.
@@ -1643,7 +1659,7 @@ export function boardText(def: BoardDefinition): string {
       '',
       `${index + 1}. ${step.name}: ${whoDoes(step)}${whoReviews(step)}`,
       ...say('When you take it', step.instructions.take),
-      ...say('Before you hand it off', step.instructions.before),
+      ...say(BEFORE_HAND_IN[langOf(def)], step.instructions.before),
       ...(step.reviewer === 'none' ? [] : say('When you review it', step.instructions.review)),
     );
   });

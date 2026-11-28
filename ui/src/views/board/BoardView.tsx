@@ -58,6 +58,7 @@ import {
 } from './model.ts';
 import { columnRects, type MorphJob, morph } from './morph-run.ts';
 import { Pasos } from './Pasos.tsx';
+import { QueueHold } from './QueueHold.tsx';
 import { listaBlocks, type RowCtx, tablaBlocks } from './rows.tsx';
 import {
   BoardActs,
@@ -363,7 +364,7 @@ function Board({ board }: { board: string }) {
     onFold: toggleFold,
     onTick,
     agents: app.agents,
-    busy: workingAgents(app.agents, app.all, app.now),
+    busy: workingAgents(app.agents, app.all, app.now, board),
   };
   const empty: LaneBlock[] | null = !items.length
     ? [
@@ -798,6 +799,7 @@ function Head({
             {dek}
           </p>
         ) : null}
+        <QueueHold ids={items.map(({ id }) => id)} />
       </div>
       {/* A Studio board's steps are its list's sections, as the mock draws it: no strip. */}
       {studio ? null : (
@@ -895,6 +897,8 @@ function Tools({
               type="button"
               role="tab"
               aria-selected={on}
+              // The words are not drawn while an item sits beside a narrow list: the name stays.
+              aria-label={t(`boardView.mode.${m}`)}
               className={on ? 'on' : undefined}
               onClick={() => onMode(m)}
             >
@@ -908,6 +912,7 @@ function Tools({
             type="button"
             role="tab"
             aria-selected={matrix.on}
+            aria-label={t('boardView.mode.matriz')}
             className={matrix.on ? 'on' : undefined}
             onClick={matrix.show}
           >
@@ -925,6 +930,7 @@ function Tools({
         data-leaf=""
         hidden={group.hidden}
         aria-haspopup="menu"
+        aria-label={`${t('boardView.tools.group')} · ${groupName}`}
         aria-expanded={menu?.kind === 'group'}
         onClick={(e) => toggle('group', e.currentTarget)}
       >
@@ -937,6 +943,9 @@ function Tools({
         className="tool"
         data-leaf=""
         aria-haspopup="menu"
+        aria-label={
+          nFilters ? `${t('boardView.tools.filter')} · ${nFilters}` : t('boardView.tools.filter')
+        }
         aria-expanded={menu?.kind === 'filter' || menu?.kind === 'show'}
         onClick={(e) => toggle('filter', e.currentTarget)}
       >
@@ -952,6 +961,7 @@ function Tools({
         data-leaf=""
         hidden={columns.hidden}
         aria-haspopup="menu"
+        aria-label={`${t('boardView.tools.columns')} · ${columnsShown}`}
         aria-expanded={menu?.kind === 'columns'}
         onClick={(e) => toggle('columns', e.currentTarget)}
       >
@@ -974,7 +984,13 @@ function Tools({
         ) : null}
       </span>
       {onNew ? (
-        <button type="button" className="tool newb" data-leaf="" onClick={onNew}>
+        <button
+          type="button"
+          className="tool newb"
+          data-leaf=""
+          aria-label={t('boardView.tools.newItem')}
+          onClick={onNew}
+        >
           <Icon name="plus" />
           <span className="wl">{t('boardView.tools.newItem')}</span>
         </button>

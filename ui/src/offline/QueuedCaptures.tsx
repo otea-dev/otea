@@ -1,6 +1,6 @@
 import { t } from '../i18n/i18n.ts';
 import { Button } from '../kit/index.ts';
-import type { QueuedCapture } from './capture-queue.ts';
+import { type QueuedCapture, titleOf } from './capture-queue.ts';
 
 // Te toca's "En cola": what was captured while the PC did not answer, each with its board and
 // "en cola" until it goes. One the PC refused when it went (a board changed meanwhile) stays here,
@@ -22,9 +22,9 @@ export function QueuedCaptures({ captures, onDiscard }: QueuedCapturesProps) {
       <ul className="q-list">
         {captures.map((c) => (
           <li key={c.id} className="q-row" data-refused={c.refused === undefined ? undefined : ''}>
-            <span className="q-title">{c.fields.title}</span>
+            <span className="q-title">{titleOf(c)}</span>
             <span className="q-meta">
-              {c.board} ·{' '}
+              {c.note ? t('bandeja.title') : c.board} ·{' '}
               {c.refused === undefined ? (
                 <span className="q-tag">{t('offline.queue.waiting')}</span>
               ) : (

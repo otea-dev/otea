@@ -114,6 +114,8 @@ export function historyOf(
   const lines = sorted.map((e, i): HistoryLine => {
     const relay = relayOf(e);
     const human = e.actor.kind === 'human';
+    // Otea's own act (the branch diff it computed): neither the person's nor an agent's.
+    const byOtea = e.actor.kind === 'otea';
     // A relayed move is the agent's word that the person said it, so it names the agent, never
     // «you» (P1-F1). (An answer noted from the chat, otea answer, still reads as yours.)
     const relayedMove = relay !== null && e.type === 'transitioned';
@@ -123,9 +125,11 @@ export function historyOf(
     const way = isSurface(from) ? ` · ${t(FROM[from])}` : '';
     const who = relayedMove
       ? relay.via
-      : human || relay
-        ? `${t('sheet.d.youLower')}${way}`
-        : e.actor.name;
+      : byOtea
+        ? 'Otea'
+        : human || relay
+          ? `${t('sheet.d.youLower')}${way}`
+          : e.actor.name;
     const base = {
       id: e.id,
       when: whenOf(e.at, now),
@@ -145,11 +149,18 @@ export function historyOf(
             })
           : null,
       ].filter(Boolean);
+      // A note an agent wrote for the person (the assistant's `update --tell`) says so: the person
+      // never wrote it.
+      const text = !note?.relayedBy
+        ? t('notes.h.left')
+        : note.byAssistant
+          ? t('notes.h.leftAssistant')
+          : t('notes.h.leftAgent', { agent: note.relayedBy });
       return {
         ...base,
-        dot: 'note',
+        dot: note?.relayedBy ? 'relay' : 'note',
         open: !note?.answer,
-        text: t('notes.h.left'),
+        text,
         quote: String(e.data.text ?? ''),
         who: said.join(' · '),
       };

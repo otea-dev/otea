@@ -1,12 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { evidenceFile } from '../app/evidence.ts';
 import { liveBoardOf } from '../app/next.ts';
 import { openProject, type Project } from '../app/project.ts';
 import { cliAt, declareProfiles, type TempRepo, tempGitRepo } from '../cli/testing.ts';
 import { stateOf } from '../core/board/engine.ts';
-import { updateItemState } from '../store/queries.ts';
+import { selectEvents, selectEvidence, updateItemState } from '../store/queries.ts';
 import { diffFiles } from './diff-files.ts';
 import { createServer, type OteaServer } from './server.ts';
 import { LOCAL_HOST, SESSION_COOKIE, TOKEN } from './testing.ts';
@@ -120,6 +121,48 @@ describe('GET /api/items/:id/diff-files', () => {
     it('names both lists when the diff covers other files than the work', async () => {
       await handOff(template, branch, () => git('diff', range).replaceAll('c.txt', 'z.txt'));
       expect(await mismatch()).toEqual({ diff: ['b.txt', 'z.txt'], landed: ['b.txt', 'c.txt'] });
+    });
+
+    // D-492953 (critical): the review's diff is the branch's, which Otea computes at the handoff and
+    // keeps as its own file of the item, the newest of its diffs; what the agent attached stays
+    // beside it, as the agent's file, and is compared with it.
+    it('keeps the branch diff Otea computed as its own file, whatever the agent attached', async () => {
+      await handOff(template, branch, () => 'nothing really, invented\n');
+      // Otea's own act, never the person's (D-eb906c: «you attached otea-branch-….diff»).
+      const own = selectEvidence(project.db, 'CAM-1').filter(
+        ({ actor }) => actor.kind === 'otea' && actor.name === 'otea',
+      );
+      expect(own).toHaveLength(1);
+      const text = readFileSync(evidenceFile(project.dataDir, own[0]?.sha256 ?? ''), 'utf8');
+      expect(text).toContain('+++ b/b.txt');
+      expect(text).toContain('+regar');
+      expect(own[0]?.kind).toBe('diff');
+      // In the round of the handoff it was computed for: before the move into review.
+      const handoff = selectEvents(project.db, 'CAM-1').findLast(
+        ({ type }) => type === 'transitioned',
+      );
+      expect(Date.parse(own[0]?.createdAt ?? '')).toBeLessThan(Date.parse(handoff?.at ?? ''));
+      // It is the last diff of the item: the one the review opens on.
+      expect(selectEvidence(project.db, 'CAM-1').at(-1)?.id).toBe(own[0]?.id);
+      // And the attached one is still compared with the branch, not with itself.
+      expect(await mismatch()).toEqual({ diff: [], landed: ['b.txt', 'c.txt'] });
+    });
+
+    // D-492953: the attached diff named the right file and showed other lines (`+Make the buy
+    // button red` for a change that wrote `button.buy { background: red }`): the names matched, so
+    // the desk said nothing and the person approved a diff that is not what lands.
+    it('warns when the diff names the files the work changes but shows other lines', async () => {
+      await handOff(template, branch, () => git('diff', range).replaceAll('+regar', '+invented'));
+      expect(await mismatch()).toEqual({
+        diff: ['b.txt', 'c.txt'],
+        landed: ['b.txt', 'c.txt'],
+        lines: true,
+      });
+    });
+
+    it('does not mind the context lines or the hunk headers around the same changes', async () => {
+      await handOff(template, branch, () => git('diff', '-U8', range));
+      expect(await mismatch()).toBeNull();
     });
 
     // The persona's case: an empty commit and an invented diff. Both lists are empty, which is

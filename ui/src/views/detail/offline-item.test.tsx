@@ -74,7 +74,7 @@ describe('an item kept for offline', () => {
     expect(html).toContain('¿Arreglo también el río?');
     // Its own line, not the close-as hint a narrow sheet hides.
     expect(html).toContain(
-      '<p class="said offline" role="status">Sin conexión con tu equipo: podrás responder cuando vuelva a conectarse.</p>',
+      '<p class="said offline" role="status">Podrás responder cuando vuelva la conexión.</p>',
     );
     expect(html).not.toContain('otea open');
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Enviar respuesta<\/button>/);
@@ -84,7 +84,7 @@ describe('an item kept for offline', () => {
     setLanguage('en');
     const { asks: _, ...unasked } = asked;
     const html = render(true, unasked);
-    expect(html).toContain('No connection to your computer: you can act once it is back.');
+    expect(html).toContain('You can act once the connection is back.');
     expect(html).not.toContain('otea open');
   });
 

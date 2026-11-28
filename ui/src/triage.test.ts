@@ -4,6 +4,7 @@ import { cambios, creatures, errores } from '../../src/core/board/testing.ts';
 import { agent, ago, item, moved, NOW, officialType, you } from './derive/fixtures.ts';
 import { setLanguage } from './i18n/i18n.ts';
 import { approvalWaitWords } from './refusals.ts';
+import { roundOf } from './rounds.ts';
 import {
   approvalGate,
   cardFigures,
@@ -25,7 +26,6 @@ import {
   releaseDirection,
   resist,
   roundEvidence,
-  roundOf,
   stampShift,
   swipeThreshold,
   throwFade,
@@ -37,6 +37,7 @@ import {
   triDecide,
   triNext,
   triPile,
+  triPlace,
   triReturn,
   triStart,
   triSync,
@@ -268,6 +269,31 @@ describe('the pass (triStart, triSync, triDecide)', () => {
     expect(s.decided).toBe(0);
   });
 
+  // D-c059c9: the counter stayed on «1 of 4» after Después, though the card on top was another.
+  it('the counter moves on with Later: it names the card on top in the order they came', () => {
+    let s = triStart(['A', 'B', 'C', 'D']);
+    expect(triPlace(s)).toEqual({ at: 1, n: 4 });
+    s = triDecide(s, 'later');
+    expect(triPlace(s)).toEqual({ at: 2, n: 4 });
+    s = triDecide(s, 'later');
+    expect(triPlace(s)).toEqual({ at: 3, n: 4 });
+    s = triDecide(s, 'approve');
+    expect(triPlace(s)).toEqual({ at: 4, n: 4 });
+    s = triDecide(s, 'approve');
+    expect(triCurrent(s)).toBe('A');
+    expect(triPlace(s)).toEqual({ at: 1, n: 4 });
+  });
+
+  it('the counter counts a review that joined, and forgets one that left', () => {
+    let s = triSync(triStart(['A', 'B']), ['A', 'B', 'C']);
+    expect(triPlace(s)).toEqual({ at: 1, n: 3 });
+    s = triDecide(s, 'later');
+    expect(triPlace(s)).toEqual({ at: 2, n: 3 });
+    s = triSync(s, ['A', 'C']);
+    expect(triCurrent(s)).toBe('C');
+    expect(triPlace(s)).toEqual({ at: 2, n: 2 });
+  });
+
   it('Later on the last card shows it again', () => {
     const s = triDecide(triStart(['A']), 'later');
     expect(triCurrent(s)).toBe('A');
@@ -322,7 +348,7 @@ describe('triageQueue', () => {
 
 describe('roundOf', () => {
   it('is the first round until you send the item back with notes', () => {
-    expect(roundOf('A', [])).toBe(1);
+    expect(roundOf(item({ id: 'A' }), [])).toBe(1);
   });
 
   it('adds a round for every time you sent it back with notes', () => {
@@ -333,7 +359,7 @@ describe('roundOf', () => {
       moved('B', 'fixing', you, { reason: 'no es este' }),
       moved('A', 'verify', you),
     ];
-    expect(roundOf('A', feed)).toBe(3);
+    expect(roundOf(item({ id: 'A' }), feed)).toBe(3);
   });
 });
 
@@ -349,6 +375,27 @@ describe('cardWords', () => {
 
   it('has no agent when nobody handed it over', () => {
     expect(cardWords(item({ id: 'A' }), [])).toEqual({ agent: null, say: '', round: 1 });
+  });
+
+  // D-9b5288 (s-real2): a round that only merges main into approved work read «after your notes».
+  it('says a round that only merges main into approved work is one, not a send-back', () => {
+    const handoff = (data: Record<string, unknown>): ItemEvent => ({
+      id: 1,
+      type: 'transitioned',
+      actor: agent('mender'),
+      at: ago(5),
+      data: { from: 'fixing', to: 'verify', ...data },
+    });
+    const merge = { since: 'a1b2c3d', tip: 'e4f5a6b', joined: 'c7d8e9f', files: ['README.md'] };
+    const it0 = item({ id: 'A', state: 'verify', round: 2 });
+    expect(cardWords(it0, [], { state: 'verify', events: [handoff({ merge })] })).toMatchObject({
+      agent: 'mender',
+      round: 2,
+      merge: true,
+    });
+    expect(cardWords(it0, [], { state: 'verify', events: [handoff({})] })).not.toHaveProperty(
+      'merge',
+    );
   });
 
   it('says the round the step engine counts on a board (the server sends it)', () => {

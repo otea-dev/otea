@@ -13,7 +13,7 @@ import {
   liveAgents,
   statusOf,
 } from '../presence.ts';
-import { projectHref, waitingElsewhere, whereOf } from '../projects.ts';
+import { projectHref, waitingElsewhere, waitingIn, whereOf } from '../projects.ts';
 import type { Item, ProjectOverview, ProjectView } from '../types.ts';
 import { agentState } from '../views/toca/trace.ts';
 
@@ -63,6 +63,9 @@ export function projectRows(
   yoursHere: number,
   // On the phone a project's folder means nothing: its line says what waits there instead.
   phone = false,
+  // The place of this project to open the others at, when it is one a project switch keeps
+  // (Hablar: the conversation of the other project, not its Te toca).
+  stay?: string,
 ): { rows: ProjectRow[]; total: number } {
   const listed: ProjectOverview[] = projects?.length
     ? [...projects.filter((p) => p.current), ...projects.filter((p) => !p.current)]
@@ -90,12 +93,12 @@ export function projectRows(
         inert: false,
       };
     }
-    const href = each.unavailable ? undefined : projectHref(each);
+    const href = each.unavailable ? undefined : projectHref(each, stay);
     const where = whereOf(each) ?? '';
     // A folder that is gone is said with its path, in the line itself: a tooltip is nothing on the
     // phone. It outranks the rest of the state, which the badge's count still carries.
     const gone = each.paths.find((path) => path.missing)?.path;
-    const waits = each.waiting.length;
+    const waits = waitingIn(each);
     const state = href
       ? (stateLine(waits, each) ?? t('shell.nothingThere'))
       : t('shell.unavailable');
@@ -105,7 +108,7 @@ export function projectRows(
       current: false,
       line: gone !== undefined ? `${t('shell.pathMissing')} · ${gone}` : state,
       ...(where && !phone ? { where } : {}),
-      waiting: each.waiting.length,
+      waiting: waits,
       ...(href ? { href } : {}),
       inert: !href,
     };
@@ -158,11 +161,25 @@ export type AgentRow = {
   // Its harness loaded Otea's server, and it works through the command line (P6-R2-10).
   mcpUnused: boolean;
   state: AgentDoing;
+  // Whole minutes since its last sign while it still works (its session runs, so it is no silence)
+  // once past HUSHED_AFTER_MIN: the menu says «callado hace N min», softly; null otherwise.
+  hushed: number | null;
   // Since when it is in that state, and the item it is about (none while idle with no past act).
   since: number;
   item: HeldItem | null;
   lastSeen: string;
 };
+
+// A working agent that gave no sign for this long reads «callado hace N min» in the menu: still at
+// work (its session runs), but the person may want to look.
+export const HUSHED_AFTER_MIN = 15;
+
+function hushedMinutes(a: Pick<Agent, 'lastSeen' | 'actedAt'>, now: number): number | null {
+  const last = Math.max(Date.parse(a.lastSeen) || 0, Date.parse(a.actedAt ?? '') || 0);
+  if (last === 0) return null;
+  const minutes = Math.floor((now - last) / 60_000);
+  return minutes >= HUSHED_AFTER_MIN ? minutes : null;
+}
 
 // The harness an agent works through: its MCP client's name, else the one its profile names (a
 // command-line agent names it there), else the command line.
@@ -242,6 +259,7 @@ export function agentRows(
       mcpMissing: a.mcp ? a.mcp === 'missing' : a.mcpMissing === true,
       mcpUnused: a.mcp === 'unused',
       state,
+      hushed: working ? hushedMinutes(a, now) : null,
       since: st.since,
       item: st.item ? { id: st.item.id, title: st.item.title, look: lookOf(st.item, now) } : null,
       lastSeen: a.lastSeen,

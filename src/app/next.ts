@@ -95,9 +95,10 @@ import { type Waiver, waiversFrom } from '../core/board/waivers.ts';
 import { OteaError } from '../core/errors.ts';
 import type { Actor } from '../core/item.ts';
 import { activeLease, type Lease } from '../core/lease.ts';
+import type { Surface } from '../core/surface.ts';
 import { closesOf, turnOf } from '../core/workflow.ts';
 import { findBoardOfCollection, findVersion, listBoards } from '../store/boards.ts';
-import { transaction } from '../store/database.ts';
+import { joinTransaction, transaction } from '../store/database.ts';
 import {
   appendEvent,
   type EventRecord,
@@ -113,6 +114,8 @@ import {
   selectRelationsOf,
   selectStateEntries,
 } from '../store/queries.ts';
+import { landedAhead, mergeAfterText, mergeFirstLines } from './approval-wait.ts';
+import { crowdCheck } from './board-workers.ts';
 import { collectionNamed } from './collections.ts';
 import type { Context } from './context.ts';
 import { type DraftRequest, draftRequestOf, handInCommand } from './draft-request.ts';
@@ -128,7 +131,7 @@ import {
 import { type LandsFirst, landsFirst, landsFirstLine, landsFirstText } from './land-order.ts';
 import { assertMayWriteItem, type BaseTips, takeItem } from './lease-take.ts';
 import { scanned } from './overlap.ts';
-import { sessionAlive, sessionRuns } from './presence.ts';
+import { sessionAlive, sessionEnded, sessionRuns } from './presence.ts';
 import { priorityOf } from './priority.ts';
 import { liftSetAside, retakeOf, retakeText, SET_ASIDE_LIFTED, setAsideOf } from './set-aside.ts';
 import { approvedTipOf, type Recorded } from './tips.ts';
@@ -974,7 +977,15 @@ function textFor(
     ...(on.approved === undefined ? {} : { approved: on.approved }),
     ...(tip && !tip.unchanged ? { approvedTip: tip.commit.slice(0, 7) } : {}),
     ...(on.facts.did === undefined ? {} : { did: on.facts.did }),
-    ...(lease ? { holder: { name: lease.holder, expiresAt: lease.expiresAt } } : {}),
+    ...(lease
+      ? {
+          holder: {
+            name: lease.holder,
+            expiresAt: lease.expiresAt,
+            ...(sessionEnded(ctx.db, lease.holder, () => at) ? { ended: true as const } : {}),
+          },
+        }
+      : {}),
     ...(left === undefined ? {} : { leftFor: left }),
     ...(planned === undefined ? {} : { plannedBy: planned }),
     ...(parent === undefined ? {} : { parent }),
@@ -1051,7 +1062,11 @@ function mayTakeNow(
   at: string,
 ): boolean {
   const lease = activeLease(item.lease, at);
-  if (lease && lease.holder !== agent) return false;
+  // Another agent's lease holds it only while that agent's session is not known to have ended: a
+  // worker killed with its harness leaves a lease of minutes, which a claim already takes over
+  // (takeItem), so next and wait offer the item at once, not when the lease runs out.
+  if (lease && lease.holder !== agent && !sessionEnded(ctx.db, lease.holder, () => at))
+    return false;
   // A lease that ran out while its holder's session runs is still its holder's (P1-R3-6).
   const ranOut = !lease && item.lease && item.lease.holder !== agent ? item.lease : null;
   if (ranOut && sessionRuns(ctx.db, ranOut.holder, () => at)) return false;
@@ -1141,11 +1156,17 @@ export function offerableTo(ctx: Context, agent: string, now = systemClock) {
   const at = now();
   const offered = offeredElsewhere(ctx, agent, at);
   const boards = liveBoards(ctx);
+  // Who works each board is read once for the whole look, however many items it asks about.
+  const crowded = crowdCheck(ctx.db, at);
   return (item: { id: string; collection: string }): boolean => {
     const board = boards.find(({ collection }) => collection === item.collection);
     if (!board) return true;
     const record = requireItem(ctx.db, item.id);
-    return !offered(record) && isTheirs(ctx, board.def, record, agent, at);
+    if (offered(record) || !isTheirs(ctx, board.def, record, agent, at)) return false;
+    // Not an item it could only be refused: a second worker beside a live one waits for nothing
+    // here (crowdCheck), or its wait would wake it at once, again and again.
+    const mine = activeLease(record.lease, at)?.holder === agent;
+    return mine || crowded(record, agent, board.def) === undefined;
   };
 }
 
@@ -1350,6 +1371,13 @@ function landingLines(
   );
 }
 
+// The lease the agent holds on the item now, if any: a lease of another agent whose session ended
+// is no lease of the agent's (a claim takes it over; an offer holds nothing).
+function ownLease(item: ItemRecord, agent: string, at: string): Lease | undefined {
+  const lease = activeLease(item.lease, at);
+  return lease?.holder === agent ? lease : undefined;
+}
+
 // With nothing to do while other agents hold the boards' work (P6-18): who holds what, and how two
 // agents share a board, so the idle one neither waits blind nor takes over what another holds.
 function heldElsewhere(
@@ -1380,9 +1408,16 @@ export function landWaitOf(
   ctx: Context,
   item: ItemRecord,
   at: string,
-): { first: string; text: string } | undefined {
+): { first: string; text: string; overlap?: true } | undefined {
   const first = landTurnFor(ctx, item, '', at);
-  return first ? { first: first.first, text: landsFirstLine(item.id, first) } : undefined;
+  return first
+    ? {
+        first: first.first,
+        text: landsFirstLine(item.id, first),
+        // They change the same files: the approval waits for it (app/approval-wait.ts).
+        ...(first.overlap ? { overlap: true as const } : {}),
+      }
+    : undefined;
 }
 
 // What next says of an item it offers without claiming it: for OFFER_MS no other agent is offered it.
@@ -1440,7 +1475,7 @@ export function nextFor(
           return {
             item,
             board,
-            held: activeLease(item.lease, at) !== null,
+            held: activeLease(item.lease, at)?.holder === agent,
             left: leftFor(ctx, item.id) === agent,
             returned: on.sentBack !== undefined,
             approved: cameApproved(ctx, board.def, item),
@@ -1470,7 +1505,28 @@ export function nextFor(
         since(a.item).localeCompare(since(b.item)) ||
         a.item.createdAt.localeCompare(b.item.createdAt),
     );
-    const first = candidates[0];
+    // Claiming: a second worker beside a live one on a board is offered the next item of another
+    // board, not an item it would only be refused; with nothing else it is told why.
+    const crowdOf = options.claim ? crowdCheck(ctx.db, at) : undefined;
+    const refused: OteaError[] = [];
+    const takeable = crowdOf
+      ? candidates.filter((each) => {
+          if (each.held) return true;
+          const refusal = crowdOf(each.item, agent, each.board.def);
+          if (refusal) refused.push(refusal);
+          return refusal === undefined;
+        })
+      : candidates;
+    const first = takeable[0];
+    const [crowded] = refused;
+    if (!first && crowded) {
+      return {
+        item: null,
+        collection: options.collection ?? null,
+        text: crowded.message,
+        idle: true,
+      };
+    }
     if (!first) {
       // Pedidos, there on every project, is named only once something was asked on it.
       const used = boards.filter(
@@ -1517,7 +1573,7 @@ export function nextFor(
           undefined,
           options.baseTipsOf,
         )
-      : (activeLease(first.item.lease, at) ?? undefined);
+      : ownLease(first.item, agent, at);
     const item = lease ? { ...first.item, lease } : first.item;
     if (!lease) saveOffer(ctx.db, { agent, item: item.id, state: item.state, at });
     const { sentBack, roundNotes } = itemOnBoard(ctx, item, board.def);
@@ -1533,6 +1589,7 @@ export function nextFor(
       collection: board.collection,
       text: [
         textFor(ctx, item, board.def, at, agent, look),
+        ...mergeFirstLines(ctx, item),
         ...mergeLines(toMerge),
         ...(later === undefined ? [] : [later]),
         ...setAsideCount(ctx, boards, options.collection === undefined ? undefined : named),
@@ -1554,11 +1611,21 @@ export type BoardMoveInput = {
   reason?: string;
   // The note of the handoff ("Nota de la entrega"), kept with the round.
   note?: string;
+  // Where the person made it (core/surface.ts), kept on the move's event.
+  surface?: Surface;
   // On a handoff, the commit and tree of the protected branch as git has it where the agent hands
   // it off: kept with a handoff into a review, it is what the person approves (app/gates.ts).
   // `pushed: false`: never pushed though the repo has a remote, for the approval to warn (P7-8).
   // `unchanged`: the base itself, holding nothing the remote lacks: no code change (P2S-R3-3).
-  tip?: { branch: string; commit: string; tree: string; pushed?: false; unchanged?: true };
+  // `local`: the repo has no remote at all, so approving pushes nothing (the review says so).
+  tip?: {
+    branch: string;
+    commit: string;
+    tree: string;
+    pushed?: false;
+    unchanged?: true;
+    local?: true;
+  };
   // Recorded with the tip of a handoff into a review (app/tips.ts Recorded): that the round only
   // merges main into what was approved, and the open items that change the files it does.
   merge?: NonNullable<Recorded['merge']>;
@@ -1731,6 +1798,7 @@ function land(
   const data = {
     ...(input.reason ? { reason: input.reason } : {}),
     ...(input.note?.trim() ? { note: input.note } : {}),
+    ...(input.surface === undefined ? {} : { surface: input.surface }),
     ...(input.tip && reviewed ? { tip: input.tip } : {}),
     ...(input.tip && reviewed && input.merge ? { merge: input.merge } : {}),
     ...(input.tip && reviewed && input.overlaps ? { overlaps: input.overlaps } : {}),
@@ -1813,6 +1881,13 @@ export function handoffItem(
       ...(input.reason === undefined ? {} : { reason: input.reason }),
     });
     if (!result.ok) refuse(board.def, item, result, input.way, facts);
+    // An approval that waited for overlapping items does not land as it is once they landed: the
+    // person reviews the merge of main into it once (app/approval-wait.ts).
+    if (input.actor.kind === 'agent' && isClosed(result.to)) {
+      const ahead = landedAhead(ctx, item);
+      if (ahead.length > 0)
+        throw new OteaError('invalid_transition', mergeAfterText(ctx, item, ahead));
+    }
     // A file new this round with the bytes of the round before is taken, and said (P5-F1).
     const repeated =
       step && input.actor.kind === 'agent'
@@ -1880,13 +1955,14 @@ export function backWithComments(ctx: Context, item: ItemRecord, to: string): bo
 }
 
 // A send-back from a review (the person's Devolver, an agent reviewer's Pedir otra ronda): the item
-// goes back to the step's `back` for its next round, with why.
+// goes back to the step's `back` for its next round, with why. Part of a larger atomic act when one
+// is open (the person's tap on a card of the assistant's sends back and answers in one).
 export function sendBackItem(
   ctx: Context,
   input: BoardMoveInput,
   now = systemClock,
 ): BoardMoveResult {
-  return transaction(ctx.db, () => {
+  return joinTransaction(ctx.db, () => {
     const item = requireWritableItem(ctx.db, input.id);
     // The review comments are what to change: with some, the send-back needs no words of its own.
     if (!input.reason?.trim() && !reviewCommented(ctx, item))
@@ -1964,7 +2040,7 @@ function dropTarget(board: LiveBoard, item: ItemRecord, input: Omit<DropInput, '
 // agent drops only while doing a step that lets it, a relay only where the person may discard
 // through an agent.
 export function dropItem(ctx: Context, input: DropInput, now = systemClock): BoardMoveResult {
-  return transaction(ctx.db, () => {
+  return joinTransaction(ctx.db, () => {
     const item = requireWritableItem(ctx.db, input.id);
     const board = requireBoard(ctx, item);
     const at = now();
@@ -1977,7 +2053,7 @@ export function dropItem(ctx: Context, input: DropInput, now = systemClock): Boa
 }
 
 // Whether a move into `target` from a review approves it: on to a later step or to Hecho.
-function approves(def: BoardDefinition, from: Position, target: Position): boolean {
+export function approves(def: BoardDefinition, from: Position, target: Position): boolean {
   if (isClosed(from) || from.phase === 'doing') return false;
   if (isClosed(target)) return target.closed === DONE;
   return target.phase === 'doing' && stepIndex(def, target.step) > stepIndex(def, from.step);

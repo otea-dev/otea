@@ -78,7 +78,7 @@ export const common = {
   'agent.status.working': 'working',
   'agent.status.listening': 'listening',
   'agent.status.connected': 'connected',
-  'agent.status.silent': 'no signal',
+  'agent.status.silent': 'quiet',
   'agent.status.away': 'away',
   'listen.noAgents': 'no agent is connected',
   'listen.noAgentsLead': 'No agent is connected.',
@@ -121,8 +121,8 @@ export const common = {
   },
   'move.closesAs': 'closes the item as {as}',
   'move.closes': 'closes the item',
-  'move.leaves': 'it leaves Waiting for you',
-  'move.comes': 'it comes to Waiting for you',
+  'move.leaves': 'it leaves Your turn',
+  'move.comes': 'it comes to Your turn',
   'move.asksReason': 'asks a reason first',
 
   // When, as a row says it (derive/when.ts): the lease left, or how long it has been where it is
@@ -131,6 +131,7 @@ export const common = {
   'when.hours': '{hours} h',
   'when.minutes': '{minutes} min',
   'when.expired': 'lease expired',
+  'when.lapsed': 'lease ran out · back in the queue',
   'when.now': 'now',
   'when.yesterday': 'yesterday',
   'when.days': { one: '{count} day', other: '{count} days' },
@@ -140,6 +141,8 @@ export const common = {
   // Marks and toasts (kit)
   'mark.you': 'you',
   'toast.undo': 'Undo',
+  // Said once to a screen reader with a toast that offers a move: the key that reaches it.
+  'toast.reach': 'Press Alt+Shift+Z to go to “{move}”.',
   // A refusal from the server, worded from its code and details (ui/src/refusals.ts); the
   // server's English message is for agents and the CLI.
   'refusal.itemMissing': 'There is no item {item}.',
@@ -159,8 +162,8 @@ export const common = {
   'refusal.why.note': 'a note',
   'refusal.why.part': 'its part {list} is not finished',
   'refusal.why.partsUnmerged': {
-    one: 'its part {list} is not merged yet',
-    other: 'its parts {list} are not merged yet',
+    one: 'its part {list} has not landed yet',
+    other: 'its parts {list} have not landed yet',
   },
   'refusal.why.allParts': {
     one: 'its {count} part is not finished: {list}',
@@ -175,10 +178,10 @@ export const common = {
     other: '{list} block it and are not finished',
   },
   'refusal.why.blockersUnmerged': {
-    one: '{list} blocks it and is not merged yet',
-    other: '{list} block it and are not merged yet',
+    one: '{list} blocks it and has not landed yet',
+    other: '{list} block it and have not landed yet',
   },
-  'link.unmerged': 'Done, not merged yet',
+  'link.unmerged': 'Done, not landed yet',
   'refusal.drop': 'Not discarded {item}: {why}.',
   'refusal.drop.notOpen': 'it has already ended',
   'refusal.drop.reason': 'say why',

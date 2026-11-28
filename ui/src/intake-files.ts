@@ -1,6 +1,7 @@
 import type { LayoutEntry as CoreEntry } from '../../src/core/modules.ts';
 import { moduleAccepts } from '../../src/core/placement.ts';
 import { evidenceEntries } from './evidence.ts';
+import { language, t } from './i18n/i18n.ts';
 import type { EvidenceRole, LayoutEntry, LayoutSlot, TypeView } from './types.ts';
 
 // The files a new item is filed with: the server's limits (src/core/evidence.ts, src/server/writes.ts).
@@ -45,6 +46,29 @@ export function isImage(name: string): boolean {
 export function extensionOf(name: string): string {
   const dot = name.lastIndexOf('.');
   return dot < 0 ? '' : name.slice(dot + 1).toLowerCase();
+}
+
+// A phone camera's name says nothing: a long number («1732717234567.jpg»), a date and time
+// («PXL_20261127_143210123.jpg»), or just «image.jpg». Chips show it as what it is, "Foto 14:32",
+// from the number when it is a time in milliseconds, else the file's own time. A name with words
+// of its own is the person's and stays.
+const CAMERA =
+  /^(?:(?:IMG|PXL|VID|MVIMG|image|photo|picture)[_-]?)?[\d_-]{8,}$|^(?:image|photo|picture)$/i;
+
+export function shownFileName(name: string, lastModified = 0): string {
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  if (!CAMERA.test(stem)) return name;
+  const epoch = /^\d{13}$/.test(stem) ? Number(stem) : 0;
+  const when = epoch > 0 ? epoch : lastModified;
+  const picture = isImage(name);
+  if (when <= 0) return t(picture ? 'file.photoBare' : 'file.otherBare');
+  const time = new Intl.DateTimeFormat(language(), {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(when);
+  return t(picture ? 'file.photo' : 'file.other', { time });
 }
 
 export function sizeLabel(bytes: number): string {

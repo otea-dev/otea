@@ -107,9 +107,9 @@ describe('names in, names out', () => {
     });
 
     it('names the steps of a move the board has not, their ids kept in the --json details', async () => {
-      const { err } = await otea('relay', 'BUG-1', 'Hecho', '--quote', 'ok');
+      const { err } = await otea('relay', 'BUG-1', 'Hecho', '--quote', 'ok then');
       expect(err).toContain('Not relayed: BUG-1 is not in review, it is at Refinar');
-      const error = await refusal('relay', 'BUG-1', 'Hecho', '--quote', 'ok');
+      const error = await refusal('relay', 'BUG-1', 'Hecho', '--quote', 'ok then');
       const { state } = await json('show', 'BUG-1');
       expect(error.details).toEqual({ kind: 'move', why: 'no_move', from: state, to: 'done' });
     });

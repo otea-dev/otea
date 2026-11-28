@@ -1,6 +1,13 @@
+import { BANDEJA_PREFIX } from './bandeja.ts';
 import { OteaError } from './errors.ts';
 
-export type Actor = { kind: 'human' | 'agent'; name: string };
+// `otea` is Otea itself: what it does on its own (the branch diff it computes at a handoff). It is
+// never the person's act, and no agent can act as it.
+export type Actor = { kind: 'human' | 'agent' | 'otea'; name: string };
+
+export const OTEA_ACTOR: Actor = { kind: 'otea', name: 'otea' };
+
+export const isOteaActor = (actor: Pick<Actor, 'kind'>): boolean => actor.kind === 'otea';
 
 // An agent's name is its identity, one per agent working at the same time: a slug of at most 40
 // characters (a subagent's <name>-<role> runs long), lowercase letters and digits joined by single
@@ -52,6 +59,14 @@ const ID_PATTERN = /^([A-Z0-9]+)-([1-9][0-9]*)$/;
 export function prefixFor(collectionName: string): string {
   const prefix = collectionName.toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!prefix) throw new OteaError('invalid_name', `"${collectionName}" has no usable characters`);
+  // B-3 is a Bandeja entry (core/bandeja.ts): no board may take the prefix, or an id would be two
+  // things.
+  if (prefix === BANDEJA_PREFIX) {
+    throw new OteaError(
+      'invalid_name',
+      `"${collectionName}" would give its items the prefix ${BANDEJA_PREFIX}, which the Inbox keeps for its entries (B-3): give the board a longer name`,
+    );
+  }
   return prefix;
 }
 

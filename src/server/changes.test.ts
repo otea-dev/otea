@@ -90,6 +90,48 @@ describe('createChangeFeed', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  // What the clock alone changes (an assistant's process ending) is looked at for an open desk only:
+  // the notifier has its own, slower tick.
+  describe('with a watch of what the clock changes', () => {
+    let signature: ReturnType<typeof vi.fn<() => string>>;
+    let watched: ChangeFeed;
+
+    beforeEach(() => {
+      signature = vi.fn(() => 'a');
+      watched = createChangeFeed(own, 250, { signature, everyMs: 1000 });
+    });
+
+    afterEach(() => watched.close());
+
+    it('looks only while a desk is subscribed, and stops once the last one leaves', () => {
+      const notifier = watched.subscribe(vi.fn());
+      vi.advanceTimersByTime(5000);
+      expect(signature).not.toHaveBeenCalled();
+
+      const leaveDesk = watched.subscribe(vi.fn(), { desk: true });
+      vi.advanceTimersByTime(2000);
+      const looked = signature.mock.calls.length;
+      expect(looked).toBeGreaterThan(0);
+
+      leaveDesk();
+      vi.advanceTimersByTime(5000);
+      expect(signature.mock.calls.length).toBe(looked);
+      notifier();
+    });
+
+    it('tells every subscriber when what it reads changed, with nothing written', () => {
+      const desk = vi.fn();
+      watched.subscribe(desk, { desk: true });
+      vi.advanceTimersByTime(1000);
+      expect(desk).not.toHaveBeenCalled();
+
+      signature.mockReturnValue('b');
+      vi.advanceTimersByTime(1000);
+
+      expect(desk).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('stops polling and drops subscribers on close', () => {
     const listener = vi.fn();
     feed.subscribe(listener);

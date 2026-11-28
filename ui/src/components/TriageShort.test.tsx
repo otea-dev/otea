@@ -2,9 +2,9 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import '../test-dom.tsx';
 import { ago, item } from '../derive/fixtures.ts';
 import { setLanguage } from '../i18n/i18n.ts';
+import { stubServer } from '../test-dom.tsx';
 import type { ItemView, Move } from '../types.ts';
 import { TriCard } from './Triage.tsx';
 
@@ -66,10 +66,16 @@ function draw(caution: string | null) {
 const approve = (el: HTMLElement) =>
   [...el.querySelectorAll('button')].find((b) => b.textContent === 'Aprobar');
 
+// The card asks the PC about the attached diff: answered as a server with nothing to say.
+beforeEach(() => {
+  stubServer();
+});
+
 afterEach(() => {
   act(() => root?.unmount());
   document.body.innerHTML = '';
   decisions.length = 0;
+  vi.unstubAllGlobals();
   setLanguage('en');
 });
 

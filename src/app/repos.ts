@@ -123,11 +123,20 @@ export function readReposIn(project: Project, folders: readonly string[]): Repo[
     if (pick.length === 1 && pick[0] !== undefined) chosen.push({ name: pick[0], identity });
   }
   const taken = (name: string) => chosen.filter((repo) => repo.name === name).length > 1;
-  const added = chosen.filter(({ name }) => !names.has(name) && !taken(name));
-  transaction(project.db, () => {
+  const wanted = chosen.filter(({ name }) => !names.has(name) && !taken(name));
+  // Read again under the write lock: another process that read the same folders at the same moment
+  // (two sessions starting in a fresh repo) may have registered a repo since the look above, and an
+  // insert of it would end in a bare UNIQUE constraint failure.
+  return transaction(project.db, () => {
+    const now = selectRepos(project.db);
+    const knownIdentities = new Set(now.map(({ identity }) => identity));
+    const knownNames = new Set(now.map(({ name }) => name));
+    const added = wanted.filter(
+      ({ identity, name }) => !knownIdentities.has(identity) && !knownNames.has(name),
+    );
     for (const repo of added) insertRepo(project.db, repo);
+    return added;
   });
-  return added;
 }
 
 function itemRepoNames(project: Project): Set<string> {
@@ -198,6 +207,8 @@ export function remoteAddedLine(
   project: Project,
   cwd: string,
   env: Env = process.env,
+  // The item the agent works on and its own name: the notice then carries the question to ask.
+  ask?: { item: string; as: string },
 ): string | undefined {
   // The happy path costs one git process: no origin, or an origin a repo of the project goes by.
   const remoteUrl = remoteUrlAt(cwd);
@@ -209,7 +220,28 @@ export function remoteAddedLine(
   if (top === undefined) return undefined;
   const before = repoByRootOf(repos, top);
   if (!before) return undefined;
-  return `A remote was added to ${top} after Otea first saw it, so every push from it is refused until the person says it is the same repo as "${before.name}" (a fork would look the same): ask the person, and if it is, run once in ${top}: otea repos add --name "${before.name}"`;
+  const command = `otea repos add --name "${before.name}"`;
+  const base = `A remote was added to ${top} after Otea first saw it, so every push from it is refused until the person says it is the same repo as "${before.name}" (a fork would look the same): ask the person`;
+  if (!ask) return `${base}, and if it is, run once in ${top}: ${command}`;
+  // The person is asked in their own words, never to run a command or read a path: the agent runs it
+  // for them on the yes.
+  const remote = plainRemote(remoteUrl);
+  const question = `You connected this project to ${remote}. Is that the same project the agents have been working on?`;
+  return `${base}. Ask them in plain words, with options to tap, never the command: otea ask ${ask.item} "${question}" --option "Yes, it is the same project" --option "No, it is another copy: do not push there" --recommend 1 --as ${ask.as}. When they say yes, run once in ${top}: ${command}, then push again; when they say no, do not push, and tell the assistant (otea escalate ${ask.item} "<what you found>" --as ${ask.as}).`;
+}
+
+// A remote address as a person reads it: host and path, with no scheme, user or password (a token
+// can sit in an https address, and a password may hold an @: everything up to the last @ before the
+// host goes), no query or fragment, no .git, and only characters that can end neither the quotes of
+// the command it is put in nor be read by a shell.
+export function plainRemote(url: string): string {
+  const rest = url.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
+  const at = rest.search(/[/?#]/);
+  const authority = (at < 0 ? rest : rest.slice(0, at)).replace(/^.*@/, '');
+  const tail = (at < 0 ? '' : rest.slice(at)).replace(/[?#].*$/, '');
+  return `${authority.replace(/^([^:/]+):(?!\d+$)/, '$1/')}${tail}`
+    .replace(/\.git$/, '')
+    .replace(/[^\w.~:/+%-]/g, '');
 }
 
 // Registers the repo checked out at `path`, under `name` or its folder's name; a repo already

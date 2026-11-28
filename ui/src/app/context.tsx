@@ -8,6 +8,7 @@ import {
   useRef,
 } from 'react';
 import type { FeedEvent } from '../activity.ts';
+import { answerUndoable } from '../answer-undo.ts';
 import {
   type AnswerGiven,
   linkItems,
@@ -18,8 +19,10 @@ import {
   postNote,
   editNote as postNoteEdit,
   withdrawNote as postNoteWithdraw,
+  postUnanswer,
   postWaive,
   reassignItem,
+  reopenDropped,
   restartItem,
   resumeItem,
   undoMove,
@@ -28,11 +31,13 @@ import {
   updateItemFields,
 } from '../api.ts';
 import type { IntakeParent } from '../components/NewItemForm.tsx';
-import { type Connection, usePhone, useRoute } from '../hooks.ts';
+import type { AssistantView } from '../conversation.ts';
+import { type Connection, usePhone, useRoute, useShort } from '../hooks.ts';
 import { toast } from '../kit/pop/toast.tsx';
 import { rowOf } from '../lanes/dom.ts';
 import { landed } from '../motion/bus.ts';
 import type { SyncState } from '../offline/sync-state.ts';
+import type { Pending } from '../pending.ts';
 import type { Agent } from '../presence.ts';
 import { linkRequestOf, unlinkRequestOf } from '../relations.ts';
 import type { Remote } from '../remote.ts';
@@ -78,10 +83,18 @@ export type AppData = {
   presetsRemote: Remote<PresetView[]>;
   studioWrites: number;
   agents: Agent[] | null | undefined;
+  // What waits for the person, as Otea counts it (questions of the Bandeja and of the assistant
+  // beside the items): undefined until the first answer.
+  pending?: Pending | undefined;
+  // The assistant's state and what waits for it: the one every screen shows (undefined until read,
+  // null while the project has none).
+  assistant?: AssistantView | null | undefined;
   // The latest 200 project events, merged live.
   feed: FeedEvent[];
   route: Route;
   phone: boolean;
+  // A screen too short for the strips over a conversation (a phone on its side): they fold.
+  short: boolean;
 };
 
 export type AppActions = {
@@ -120,6 +133,8 @@ export type AppActions = {
   // An item an agent set aside for later, taken up again (Retomar): nothing moves, so the toast
   // comes at once, with nothing to undo.
   resume(id: string, toast: string): Promise<void>;
+  // A discard taken back (Reabrir): the item returns to the state it left, so it reads as before.
+  reopenDropped(id: string, toast: string): Promise<void>;
   link(id: string, kind: RelationView, other: string): Promise<void>;
   unlink(id: string, relation: RelatedItem): Promise<void>;
   newItem(o?: { board?: string; parent?: IntakeParent }): void;
@@ -174,6 +189,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const data = useAppData();
   const route = useRoute();
   const phone = usePhone();
+  const short = useShort();
   const ref = useRef({ data, route });
   ref.current = { data, route };
 
@@ -236,7 +252,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await Q.run(() => postAnswer(id, given));
         if (message === undefined) return;
         await landed();
-        toast({ msg: message, id });
+        // A tap on an option can be taken back while the toast stands (Deshacer, Ctrl+Z).
+        toast({
+          msg: message,
+          id,
+          ...(answerUndoable(given)
+            ? {
+                undo: () =>
+                  void Q.run(() => postUnanswer(id)).catch((error: unknown) =>
+                    toast({ msg: error instanceof Error ? error.message : String(error), id }),
+                  ),
+              }
+            : {}),
+        });
       },
       async waive(id, part, reason, message) {
         await Q.run(() => postWaive(id, part, reason));
@@ -256,6 +284,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       async resume(id, message) {
         await Q.run(() => resumeItem(id));
+        toast({ msg: message, id });
+      },
+      async reopenDropped(id, message) {
+        await Q.run(() => reopenDropped(id));
+        await landed();
         toast({ msg: message, id });
       },
       async link(id, kind, other) {
@@ -301,9 +334,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     presetsRemote: data.presetsRemote,
     studioWrites: data.studioWrites,
     agents: data.agents,
+    pending: data.pending,
+    assistant: data.assistant,
     feed: data.feed,
     route,
     phone,
+    short,
     ...actions,
   };
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

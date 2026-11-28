@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ASSISTANT_WAIT_MS,
+  type AssistantFacts,
+  assistantSignalsOf,
+  bandejaSignalsOf,
   freshSignals,
   type NotifyFacts,
   settleUnheard,
@@ -168,6 +172,54 @@ describe('settleUnheard', () => {
   });
 });
 
+describe('assistantSignalsOf', () => {
+  const facts = (over: Partial<AssistantFacts> = {}): AssistantFacts => ({
+    name: 'sage',
+    state: 'offline',
+    since: earlier,
+    replies: [],
+    waiting: { count: 2, since: '2026-11-14T09:45:00.000Z' },
+    ...over,
+  });
+
+  it('says nothing while the project has no assistant', () => {
+    expect(assistantSignalsOf(undefined, NOW)).toEqual([]);
+  });
+
+  it('tells each reply under its own key, at the turn it answered', () => {
+    const replies = [{ id: 9, turn: 4, by: 'sage', text: 'Listo' }];
+    expect(assistantSignalsOf(facts({ state: 'listening', replies }), NOW)).toEqual([
+      {
+        key: 'assistant_reply:9',
+        kind: 'assistant_reply',
+        item: 'hablar:4',
+        title: '',
+        by: 'sage',
+        turn: 4,
+        text: 'Listo',
+      },
+    ]);
+  });
+
+  it('tells an offline assistant only once messages have waited the threshold', () => {
+    const waiting = (since: string) => ({ count: 2, since });
+    const kindsAt = (since: string, state: AssistantFacts['state'] = 'offline') =>
+      assistantSignalsOf(facts({ state, waiting: waiting(since) }), NOW).map(({ kind }) => kind);
+    expect(kindsAt(new Date(NOW - ASSISTANT_WAIT_MS + 1000).toISOString())).toEqual([]);
+    expect(kindsAt(new Date(NOW - ASSISTANT_WAIT_MS).toISOString())).toEqual(['assistant_offline']);
+    expect(kindsAt(new Date(NOW - 2 * ASSISTANT_WAIT_MS).toISOString(), 'connected')).toEqual([]);
+    expect(assistantSignalsOf(facts({ waiting: { count: 0, since: null } }), NOW)).toEqual([]);
+  });
+
+  it('keys the offline notice to the stretch, not to what waits', () => {
+    const key = (over: Partial<AssistantFacts>) => assistantSignalsOf(facts(over), NOW)[0]?.key;
+    expect(key({ waiting: { count: 5, since: '2026-11-14T09:45:00.000Z' } })).toBe(
+      key({ waiting: { count: 2, since: '2026-11-14T09:30:00.000Z' } }),
+    );
+    expect(key({ since: '2026-11-14T09:55:00.000Z' })).not.toBe(key({}));
+  });
+});
+
 describe('freshSignals', () => {
   const yours = signalsOf([item()], NOW);
 
@@ -178,5 +230,38 @@ describe('freshSignals', () => {
   it('keeps what was not there the last time', () => {
     expect(freshSignals(new Set(), yours)).toEqual(yours);
     expect(freshSignals(new Set(yours.map(({ key }) => key)), yours)).toEqual([]);
+  });
+});
+
+describe('bandejaSignalsOf', () => {
+  const ask = {
+    ref: 'B-3',
+    snippet: 'El botón Aprobar queda tapado',
+    question: 1,
+    by: 'lia',
+    text: '¿Solo Aprobar o todas?',
+    options: ['Solo Aprobar', 'Todas'],
+  };
+
+  it('tells each unanswered question as an ask, under a key of its own that changes with the question', () => {
+    expect(bandejaSignalsOf([ask])).toEqual([
+      {
+        key: 'bandeja:B-3:q1',
+        kind: 'ask',
+        item: 'B-3',
+        bandeja: true,
+        title: 'El botón Aprobar queda tapado',
+        by: 'lia',
+        text: '¿Solo Aprobar o todas?',
+        options: ['Solo Aprobar', 'Todas'],
+      },
+    ]);
+    expect(bandejaSignalsOf([{ ...ask, question: 2 }])[0]?.key).toBe('bandeja:B-3:q2');
+    expect(bandejaSignalsOf([])).toEqual([]);
+  });
+
+  it('leaves out the options a question has none of', () => {
+    const [signal] = bandejaSignalsOf([{ ...ask, options: undefined }]);
+    expect(signal).not.toHaveProperty('options');
   });
 });

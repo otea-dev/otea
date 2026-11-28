@@ -1,6 +1,11 @@
 import type { AgentStatus } from '../../src/core/agent-status.ts';
+import type { FromBandeja } from '../../src/core/bandeja.ts';
+import type { Advice } from '../../src/core/board/advice.ts';
+import type { RequestChanged } from '../../src/core/board/request-changed.ts';
+import type { FromMessage } from '../../src/core/conversation.ts';
 import type { Layout } from '../../src/core/modules.ts';
 import type { NotifyPrefs } from '../../src/core/notify/planner.ts';
+import type { PendingEntry } from '../../src/core/pending.ts';
 import type { FieldRequirement, Labels } from '../../src/core/preset.ts';
 import type { ChildrenSummary, RelationRef, RelationView } from '../../src/core/relations.ts';
 import type { AgentProfile } from './presence.ts';
@@ -15,7 +20,7 @@ export type {
 
 export type Turn = 'human' | 'agent' | 'none';
 
-export type Actor = { kind: 'human' | 'agent'; name: string };
+export type Actor = { kind: 'human' | 'agent' | 'otea'; name: string };
 
 export type Lease = { holder: string; expiresAt: string };
 
@@ -39,6 +44,8 @@ export type Item = {
     // What the agent offers to pick with one tap (2 to 4), and the number (from 1) it recommends.
     options?: string[];
     recommended?: number;
+    // The options that need your own words (the agent marked them): tapping one opens the box.
+    optionText?: number[];
   };
   collection: string;
   // The item type: "item" in a collection whose preset declares no types.
@@ -56,17 +63,27 @@ export type Item = {
   enteredAt?: string;
   createdBy: Actor;
   lease: Lease | null;
-  // A lease that ran out with nobody releasing it; lease is null then.
-  expiredLease?: Lease;
+  // A lease that ran out with nobody releasing it; lease is null then. `connected`: its holder is
+  // still connected, so the item is not stuck: it only went back to the queue.
+  expiredLease?: Lease & { connected?: true };
   // While an agent has it set aside for later (otea release --later, app/set-aside.ts): that agent
   // and when. Its next and wait leave the item out until it lifts (Retomar, or what the person does).
   setAside?: { by: string; at: string };
+  // Approved by you and waiting for an agent to land it in its base (src/app/step-facts.ts): it is
+  // not done until it lands, so its card says «aprobado · falta integrar».
+  landing?: true;
+  // Taken back to its doing step by an agent after it was approved (a conflict once another change
+  // landed first): who, when, and the reason it gave.
+  bounced?: { by: string; at: string; reason: string | null };
   // Held by an agent whose own question waits for your answer on another item (P7-R3-9): that
   // agent and the item; the desk says it waits there, not that it is on this one.
   holderAsks?: { by: string; item: string };
   // Approved and waiting for another item to land in its base first (src/app/land-order.ts): that
   // item, and the line that says why (the same files, what the other waits for, the way out).
-  landsAfter?: { first: string; text: string };
+  landsAfter?: { first: string; text: string; overlap?: true };
+  // Approved together with overlapping items, which landed first: its agent merges main into it
+  // and you review that merge once (src/app/approval-wait.ts); never a bounce.
+  merging?: { after: string[] };
   // The item's relations, read from it, and a parent's children summary; absent when it has none.
   relations?: RelationRef[];
   children?: ChildrenSummary;
@@ -165,6 +182,14 @@ export type ItemView = Omit<ItemWithEvents, 'relations'> & {
   // On an archived board (Studio's Archivados): read-only. The board by its name and hidden id, and
   // its collection, which no list holds, to read the item's words.
   archived?: { board: string; id: string; collection?: CollectionView };
+  // The turns of the conversation with the assistant it came out of (Hablar), when it came out of one.
+  fromMessages?: FromMessage[];
+  // The Bandeja entry it was refined from, when it was.
+  fromBandeja?: FromBandeja;
+  // While it waits for the person: its request was rewritten after the delivery was handed in.
+  requestChanged?: RequestChanged;
+  // While it waits for the person: what the assistant or the delivering agent said of this delivery.
+  advice?: Advice;
 };
 
 // canManageDevices: this computer's signed-in browser, the only one that pairs and revokes devices.
@@ -346,6 +371,9 @@ export type ProjectOverview = {
   waiting: WaitingItem[];
   // Side topics an agent answered there: yours to read, never work (absent from an older server).
   topics?: AnsweredTopic[];
+  // What waits for you there that is no item: a question on a Bandeja note, the assistant's own,
+  // what agents escalated while it is away (absent from an older server).
+  asking?: PendingEntry[];
   withAgents: number;
   // The agents there that are not away, with the server's status for each (absent from an older
   // server).

@@ -182,7 +182,7 @@ describe('Quién lo hace', () => {
       now: NOW,
       board: { reviewer: 'none', reviewedBy: { kind: 'human', name: 'human' }, relayedBy: 'orch' },
     })[1];
-    expect(relayed?.value).toBe('Relayada por orch');
+    expect(relayed?.value).toBe('Transmitida por orch');
     expect(relayed?.cls).toBeUndefined();
   });
 

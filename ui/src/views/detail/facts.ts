@@ -258,6 +258,16 @@ export function standOf(o: {
   byYou?: boolean;
   // The agent that set it aside for later: it says so, never that it waits for one (P7-R3-1).
   aside?: string | undefined;
+  // Approved by you and waiting for an agent to land it.
+  landing?: boolean | undefined;
+  // Approved while an overlapping item was still to land: the item it waits for to land first.
+  waits?: string | undefined;
+  // Overlapping items landed ahead of it: its agent merges main into it and you review the merge
+  // once, no bounce (src/app/approval-wait.ts).
+  merging?: readonly string[] | undefined;
+  // An agent took it back to its doing step after you approved it, because it conflicted with
+  // another change that landed first: the reason it gave (null when it gave none).
+  bounced?: string | null | undefined;
   // Its holder's question waits for your answer on another item (P7-R3-9): it says so, never that
   // the holder is on this one.
   asksOn?: { by: string; item: string } | undefined;
@@ -285,6 +295,17 @@ export function standOf(o: {
   const waitsAgent = o.look === 'queued' || o.look === 'waiting' || o.look === 'stuck';
   if (o.aside !== undefined && waitsAgent) return { key: 'sheet.stand.setAside', agent: o.aside };
   const agentTurn = o.look === 'working' || o.look === 'queued' || o.look === 'stuck';
+  // Approved is not landed: it says so until an agent has merged it (U1, field study 4).
+  // Still waiting for an overlapping item comes before the merge it will make once that landed.
+  if (o.landing && o.waits !== undefined && agentTurn)
+    return { key: 'sheet.stand.approvedWaits', item: o.waits };
+  if (o.merging && o.merging.length > 0 && agentTurn)
+    return { key: 'sheet.stand.approvedMerging', item: o.merging.join(', ') };
+  if (o.landing && agentTurn) return { key: 'sheet.stand.landing', ...a };
+  if (o.bounced !== undefined && agentTurn && o.reopened === undefined) {
+    const why = o.bounced?.trim().replace(/[.。]+$/, '') ?? '';
+    return why === '' ? { key: 'sheet.stand.bouncedPlain' } : { key: 'sheet.stand.bounced', why };
+  }
   if (o.reopened !== undefined && agentTurn) {
     // Quoted inside a sentence of its own: its closing stop would double the sentence's.
     const why = o.reopened.trim().replace(/[.。]+$/, '');

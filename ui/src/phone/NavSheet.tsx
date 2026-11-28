@@ -1,17 +1,16 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useApp } from '../app/context.tsx';
-import { tocaCount } from '../derive/toca.ts';
+import type { AssistantStatus } from '../conversation.ts';
 import { t } from '../i18n/i18n.ts';
-import { TypeIcon } from '../icons/TypeIcon.tsx';
 import { Count } from '../kit/Count.tsx';
 import { Icon } from '../kit/Icon.tsx';
 import { Buddy } from '../kit/Marks.tsx';
+import { waitingCount } from '../pending.ts';
 import type { Route, ViewRoute } from '../selection.ts';
-import { RowIcon } from '../shell/Rail.tsx';
+import { AssistantDot, RowIcon } from '../shell/Rail.tsx';
 import { type BoardEntry, boardEntries } from '../shell/rail-model.ts';
 import { shellUi } from '../shell/shell-ui.ts';
-import { answeredTopics } from '../topics.ts';
-import { topicsShown, useTopics } from '../views/topics/use-topics.ts';
+import { AssistantMark } from '../views/hablar/AssistantMark.tsx';
 import { BottomSheet } from './BottomSheet.tsx';
 import { navSheet, useNavSheet } from './nav.ts';
 
@@ -30,8 +29,8 @@ export function navOn(route: Route): string | null {
       return 'toca';
     case 'board':
       return `board:${route.board}`;
-    case 'topics':
-      return 'topics';
+    case 'hablar':
+      return 'hablar';
     default:
       return null;
   }
@@ -40,8 +39,8 @@ export function navOn(route: Route): string | null {
 export type NavBodyProps = {
   route: Route;
   toca: number;
-  // The answered side topics, yours; undefined while topics are off and none were kept.
-  topics?: number | undefined;
+  // The assistant's state, for the dot on Hablar's row.
+  assistant?: AssistantStatus | null | undefined;
   boards: BoardEntry[];
   onGo: (to: ViewRoute) => void;
   onPrefs: () => void;
@@ -73,12 +72,20 @@ function Row({ i, on = false, icon, label, pair, className, onPress }: RowProps)
   );
 }
 
-export function NavBody({ route, toca, topics, boards, onGo, onPrefs }: NavBodyProps) {
+export function NavBody({ route, toca, assistant, boards, onGo, onPrefs }: NavBodyProps) {
   const on = navOn(route);
   let i = 0;
   return (
     <>
       <nav className="nav">
+        <Row
+          i={i++}
+          on={on === 'hablar'}
+          icon={<AssistantMark />}
+          label={t('hablar.nav')}
+          pair={<AssistantDot status={assistant} />}
+          onPress={() => onGo({ view: 'hablar' })}
+        />
         <Row
           i={i++}
           on={on === 'toca'}
@@ -87,16 +94,6 @@ export function NavBody({ route, toca, topics, boards, onGo, onPrefs }: NavBodyP
           pair={<Count value={toca} tone="you" hold />}
           onPress={() => onGo({ view: 'toca' })}
         />
-        {topics === undefined ? null : (
-          <Row
-            i={i++}
-            on={on === 'topics'}
-            icon={<TypeIcon name="chat-bubble" size={16} />}
-            label={t('nav.topics')}
-            pair={<Count value={topics} tone="you" hold />}
-            onPress={() => onGo({ view: 'topics' })}
-          />
-        )}
       </nav>
       <div className="rail-label" data-i={i++}>
         {t('phone.boards')}
@@ -144,7 +141,7 @@ export function NavSheet() {
   const [now, setNow] = useState(false);
   const phone = app.phone;
   const view = navOn(app.route) ?? app.route.view;
-  const topics = useTopics();
+  const assistant = app.assistant;
 
   // Off the phone there is no sheet to keep open.
   useEffect(() => {
@@ -177,9 +174,9 @@ export function NavSheet() {
     >
       <NavBody
         route={app.route}
-        toca={tocaCount(app.all, { now: app.now })}
-        topics={topicsShown(topics) ? answeredTopics(topics?.topics ?? []).length : undefined}
-        boards={boardEntries(app.collections, app.all)}
+        toca={waitingCount(app)}
+        assistant={assistant}
+        boards={boardEntries(app.collections, app.all, app.now)}
         onGo={(to) => {
           closeNow();
           app.go(to);

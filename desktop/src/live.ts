@@ -1,9 +1,12 @@
 // The main process's own view of the items: /api/items and /api/collections, read again on every
 // change the live stream announces. It keeps working while the window is closed to the tray. And
 // the notices the server tells the desktop app, for the system's notifications.
+import type { Pending } from '../../src/core/pending.ts';
 import type { DeskItem } from './state.ts';
 
-export type Snapshot = { items: DeskItem[]; collections: string[] };
+// `pending`: what Otea counts that is no item (GET /api/pending), so the tray and the rail say one
+// number; absent from a server that does not say.
+export type Snapshot = { items: DeskItem[]; collections: string[]; pending?: Pending };
 
 export type Watch = { close(): void };
 
@@ -22,16 +25,28 @@ async function getJson<T>(url: string, cookie: string, signal: AbortSignal): Pro
   return (await response.json()) as T;
 }
 
+function isPending(value: unknown): value is Pending {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Array.isArray((value as { entries?: unknown }).entries)
+  );
+}
+
 export async function readSnapshot(
   base: string,
   cookie: string,
   signal: AbortSignal,
 ): Promise<Snapshot> {
-  const [items, collections] = await Promise.all([
+  const [items, collections, pending] = await Promise.all([
     getJson<DeskItem[]>(`${base}/api/items`, cookie, signal),
     getJson<{ name: string }[]>(`${base}/api/collections`, cookie, signal),
+    getJson<unknown>(`${base}/api/pending`, cookie, signal).catch(() => undefined),
   ]);
-  return { items, collections: collections.map((each) => each.name) };
+  const snapshot: Snapshot = { items, collections: collections.map((each) => each.name) };
+  // Read defensively: an older server has no such route, and its answer is no list of entries.
+  if (isPending(pending)) snapshot.pending = pending;
+  return snapshot;
 }
 
 export type SseMessage = { event: string; data: string };

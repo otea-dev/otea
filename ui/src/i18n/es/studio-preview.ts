@@ -164,7 +164,7 @@ export const studioPreview = {
   'bs.preview.agent.ifTakenBack': 'Si lo regresa a {step}',
   'bs.preview.agent.ifDrops': 'Si lo descarta',
   'bs.preview.agent.ifTriesToDrop': 'Si intenta descartarlo',
-  'bs.preview.agent.ifBranch': 'Si sube o fusiona la rama',
+  'bs.preview.agent.ifBranch': 'Si sube o integra la rama',
   'bs.preview.agent.onCreate': 'Al crearlo',
   'bs.preview.agent.ifNoParent': 'Si se crea sin su {item}',
   'bs.preview.agent.ifOtherPart': 'Si enlaza otra cosa como parte',
@@ -301,9 +301,9 @@ export const studioPreview = {
   'bs.preview.try.git.notPushStepBase':
     '{id} está en {step}; {base} solo se sube mientras se hace {steps}.',
   'bs.preview.try.git.notDone':
-    '{id} está en {step}, ronda {n}; su rama solo se fusiona cuando {id} esté Hecho.',
+    '{id} está en {step}, ronda {n}; su rama solo se integra cuando {id} esté Hecho.',
   'bs.preview.try.git.notDoneDropped':
-    '{id} está Descartado; su rama solo se fusiona cuando {id} esté Hecho.',
+    '{id} está Descartado; su rama solo se integra cuando {id} esté Hecho.',
   'bs.preview.try.tree.label': 'Ítems de esta práctica',
   'bs.preview.try.tree.gloss': 'toca uno para jugarlo',
   'bs.preview.try.tree.add': 'Crear · {item}, parte de {parent}',

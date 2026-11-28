@@ -98,6 +98,8 @@ export function relayableMoves(workflow: Workflow, from: string): Move[] {
   for (const transition of transitionsFrom(workflow, from)) {
     const { to, by } = transition;
     if (moves.has(to) || by !== 'human') continue;
+    // A relay never drops or finishes: that is the person's tap (adversarial review of S).
+    if (closesOf(workflow, to) !== undefined) continue;
     moves.set(to, moveTo(workflow, transition));
   }
   return [...moves.values()];

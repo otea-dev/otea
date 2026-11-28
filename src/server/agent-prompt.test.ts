@@ -155,16 +155,53 @@ describe('GET /api/agent-prompt', () => {
   // The same texts otea prompt --role prints, for the desk to copy.
   it('gives the text of a role, with the board and name filled in', async () => {
     initBoards(project, 'changes', 'es');
-    expect((await get('?role=coordinator&lang=en')).body).toEqual({
-      kind: 'coordinator',
-      prompt: rolePrompt('coordinator', 'en', {}),
+    expect((await get('?role=assistant&lang=en')).body).toEqual({
+      kind: 'assistant',
+      prompt: rolePrompt('assistant', 'en', {}),
+    });
+    expect((await get('?role=refiner&as=rita&lang=es')).body).toEqual({
+      kind: 'refiner',
+      prompt: rolePrompt('refiner', 'es', { name: 'rita' }),
     });
     // The board as the project names it, whatever the case it was asked in.
     expect((await get('?role=worker&board=cambios&as=ana&lang=es')).body).toEqual({
       kind: 'worker',
-      prompt: rolePrompt('worker', 'es', { board: 'Cambios', name: 'ana' }),
+      // This project's folder is no git repository: no worktree or land sync in the worker's text.
+      prompt: rolePrompt('worker', 'es', { board: 'Cambios', name: 'ana', code: false }),
     });
     expect((await get('?role=worker&board=Cambios&lang=en')).body.prompt).toContain('otea whoami');
+  });
+
+  // A worker is told to work in a git worktree and to land sync only on a board that protects a
+  // branch in a git repository (cold review G2), whichever way the text is asked for.
+  it('gives a worker on a board with no protected branch no worktree and no land sync', async () => {
+    initBoards(project, 'todos', 'en');
+    const { prompt } = (await get('?role=worker&board=To-dos&as=ana&lang=en')).body;
+    expect(prompt).not.toMatch(/worktree|land sync/);
+    expect(prompt).toBe(rolePrompt('worker', 'en', { board: 'To-dos', name: 'ana', code: false }));
+  });
+
+  it('gives a worker on a board that protects a branch, in a git repository, its worktree and land sync', async () => {
+    initBoards(project, 'changes', 'es');
+    setProjectLanguage(project, 'es');
+    const folder = mkdtempSync(join(tmpdir(), 'otea-repo-'));
+    mkdirSync(join(folder, '.git'));
+    const inRepo = createServer({ ...project, root: folder }, { token: TOKEN });
+    try {
+      const response = await inRepo.app.request(
+        '/p/memory-aaaaaa/api/agent-prompt?role=worker&board=Cambios&as=ana&lang=es',
+        { headers: { host: LOCAL_HOST, cookie: SESSION_COOKIE } },
+      );
+      const { prompt } = (await response.json()) as { prompt: string };
+      expect(prompt).toContain('git worktree add');
+      expect(prompt).toContain('otea land sync');
+    } finally {
+      inRepo.close();
+      rmSync(folder, { recursive: true, force: true });
+    }
+    // The same board in a folder with no git has neither.
+    const { prompt } = (await get('?role=worker&board=Cambios&as=ana&lang=es')).body;
+    expect(prompt).not.toMatch(/worktree|land sync/);
   });
 
   it('refuses a role asked wrongly', async () => {
@@ -172,7 +209,9 @@ describe('GET /api/agent-prompt', () => {
     for (const query of [
       '?role=boss',
       '?role=worker',
-      '?role=coordinator&board=Cambios',
+      '?role=coordinator',
+      '?role=assistant&board=Cambios',
+      '?role=refiner&board=Cambios',
       '?role=worker&board=Cambios&kind=join',
       '?role=worker&board=Cambios&as=Not%20A%20Name',
       '?board=Cambios',

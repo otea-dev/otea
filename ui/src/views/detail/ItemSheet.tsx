@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { isClosed, NOTE_REF, positionOf } from '../../../../src/core/board/engine.ts';
-import { SAME, stepById } from '../../../../src/core/board/model.ts';
+import { DONE, SAME, stepById } from '../../../../src/core/board/model.ts';
 import { waitsOf } from '../../actions.ts';
 import type { NoteAnchorInput } from '../../api.ts';
 import { typeOfItem, useApp } from '../../app/context.tsx';
@@ -14,6 +14,7 @@ import { noteAnchor } from '../../components/evidence/video-moment.ts';
 import { blindPartsOf } from '../../evidence.ts';
 import { t, tx } from '../../i18n/i18n.ts';
 import { TypeIcon } from '../../icons/TypeIcon.tsx';
+import { detailBlocks, slotData } from '../../item-types.ts';
 import { GhostButton, Icon, StepPill, Swap, toast } from '../../kit/index.ts';
 import { laneOf } from '../../lanes/geometry.ts';
 import { lookOf } from '../../lanes/looks.ts';
@@ -28,14 +29,18 @@ import {
 } from '../../listening.ts';
 import { BottomSheet } from '../../phone/BottomSheet.tsx';
 import { ItemTypeScope, stateWord, stateWordIn, typeWord } from '../../preset-words.ts';
+import { usePlainReview } from '../../review-detail.ts';
 import { roundsOf } from '../../rounds.ts';
 import { studioHash } from '../../selection.ts';
 import type { ItemView, RelatedItem } from '../../types.ts';
 import { useStudioBoard } from '../board/studio-board.tsx';
+import { FromBandeja } from '../hablar/FromBandeja.tsx';
+import { FromTurns } from '../hablar/FromTurns.tsx';
 import { ItemTopics } from '../topics/ItemTopics.tsx';
 import { Acts, actsModeOf } from './Acts.tsx';
 import {
   BranchLine,
+  branchNoticeCount,
   DraftRequestLine,
   type DropChoice,
   DropDialog,
@@ -43,10 +48,11 @@ import {
   LinksSection,
   PartOfLine,
   PartsSection,
+  RequestChangedLine,
   RoundNotes,
   WaitChecklist,
 } from './BoardSections.tsx';
-import { Body, bodySections } from './Body.tsx';
+import { Body, bodySections, Plain } from './Body.tsx';
 import {
   approvalRefusal,
   backOf,
@@ -59,6 +65,7 @@ import {
   holdApproval,
   type ItemBoardBlock,
   linksOf,
+  noRemoteOf,
   ownStepOf,
   railStep,
   roundStartOf,
@@ -70,13 +77,14 @@ import {
   waitRows,
 } from './board-item.ts';
 import { cautionKeyOf, useCaution } from './caution.ts';
-import { Details, detailCells } from './Details.tsx';
-import { useDiffFiles, useDiffOffTip } from './diff-tip.ts';
+import { Details, detailCells, Value } from './Details.tsx';
 import { useDrift } from './drift.ts';
 import { boardFactsOf, factsOf, standAgentOf, standOf } from './facts.ts';
 import { pressInView, toastOf } from './frame.ts';
 import { History } from './History.tsx';
 import { historyOf } from './history.ts';
+import { landsAfterText } from './lands-after.ts';
+import { useLocalBehind } from './local-behind.ts';
 import { useMergeOnly } from './merge-only.ts';
 import { useMergedOutside } from './merged-outside.ts';
 import { draftWaitsOf, type MoveChoice, planMoves } from './moves.ts';
@@ -93,11 +101,12 @@ import {
 } from './notes.ts';
 import { useOpened } from './opened.ts';
 import { useOverlaps } from './overlaps.ts';
-import { PhoneItem } from './PhoneItem.tsx';
+import { PhoneItem, type WorkedSec } from './PhoneItem.tsx';
 import { ProofChecklist } from './ProofChecklist.tsx';
 import { partNames, phoneRounds, readerOf, requestLine, unopenedOf } from './phone-review.ts';
 import { pickOf, pickWays } from './pick.ts';
 import { Route } from './Route.tsx';
+import { useReviewNotices } from './review-notices.ts';
 import { useRoundSame } from './round-same.ts';
 import { routeIndex, routeSteps } from './route.ts';
 
@@ -157,6 +166,9 @@ function dropReason(item: ItemView): string | undefined {
 
 export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheetProps) {
   const app = useApp();
+  // What only code readers use (branch, diff, checks) folds behind «Detalles técnicos»: always on
+  // the phone, and on the desk when the person chose it in Preferencias.
+  const plain = usePlainReview(app.phone);
   // The board this item is on, when Studio shapes it: Editar tablero opens its editor.
   const summaries = boardsOf(useBoards(app.version));
   const board = boardOfCollection(summaries, item.collection);
@@ -169,12 +181,19 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   const onBoard = useMemo(
     () =>
       live
-        ? boardItemOf(live, item, {
-            done: boardSpeech(live).done,
-            dip: (n, at) => t('sheet.dip', { n, when: at ? dipWhen(at, now) : '' }),
-            redone: (n) => t('sheet.dipRedone', { n }),
-            reopen: (at) => t('sheet.reopenDip', { when: at ? dipWhen(at, now) : '' }),
-          })
+        ? boardItemOf(
+            live,
+            item,
+            {
+              done: boardSpeech(live).done,
+              dip: (n, at) => t('sheet.dip', { n, when: at ? dipWhen(at, now) : '' }),
+              redone: (n) => t('sheet.dipRedone', { n }),
+              reopen: (at) => t('sheet.reopenDip', { when: at ? dipWhen(at, now) : '' }),
+              bounce: (n) => t('sheet.dipBounced', { n }),
+              merge: (n) => t('sheet.dipMerge', { n }),
+            },
+            item.bounced,
+          )
         : null,
     [live, item, now],
   );
@@ -209,16 +228,25 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   const stepId = isClosed(position) ? null : position.step;
   const waits = live && links && stepId ? waitRows(live, stepId, links) : [];
   const strip = live
-    ? branchStrip(live, item.state, item.fields, { merged: !!block?.merged })
+    ? branchStrip(live, item.state, item.fields, {
+        merged: !!block?.merged,
+        local: noRemoteOf(item),
+      })
     : null;
   // While the person reviews it: what a clone without Otea's hook pushed since the handoff.
   const drift = useDrift(item.id, strip?.key === 'frozen', item.updatedAt);
   // In its land step: whether git shows it merged outside Otea already (P1-R3-9).
   const outside = useMergedOutside(item.id, strip?.key === 'landing', item.updatedAt);
-  // While the person reviews it: whether the attached diff comes from another tip (P1-R3-1).
-  const off = useDiffOffTip(item.id, strip?.key === 'frozen', item.updatedAt);
-  // And whether it names other files than the work handed off changes (P1-F2).
-  const files = useDiffFiles(item.id, strip?.key === 'frozen', item.updatedAt);
+  // Done: whether what landed is on the remote's base and the local one is behind it.
+  const behind = useLocalBehind(
+    item.id,
+    isClosed(position) && position.closed === DONE,
+    item.updatedAt,
+  );
+  // While the person reviews it: what is said beside Aprobar, from one source for every page that
+  // offers it: the attached diff is not what lands (another tip, P1-R3-1; other files, P1-F2) and
+  // what the assistant or the delivering agent advised (D-00b356).
+  const notices = useReviewNotices(item, strip?.key === 'frozen');
   // And whether this round holds the same files as the one it answers (P5-F2).
   const same = useRoundSame(item.id, strip?.key === 'frozen', item.updatedAt);
   // And which other open items change the same files, so one of them meets a conflict.
@@ -409,6 +437,10 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
     reopened: onBoard?.reopened?.why,
     byYou: !!closedBy?.doneByPerson,
     aside: item.setAside?.by,
+    landing: item.landing,
+    waits: item.landsAfter?.overlap ? item.landsAfter.first : undefined,
+    merging: item.merging?.after,
+    bounced: item.bounced ? item.bounced.reason : undefined,
     asksOn: item.holderAsks,
     gone: gone
       ? { agent: gone.name, ended: gone.sessionEnded === true, quiet: quietFor(gone.lastSeen, now) }
@@ -436,7 +468,8 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   const silentHere = unheard(item, app.agents, now);
   const standText = silentHere ? (
     <>
-      {standWords} {unheardLead(workingAgents(app.agents, app.all, now), app.agents, item.id)}
+      {standWords}{' '}
+      {unheardLead(workingAgents(app.agents, app.all, now, item.collection), app.agents, item.id)}
     </>
   ) : (
     standWords
@@ -649,6 +682,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
             }
           : undefined,
         warn: careful.line || undefined,
+        notices: notices.map(({ text }) => text),
       }
     : undefined;
   const unseen = approveChoice && deciding ? unopenedOf(reader.files, seen) : null;
@@ -657,7 +691,11 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   const unopenedLine =
     [
       unseen && unseen.unopened > 0
-        ? t('evidence.reader.unopened', { n: unseen.unopened, total: unseen.total })
+        ? t('evidence.reader.unopened', {
+            count: unseen.total,
+            n: unseen.unopened,
+            total: unseen.total,
+          })
         : '',
       deciding && reviewComments.length
         ? t('notes.review.notice', { count: reviewComments.length })
@@ -745,6 +783,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
     facts,
     canWrite,
     now,
+    plain,
     onRead: canRead ? onRead : undefined,
     board: live
       ? {
@@ -822,7 +861,41 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
     // On the phone: what was delivered first, the rounds as one segment, the moves docked. What
     // was asked is the item's fields; the rounds, the evidence and the board's sections are
     // drawn by the delivery, and links and parts stay on the computer.
-    const request = sections.filter(({ key }) => key.startsWith('f:'));
+    // On a board only the creation form's fields are what was asked: the rest (the findings, the
+    // options, the sources an agent filled in) are its work, drawn as the desk draws them and not
+    // kept in the closed «Lo pedido» (field study 3: a decision showed none of what was researched).
+    const asked = new Set(live?.form.map(({ ref }) => ref));
+    const fieldKey = (key: string) => key.slice(2);
+    const request = sections.filter(
+      ({ key }) => key.startsWith('f:') && (!live || asked.has(fieldKey(key))),
+    );
+    const longWork = live
+      ? sections.filter(({ key }) => key.startsWith('f:') && !asked.has(fieldKey(key)))
+      : [];
+    // The short ones (a link, a number) are the desk's Details cells; here they stand with the rest.
+    const blocks = detailBlocks(type, item.fields);
+    const shortWork: WorkedSec[] = live
+      ? [...blocks.primary, ...(blocks.sections ?? []).flatMap((s) => s.blocks), ...blocks.side]
+          .flatMap((b) => (b.kind === 'fields' ? b.values : []))
+          .filter(
+            (v) => v.field.module !== 'markdown' && v.value !== '' && !asked.has(v.field.name),
+          )
+          .map((v) => ({
+            key: `f:${v.field.name}`,
+            ref: v.field.name,
+            node: (
+              <Plain k={`f:${v.field.name}`} label={v.label} className="d-sec field">
+                <div {...slotData(v.at)}>
+                  <Value placed={v} />
+                </div>
+              </Plain>
+            ),
+          }))
+      : [];
+    const worked: WorkedSec[] = [
+      ...longWork.map((s) => ({ ...s, ref: fieldKey(s.key) })),
+      ...shortWork,
+    ];
     const firstField = request[0]?.key.slice(2);
     return (
       <ItemTypeScope type={type}>
@@ -849,18 +922,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
               checks={
                 <>
                   {/* Its branch and where it stands: «fusionada» once merged, as on the desk (WF-3). */}
-                  <BranchLine
-                    strip={strip}
-                    drift={drift}
-                    outside={outside}
-                    off={off}
-                    files={files}
-                    same={same}
-                    item={item.id}
-                    overlaps={overlaps}
-                    merge={merge}
-                    waits={item.landsAfter?.text}
-                  />
+                  <RequestChangedLine changed={item.requestChanged} />
                   {hand.length ? (
                     <HandChecklist item={item} rows={hand} canWrite={app.session.canWrite} />
                   ) : null}
@@ -877,13 +939,40 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                   {proofSections.map(({ key, node }) => (
                     <div key={key}>{node}</div>
                   ))}
+                  <FromTurns turns={item.fromMessages} />
+                  <FromBandeja from={item.fromBandeja} />
                   <ItemTopics item={item} canWrite={app.session.canWrite} />
                 </>
               }
+              technical={
+                strip || behind ? (
+                  <BranchLine
+                    strip={strip}
+                    behind={behind}
+                    drift={drift}
+                    outside={outside}
+                    same={same}
+                    item={item.id}
+                    overlaps={overlaps}
+                    merge={merge}
+                    waits={landsAfterText(item.landsAfter)}
+                  />
+                ) : undefined
+              }
+              notices={notices}
+              technicalNotices={branchNoticeCount({
+                behind,
+                drift,
+                same,
+                merge,
+                waits: landsAfterText(item.landsAfter),
+                overlaps,
+              })}
               details={<Details cells={cells} k={`${item.state}:${item.updatedAt}`} />}
               detailsSummary={[facts.agent, typeWord(type, item.type), item.collection]
                 .filter(Boolean)
                 .join(' · ')}
+              worked={worked}
               request={request.length ? <Body id={item.id} sections={request} /> : null}
               requestSummary={firstField ? requestLine(String(item.fields[firstField] ?? '')) : ''}
               links={
@@ -1054,6 +1143,8 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                 {item.title}
               </h1>
               {links ? <PartOfLine parent={links.parent} /> : null}
+              <FromTurns turns={item.fromMessages} />
+              <FromBandeja from={item.fromBandeja} />
               <div data-c>
                 <Swap
                   k={`${stand.key}:${stand.agent ?? ''}:${stand.round ?? ''}:${stand.time ?? ''}:${silentHere}`}
@@ -1096,6 +1187,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                 onNotes={openNotes}
                 note={leave}
                 unopened={unopenedLine}
+                notices={notices}
               />
               {canRead ? (
                 <DeskReader
@@ -1167,17 +1259,18 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                   />
                 ) : null}
               </div>
+              <RequestChangedLine changed={item.requestChanged} />
               <BranchLine
                 strip={strip}
+                behind={behind}
                 drift={drift}
                 outside={outside}
-                off={off}
-                files={files}
                 same={same}
                 item={item.id}
                 overlaps={overlaps}
                 merge={merge}
-                waits={item.landsAfter?.text}
+                waits={landsAfterText(item.landsAfter)}
+                plain={plain}
               />
               {block?.request ? (
                 <DraftRequestLine

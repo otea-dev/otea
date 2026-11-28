@@ -17,6 +17,21 @@ describe('openDatabase', () => {
     for (const cleanup of cleanups.splice(0)) cleanup();
   });
 
+  // U3 (field study 4): an agent in a sandbox that cannot write Otea's folder read one bare line,
+  // and could not tell what to do, nor escalate (escalate needs the same database).
+  it('says in plain words what a database that cannot be opened needs', () => {
+    const path = join(tmpdir(), `otea-missing-${randomUUID()}`, 'otea.db');
+    let message = '';
+    try {
+      openDatabase(path);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain(path);
+    expect(message).toMatch(/permission to write/);
+    expect(message).toMatch(/stop and tell the person/i);
+  });
+
   it('applies WAL, busy timeout and foreign keys on a file database', () => {
     const path = join(tmpdir(), `otea-test-${randomUUID()}.db`);
     const db = openDatabase(path);

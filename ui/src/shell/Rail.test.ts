@@ -1,50 +1,15 @@
 import { createElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { workspace } from '../app/workspace.ts';
 import { ago, item } from '../derive/fixtures.ts';
 import { setLanguage } from '../i18n/i18n.ts';
-import type { Topic, TopicsView } from '../topics.ts';
 import type { CollectionView } from '../types.ts';
 import { Rail } from './Rail.tsx';
 import { renderIn, testApp } from './test-app.ts';
 
-// The side topics are read with a fetch the server render never makes; a test hands them in.
-const side = vi.hoisted(() => ({ view: undefined as TopicsView | undefined }));
-vi.mock('../views/topics/use-topics.ts', async (actual) => ({
-  ...(await actual<typeof import('../views/topics/use-topics.ts')>()),
-  useTopics: () => side.view,
-}));
-
 afterEach(() => {
   setLanguage('en');
   workspace.set({ folded: false });
-  side.view = undefined;
-});
-
-const topic = (id: string, state: Topic['state']): Topic => ({
-  id,
-  title: id,
-  state,
-  turn: state === 'answered' ? 'human' : 'agent',
-  createdAt: '2026-11-17T10:00:00.000Z',
-  updatedAt: '2026-11-17T10:00:00.000Z',
-  by: { kind: 'agent', name: 'quill' },
-  turns: [],
-  links: [],
-});
-
-// Three answered (yours), one still open with the agent, one closed.
-const topics = (on = true, list = true): TopicsView => ({
-  on,
-  topics: list
-    ? [
-        topic('TEM-1', 'answered'),
-        topic('TEM-2', 'open'),
-        topic('TEM-3', 'answered'),
-        topic('TEM-4', 'closed'),
-        topic('TEM-5', 'answered'),
-      ]
-    : [],
 });
 
 // The markup from one row's data-k to the next row's (or the end of its nav).
@@ -91,23 +56,37 @@ describe('the rail', () => {
     expect(html.indexOf('vistas</div>')).toBeLessThan(html.indexOf('Te toca'));
   });
 
+  // s-real D-a0b4a2: on a tablet and at 150% nobody found where to jot an idea.
+  it('names the quick note in the views, for who can write', () => {
+    const html = rail();
+    expect(html).toMatch(
+      /<button type="button" class="add jot"[^>]*>.*?Anotar idea<\/span><\/button>/,
+    );
+    expect(html.indexOf('Anotar idea')).toBeGreaterThan(html.indexOf('Atasco'));
+    expect(html.indexOf('Anotar idea')).toBeLessThan(html.indexOf('tableros</div>'));
+    expect(
+      rail({ session: { canWrite: false, canConfigure: false, canManageDevices: false } }),
+    ).not.toContain('Anotar idea');
+  });
+
   it('counts Te toca in your blue and Atasco in warn, each with its folded badge', () => {
     const html = rail();
     expect(html).toMatch(
-      /Te toca<\/span><span class="pair"><span class="n you"><span class="nv" data-v="2">/,
+      /Te toca<\/span><span class="pair"[^>]*><span class="n you"><span class="nv" data-v="2">/,
     );
     expect(html).toMatch(
-      /Atasco<\/span><span class="pair"><span class="n warn"><span class="nv" data-v="1">/,
+      /Atasco<\/span><span class="pair"[^>]*><span class="n warn"><span class="nv" data-v="1">/,
     );
-    expect(html).toContain('<i class="badge has">2</i>');
-    expect(html).toContain('<i class="badge warn has">1</i>');
+    expect(html).toMatch(/<i class="badge has"[^>]*>2<\/i>/);
+    expect(html).toMatch(/<i class="badge warn has"[^>]*>1<\/i>/);
   });
 
   it('lists each board with its icon, yours over open, and a + for a new item in it', () => {
     const html = rail();
     expect(html).toContain('<div class="rail-label">tableros</div>');
+    // What waits on the board is what Te toca counts: its item on your turn and the one stuck.
     expect(html).toMatch(
-      /Errores<\/span><span class="pair"[^>]*><span class="n you"><span class="nv" data-v="1">1<\/span><\/span> \/ <span class="n"><span class="nv" data-v="3">3/,
+      /Errores<\/span><span class="pair"[^>]*><span class="n you"><span class="nv" data-v="2">2<\/span><\/span> \/ <span class="n"><span class="nv" data-v="3">3/,
     );
     expect(html).toContain('aria-label="Nuevo ítem en Errores"');
     expect(html).toContain('Nuevo tablero');
@@ -117,34 +96,62 @@ describe('the rail', () => {
   // folded or not.
   it('says what a board’s pair counts when you rest on its row', () => {
     expect(rail()).toMatch(
-      /data-k="board:Errores" data-tip="Errores · Te toca: 1 · Abiertos: 3" data-tip-more=""/,
+      /data-k="board:Errores" data-tip="Errores · Te toca: 2 · Abiertos: 3" data-tip-more=""/,
     );
     setLanguage('en');
     const en = renderIn(
       testApp({ all, collections: [board('Errores', 'bug'), board('Criaturas', 'paw')] }),
       createElement(Rail),
     );
-    expect(en).toContain('data-tip="Errores · Your turn: 1 · Open: 3" data-tip-more=""');
+    expect(en).toContain('data-tip="Errores · Your turn: 2 · Open: 3" data-tip-more=""');
     // Te toca and Atasco count one thing each: their rows name it, and say nothing more.
     expect(rail()).toMatch(/data-k="toca" data-tip="Te toca">/);
   });
 
+  // F4: a question on a note or the assistant's own waits for you as much as an item does.
+  it('counts in Te toca the questions of the Bandeja and the assistant, beside the items', () => {
+    const countOf = (html: string) => /data-k="toca"[\s\S]*?data-v="(\d+)"/.exec(html)?.[1];
+    const ask = (kind: 'bandeja' | 'assistant', ref: string) => ({
+      kind,
+      ref,
+      title: 'x',
+      since: ago(5),
+    });
+
+    expect(countOf(rail())).toBe('2');
+    expect(
+      countOf(
+        rail({
+          pending: {
+            count: 2,
+            entries: [ask('bandeja', 'B-1'), ask('assistant', '4')],
+            blocks: [],
+            queues: [],
+            assistant: null,
+          },
+        }),
+      ),
+    ).toBe('4');
+  });
+
   it('marks the row in view and slides one pill under it', () => {
     const html = rail({ route: { view: 'board', board: 'Criaturas' } });
-    expect(html).toMatch(/class="nrow on"[^>]*aria-current="page"[^>]*data-k="board:Criaturas"/);
+    // The row's one button says it is the page in view.
+    expect(html).toMatch(
+      /class="nrow on"[^>]*data-k="board:Criaturas"[^>]*><button[^>]*aria-current="page"/,
+    );
     expect(html.match(/class="rsel"/g)).toHaveLength(1);
   });
 
-  // Temas wait for you to read or close them, as Te toca does: they end the views, set apart from
-  // Te toca and Atasco by a small gap (lists of items above, conversations here), with no heading.
-  it('ends the views with Temas, after Te toca and Atasco, a gap above it and no heading', () => {
-    side.view = topics();
+  // Hablar is the first view: the assistant's mark in its colour, then Te toca and Atasco. The old
+  // Temas row is gone: its consultations live in Hablar's filter.
+  it('opens the views with Hablar and its mark, before Te toca and Atasco', () => {
     const html = rail();
     const order = [
       'vistas</div>',
+      'data-k="hablar"',
       'data-k="toca"',
       'data-k="atasco"',
-      'data-k="topics"',
       'tableros</div>',
       'proyecto</div>',
     ];
@@ -154,53 +161,24 @@ describe('the rail', () => {
       expect(i, w).toBeGreaterThan(at);
       at = i;
     }
-    // In the views' own list: no heading and no new list between Atasco and Temas.
-    const between = html.slice(html.indexOf('data-k="atasco"'), html.indexOf('data-k="topics"'));
-    expect(between).not.toContain('rail-label');
-    expect(between).not.toContain('</nav>');
-    expect(rowOf(html, 'topics')).toMatch(/^<div class="nrow apart"/);
-    expect(rowOf(html, 'atasco')).toMatch(/^<div class="nrow"/);
-    expect(rowOf(html, 'topics')).toContain('<span class="lb">Temas</span>');
-    expect(rowOf(html, 'topics')).toContain('class="type-icon');
+    expect(rowOf(html, 'hablar')).toContain('<span class="mk assistant">as</span>');
+    expect(rowOf(html, 'hablar')).toMatch(/<span class="lb"[^>]*>Hablar<\/span>/);
+    expect(html).not.toContain('data-k="topics"');
+    expect(html).not.toContain('Temas');
     // Studio, Configuración and Rendimiento keep the project to themselves.
     const project = html.slice(html.indexOf('proyecto</div>'));
-    expect(project).not.toContain('Temas');
     expect(project.indexOf('data-k="studio"')).toBeLessThan(project.indexOf('data-k="settings"'));
     expect(project.indexOf('data-k="settings"')).toBeLessThan(
       project.indexOf('data-k="performance"'),
     );
   });
 
-  it('counts the answered topics, yours, as Te toca counts its own, with a folded badge', () => {
-    side.view = topics();
-    const html = rail();
-    expect(rowOf(html, 'topics')).toMatch(
-      /Temas<\/span><span class="pair"><span class="n you"><span class="nv" data-v="3">/,
-    );
-    expect(rowOf(html, 'topics')).toContain('<i class="badge has">3</i>');
-    // None answered: a quiet 0, and no badge on the strip.
-    side.view = { on: true, topics: [topic('TEM-2', 'open')] };
-    const none = rowOf(rail(), 'topics');
-    expect(none).toContain('data-v="0"');
-    expect(none).toContain('<i class="badge">0</i>');
-  });
-
-  it('lists Temas while topics are on or some were kept, as the phone does', () => {
-    side.view = topics(true, false);
-    expect(rail()).toContain('data-k="topics"');
-    side.view = topics(false, true);
-    expect(rail()).toContain('data-k="topics"');
-    side.view = topics(false, false);
-    expect(rail()).not.toContain('data-k="topics"');
-    side.view = undefined;
-    expect(rail()).not.toContain('data-k="topics"');
-  });
-
-  it('slides the pill under Temas while you read them', () => {
-    side.view = topics();
-    const html = rail({ route: { view: 'topics' } });
+  it('slides the pill under Hablar while you talk', () => {
+    const html = rail({ route: { view: 'hablar' } });
     expect(html.match(/class="nrow[^"]*\bon\b/g)).toHaveLength(1);
-    expect(rowOf(html, 'topics')).toMatch(/^<div class="nrow on apart"[^>]*aria-current="page"/);
+    expect(rowOf(html, 'hablar')).toMatch(
+      /^<div class="nrow on"[^>]*><button[^>]*aria-current="page"/,
+    );
   });
 
   it('keeps the project’s Studio and its settings, even for a browser without a session', () => {

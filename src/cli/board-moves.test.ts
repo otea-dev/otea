@@ -176,29 +176,21 @@ describe('a relayed drop', () => {
         id,
         'dropped__duplicate',
         '--quote',
-        'tíralo',
+        'tíralo ya',
         '--reason',
         'repetido',
         '--json',
       );
-      expect(result.code).toBe(4);
-      expect(JSON.parse(result.err).error).toEqual({
-        code: 'not_relayable',
-        message: "Not relayed: on Errores the person drops items from the item's page.",
-        details: {
-          kind: 'drop',
-          item: id,
-          board: 'Errores',
-          why: 'not_relayable',
-          motives: ['Rechazado', 'Duplicado'],
-        },
-      });
+      // A relay never drops, wherever the person drops from (adversarial review of S).
+      expect(result.code).toBe(7);
+      expect(JSON.parse(result.err).error.code).toBe('forbidden');
+      expect(JSON.parse(result.err).error.message).toContain("person's alone");
     } finally {
       repo.remove();
     }
   });
 
-  it('says Dropped once in show, with its motives, not once per motive', async () => {
+  it('does not offer Dropped to relay in show: the person taps a drop', async () => {
     const repo = tempGitRepo();
     try {
       const otea = cliAt(repo.dir, { OTEA_AGENT: 'claude' });
@@ -218,14 +210,13 @@ describe('a relayed drop', () => {
       const { out } = await otea('show', id);
 
       const relay = out.split('\n').find((line) => line.startsWith('Agent can relay to:'));
-      expect(relay).toContain('Dropped (reason required; --motive "Rechazado|Duplicado")');
-      expect(relay?.match(/Dropped/g)).toHaveLength(1);
+      expect(relay ?? '').not.toContain('Dropped');
     } finally {
       repo.remove();
     }
   });
 
-  it('takes the motive with --motive where the person may drop through an agent', async () => {
+  it('refuses a drop even where the person may drop through an agent, with or without a motive', async () => {
     const repo = tempGitRepo();
     try {
       const otea = cliAt(repo.dir, { OTEA_AGENT: 'claude' });
@@ -241,9 +232,16 @@ describe('a relayed drop', () => {
       const id = JSON.parse(
         (await otea('create', '--collection', 'Errores', '--title', 'Faro', '--json')).out,
       ).id;
-      const asked = await otea('relay', id, 'Dropped', '--quote', 'tíralo', '--reason', 'repetido');
-      expect(asked.code).toBe(2);
-      expect(asked.err).toContain(`say which with --motive "Rechazado|Duplicado"`);
+      const asked = await otea(
+        'relay',
+        id,
+        'Dropped',
+        '--quote',
+        'tíralo ya',
+        '--reason',
+        'repetido',
+      );
+      expect(asked.code).toBe(7);
       const relayed = await otea(
         'relay',
         id,
@@ -251,12 +249,13 @@ describe('a relayed drop', () => {
         '--motive',
         'Duplicado',
         '--quote',
-        'tíralo',
+        'tíralo ya',
         '--reason',
         'repetido',
       );
-      expect(relayed.code).toBe(0);
-      expect(JSON.parse((await otea('show', id, '--json')).out).state).toBe('dropped__duplicate');
+      expect(relayed.code).toBe(7);
+      expect(relayed.err).toContain("person's alone");
+      expect(JSON.parse((await otea('show', id, '--json')).out).state).not.toMatch(/dropped/);
     } finally {
       repo.remove();
     }

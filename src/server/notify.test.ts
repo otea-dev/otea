@@ -1,6 +1,10 @@
 import { createECDH, randomBytes } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { declareAssistant } from '../app/assistant.ts';
+import { answerBandeja, askOnBandeja, captureToBandeja, takeBandeja } from '../app/bandeja.ts';
+import { BETWEEN_ITEMS_MS } from '../app/board-workers.ts';
 import { addCollection } from '../app/collections.ts';
+import { postPersonMessage, readAsAssistant, sayAsAssistant } from '../app/conversation.ts';
 import { createItem, moveItem } from '../app/items.ts';
 import { claimItem, releaseItem } from '../app/leases.ts';
 import { listTargets } from '../app/notify-targets.ts';
@@ -157,6 +161,8 @@ describe('notifications on the server', () => {
           stuck: true,
           aside: false,
           unheard: true,
+          assistant_reply: true,
+          assistant_offline: true,
           askText: true,
           quiet: null,
           muted: [],
@@ -407,6 +413,21 @@ describe('notifications on the server', () => {
       await subscribe(cookie);
     });
 
+    // G1: one source that throws used to end the whole look, silently.
+    it('still tells what an item needs when the Bandeja’s source throws, and logs it', async () => {
+      project.db.exec('DROP TABLE bandeja_questions');
+      project.db.exec('DROP TABLE bandeja_attachments');
+      project.db.exec('DROP TABLE bandeja_entries');
+
+      toReview(first);
+      await pass(1000);
+      await pass(GATHER_MS);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.payload).toMatchObject({ item: first });
+      expect(logged.some((line) => /Bandeja/.test(line))).toBe(true);
+    });
+
     it('pushes to the phone when something becomes yours, after a moment, once', async () => {
       toReview(first);
       await pass(1000);
@@ -418,7 +439,7 @@ describe('notifications on the server', () => {
           payload: {
             title: 'memory · Te toca',
             body: `${first} · Ship the login`,
-            tag: `otea-item-${first}`,
+            tag: `otea-item-memory-aaaaaa-${first}`,
             url: `/p/memory-aaaaaa/#/i/${first}`,
             item: first,
           },
@@ -500,6 +521,362 @@ describe('notifications on the server', () => {
       ]);
     });
 
+    describe('a question on a Bandeja note', () => {
+      const stamp = () => new Date(clock).toISOString();
+      const ask = () => {
+        const { entry } = captureToBandeja(
+          project,
+          { text: 'El botón Aprobar queda tapado en el celu' },
+          stamp,
+        );
+        takeBandeja(project, { id: entry.id, agent: 'lia' }, stamp);
+        askOnBandeja(
+          project,
+          {
+            id: entry.id,
+            agent: 'lia',
+            text: '¿Solo Aprobar o todas las acciones fijas?',
+            options: ['Solo Aprobar', 'Todas'],
+          },
+          stamp,
+        );
+        return entry.id;
+      };
+
+      it('tells the person like an item’s question, with its options, and opens Hablar at the note', async () => {
+        await pass(1000);
+        ask();
+        await pass(1000);
+        await pass(GATHER_MS);
+        expect(sent).toEqual([
+          {
+            subscription: expect.objectContaining({ endpoint: endpoint() }),
+            payload: {
+              title: 'memory · lia te pregunta · B-1',
+              body: '¿Solo Aprobar o todas las acciones fijas?\n1) Solo Aprobar  2) Todas',
+              tag: 'otea-bandeja-memory-aaaaaa-B-1',
+              url: '/p/memory-aaaaaa/#/hablar/B-1',
+              item: null,
+            },
+          },
+        ]);
+        // Told once; answered, it is gone and nothing more is said.
+        await pass(ITEM_COOLDOWN_MS * 2);
+        await pass(GATHER_MS);
+        expect(sent).toHaveLength(1);
+      });
+
+      // G1 review: two failed looks in a row must not make the question new when it reads again.
+      it('does not tell it again when its source failed twice and then read again', async () => {
+        await pass(1000);
+        ask();
+        await pass(1000);
+        await pass(GATHER_MS);
+        expect(sent).toHaveLength(1);
+
+        project.db.exec('ALTER TABLE bandeja_entries RENAME TO bandeja_entries_away');
+        await pass(1000);
+        await pass(1000);
+        project.db.exec('ALTER TABLE bandeja_entries_away RENAME TO bandeja_entries');
+        await pass(ITEM_COOLDOWN_MS * 2);
+        await pass(GATHER_MS);
+
+        expect(sent).toHaveLength(1);
+      });
+
+      it('respects the phone’s ask switch, and keeps the question out when the person hid the text', async () => {
+        const { cookie } = await pair();
+        await subscribe(cookie, 2);
+        await choose(cookie, { ask: false });
+        const second = await pair();
+        await subscribe(second.cookie, 3);
+        await choose(second.cookie, { askText: false });
+        await pass(1000);
+        ask();
+        await pass(1000);
+        await pass(GATHER_MS);
+
+        const by = (n: number) =>
+          sent.find(({ subscription }) => subscription.endpoint === endpoint(n));
+        expect(by(2)).toBeUndefined();
+        expect(by(1)?.payload.title).toBe('memory · lia te pregunta · B-1');
+        expect(by(3)?.payload).toMatchObject({
+          title: 'memory · lia te pregunta',
+          url: '/p/memory-aaaaaa/#/hablar/B-1',
+        });
+        expect(JSON.stringify(by(3)?.payload)).not.toContain('Solo Aprobar');
+      });
+
+      it('tells nothing for a note that is only waiting, or already answered', async () => {
+        await pass(1000);
+        const id = ask();
+        await pass(1000);
+        await pass(GATHER_MS);
+        const tag = sent[0]?.payload.tag;
+        sent.length = 0;
+        answerBandeja(project, { id, option: 1 }, stamp);
+        await pass(1000);
+        await pass(GATHER_MS);
+        captureToBandeja(project, { text: 'another one' }, stamp);
+        await pass(1000);
+        await pass(GATHER_MS);
+        // The answered question's notice is closed on the phone; nothing else is told.
+        expect(sent.map(({ payload }) => payload)).toEqual([{ close: tag }]);
+      });
+    });
+
+    describe('the assistant', () => {
+      const stamp = () => new Date(clock).toISOString();
+      const hear = () => seeAgent(project.db, { agent: 'sage', channel: 'cli' }, stamp);
+      const person = (text: string) => postPersonMessage(project, { text }, stamp).message;
+      const say = (text: string, replyTo: number) =>
+        sayAsAssistant(project, { agent: 'sage', text, replyTo }, stamp).message;
+      // The first look of a server that watches is its starting point: the assistant is there
+      // before the phone looks, and what follows is news.
+      const watching = async () => {
+        declareAssistant(project.db, 'sage', stamp);
+        hear();
+        await pass(1000);
+      };
+
+      it('tells a reply once, with its first line, and opens Hablar at that turn', async () => {
+        await watching();
+        const asked = person('¿Cómo va CAM-12?');
+        const reply = say('Va bien, lo reviso hoy.\nY mañana el resto.', asked.id);
+        expect(reply.root).toBe(asked.id);
+        await pass(1000);
+        expect(sent).toEqual([]);
+        await pass(GATHER_MS);
+        expect(sent).toEqual([
+          {
+            subscription: expect.objectContaining({ endpoint: endpoint() }),
+            payload: {
+              title: 'memory · sage te respondió',
+              body: 'Va bien, lo reviso hoy.',
+              tag: `otea-hablar-reply-memory-aaaaaa-${asked.id}`,
+              url: `/p/memory-aaaaaa/#/hablar/${asked.id}`,
+              item: null,
+            },
+          },
+        ]);
+        await pass(GATHER_MS);
+        await pass(SPACING_MS);
+        expect(sent).toHaveLength(1);
+      });
+
+      // G1 (SPEC decision 7: an agent's question pushes): the assistant asking with options to tap
+      // is a question the person must answer; its news and plain notices are not pushed.
+      it('tells a question of its own with options, once, opening Hablar at it; its plain notices stay quiet', async () => {
+        await watching();
+        sayAsAssistant(project, { agent: 'sage', text: 'CAM-12 is ready for review.' }, stamp);
+        await pass(1000);
+        await pass(GATHER_MS);
+        expect(sent).toEqual([]);
+
+        const asked = sayAsAssistant(
+          project,
+          { agent: 'sage', text: 'Ship it today?', options: ['Yes', 'Wait'] },
+          stamp,
+        ).message;
+        await pass(1000);
+        await pass(GATHER_MS);
+
+        expect(sent).toEqual([
+          {
+            subscription: expect.objectContaining({ endpoint: endpoint() }),
+            payload: {
+              title: 'memory · sage te pregunta',
+              body: 'Ship it today?\n1) Yes  2) Wait',
+              tag: `otea-hablar-ask-memory-aaaaaa-${asked.root}`,
+              url: `/p/memory-aaaaaa/#/hablar/${asked.root}`,
+              item: null,
+            },
+          },
+        ]);
+        await pass(GATHER_MS);
+        await pass(SPACING_MS);
+        expect(sent).toHaveLength(1);
+      });
+
+      it('keeps the reply out of the notice when the person hid the text', async () => {
+        const { cookie } = await pair();
+        await subscribe(cookie, 2);
+        await choose(cookie, { askText: false });
+        await watching();
+        say('Esto es privado', person('hola').id);
+        await pass(1000);
+        await pass(GATHER_MS);
+        const hidden = sent.find(({ subscription }) => subscription.endpoint === endpoint(2));
+        const shown = sent.find(({ subscription }) => subscription.endpoint === endpoint(1));
+        expect(shown?.payload.body).toBe('Esto es privado');
+        expect(hidden?.payload.title).toBe('memory · sage te respondió');
+        expect(JSON.stringify(hidden?.payload)).not.toContain('privado');
+      });
+
+      it('says nothing of a reply to a phone that turned replies off', async () => {
+        const { cookie } = await pair();
+        await subscribe(cookie, 2);
+        await choose(cookie, { assistant_reply: false });
+        await watching();
+        say('Listo', person('hola').id);
+        await pass(1000);
+        await pass(GATHER_MS);
+        expect(sent.map(({ subscription }) => subscription.endpoint)).toEqual([endpoint(1)]);
+      });
+
+      // Field study 7: «5 cosas te esperan» while `otea pending` said 3.
+      it('counts a mixed burst as pending does: what waits, with the assistant’s replies named apart', async () => {
+        await watching();
+        toReview(first);
+        toReview(newTask('Two'));
+        toReview(newTask('Three'));
+        say('Bien.', person('¿Cómo va?').id);
+        say('Y además esto.', person('¿Y lo otro?').id);
+        await pass(1000);
+        await pass(GATHER_MS);
+        expect(sent).toHaveLength(1);
+        expect(sent[0]?.payload.title).toBe(
+          '3 cosas te esperan y 2 respuestas de tu asistente en memory',
+        );
+      });
+
+      describe('a notice that stops being true', () => {
+        const approve = (id: string) =>
+          moveItem(
+            project,
+            { id, to: 'done', actor: { kind: 'human', name: 'ana' }, channel: 'ui' },
+            at,
+          );
+
+        it('is closed on the phone once the item left review, with no visible notice of its own', async () => {
+          await watching();
+          toReview(first);
+          await pass(1000);
+          await pass(GATHER_MS);
+          expect(sent).toHaveLength(1);
+          const tag = sent[0]?.payload.tag;
+          approve(first);
+          await pass(1000);
+          expect(sent).toHaveLength(2);
+          expect(sent[1]).toEqual({
+            subscription: expect.objectContaining({ endpoint: endpoint() }),
+            payload: { close: tag },
+          });
+          await pass(GATHER_MS);
+          expect(sent).toHaveLength(2);
+        });
+
+        it('replaces the group notice with the count of what still waits, then closes it', async () => {
+          await watching();
+          const ids = [first, newTask('Two'), newTask('Three')];
+          for (const id of ids) toReview(id);
+          await pass(1000);
+          await pass(GATHER_MS);
+          expect(sent).toHaveLength(1);
+          const tag = sent[0]?.payload.tag;
+          expect(sent[0]?.payload.title).toBe('3 cosas te tocan en memory');
+
+          approve(ids[0] as string);
+          await pass(1000);
+          expect(sent[1]?.payload).toMatchObject({
+            title: '2 cosas te tocan en memory',
+            body: 'Two · Three',
+            tag,
+          });
+
+          approve(ids[1] as string);
+          await pass(1000);
+          expect(sent[2]?.payload).toMatchObject({
+            title: '1 cosa te toca en memory',
+            body: 'Three',
+            tag,
+          });
+
+          approve(ids[2] as string);
+          await pass(1000);
+          expect(sent[3]?.payload).toEqual({ close: tag });
+          expect(sent).toHaveLength(4);
+        });
+      });
+
+      describe('when it is offline with messages waiting', () => {
+        const OFFLINE_AFTER_MS = 31 * 60_000;
+
+        it('tells once, after the threshold, with how many wait', async () => {
+          await watching();
+          person('uno');
+          person('dos');
+          await pass(OFFLINE_AFTER_MS);
+          await pass(GATHER_MS);
+          expect(sent).toEqual([
+            expect.objectContaining({
+              payload: {
+                title: 'memory · Tu asistente está desconectado',
+                body: 'Tus 2 mensajes esperan respuesta',
+                tag: 'otea-hablar-offline-memory-aaaaaa',
+                url: '/p/memory-aaaaaa/#/hablar',
+                item: null,
+              },
+            }),
+          ]);
+          await pass(ITEM_COOLDOWN_MS * 2);
+          await pass(GATHER_MS);
+          expect(sent).toHaveLength(1);
+        });
+
+        it('tells nothing while the assistant is connected, however long they wait', async () => {
+          await watching();
+          person('uno');
+          for (let i = 0; i < 6; i++) {
+            await pass(10 * 60_000);
+            hear();
+          }
+          await pass(GATHER_MS);
+          expect(sent).toEqual([]);
+        });
+
+        it('tells nothing before the messages have waited the threshold', async () => {
+          await watching();
+          await pass(OFFLINE_AFTER_MS);
+          person('uno');
+          await pass(9 * 60_000);
+          await pass(GATHER_MS);
+          expect(sent).toEqual([]);
+          await pass(2 * 60_000);
+          await pass(GATHER_MS);
+          expect(sent).toHaveLength(1);
+        });
+
+        it('tells again only after it came back and went offline with new messages', async () => {
+          await watching();
+          person('uno');
+          await pass(OFFLINE_AFTER_MS);
+          await pass(GATHER_MS);
+          expect(sent).toHaveLength(1);
+          // It returns and reads what waited.
+          hear();
+          readAsAssistant(project, { agent: 'sage' }, stamp);
+          await pass(1000);
+          person('dos');
+          await pass(OFFLINE_AFTER_MS);
+          await pass(GATHER_MS);
+          await pass(ITEM_COOLDOWN_MS);
+          expect(sent).toHaveLength(2);
+        });
+
+        it('says nothing to a phone that turned it off', async () => {
+          const { cookie } = await pair();
+          await subscribe(cookie, 2);
+          await choose(cookie, { assistant_offline: false });
+          await watching();
+          person('uno');
+          await pass(OFFLINE_AFTER_MS);
+          await pass(GATHER_MS);
+          expect(sent.map(({ subscription }) => subscription.endpoint)).toEqual([endpoint(1)]);
+        });
+      });
+    });
+
     describe('when nobody listens', () => {
       const second = () => newTask('Write the docs');
       const listen = () =>
@@ -516,7 +893,7 @@ describe('notifications on the server', () => {
         expect(sent).toEqual([
           expect.objectContaining({
             payload: expect.objectContaining({
-              title: 'memory · Nadie escucha',
+              title: 'memory · Hay trabajo y ningún agente conectado',
               url: `/p/memory-aaaaaa/#/i/${id}`,
             }),
           }),
@@ -532,6 +909,25 @@ describe('notifications on the server', () => {
         await pass(UNHEARD_GRACE_MS);
         await pass(GATHER_MS);
         expect(sent).toEqual([]);
+      });
+
+      it('still tells while only the assistant waits: it is no listener on the boards', async () => {
+        const stamp = () => new Date(clock).toISOString();
+        declareAssistant(project.db, 'sage', stamp);
+        waitBeat(project.db, { agent: 'sage', channel: 'cli', waiter: process.pid }, stamp).run();
+        expect(listAgents(project.db, stamp).find(({ name }) => name === 'sage')).toMatchObject({
+          attending: true,
+          waiting: false,
+        });
+        const id = second();
+        await pass(1000);
+        await pass(UNHEARD_GRACE_MS);
+        await pass(GATHER_MS);
+        expect(sent).toEqual([
+          expect.objectContaining({
+            payload: expect.objectContaining({ url: `/p/memory-aaaaaa/#/i/${id}` }),
+          }),
+        ]);
       });
 
       it('says nothing of an item heard again within the grace', async () => {
@@ -551,7 +947,10 @@ describe('notifications on the server', () => {
         expect(sent).toEqual([]);
       });
 
-      it('is not silenced by an agent working on another item', async () => {
+      // F2 (field study 3): the worker the assistant launched was busy on one item, the rest of the
+      // queue was told as «nobody is listening», and a second worker was launched. A worker at work
+      // on the board comes to the next item when its step ends: that is no silence to tell.
+      it('says nothing of an item while an agent works another one of the board', async () => {
         const busy = { agent: 'busy', channel: 'cli', call: true } as const;
         const stamp = () => new Date(clock).toISOString();
         seeAgent(project.db, busy, stamp);
@@ -559,16 +958,28 @@ describe('notifications on the server', () => {
         expect(listAgents(project.db, stamp).find(({ name }) => name === 'busy')?.status).toBe(
           'working',
         );
-        const id = second();
+        second();
         await pass(1000);
         seeAgent(project.db, busy, stamp);
         await pass(UNHEARD_GRACE_MS);
         await pass(GATHER_MS);
-        expect(sent).toEqual([
-          expect.objectContaining({
-            payload: expect.objectContaining({ url: `/p/memory-aaaaaa/#/i/${id}` }),
-          }),
-        ]);
+        expect(sent).toEqual([]);
+      });
+
+      it('tells it once that agent let the item go and went quiet', async () => {
+        const busy = { agent: 'busy', channel: 'cli', call: true } as const;
+        const stamp = () => new Date(clock).toISOString();
+        seeAgent(project.db, busy, stamp);
+        claimItem(project, { id: first, actor: { kind: 'agent', name: 'busy' } }, at);
+        second();
+        await pass(1000);
+        releaseItem(project, { id: first, actor: { kind: 'agent', name: 'busy' } }, at);
+        // Nothing of it for a long while: it is no worker of the board any more.
+        await pass(BETWEEN_ITEMS_MS + LISTEN_WINDOW_MS);
+        await pass(UNHEARD_GRACE_MS);
+        await pass(GATHER_MS);
+        // Both items wait, and are told as one.
+        expect(sent).toHaveLength(1);
       });
 
       it('does not tell again when a listener lapses and returns within the cooldown', async () => {

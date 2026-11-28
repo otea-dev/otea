@@ -294,6 +294,8 @@ describe('agent presence', () => {
           status: 'connected',
           listening: true,
           waiting: false,
+          attending: false,
+          role: null,
           profile: null,
           profileConfirmed: false,
           profileChangedAt: null,
@@ -302,7 +304,9 @@ describe('agent presence', () => {
           mcp: null,
           folder: null,
           actedAt: null,
+          heardAt: T0,
           sessionEnded: false,
+          there: false,
         },
       ]);
       expect(listAgents(ctx.db, at(T2_31S))[0]).toMatchObject({ live: false, listening: false });
@@ -746,11 +750,20 @@ describe('agent presence', () => {
       expect(listAgents(ctx.db, at(T2), running)[0]?.status).toBe('listening');
     });
 
-    it('is silent, not away, while it holds a live lease nothing says ended', () => {
+    // F2 (field study 3): «sin señal» in red while a worker ran slow commands, and it delivered.
+    // A live lease is the promise of work; a step with no otea call is still work for a while.
+    it('is still working on a long step with no call, while its lease lives and it was heard lately', () => {
       seeAgent(ctx.db, { agent: 'claude', channel: 'cli', call: true }, at(T0));
       claimItem(ctx, { id: 'TASKS-1', actor: claude, ttlMs: 60 * 60_000 }, at(T0));
 
-      expect(listAgents(ctx.db, at(T5))[0]).toMatchObject({ live: false, status: 'silent' });
+      expect(listAgents(ctx.db, at(T5))[0]).toMatchObject({ live: false, status: 'working' });
+    });
+
+    it('is silent, not away, once a long while passes with no sign of it, nothing says ended', () => {
+      seeAgent(ctx.db, { agent: 'claude', channel: 'cli', call: true }, at(T0));
+      claimItem(ctx, { id: 'TASKS-1', actor: claude, ttlMs: 60 * 60_000 }, at(T0));
+
+      expect(listAgents(ctx.db, at(T30))[0]).toMatchObject({ live: false, status: 'silent' });
     });
 
     it('is away once its session ended, whatever it still holds', () => {

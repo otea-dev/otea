@@ -30,6 +30,12 @@ export type RouteWords = {
   dip: (round: number, at?: string) => string;
   redone?: (round: number) => string;
   reopen?: (at?: string) => string;
+  // bounce: the label of a loop an agent made, taking an approved item back (a conflict at
+  // landing): nobody sent it back.
+  bounce?: (round: number) => string;
+  // merge: the label of a loop an agent made to bring main into an approved item (or to merge a
+  // clash): nobody sent it back either.
+  merge?: (round: number) => string;
 };
 
 const laneOfWho = (who: Doer | Reviewer): Lane => (who === 'you' ? 'you' : 'ag');
@@ -39,7 +45,13 @@ const visitOf = (stepId: string) => `${stepId}:review`;
 export function definitionRoute(
   def: BoardDefinition,
   at: RouteAt,
-  dips: readonly { from: string; at?: string; reopened?: true }[],
+  dips: readonly {
+    from: string;
+    at?: string;
+    reopened?: true;
+    bounced?: true;
+    merged?: true;
+  }[],
   words: RouteWords,
 ): DefinitionRoute {
   const steps: RouteStep[] = [];
@@ -76,7 +88,7 @@ export function definitionRoute(
   const closed = at === DONE;
   const sent = new Map<string, number>();
   const dipped: DipSpec[] = [];
-  for (const { from, at: when, reopened } of dips) {
+  for (const { from, at: when, reopened, bounced, merged } of dips) {
     // A reopen loops back from Done, the last stop.
     const at = reopened ? steps.length - 1 : reviewAt(from);
     if (at < 0) continue;
@@ -85,9 +97,13 @@ export function definitionRoute(
     const label =
       reopened && words.reopen
         ? words.reopen(when)
-        : !reopened && closed && words.redone
-          ? words.redone(n)
-          : words.dip(n, when);
+        : merged && words.merge
+          ? words.merge(n)
+          : bounced && words.bounce
+            ? words.bounce(n)
+            : !reopened && closed && words.redone
+              ? words.redone(n)
+              : words.dip(n, when);
     dipped.push({ at, label });
   }
   return { steps, words: shown, ci, lane, dips: dipped };

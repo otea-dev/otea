@@ -1,5 +1,12 @@
 import { type ReactNode, useContext, useState } from 'react';
-import { comparePair, emptyText, evidenceOf, latestFirst, moduleTitle } from '../../evidence.ts';
+import {
+  comparePair,
+  diffOrigin,
+  emptyText,
+  evidenceOf,
+  latestFirst,
+  moduleTitle,
+} from '../../evidence.ts';
 import { t } from '../../i18n/i18n.ts';
 import { Button } from '../../kit/index.ts';
 import type { Evidence, LayoutEntry } from '../../types.ts';
@@ -7,7 +14,7 @@ import { EvidenceList } from '../EvidenceList.tsx';
 import { DiagramView } from './DiagramView.tsx';
 import { BlindPick } from './EvidenceViewer.tsx';
 import { FileView } from './FileViews.tsx';
-import { ImageCompare, ImageGallery, ImageSingle } from './ImageViews.tsx';
+import { ImageCompare, ImageCompares, ImageGallery, ImageSingle } from './ImageViews.tsx';
 import { ItemReview } from './item-evidence.ts';
 import { pickAt, READ_AT } from './reader-pick.ts';
 import { ReportOr } from './TestReportView.tsx';
@@ -96,7 +103,17 @@ function OneOf({
                 <span className="ev-round">{t('evidence.roundTag', { n: round(entry) ?? 0 })}</span>
               ) : null}
               {entry.filename}
-              {index === 0 ? <span className="ev-latest">{t('evidence.latest')}</span> : null}
+              {diffOrigin(entry, evidence) ? (
+                <span className="ev-latest">
+                  {t(
+                    diffOrigin(entry, evidence) === 'branch'
+                      ? 'evidence.branchDiff'
+                      : 'evidence.agentFile',
+                  )}
+                </span>
+              ) : index === 0 ? (
+                <span className="ev-latest">{t('evidence.latest')}</span>
+              ) : null}
             </Button>
           ))}
           {images ? (
@@ -122,7 +139,14 @@ function OneOf({
           initial="side"
         />
       ) : (
-        children(shown)
+        <>
+          {diffOrigin(shown, evidence) === 'agent' ? (
+            <p className="ev-agent-note t-cap" role="note">
+              {t('evidence.agentFileNote')}
+            </p>
+          ) : null}
+          {children(shown)}
+        </>
       )}
     </div>
   );
@@ -173,7 +197,7 @@ export function NotableDiff({ evidence }: { evidence: Evidence }) {
 function Body({ entry, held, title }: { entry: LayoutEntry; held: Evidence[]; title: string }) {
   const { module, variant } = entry;
   if (module === 'images' && variant === 'compare')
-    return entry.blind ? <BlindCompare held={held} /> : <ImageCompare evidence={held} />;
+    return entry.blind ? <BlindCompare held={held} /> : <ImageCompares evidence={held} />;
   if (module === 'diagram') return <DiagramView evidence={held} />;
   if (module === 'images' && variant === 'gallery') {
     return <ImageGallery evidence={held} label={title} />;

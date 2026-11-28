@@ -49,6 +49,8 @@ const Prefs = z.object({
   aside: z.boolean(),
   // Newer than the first clients: one that does not send them gets them on.
   unheard: z.boolean().default(DEFAULT_PREFS.unheard),
+  assistant_reply: z.boolean().default(DEFAULT_PREFS.assistant_reply),
+  assistant_offline: z.boolean().default(DEFAULT_PREFS.assistant_offline),
   askText: z.boolean().default(DEFAULT_PREFS.askText),
   quiet: z.object({ from: Time, to: Time }).nullable(),
   // The projects muted, by id.
@@ -125,7 +127,9 @@ export function notifyApi(
   notifier: Notifier,
   keys: VapidKeys,
   auth: Session,
-  push: { sender: PushSender; log: (line: string) => void },
+  // `changed` makes every project's notifier look at the devices again: a phone subscribes once,
+  // from one project's page, and is told about all of them.
+  push: { sender: PushSender; log: (line: string) => void; changed(): void },
 ): Hono<OteaEnv> {
   return (
     new Hono<OteaEnv>()
@@ -149,7 +153,7 @@ export function notifyApi(
           throw new RejectedRequest(400, 'invalid_body', 'The subscription keys do not read');
         }
         saveSubscription(machine, device, { endpoint, ...subscription }, lang);
-        notifier.refresh();
+        push.changed();
         return c.json(view(c, machine, keys), 201);
       })
       // Preferencias › Avisos › Enviar un aviso de prueba: one push to this device now, past the
@@ -159,14 +163,14 @@ export function notifyApi(
         assertSameOrigin(c);
         const device = pushDevice(c);
         const answer = await sendTestPush(machine, push.sender, device, push.log);
-        if (answer.result === 'gone') notifier.refresh();
+        if (answer.result === 'gone') push.changed();
         return c.json(answer);
       })
       .post('/notify/unsubscribe', (c) => {
         assertWritable(c, auth);
         assertSameOrigin(c);
         dropSubscription(machine, unsubscribingDevice(c));
-        notifier.refresh();
+        push.changed();
         return c.json(view(c, machine, keys));
       })
       // The phone's browser no longer holds the subscription the server pushes to (TS-3).
@@ -174,7 +178,7 @@ export function notifyApi(
         assertWritable(c, auth);
         assertSameOrigin(c);
         loseSubscription(machine, unsubscribingDevice(c));
-        notifier.refresh();
+        push.changed();
         return c.json(view(c, machine, keys));
       })
       .post('/notify/prefs', async (c) => {
@@ -182,7 +186,7 @@ export function notifyApi(
         const { prefs, lang } = await body(
           c,
           PrefsBody,
-          '{"prefs": {"turn", "ask", "replied", "stuck", "aside": boolean, "unheard"?: boolean, "askText"?: boolean, "quiet": {"from": "HH:MM", "to": "HH:MM"} | null, "muted": [project id]}, "lang": "es" | "en"}',
+          '{"prefs": {"turn", "ask", "replied", "stuck", "aside": boolean, "unheard"?: boolean, "assistant_reply"?: boolean, "assistant_offline"?: boolean, "askText"?: boolean, "quiet": {"from": "HH:MM", "to": "HH:MM"} | null, "muted": [project id]}, "lang": "es" | "en"}',
         );
         const client = clientOf(c);
         if (client.kind === 'device') savePrefs(machine, client.device.id, prefs, lang);

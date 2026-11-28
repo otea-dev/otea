@@ -330,6 +330,22 @@ describe('before and after in the reader', () => {
     expect(pairIn(files, single)).toBeNull();
   });
 
+  // s-real D-fdfd69: four cases in one part listed «despues-no-existe.png» three times and put
+  // «antes-al-abrir.png» next to the wrong after.
+  it('lists each file once, every before next to the after of its own case', () => {
+    const cases = ['al-abrir', 'a100', 'a101', 'no-existe'];
+    const all = cases.flatMap((name) => [
+      side(`antes-${name}.png`, 'before'),
+      side(`despues-${name}.png`, 'after'),
+    ]);
+    const names = readerOf([], all).files.map(({ filename }) => filename);
+    expect(names).toHaveLength(all.length);
+    expect(new Set(names).size).toBe(all.length);
+    for (const name of cases) {
+      expect(names.indexOf(`despues-${name}.png`) - names.indexOf(`antes-${name}.png`)).toBe(1);
+    }
+  });
+
   it('reads a before next to its after, and names each side', () => {
     const before = side('antes.png', 'before');
     const after = side('despues.png', 'after');

@@ -4,6 +4,7 @@ import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AGENTS_BLOCK } from '../app/agents.ts';
 import { AGENT_GUIDE } from '../core/agent-guide.ts';
+import { SILENT_AFTER_MS } from '../core/agent-status.ts';
 import { createMcpServer } from '../mcp/server.ts';
 import { mcpWords } from '../mcp/words.ts';
 import { COMMANDS } from './commands.ts';
@@ -69,9 +70,26 @@ describe("Otea's agent guide", () => {
       // P7-R3-6: it is the person's wish, so it holds for every agent.
       'When the person says to leave an item for later: otea release <id> --later sets it aside for every agent; then keep waiting.',
       'Never write a polling loop of your own: otea wait is how you wait.',
+      // 0.8: who the assistant is, and that nobody else talks to the person in its chat.
+      "The project's assistant (otea profile --role assistant) alone talks with the person in the Talk chat",
+      'You are not it unless told so: ask on the item (rule 10).',
     ]) {
       expect(AGENT_GUIDE).toContain(line);
     }
+  });
+
+  // Cold review G2: the guide is printed to the assistant too, and told it to claim, next and wait
+  // for turns; rule 4 named one heading on a board that may use the other; the desk says «sin señal»
+  // after SILENT_AFTER_MS, not the 7 minutes the guide said.
+  it('tells the assistant which rules are not its own, names both hand-off headings and the real silent time', () => {
+    const rule = (n: number) =>
+      AGENT_GUIDE.split('\n').find((line) => line.startsWith(`${n}. `)) ?? '';
+    expect(rule(13)).toMatch(/If you are it.*skip rules 3, 6 and 12.*otea wait --assistant/);
+    expect(rule(4)).toContain(
+      '"Before you hand it off" ("Antes de entregarlo" on a Spanish board)',
+    );
+    expect(rule(3)).toContain(`past ${SILENT_AFTER_MS / 60_000} min`);
+    expect(SILENT_AFTER_MS).toBe(7.5 * 60_000);
   });
 
   // P8-F4: a client that reads only the instructions has no shell to run `otea next --claim` in, so

@@ -7,6 +7,7 @@ import type { Project } from '../app/project.ts';
 import { approvedTipOf } from '../app/tips.ts';
 import { isClosed, positionOf } from '../core/board/engine.ts';
 import { guardedBranch } from '../core/board/model.ts';
+import { isOteaActor } from '../core/item.ts';
 import { selectEvidence } from '../store/queries.ts';
 
 // The attached diff of an item in review against the tip its handoff recorded (P1-R3-1): a «Rama»
@@ -62,7 +63,7 @@ export async function diffOffTip(project: Project, id: string): Promise<DiffOffT
   const tip = approvedTipOf(project, item.id, branch);
   if (!tip || tip.unchanged) return null;
   const diff = selectEvidence(project.db, item.id)
-    .filter(({ kind }) => kind === 'diff')
+    .filter(({ kind, actor }) => kind === 'diff' && !isOteaActor(actor))
     .at(-1);
   if (!diff) return null;
   let text: string;

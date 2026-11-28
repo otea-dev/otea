@@ -756,7 +756,12 @@ class Shell {
   // Derive on every event; the surfaces follow under the throttle.
   private derive(): void {
     const now = Date.now();
-    this.attention = deskAttention(this.snapshot.items, this.snapshot.collections, now);
+    this.attention = deskAttention(
+      this.snapshot.items,
+      this.snapshot.collections,
+      now,
+      this.snapshot.pending,
+    );
     clearTimeout(this.leaseTimer);
     const expiry = nextLeaseExpiry(this.snapshot.items, now);
     if (expiry !== undefined) {
@@ -933,8 +938,10 @@ else {
   // `--project` on a second launch opens that project in the running app.
   app.on('second-instance', (_event, argv, workingDirectory, data) => {
     const dir = secondLaunchProject(data, argv, workingDirectory);
+    // A launch is the person asking for Otea: a window closed to the tray comes back whether or not
+    // the launch names a folder (`--project` used to load the project into the hidden window).
+    shellInstance?.show();
     if (dir !== undefined) void shellInstance?.openAsked(dir);
-    else shellInstance?.show();
   });
   // Closed to the tray: the app lives on until Quit Otea.
   app.on('window-all-closed', () => {});

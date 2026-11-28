@@ -177,6 +177,24 @@ describe('templates', () => {
     }
   });
 
+  // Field study 5, V7: on a repo with no remote the worker asked «¿la actualizo?» after 9 of 10
+  // approvals. The Land step says the approval is the yes, and what landing is with no remote.
+  it('says in the Land step that approving is the yes, and what landing is with no remote', () => {
+    const said = {
+      en: [/never ask whether to/, /no remote/, /otea land sync/],
+      es: [/nunca preguntes si hacerlo/, /sin remoto/i, /otea land sync/],
+    };
+    for (const key of ['changes', 'bug-reports', 'design'] as const) {
+      for (const lang of ['en', 'es'] as const) {
+        const def = instantiate(requireTemplate(key), lang, {}, sequenceIds());
+        const land = def.steps.find(({ name }) => name === (lang === 'en' ? 'Land' : 'Integrar'));
+        for (const pattern of said[lang]) expect(land?.instructions.take).toMatch(pattern);
+        // One guarded way into the person's checkout: otea land sync, never a merge by the worker.
+        expect(land?.instructions.take).not.toContain('--ff-only');
+      }
+    }
+  });
+
   // P8-F1: the commit field the guard names is checked by a handoff; boards keep naming it.
   it('names the commit field of Code on main, so a handoff checks it', () => {
     const def = instantiate(requireTemplate('mainline'), 'en', {}, sequenceIds());
@@ -410,6 +428,29 @@ describe('templates that fit the work', () => {
     expect(Object.values(def.parts).find(({ name }) => name === 'En el repositorio')?.initial).toBe(
       'no',
     );
+  });
+});
+
+// D-a9f8d4 (final study, u6): a Bugs board in a repo with no remote showed Done and «merged in Land»
+// while the local main never got the commit: the board's branch guard named no base and no commit
+// field, so the hash its Land step takes was never checked against the base nor brought to it.
+// A board whose Land step records the commit that landed says where it lands and where it writes it.
+describe('a board that lands code', () => {
+  const landing = TEMPLATES.flatMap((template) =>
+    template.parts.flatMap((part) =>
+      part.guard?.push.some((step) => /^s?land$/.test(step)) ? [[template.key, part] as const] : [],
+    ),
+  );
+
+  it('names the base it lands on and the field holding the commit', () => {
+    expect(landing.length).toBeGreaterThan(0);
+    for (const [key, part] of landing) {
+      expect({ key, base: part.guard?.base, commit: part.guard?.commit }).toEqual({
+        key,
+        base: 'main',
+        commit: expect.any(String),
+      });
+    }
   });
 });
 

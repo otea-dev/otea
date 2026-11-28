@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   inboxOf,
   itemHref,
+  placeOf,
   projectHref,
   sizeLabel,
   waitingElsewhere,
@@ -34,6 +35,32 @@ const project = (name: string, over: Partial<ProjectOverview> = {}): ProjectOver
   withAgents: 0,
   open: 0,
   ...over,
+});
+
+// F4 review round: a project whose only waiting thing is a refiner's question on a note is a
+// project with something waiting for you.
+describe('what waits that is no item, across projects', () => {
+  const asks = {
+    kind: 'bandeja' as const,
+    ref: 'B-1',
+    title: 'the button',
+    since: null,
+    text: 'Which screen?',
+  };
+
+  it('puts a project with only a question in the inbox and counts it', () => {
+    const quiet = project('quiet');
+    const asking = project('tandas', { asking: [asks] });
+
+    expect(inboxOf([quiet, asking]).groups).toEqual([asking]);
+    expect(inboxOf([quiet, asking]).waiting).toBe(1);
+  });
+
+  it('counts it beside the switcher, with the items', () => {
+    const mixed = project('mixed', { waiting: [item('A-1')], asking: [asks, asks] });
+
+    expect(waitingElsewhere([mixed])).toEqual({ count: 3, projects: 1 });
+  });
 });
 
 describe('the projects inbox', () => {
@@ -91,5 +118,18 @@ describe('the projects inbox', () => {
     [134_217_728, '128 MB'],
   ])('writes %d bytes as %s', (bytes, label) => {
     expect(sizeLabel(bytes)).toBe(label);
+  });
+});
+
+// field study 4 (design): a project's folder was its dek as a raw temp path, cut mid-word.
+describe('placeOf', () => {
+  it.each([
+    ['C:\\Users\\ana\\code\\shop', '~/code/shop'],
+    ['/home/ana/work/clients/acme/shop', '~/…/acme/shop'],
+    ['C:\\Users\\ana\\AppData\\Local\\Temp\\claude\\run\\scratchpad\\dw\\repo2', '~/…/dw/repo2'],
+    ['/srv/app', '/srv/app'],
+    ['/var/lib/otea/projects/shop/', '/…/projects/shop'],
+  ])('says %s as %s', (path, shown) => {
+    expect(placeOf(path)).toBe(shown);
   });
 });

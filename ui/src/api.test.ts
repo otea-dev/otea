@@ -20,6 +20,7 @@ import {
   subscribe as subscribeSync,
   syncNow,
 } from './offline/sync-state.ts';
+import { resetLeaving } from './stale-project.ts';
 
 // Retomar, Reasignar and their Deshacer, as the UI asks the server.
 
@@ -187,5 +188,53 @@ describe('a session that ran out, from the UI', () => {
     expect(first).toBeGreaterThanOrEqual(0);
     expect(seen.slice(first).every((state) => state.signedOut === true)).toBe(true);
     expect(seen.every((state) => !state.offline)).toBe(true);
+  });
+});
+
+// A remembered project the PC no longer serves (an installed app, a bookmark): its reads answer
+// 404 «no_project». The page stayed on the answers it kept, offline, and Reintentar asked for the
+// same project again; it must forget it and go to `/`, where the PC opens one it does serve.
+describe('a project the PC no longer serves, from the UI', () => {
+  afterEach(() => {
+    resetLeaving();
+    vi.unstubAllGlobals();
+  });
+
+  it('forgets the project, what was kept of it, and leaves for the PC home', async () => {
+    const dropped: string[] = [];
+    const data = new Map([['/otea-last-project', 'old1']]);
+    const go: string[] = [];
+    const kept = { getItem: vi.fn(() => 'old1'), removeItem: vi.fn() };
+    vi.stubGlobal('window', {
+      location: { pathname: '/p/old1/', replace: (url: string) => go.push(url) },
+      localStorage: kept,
+    });
+    vi.stubGlobal('caches', {
+      delete: async (name: string) => dropped.push(name),
+      open: async () => ({
+        match: async (key: string) =>
+          data.has(key) ? new Response(data.get(key) as string) : undefined,
+        delete: async (key: string) => data.delete(key),
+      }),
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              error: { code: 'no_project', message: 'This server serves no project old1' },
+            }),
+            { status: 404 },
+          ),
+      ),
+    );
+    await expect(fetchItems(new AbortController().signal)).rejects.toThrow();
+    await vi.waitFor(() => expect(go).toEqual(['/']));
+    expect(kept.removeItem).toHaveBeenCalledWith('otea.project');
+    expect(dropped).toEqual(['otea-data-old1']);
+    expect(data.has('/otea-last-project')).toBe(false);
+    // Not an offline PC: it answered.
+    expect(syncNow().offline).toBe(false);
   });
 });

@@ -77,10 +77,18 @@ export function takeItem(
 // Whether the actor may write the item now: no other agent holds it (assertMayWrite), and an agent
 // whose own lease ran out, or that the person freed it from, claims it again first. Its work may
 // have gone to another agent meanwhile; writing on as if it still held it would hand off over them.
-export function assertMayWriteItem(ctx: Context, item: ItemRecord, actor: Actor, at: string): void {
+export function assertMayWriteItem(
+  ctx: Context,
+  item: ItemRecord,
+  actor: Actor,
+  at: string,
+  // The assistant telling a worker what the person changed goes over a live lease, and only over
+  // that: every other check below still holds (app/relay-change.ts).
+  overLease = false,
+): void {
   const { db } = ctx;
   const lease = activeLease(item.lease, at);
-  assertMayWrite(item.id, lease, actor);
+  if (!overLease) assertMayWrite(item.id, lease, actor);
   if (actor.kind !== 'agent' || lease) return;
   const again = `claim it again before you write: otea claim ${item.id}`;
   if (item.lease?.holder === actor.name) {

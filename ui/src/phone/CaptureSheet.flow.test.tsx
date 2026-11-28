@@ -94,7 +94,8 @@ const save = () => document.querySelector<HTMLButtonElement>('button[type=submit
 
 async function openSheet() {
   await settle();
-  openCapture();
+  // The sheet opens on a free note; these tests are the board form's.
+  openCapture({ mode: 'board' });
   await settle();
 }
 

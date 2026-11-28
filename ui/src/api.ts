@@ -1,5 +1,6 @@
 import type { MergeOnly } from '../../src/app/merge-only.ts';
 import type { Overlap } from '../../src/app/overlap.ts';
+import type { LocalBehind } from '../../src/cli/local-behind.ts';
 import type { MergedOutside } from '../../src/cli/merged-outside.ts';
 import { withoutUndone } from '../../src/core/board/history.ts';
 import type { PerformanceView } from '../../src/core/board/performance.ts';
@@ -10,14 +11,18 @@ import type { DiffOffTip } from '../../src/server/diff-tip.ts';
 import type { Drift } from '../../src/server/drift.ts';
 import type { RoundSame } from '../../src/server/round-same.ts';
 import type { FeedEvent } from './activity.ts';
+import type { BandejaEntry, BandejaView } from './bandeja.ts';
 import { apiUrl } from './base.ts';
 import type { WrittenBrief } from './brief.ts';
+import type { AssistantView, ConversationView, Message, MessageKind } from './conversation.ts';
 import { type Language, t } from './i18n/i18n.ts';
 import type { NotifyView } from './notify/offer.ts';
 import { noteRead, readOf } from './offline/sync-state.ts';
+import type { Pending } from './pending.ts';
 import { type Agent, parseAgents } from './presence.ts';
 import type { LinkRequest } from './relations.ts';
 import { serverMessage, unreachable } from './remote.ts';
+import { leaveStaleProject, NO_PROJECT } from './stale-project.ts';
 import type { ItemTopics, Topic, TopicsView } from './topics.ts';
 import type {
   CollectionView,
@@ -55,7 +60,7 @@ async function get(path: string, signal: AbortSignal): Promise<Response> {
   // The refusal is classified before the read is noted: a refused read records only that, never a
   // fresh answer that would lift the signed-out page for an instant (it remounts the app).
   let code: unknown;
-  if (response.status === 401) {
+  if (response.status === 401 || response.status === 404) {
     const body: unknown = await response
       .clone()
       .json()
@@ -68,6 +73,12 @@ async function get(path: string, signal: AbortSignal): Promise<Response> {
   if (code === 'unauthorized') {
     noteRead({ kind: 'refused' });
     throw new Error(t('error.readSignIn'));
+  }
+  // The PC serves no such project (it was removed, or the server was set up again) while this page,
+  // or the app installed on it, still remembers it: leave for the project the PC does serve.
+  if (code === NO_PROJECT) {
+    void leaveStaleProject();
+    throw new Error(t('error.getFailed', { path, status: response.status }));
   }
   const read = readOf(response.headers);
   // The session's own read is the PC's answer to anyone: it says it is there, not that this
@@ -247,6 +258,11 @@ export async function resumeItem(id: string): Promise<void> {
   await post(`/api/items/${encodeURIComponent(id)}/resume`, {});
 }
 
+// A discard the person takes back (Reabrir): the item returns to the state it left.
+export async function reopenDropped(id: string): Promise<void> {
+  await post(`/api/items/${encodeURIComponent(id)}/reopen-dropped`, {});
+}
+
 // The person's order of the work (app/priority.ts): «Fijar el orden» from a board's matrix (the
 // items in order; the board's earlier order goes), and «Poner arriba» / «Quitar de arriba».
 export async function setOrder(collection: string, ids: readonly string[]): Promise<void> {
@@ -317,6 +333,17 @@ export async function fetchMergedOutside(
   return body.merged;
 }
 
+// Whether what a Done item landed is on the remote's base while the person's local one is behind
+// (src/cli/local-behind.ts): null otherwise.
+export async function fetchLocalBehind(
+  id: string,
+  signal: AbortSignal,
+): Promise<LocalBehind | null> {
+  const url = `/api/items/${encodeURIComponent(id)}/local-behind`;
+  const body = (await (await get(url, signal)).json()) as { behind: LocalBehind | null };
+  return body.behind;
+}
+
 // Whether the attached diff of an item in review comes from another tip than the one handed off
 // (src/server/diff-tip.ts, P1-R3-1): null when it matches, or when the PC cannot tell.
 export async function fetchDiffOffTip(id: string, signal: AbortSignal): Promise<DiffOffTip | null> {
@@ -367,12 +394,21 @@ export async function postOpened(id: string, evidence: number): Promise<void> {
 // What you answer an agent's question with: your words, one of its options (by number, from 1), or
 // the decision left to the agent, and the number of the question you were shown: an answer to one
 // that has since changed is refused.
-export type AnswerWords = { text: string } | { option: number } | { delegate: true };
+// `note`: with the first option of a card that sends an item back, the person's edit of its note.
+export type AnswerWords =
+  | { text: string }
+  | { option: number; note?: string; explain?: string }
+  | { delegate: true };
 export type AnswerGiven = { question: number } & AnswerWords;
 
 // Your answer to an agent's question (otea ask): the turn goes back to the agent, in the same round.
 export async function postAnswer(id: string, given: AnswerGiven): Promise<void> {
   await post(`/api/items/${encodeURIComponent(id)}/answer`, given);
+}
+
+// You take back the tap you just gave on an option of an agent's question (Deshacer): it asks again.
+export async function postUnanswer(id: string): Promise<void> {
+  await post(`/api/items/${encodeURIComponent(id)}/unanswer`, {});
 }
 
 // You let the item go on without a file its step asks for: its handoff stops asking for it.
@@ -574,7 +610,7 @@ export async function fetchProjects(signal: AbortSignal): Promise<ProjectOvervie
 // moment (the first contact while it has no board of its own, then one more agent joining).
 // `first`: a join prompt for a project's first agent, which connects since nobody else works there.
 export type AgentPromptView = {
-  kind: 'start' | 'join' | 'design' | 'coordinator' | 'worker';
+  kind: 'start' | 'join' | 'design' | 'assistant' | 'worker' | 'refiner';
   prompt: string;
   first?: boolean;
   // For the plain words beside the prompt (core/agent-prompts.ts connectFacts): whether the work is
@@ -591,10 +627,10 @@ export async function fetchAgentPrompt(
   return (await get(`/api/agent-prompt?${query}`, signal)).json();
 }
 
-// The canonical text of a role (a coordinator, or a worker of one board, under a name when it has
-// one): what a desk button copies, the same text `otea prompt --role` prints.
+// The canonical text of a role (the assistant, a refiner, or a worker of one board, under a name
+// when it has one): what a desk button copies, the same text `otea prompt --role` prints.
 export async function fetchRolePrompt(
-  role: 'coordinator' | 'worker',
+  role: 'assistant' | 'worker' | 'refiner',
   options: { board?: string; name?: string },
   signal: AbortSignal,
 ): Promise<AgentPromptView> {
@@ -623,6 +659,127 @@ export async function relinkProjectPath(from: string, to: string, force: boolean
 
 export async function forgetProjectPath(path: string): Promise<void> {
   await post('/api/project/paths/forget', { path });
+}
+
+// The conversation with the project's assistant (Hablar): the newest page of messages, the page
+// before `before`, or what came after `since`; the assistant's state beside them.
+export async function fetchConversation(
+  query: {
+    before?: number;
+    since?: number;
+    limit?: number;
+    // Words a turn mentions, all of them, wherever they stand in it (the search of the phone and Hablar).
+    search?: string;
+  } = {},
+  signal: AbortSignal,
+): Promise<ConversationView> {
+  const params = new URLSearchParams();
+  for (const [name, value] of Object.entries(query)) params.set(name, String(value));
+  const qs = params.toString();
+  return (await get(`/api/conversation${qs === '' ? '' : `?${qs}`}`, signal)).json();
+}
+
+// The project's assistant as the desk tells it: listening, connected or offline since when; null
+// while the project has none.
+export async function fetchAssistant(signal: AbortSignal): Promise<AssistantView | null> {
+  const body = (await (await get('/api/assistant', signal)).json()) as {
+    assistant: AssistantView | null;
+  };
+  return body.assistant;
+}
+
+// What waits for the person, as Otea counts it (src/app/pending.ts): Te toca, the numbers beside
+// it and Hablar's «Te espera» strip read this.
+export async function fetchPending(signal: AbortSignal): Promise<Pending> {
+  return (await get('/api/pending', signal)).json();
+}
+
+// What the person says to the assistant: the text and the files, as a form when it has files. The
+// Idempotency-Key makes a send that is repeated (a phone that never heard back) one message.
+export function postMessage(
+  input: { text: string; files?: readonly File[]; replyTo?: number },
+  clientKey: string,
+): Promise<Message> {
+  const body = {
+    text: input.text,
+    ...(input.replyTo === undefined ? {} : { replyTo: input.replyTo }),
+  };
+  const key = { 'idempotency-key': clientKey };
+  const files = input.files ?? [];
+  if (files.length === 0) return post<Message>('/api/conversation/messages', body, key);
+  const form = new FormData();
+  form.append('message', JSON.stringify(body));
+  for (const file of files) form.append('file', file, file.name);
+  return post<Message>('/api/conversation/messages', form, key);
+}
+
+// The person's one-tap correction of what a turn is: a request or a consultation.
+export function correctTurn(message: number, kind: MessageKind): Promise<Message> {
+  return post<Message>(`/api/conversation/messages/${message}/kind`, { kind });
+}
+
+// The person's tap on a question of the assistant's (a message with options): one of its options
+// (by number, from 1), their own words, or the decision left to the assistant. It is their own
+// message in reply to it, which the assistant hears.
+export function answerAssistantQuestion(message: number, given: AnswerWords): Promise<Message> {
+  return post<Message>(`/api/conversation/messages/${message}/answer`, given);
+}
+
+// Deshacer after such a tap, while the assistant has not heard it: the question waits again.
+export function unanswerAssistantQuestion(message: number): Promise<Message> {
+  return post<Message>(`/api/conversation/messages/${message}/unanswer`, {});
+}
+
+// The Bandeja: the entries not filed yet, and the latest filed ones.
+export async function fetchBandeja(signal: AbortSignal): Promise<BandejaView> {
+  return (await get('/api/bandeja', signal)).json();
+}
+
+// What the person captures: free text and files, no board form. The Idempotency-Key makes a
+// capture that is sent again (a phone that never heard back) one entry.
+export function postCapture(
+  input: { text: string; files?: readonly File[] },
+  clientKey: string,
+): Promise<BandejaEntry> {
+  const key = { 'idempotency-key': clientKey };
+  const files = input.files ?? [];
+  if (files.length === 0) return post<BandejaEntry>('/api/bandeja', { text: input.text }, key);
+  const form = new FormData();
+  form.append('message', JSON.stringify({ text: input.text }));
+  for (const file of files) form.append('file', file, file.name);
+  return post<BandejaEntry>('/api/bandeja', form, key);
+}
+
+// The person's answer to a question a refiner asked on an entry: their words, one of its options
+// (by number, from 1) or the decision left to the refiner.
+export function postBandejaAnswer(id: number, given: AnswerGiven): Promise<BandejaEntry> {
+  return post<BandejaEntry>(`/api/bandeja/${id}/answer`, given);
+}
+
+// You take back the tap you just gave on an option of a refiner's question on a note.
+export function postBandejaUnanswer(id: number): Promise<BandejaEntry> {
+  return post<BandejaEntry>(`/api/bandeja/${id}/unanswer`, {});
+}
+
+// The person sets an agent's escalation aside (the `signal` number of its row in Te espera).
+export function postEscalationDismiss(signal: number): Promise<{ ok: true }> {
+  return post<{ ok: true }>(`/api/escalations/${signal}/dismiss`, {});
+}
+
+// A note the assistant or its refiner closed, opened again by the person.
+export function postBandejaReopen(id: number): Promise<BandejaEntry> {
+  return post<BandejaEntry>(`/api/bandeja/${id}/reopen`, {});
+}
+
+// A file captured in the Bandeja, served to a signed-in browser.
+export function bandejaFileUrl(id: number): string {
+  return apiUrl(`/api/bandeja/attachments/${id}`);
+}
+
+// A file of the conversation, served to a signed-in browser (an image opens inline, the rest
+// downloads).
+export function attachmentUrl(id: number): string {
+  return apiUrl(`/api/conversation/attachments/${id}`);
 }
 
 // Side topics (topics.ts): the list and whether the project keeps them; one topic's note, close

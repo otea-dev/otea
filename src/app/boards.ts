@@ -27,7 +27,7 @@ import {
   type TemplateView,
 } from '../core/board/templates.ts';
 import { OteaError } from '../core/errors.ts';
-import type { Actor } from '../core/item.ts';
+import { type Actor, OTEA_ACTOR } from '../core/item.ts';
 import {
   type BoardRow,
   boardsStamp,
@@ -391,7 +391,8 @@ function retitleRequest(
   appendEvent(ctx.db, {
     itemId: item,
     type: 'updated',
-    actor: { kind: 'human', name: 'human' },
+    // Otea follows the board's new name on its own: the person renamed the board, not the Pedido.
+    actor: OTEA_ACTOR,
     at,
     data: { changes: { title: { from: pedido.title, to: title } } },
   });

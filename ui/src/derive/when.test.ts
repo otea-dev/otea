@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { setLanguage } from '../i18n/i18n.ts';
+import { lookOf } from '../lanes/looks.ts';
 import { ago, inMinutes, item, NOW } from './fixtures.ts';
+import { isStuck } from './toca.ts';
 import { agoText, turnSince, whenText } from './when.ts';
 
 afterEach(() => setLanguage('en'));
@@ -25,7 +27,27 @@ describe('when, as a row says it', () => {
       turn: 'agent',
       expiredLease: { holder: 'kiln', expiresAt: ago(12) },
     });
-    expect(whenText(lapsed, NOW)).toEqual({ text: 'reserva vencida', warn: true });
+    expect(whenText(lapsed, NOW)).toEqual({ text: 'sin señales', warn: true });
+  });
+
+  // Field study 5, V2: a short lease ran out under an agent that was still connected, and the desk
+  // said «Atasco · reserva vencida» in red.
+  it('says a lease that ran out under a connected agent is back in the queue, never in warn', () => {
+    const lapsed = item({
+      id: 'A',
+      turn: 'agent',
+      expiredLease: { holder: 'kiln', expiresAt: ago(2), connected: true },
+    });
+    setLanguage('es');
+    expect(whenText(lapsed, NOW)).toEqual({
+      text: 'se le acabó el tiempo · vuelve a la cola',
+      warn: false,
+    });
+    expect(isStuck(lapsed, NOW)).toBe(false);
+    expect(lookOf(lapsed, NOW)).toBe('queued');
+    expect(isStuck({ ...lapsed, expiredLease: { holder: 'kiln', expiresAt: ago(2) } }, NOW)).toBe(
+      true,
+    );
   });
 
   it('counts your turn from when it began, not from the item’s last change (P1-6)', () => {

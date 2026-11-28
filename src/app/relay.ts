@@ -5,13 +5,16 @@ import { OteaError } from '../core/errors.ts';
 import { assertCanLeave } from '../core/fields.ts';
 import type { Actor } from '../core/item.ts';
 import { activeLease } from '../core/lease.ts';
-import { stateLabel, transitionsBetween, type Workflow } from '../core/workflow.ts';
+import { closesOf, stateLabel, transitionsBetween, type Workflow } from '../core/workflow.ts';
+import { selectMessage } from '../store/conversation.ts';
 import { transaction } from '../store/database.ts';
 import { type EventRecord, type ItemRecord, selectEvents } from '../store/queries.ts';
+import { assistantName } from './assistant.ts';
 import { typeOfItem } from './collections.ts';
 import type { Context } from './context.ts';
 import { type Item, landMove, requireWritableItem, systemClock } from './items.ts';
 import {
+  approves,
   assertMoveHandsOff,
   boardState,
   liveBoardOf,
@@ -35,7 +38,117 @@ export type RelayInput = {
   reason?: string;
   // On a board with motives, the motive of a relayed discard, by its name (any case) or its id.
   motive?: string;
+  // The message of the person's in Hablar the quote comes from. A project with an assistant takes a
+  // relay only from it and only with this message, which must contain the quote.
+  fromMessage?: number;
 };
+
+// Words compared as a reader would: case, accents' case and the spaces between words do not tell
+// two sentences apart.
+const plainWords = (text: string) => text.toLocaleLowerCase().replace(/\s+/g, ' ').trim();
+
+// What a relay stands on once the project has an assistant (field study 4, U8: any process could drop
+// an item with a sentence nobody said): the assistant, with the person's own message, which says
+// what is quoted. Returns the message. Without an assistant there is no conversation to check
+// against and a relay is the agent's word, as it was.
+export function assertSaidInHablar(
+  ctx: Context,
+  input: Pick<RelayInput, 'id' | 'via' | 'fromMessage'>,
+  quote: string,
+  at: string,
+): number | undefined {
+  const assistant = assistantName(ctx.db);
+  if (assistant === undefined) return undefined;
+  if (input.via !== assistant) {
+    throw new OteaError(
+      'forbidden',
+      `Not relayed: only the assistant (${assistant}) relays what the person said, and only words they wrote in Talk.${input.via} asks them instead: otea ask ${input.id} "<your question>"`,
+    );
+  }
+  const refer = `relay it with --from-message <id of the person's message in Talk (otea conversation shows them)> and --quote words that message contains`;
+  if (input.fromMessage === undefined) {
+    throw new OteaError('quote_required', `Not relayed: ${refer}`);
+  }
+  const message = selectMessage(ctx.db, input.fromMessage);
+  if (message === undefined) {
+    throw new OteaError('quote_required', `Not relayed: there is no message ${input.fromMessage}`);
+  }
+  if (message.author !== 'person') {
+    throw new OteaError(
+      'quote_required',
+      `Not relayed: message ${message.id} is not the person's: ${refer}`,
+    );
+  }
+  // What they typed, not what they tapped: a tap on a card's option is the assistant's own words.
+  if (message.choice !== null) {
+    throw new OteaError(
+      'quote_required',
+      `Not relayed: message ${message.id} is a tap on a question, not words the person wrote: ${refer}`,
+    );
+  }
+  if (Date.parse(at) - Date.parse(message.at) > RELAY_MESSAGE_MS) {
+    throw new OteaError(
+      'quote_required',
+      `Not relayed: message ${message.id} is more than a day old (words of the person's from the last 24 hours only): ${refer}`,
+    );
+  }
+  if (!plainWords(message.text).includes(plainWords(quote))) {
+    throw new OteaError(
+      'quote_required',
+      `Not relayed: message ${message.id} does not contain that quote: ${refer}`,
+    );
+  }
+  return message.id;
+}
+
+// How long a message of the person's may be quoted by a relay.
+const RELAY_MESSAGE_MS = 24 * 3600_000;
+
+// A message of the person's backs one relay on an item: said once, it is not a standing order.
+function assertMessageUnused(ctx: Context, item: ItemRecord, message: number): void {
+  const used = selectEvents(ctx.db, item.id).some(
+    (event) => event.type === 'transitioned' && event.data.message === message,
+  );
+  if (used) {
+    throw new OteaError(
+      'quote_required',
+      `Not relayed: message ${message} was already relayed on ${item.id}; a message backs one relay of an item. Ask the person again.`,
+    );
+  }
+}
+
+// What a relay may never do, with an assistant or without one (adversarial review of S): drop,
+// finish or approve. Words an agent says the person said cannot do what is the person's alone or
+// cannot be taken back; the person taps a card (otea say --drop) or decides on the desk.
+function assertNotDestructive(
+  ctx: Context,
+  item: ItemRecord,
+  workflow: Workflow,
+  to: string,
+): void {
+  const board = liveBoardOf(ctx, item.collection);
+  const target = positionOf(to);
+  const from = positionOf(item.state);
+  const closes = isClosed(target) || closesOf(workflow, to) !== undefined;
+  const approving = board !== undefined && approves(board.def, from, target);
+  if (!closes && !approving) return;
+  throw new OteaError(
+    'forbidden',
+    `Not relayed: ${closes ? 'dropping or finishing' : 'approving'} ${item.id} is the person's alone, by their own tap, never by words relayed through an agent. Ask them: otea ask ${item.id} "<your question>"${closes ? ' (the assistant offers a card with otea say --drop)' : ''}, or they decide it on the desk or the phone.`,
+  );
+}
+
+// An item that waits for the person's review leaves it by their own tap (the desk's Devolver,
+// Descartar, Aprobar, or a card of the assistant's they tap), never by words an agent relays.
+function assertNotInReview(ctx: Context, item: ItemRecord): void {
+  const board = liveBoardOf(ctx, item.collection);
+  const position = positionOf(item.state);
+  if (!board || isClosed(position) || position.phase !== 'review') return;
+  throw new OteaError(
+    'forbidden',
+    `Not relayed: ${item.id} waits for your review, and an item leaves the person's review only by their own tap, never by a relayed sentence. Ask them in Talk with a card they tap: otea say "<text>" --drop ${item.id} --note "<why>" --option "Drop ${item.id}" --option "Leave it" (or --send-back ${item.id}), or they decide it on the desk.`,
+  );
+}
 
 // Where a relayed decision moves the item: the state named, or, with a motive, the discard with
 // that motive (`otea relay ERR-2 Dropped --motive Duplicado`).
@@ -69,21 +182,31 @@ export function relayDecision(ctx: Context, input: RelayInput, now = systemClock
       'A relayed decision needs a quote of what the human said',
     );
   }
+  if (quote.split(/\s+/).length < 2) {
+    throw new OteaError(
+      'quote_required',
+      'A relayed decision needs a quote of two words or more: what the human said, not a bare yes',
+    );
+  }
   const { db } = ctx;
   return transaction(db, () => {
     const item = requireWritableItem(db, input.id);
     assertRelayOn(ctx, item);
+    const message = assertSaidInHablar(ctx, input, quote, now());
+    if (message !== undefined) assertNotInReview(ctx, item);
     const type = typeOfItem(ctx, item);
     const { workflow } = type;
     const { reason, via, channel } = input;
     const to = relayedState(ctx, item.collection, input.to, input.motive);
-    // On a board the engine says first: a discard the person makes only on the page, an approval
-    // whose parts are not finished.
+    // An item still in its agent's hands has no decision to relay: said first, with what to do.
+    assertRelayable(workflow, item, to);
+    assertNotDestructive(ctx, item, workflow, to);
+    if (message !== undefined) assertMessageUnused(ctx, item, message);
+    // On a board the engine says first: an approval whose parts are not finished.
     const note = assertMoveHandsOff(ctx, item, to, RELAYED_HUMAN, {
       ...(reason === undefined ? {} : { reason }),
       via: 'relay',
     });
-    assertRelayable(workflow, item, to);
     authorizeRelay(workflow, item.state, to, reason);
     assertCanLeave(type, item.state, to, item.fields);
     const at = now();
@@ -97,6 +220,7 @@ export function relayDecision(ctx: Context, input: RelayInput, now = systemClock
       channel,
       quote,
       source: 'conversation',
+      ...(message === undefined ? {} : { message }),
     };
     return landMove(ctx, workflow, item, move, data, { via });
   });

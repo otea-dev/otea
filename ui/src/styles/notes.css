@@ -321,7 +321,7 @@
 .nt-sec .margin-label span.you {
   color: var(--you-ink);
   white-space: nowrap;
-  font-size: 10.5px;
+  font-size: 11px;
 }
 .bi-check .sep {
   height: 1px;

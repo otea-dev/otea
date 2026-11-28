@@ -3,6 +3,7 @@ import { boardStudio } from './es/board-studio.ts';
 import { catalog } from './es/catalog.ts';
 import { common } from './es/common.ts';
 import { detail } from './es/detail.ts';
+import { hablar } from './es/hablar.ts';
 import { phone } from './es/phone.ts';
 import { shell } from './es/shell.ts';
 import { studioEditor } from './es/studio-editor.ts';
@@ -39,7 +40,7 @@ import type { Catalog } from './i18n.ts';
 //   triage            triaje
 //   brief             encargo
 //   template          plantilla
-//   agent status      trabajando, escuchando, conectado, sin señal, ausente (las del servidor; ninguna otra)
+//   agent status      trabajando, escuchando, conectado, sin novedades, ausente (las del servidor; ninguna otra)
 //   On the way        En camino
 //   Closed            Cerrados
 //   Questions for you Preguntas para ti
@@ -60,4 +61,5 @@ export const es: Catalog = {
   ...studioEditor,
   ...studioPreview,
   ...phone,
+  ...hablar,
 };

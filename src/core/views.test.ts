@@ -59,9 +59,8 @@ describe('itemMoves', () => {
         { to: 'todo', by: 'human-ui', reasonRequired: true, turn: 'agent' },
         { to: 'discarded', by: 'human', reasonRequired: true, turn: 'none', closes: 'discarded' },
       ],
-      relayable: [
-        { to: 'discarded', by: 'human', reasonRequired: true, turn: 'none', closes: 'discarded' },
-      ],
+      // Never the discard: a relay does not drop.
+      relayable: [],
       missing: ['description'],
     });
   });

@@ -1,7 +1,7 @@
 // The board area of the English catalog.
 export const board = {
   // Groups of the list and the grid
-  'section.human': 'Waiting for you',
+  'section.human': 'Your turn',
   'section.agent': 'With agents',
   'section.none': 'Closed',
   'section.noValue': '{group}: none',
@@ -140,6 +140,7 @@ export const board = {
     '“{board}” is archived. Its items can be read and searched in Archived, in Studio.',
   'boardView.archived.open': 'See it in Archived',
   'boardView.doneCol': 'Done',
+  'boardView.droppedCol': 'Discarded',
   'boardView.dek.bug-triage': 'Bugs, from the first report to the fix.',
   'boardView.dek.tasks': 'The work to do, from the plan to done.',
   'boardView.dek.review': 'What waits for a review, round by round.',
@@ -223,8 +224,11 @@ export const board = {
   'boardView.quiet': 'lease expired · {time}',
   'boardView.quietCard': 'lease expired {time}',
   'boardView.round': 'round {n}',
-  'boardView.approvedUnmerged': 'Approved, not merged yet',
-  'boardView.merged': 'branch merged',
+  'boardView.approvedUnmerged': 'Approved, not landed yet',
+  'boardView.approvedLanding': 'Approved · not landed yet',
+  'boardView.approvedWaits': 'Approved · waits for {first}',
+  'boardView.approvedMerging': 'Approved · merging main',
+  'boardView.merged': 'landed',
   'boardView.queued': 'queued',
   'boardView.blocked': { one: 'waits for {count} blocker', other: 'waits for {count} blockers' },
   'boardView.waits': 'waits {count}',
@@ -280,7 +284,7 @@ export const board = {
   'boardView.tray.movingTo': 'Moving to {state}, one at a time:',
   'boardView.tray.ofTotal': 'of {total}',
   'boardView.tray.receipt': { one: '{count} item → {state}.', other: '{count} items → {state}.' },
-  'boardView.tray.closesIn': 'This notice closes in 6 s.',
+  'boardView.tray.closesIn': 'This notice closes in {s} s.',
   'boardView.tray.toast': {
     one: 'You moved {count} item → {state}.',
     other: 'You moved {count} items → {state}.',

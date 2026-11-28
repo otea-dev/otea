@@ -1,3 +1,4 @@
+import { waitsForPerson } from '../../src/core/waiting.ts';
 import { activeLease } from './active-lease.ts';
 import type { Item } from './types.ts';
 
@@ -17,11 +18,13 @@ export const FAVICONS: Readonly<Record<AttentionFrame, string>> = {
   idle: '/otea-idle.svg',
 };
 
-type Facts = Pick<Item, 'turn' | 'lease'>;
+type Facts = Pick<Item, 'turn' | 'lease'> & Partial<Pick<Item, 'expiredLease'>>;
 
+// `yours`: the items that wait for the person by the one rule (your turn, or stuck); what is no item
+// is added by the caller that has it (waitingCount).
 export function attentionOf(items: readonly Facts[], now: number): Attention {
   return {
-    yours: items.filter((item) => item.turn === 'human').length,
+    yours: items.filter((item) => waitsForPerson(item, now)).length,
     working: items.some((item) => activeLease(item.lease, now) !== null),
   };
 }

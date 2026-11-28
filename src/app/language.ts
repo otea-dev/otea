@@ -43,17 +43,28 @@ export function storedLanguageAt(env: Env = process.env): Lang | undefined {
   return withMachine(env, storedLanguage);
 }
 
-// This computer's language: the locale variables a person set (LC_ALL, then LC_MESSAGES, then LANG;
-// C and POSIX, with or without an encoding, say nothing), else the one the runtime reads from the
-// system.
-export function systemLanguage(env: Env = process.env, locale = system.locale): Lang {
-  // Git for Windows does not set a false LANG: its profile (lang.sh) derives it from the Windows
-  // locale when none is set, so a Spanish Windows gives es_ES.UTF-8 in a fresh Git Bash. An English
-  // LANG seen there was chosen, or inherited from the program that started the shell.
-  const set = [env.LC_ALL, env.LC_MESSAGES, env.LANG].find(
-    (value) => value && !/^(C|POSIX)(\.|$)/.test(value),
-  );
-  return /^es(?![a-z])/i.test(set ?? locale()) ? 'es' : 'en';
+// This computer's language: the locale variables (LC_ALL, then LC_MESSAGES, then LANG; C and
+// POSIX, with or without an encoding, say nothing), else the one the runtime reads from the
+// system; on Windows a bare LANG ranks below the system's own language.
+export function systemLanguage(
+  env: Env = process.env,
+  locale = system.locale,
+  platform: string = process.platform,
+): Lang {
+  const says = (value: string | undefined) =>
+    value && !/^(C|POSIX)(\.|$)/.test(value) ? value : '';
+  // On POSIX the variables are the locale: LC_ALL, then LC_MESSAGES, then LANG (a C or POSIX one
+  // says nothing, so the next speaks), and only with none set the system's own report. On Windows
+  // there is no locale variable of the system's: LC_ALL and LC_MESSAGES are choices, but a bare
+  // LANG is whatever started the shell (an agent's harness on a Spanish computer carried
+  // LANG=en_US.UTF-8, and init made the project in English: field study 3), so the language
+  // Windows reports outranks it, and LANG speaks only where there is none.
+  const chosen = says(env.LC_ALL) || says(env.LC_MESSAGES);
+  const named =
+    platform === 'win32'
+      ? chosen || locale() || says(env.LANG)
+      : chosen || says(env.LANG) || locale();
+  return /^es(?![a-z])/i.test(named) ? 'es' : 'en';
 }
 
 // The one resolver: the stored desk language, else the system's, else English.

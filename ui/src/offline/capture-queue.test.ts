@@ -10,6 +10,7 @@ import {
   type Sent,
   sendWith,
   serialFlush,
+  titleOf,
 } from './capture-queue.ts';
 
 function memoryStore(initial: QueuedCapture[] = []) {
@@ -242,6 +243,79 @@ describe('a capture made for one project', () => {
   it('says the project it was made for on its send', () => {
     const { init } = captureRequest(capture('a', 1, { project: 'p2-abc' }));
     expect((init.headers as Record<string, string>)['x-otea-project']).toBe('p2-abc');
+  });
+});
+
+// A quick note kept while the PC was off goes to the Bandeja when it answers, not to a board.
+describe('a quick note in the queue', () => {
+  const note = (id: string, text: string, files: { name: string; bytes: number }[] = []) =>
+    capture(id, 1, {
+      board: '',
+      type: '',
+      fields: {},
+      project: 'p2-abc',
+      note: {
+        text,
+        files: files.map(({ name, bytes }) => ({
+          name,
+          type: 'image/png',
+          bytes: new ArrayBuffer(bytes),
+        })),
+      },
+    });
+
+  it('is sent to the project’s Bandeja as JSON, under its id as the Idempotency-Key', () => {
+    const { url, init } = captureRequest(note('cap-1', 'el botón Aprobar queda tapado'));
+
+    expect(url).toBe('/p/p2-abc/api/bandeja');
+    expect(init.method).toBe('POST');
+    const headers = init.headers as Record<string, string>;
+    expect(headers['idempotency-key']).toBe('cap-1');
+    expect(headers['x-otea-project']).toBe('p2-abc');
+    expect(JSON.parse(String(init.body))).toEqual({ text: 'el botón Aprobar queda tapado' });
+  });
+
+  it('carries its files as a form, as the desk sends them', () => {
+    const { init } = captureRequest(note('cap-2', 'ver captura', [{ name: 'a.png', bytes: 4 }]));
+    const form = init.body as FormData;
+
+    expect(JSON.parse(String(form.get('message')))).toEqual({ text: 'ver captura' });
+    expect((form.get('file') as File).name).toBe('a.png');
+  });
+
+  it('is read as made when the PC answers with the entry’s number, and a resend with the same key too', async () => {
+    const fetcher = (async () =>
+      new Response(JSON.stringify({ id: 7, ref: 'B-7' }), {
+        status: 201,
+        headers: { 'content-type': 'application/json' },
+      })) as unknown as typeof fetch;
+
+    expect(await sendWith(fetcher)(note('cap-3', 'idea'))).toEqual({ kind: 'made', item: 'B-7' });
+  });
+
+  it('goes through flush like any capture, and is named by its first line', async () => {
+    const { store, map } = memoryStore([note('cap-4', 'primera línea\nsegunda')]);
+    const pc = fakePc();
+
+    const out = await flush(store, pc.send);
+
+    expect(out.made).toHaveLength(1);
+    expect(map.size).toBe(0);
+    expect(titleOf(note('x', 'primera línea\nsegunda'))).toBe('primera línea');
+    expect(
+      titleOf(
+        note('x', '', [
+          { name: 'a.png', bytes: 1 },
+          { name: 'b.pdf', bytes: 1 },
+        ]),
+      ),
+    ).toBe('a.png, b.pdf');
+    expect(titleOf(capture('y', 1))).toBe('Item y');
+  });
+
+  it('counts its files toward the queue’s size', () => {
+    expect(fits([], note('big', 'x', [{ name: 'a.png', bytes: QUEUE_MAX_BYTES + 1 }]))).toBe(false);
+    expect(fits([], note('ok', 'x', [{ name: 'a.png', bytes: 1000 }]))).toBe(true);
   });
 });
 

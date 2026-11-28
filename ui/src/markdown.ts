@@ -42,7 +42,7 @@ const alignOf = (cell: string): Align =>
 
 // One cell's text as inline Markdown: micromark's paragraph without its <p>.
 const inline = (text: string) =>
-  micromark(text)
+  micromark(guardNames(text))
     .trim()
     .replace(/^<p>([\s\S]*)<\/p>$/, '$1');
 
@@ -104,7 +104,37 @@ function blocks(source: string): { table: boolean; text: string; html?: string }
   return out;
 }
 
-function commonMark(source: string): string {
+// A file name or a path is no emphasis. Between a slash and a dot CommonMark reads «__» as strong
+// emphasis, so a note naming «library/__init__.py» drew «library/init.py» with init in bold (s-real
+// D-6f9caa). A token with an underscore and a «.» or «/» inside it, outside code, has its underscores
+// escaped; code spans, fenced and indented code and autolinks are left as written, and so is
+// emphasis that stands apart (`__bold__`, `_this_`).
+const CODE_OR_AUTOLINK = /(```[\s\S]*?```|~~~[\s\S]*?~~~|`+[^`\n]*`+|<[a-z][a-z0-9+.-]*:[^>\s]*>)/i;
+const NAME_LIKE = /(?<![\\A-Za-z0-9_./-])[A-Za-z0-9_./-]*_[A-Za-z0-9_./-]*/g;
+const INSIDE = /[A-Za-z0-9_][./][A-Za-z0-9_]/;
+
+function guardNames(text: string): string {
+  return text
+    .split(CODE_OR_AUTOLINK)
+    .map((part, at) =>
+      at % 2 === 1
+        ? part
+        : part
+            .split('\n')
+            .map((line) =>
+              /^(?: {4}|\t)/.test(line)
+                ? line
+                : line.replace(NAME_LIKE, (token) =>
+                    INSIDE.test(token) ? token.replace(/[\\_]/g, '\\$&') : token,
+                  ),
+            )
+            .join('\n'),
+    )
+    .join('');
+}
+
+function commonMark(raw: string): string {
+  const source = guardNames(raw);
   const paren = parenLists(source);
   let list = 0;
   return micromark(source).replace(/<ol(?=[ >])/g, (open) =>

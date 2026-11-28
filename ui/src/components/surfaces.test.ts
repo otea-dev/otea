@@ -76,6 +76,7 @@ function fakeApp(o: Partial<App> = {}): App {
     feed,
     route: { view: 'toca' },
     phone: false,
+    short: false,
     go: noop,
     openItem: noop,
     closeItem: noop,
@@ -89,6 +90,7 @@ function fakeApp(o: Partial<App> = {}): App {
     restart: async () => undefined,
     reassign: async () => undefined,
     resume: async () => undefined,
+    reopenDropped: async () => undefined,
     link: async () => undefined,
     unlink: async () => undefined,
     newItem: noop,
@@ -141,10 +143,13 @@ describe('Triaje', () => {
     expect(html).not.toContain('## Resumen');
   });
 
-  it('is all caught up when nothing waits for review', () => {
+  // s-real2 D-362fa3: «Todo al día» told the person nothing was left while questions and steps of
+  // their own still waited in Te toca. The end of Triage speaks of the reviews only.
+  it('says the reviews are done when none waits, never that everything is up to date', () => {
     setLanguage('es');
     const html = render(createElement(Triage, {}), fakeApp({ all: items.slice(2) }));
-    expect(html).toContain('Todo al día.');
+    expect(html).toContain('No quedan revisiones.');
+    expect(html).not.toContain('Todo al día');
     expect(html).toContain('Volver a Te toca');
   });
 });
@@ -297,11 +302,30 @@ describe('Te espera', () => {
     expect(blocks[1]).toMatchObject({ kind: 'row', inert: false, lane: 'you' });
     const gone = elsewhereBlocks({ ...salinas, unavailable: 'The data is missing' });
     expect(gone.find((block) => block.kind === 'row')).toMatchObject({ inert: true });
-    // The step in words, in the language on screen, never its id.
+    // What the row asks of you, in words and in the language on screen: never a step or a column
+    // name (field study 4: «Hacerlo (en revisión)»), never its id.
     const html = renderToStaticMarkup(
       createElement('div', null, (blocks[1] as { content: ReactNode }).content),
     );
-    expect(html).toContain('Refinar (en revisión)');
+    expect(html).toContain('para revisar');
+    expect(html).not.toContain('Refinar');
+    // A question says who asks.
+    const asked = elsewhereBlocks({
+      ...salinas,
+      waiting: [
+        {
+          ...item({ id: 'SAL-13', title: 'Cartel', turn: 'human' }),
+          state: 'sk3j9x__doing',
+          stateName: 'Hacerlo',
+          asks: { question: 1, by: 'quill', text: '¿Verde?', at: ago(3) },
+        },
+      ],
+    });
+    const question = renderToStaticMarkup(
+      createElement('div', null, (asked[1] as { content: ReactNode }).content),
+    );
+    expect(question).toContain('te pregunta quill');
+    expect(question).not.toContain('Hacerlo');
     // The same id lives in several projects: the project's name goes right after it.
     expect(html).toContain(
       '<span class="id">SAL-12</span><span class="mpt"><span class="sep">·</span><span class="pid">Salinas</span></span>',
@@ -333,7 +357,8 @@ describe('Te espera', () => {
       createElement('div', null, (more as { content: ReactNode }).content),
     );
     expect(html).toContain('Y 2 temas respondidos más');
-    expect(html).toContain('/p/salinas/#/topics');
+    // The rest wait in Hablar's consultations.
+    expect(html).toContain('/p/salinas/#/hablar');
 
     const here = hereBlocks(fakeApp({ all: [] }), 'Hollowmere', [answered(7)]);
     expect(here[0]).toMatchObject({ kind: 'sec', count: 1 });
@@ -360,11 +385,12 @@ describe('Te espera', () => {
     expect(html).not.toContain('p3 y p4 no tienen nada abierto');
   });
 
-  it('heads the page Te espera on the lanes', () => {
+  it('heads the all-projects page with the name of the Te toca list, on the lanes', () => {
     setLanguage('es');
     const html = render(createElement(ProjectsInbox, {}), fakeApp({ projects: [salinas] }));
     expect(html).toContain('Todos los proyectos');
-    expect(html).toContain('Te espera');
+    expect(html).toContain('Te toca en todos lados');
+    expect(html).not.toContain('Te espera');
     expect(html).toContain('data-list="projects"');
     expect(html).toContain('una fila de otro proyecto lo abre aquí');
     expect(html).not.toContain('pestaña');

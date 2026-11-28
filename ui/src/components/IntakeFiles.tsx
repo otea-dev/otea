@@ -6,6 +6,7 @@ import {
   isImage,
   MAX_FILE_MB,
   MAX_FILES,
+  shownFileName,
   sizeLabel,
   tooLarge,
 } from '../intake-files.ts';
@@ -19,7 +20,7 @@ const ROLE_LABEL = {
 } as const;
 
 // A picked image shows itself; anything else shows its extension.
-function Thumb({ file }: { file: File }) {
+export function Thumb({ file }: { file: File }) {
   const [url, setUrl] = useState<string>();
   const image = isImage(file.name);
   useEffect(() => {
@@ -116,7 +117,7 @@ export function IntakeFiles({
                 <li key={key} className="intake-file" data-error={large || undefined}>
                   <Thumb file={file} />
                   <span className="intake-file-name">
-                    <span className="mono">{file.name}</span>
+                    <span className="mono">{shownFileName(file.name, file.lastModified)}</span>
                     <span className="t-cap">
                       {large ? t('intake.tooLarge', { mb: MAX_FILE_MB }) : sizeLabel(file.size)}
                     </span>

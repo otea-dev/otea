@@ -4,6 +4,7 @@ import { attachFiles } from '../../api.ts';
 import { EvidenceList } from '../../components/EvidenceList.tsx';
 import { EvidenceGaps } from '../../components/evidence/EvidenceGaps.tsx';
 import { EvidenceModule } from '../../components/evidence/EvidenceModule.tsx';
+import { Pic } from '../../components/evidence/Pic.tsx';
 import { OptionsModule } from '../../components/OptionsModule.tsx';
 import { RoundsModule } from '../../components/RoundsModule.tsx';
 import { agoText } from '../../derive/when.ts';
@@ -20,6 +21,7 @@ import type { Evidence, ItemView, TypeView } from '../../types.ts';
 import type { EvidenceGaps as Gaps } from './board-item.ts';
 import type { Facts } from './facts.ts';
 import { Structure } from './Structure.tsx';
+import { TechDetails } from './TechDetails.tsx';
 
 // The body (SPEC §10.3, mock:2740-2749): sections over hairlines, each named in its margin: what the
 // agent says, your notes, what you answered, the type's layout (its fields, options), the evidence,
@@ -54,7 +56,7 @@ function Note({
   );
 }
 
-function Plain({
+export function Plain({
   k,
   label,
   aside,
@@ -78,12 +80,41 @@ function Plain({
   );
 }
 
+// Moves the field sections of the parts the step in view hands off ahead of the other field
+// sections, in the slots those occupy: the sections of any other kind stay where they are.
+function putHandedFirst(out: Sec[], rounds: BoardRounds): void {
+  const step =
+    rounds.step === undefined ? undefined : rounds.def.steps.find((s) => s.id === rounds.step);
+  if (!step) return;
+  // A field's section is keyed by the name the type gives it: a board's fields go by their part's
+  // id (the desk shows the part's name as the label), a plainer type's by the name itself.
+  const handed = new Set(
+    step.hand.flatMap(({ ref }) => {
+      const name = rounds.def.parts[ref]?.name;
+      return name === undefined ? [`f:${ref}`] : [`f:${ref}`, `f:${name}`];
+    }),
+  );
+  const slots = out.flatMap(({ key }, at) => (key.startsWith('f:') ? [at] : []));
+  const fields = slots.map((at) => out[at]).filter((sec): sec is Sec => sec !== undefined);
+  const ordered = [
+    ...fields.filter(({ key }) => handed.has(key)),
+    ...fields.filter(({ key }) => !handed.has(key)),
+  ];
+  slots.forEach((at, i) => {
+    const sec = ordered[i];
+    if (sec) out[at] = sec;
+  });
+}
+
 export function bodySections(o: {
   item: ItemView;
   type: TypeView | undefined;
   facts: Facts;
   canWrite: boolean;
   now: number;
+  // A review in plain words: the pictures come first, and the diff, the logs and the files are
+  // folded behind «Detalles técnicos» (field study 4: the code came before the screenshots).
+  plain?: boolean;
   // Opens the reader, at a file or at the round's first.
   onRead?: ((id?: number) => void) | undefined;
   // On a Studio board: the long texts it shows as options side by side, the notes of each round
@@ -112,7 +143,7 @@ export function bodySections(o: {
       }
     | undefined;
 }): Sec[] {
-  const { item, type, facts, canWrite, now, board, onRead } = o;
+  const { item, type, facts, canWrite, now, board, onRead, plain = false } = o;
   let roundsDrawn = false;
   const out: Sec[] = [];
   const agent = facts.handed?.agent ?? facts.agent ?? '';
@@ -196,6 +227,8 @@ export function bodySections(o: {
 
   const { primary, sections } = detailBlocks(type, item.fields);
   const evidence: ReactNode[] = [];
+  // What only code readers use, when the review is plain.
+  const technical: ReactNode[] = [];
   // Rondas come after the deliverable, wherever the layout places them: what was handed in is
   // what the person reads first, as on the phone.
   const rounds: Sec[] = [];
@@ -288,7 +321,9 @@ export function bodySections(o: {
       const asked = gaps?.required.some(({ ref }) => ref === block.entry.id) === true;
       // On a board, a part nothing was attached to is drawn only when the step requires it.
       if (gaps && empty && !asked) return [];
-      evidence.push(
+      // Pictures and recordings are what a person judges; the rest is for reading code.
+      const shown = plain && !['images', 'recording'].includes(block.entry.module);
+      (shown ? technical : evidence).push(
         <EvidenceModule
           key={`m:${block.entry.id}`}
           slot={slotData(block.at)}
@@ -306,7 +341,9 @@ export function bodySections(o: {
       const rest = loose.filter((e) => !images.includes(e));
       if (images.length) evidence.push(<Figures key="figs" images={images} />);
       if (rest.length)
-        evidence.push(<EvidenceList key="loose" evidence={rest} canWrite={canWrite} />);
+        (plain ? technical : evidence).push(
+          <EvidenceList key="loose" evidence={rest} canWrite={canWrite} />,
+        );
     }
     return [];
   };
@@ -317,6 +354,9 @@ export function bodySections(o: {
     s.blocks.forEach((b, i) => {
       out.push(...fieldSecs(b, 100 * (s.index + 1) + i, s.title));
     });
+  // What the step under review handed in reads first; what was settled in an earlier step follows
+  // (the draft, not the approved outline above it).
+  if (board) putHandedFirst(out, board.steps);
   if (board?.rounds && board.roundsAfter && !roundsDrawn)
     rounds.push({
       key: 'r:notes',
@@ -342,9 +382,11 @@ export function bodySections(o: {
           {canWrite && item.turn !== 'none' ? <AttachFile id={item.id} /> : null}
         </div>
         {evidence.length ||
+        technical.length ||
         (board?.gaps?.groups.length ?? 0) + (board?.gaps?.optional.length ?? 0) ? (
           <div className="evs">
             {evidence}
+            {technical.length ? <TechDetails>{technical}</TechDetails> : null}
             {board?.gaps ? <EvidenceGaps gaps={board.gaps} /> : null}
           </div>
         ) : (
@@ -416,9 +458,13 @@ function Figures({ images }: { images: Evidence[] }) {
     <div className={shown.length === 1 ? 'figs one' : 'figs'}>
       {shown.map((e) => (
         <figure key={e.id}>
-          <a href={url(e)} target="_blank" rel="noreferrer">
-            <img src={url(e)} alt={e.caption ?? e.filename} loading="lazy" />
-          </a>
+          <Pic
+            src={url(e)}
+            opens={url(e)}
+            alt={e.caption ?? e.filename}
+            name={e.filename}
+            loading="lazy"
+          />
           <figcaption>
             <b>{kicker(e)}</b>
             {e.caption ?? e.filename}

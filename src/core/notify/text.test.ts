@@ -62,7 +62,11 @@ describe('noticeText', () => {
   it.each([
     [{ kind: 'ask', by: 'claude' }, 'claude te pregunta', 'claude asks you'],
     [{ kind: 'aside', by: 'kiln' }, 'kiln lo dejó para después', 'kiln set it aside for later'],
-    [{ kind: 'unheard' }, 'Nadie escucha', 'Nobody is listening'],
+    [
+      { kind: 'unheard' },
+      'Hay trabajo y ningún agente conectado',
+      'Work is waiting and no agent is connected',
+    ],
     [{ kind: 'replied', by: 'claude' }, 'claude contestó tu nota', 'claude answered your note'],
     [{ kind: 'stuck', by: 'codex' }, 'Se atascó · codex no responde', 'Stuck · codex went quiet'],
   ] as const)('says %j in Spanish and English', (what, es, en) => {
@@ -116,8 +120,71 @@ describe('noticeText', () => {
     expect(noticeText({ ...group, of: 'ask' }, 'es').title).toBe('3 preguntas te esperan');
     expect(noticeText({ ...group, of: 'aside' }, 'en').title).toBe('3 things set aside');
     expect(noticeText({ ...group, of: 'unheard' }, 'en').title).toBe(
-      '3 things wait for an agent, and nobody is listening',
+      '3 things wait and no agent is connected',
     );
+  });
+
+  // Field study 7: «5 cosas te esperan» while `otea pending` said 3. A mixed burst counts what
+  // waits for the person (the number `pending` gives), and names the assistant's replies apart.
+  it('counts what waits in a mixed burst as pending does, and names assistant replies apart', () => {
+    const mixed: Notice = {
+      kind: 'group',
+      count: 5,
+      of: 'mixed',
+      waiting: 3,
+      items: [
+        { item: 'A-1', title: 'One', kind: 'turn' },
+        { item: 'A-2', title: 'Two', kind: 'ask' },
+        { item: 'A-3', title: 'Three', kind: 'stuck' },
+        { item: 'hablar:1', title: '', kind: 'assistant_reply' },
+        { item: 'hablar:2', title: '', kind: 'assistant_reply' },
+      ],
+    };
+    expect(noticeText(mixed, 'es').title).toBe('3 cosas te esperan y 2 respuestas de tu asistente');
+    expect(noticeText(mixed, 'en', { id: 'p', name: 'tienda' }).title).toBe(
+      '3 things wait for you and 2 replies from your assistant in tienda',
+    );
+    const one: Notice = {
+      ...mixed,
+      count: 2,
+      waiting: 1,
+      items: [
+        { item: 'A-1', title: 'One', kind: 'turn' },
+        { item: 'hablar:1', title: '', kind: 'assistant_reply' },
+      ],
+    };
+    expect(noticeText(one, 'es').title).toBe('1 cosa te espera y una respuesta de tu asistente');
+    expect(noticeText(one, 'en').title).toBe(
+      '1 thing waits for you and a reply from your assistant',
+    );
+  });
+
+  it('without a count from pending, a mixed burst counts its notices except the assistant replies', () => {
+    const mixed: Notice = {
+      kind: 'group',
+      count: 4,
+      of: 'mixed',
+      items: [
+        { item: 'A-1', title: 'One', kind: 'turn' },
+        { item: 'A-2', title: 'Two', kind: 'ask' },
+        { item: 'hablar:1', title: '', kind: 'assistant_reply' },
+        { item: 'hablar:2', title: '', kind: 'assistant_reply' },
+      ],
+    };
+    expect(noticeText(mixed, 'es').title).toBe('2 cosas te esperan y 2 respuestas de tu asistente');
+  });
+
+  it('names Hablar once when a burst is the assistant talking, not once per message', () => {
+    const group: Notice = {
+      kind: 'group',
+      count: 2,
+      of: 'assistant_reply',
+      items: [
+        { item: 'hablar:1', title: '', kind: 'assistant_reply' },
+        { item: 'hablar:2', title: '', kind: 'assistant_reply' },
+      ],
+    };
+    expect(noticeText(group, 'es').body).toBe('Hablar');
   });
 
   it('names the project a burst comes from, and keeps one burst per project on screen', () => {
@@ -142,9 +209,126 @@ describe('noticeText', () => {
     );
   });
 
+  // G1: a notice replaces the one with the same tag on the person's screen, so the tag names the
+  // project and the thing it is about: B's notice must not wipe A's, nor one turn's reply another's.
+  describe('what replaces what on the screen', () => {
+    const web = { id: 'tienda-web-x1', name: 'tienda-web' };
+    const api = { id: 'api-z9', name: 'api' };
+    const tagOf = (notice: Notice, project: { id: string; name: string }) =>
+      noticeText(notice, 'en', project).tag;
+    const reply = (turn: number): Notice => ({
+      kind: 'assistant_reply',
+      item: `hablar:${turn}`,
+      title: '',
+      by: 'sage',
+      turn,
+      text: 'ok',
+    });
+    const offline: Notice = {
+      kind: 'assistant_offline',
+      item: 'hablar:offline',
+      title: '',
+      count: 1,
+    };
+    const note: Notice = { kind: 'ask', item: 'B-1', title: 'n', by: 'lia', text: 'which?' };
+
+    it('keeps two projects apart, for every kind', () => {
+      for (const notice of [review, reply(4), offline, note]) {
+        expect(tagOf(notice, web)).not.toBe(tagOf(notice, api));
+      }
+    });
+
+    it('keeps two replies to different turns apart', () => {
+      expect(tagOf(reply(4), web)).not.toBe(tagOf(reply(5), web));
+    });
+  });
+
+  describe('the assistant', () => {
+    const reply: Notice = {
+      kind: 'assistant_reply',
+      item: 'hablar:4',
+      title: '',
+      by: 'sage',
+      turn: 4,
+      text: 'Listo\u0007 el  pedido',
+    };
+
+    it('says it replied, with the first line cleaned, and opens Hablar at the turn', () => {
+      expect(noticeText(reply, 'es')).toEqual({
+        title: 'sage te respondió',
+        body: 'Listo el pedido',
+        tag: 'otea-hablar-reply-4',
+        url: '/#/hablar/4',
+        item: null,
+      });
+      expect(noticeText(reply, 'en').title).toBe('sage replied');
+    });
+
+    it('keeps the words out when the text was hidden', () => {
+      const { text: _hidden, ...bare } = reply as Notice & { text?: string };
+      expect(noticeText(bare as Notice, 'es').body).toBe('Abre Hablar para leerlo');
+    });
+
+    it('counts what waits for an offline assistant, in both languages', () => {
+      const offline: Notice = {
+        kind: 'assistant_offline',
+        item: 'hablar:offline',
+        title: '',
+        count: 3,
+      };
+      expect(noticeText(offline, 'es')).toMatchObject({
+        title: 'Tu asistente está desconectado',
+        body: 'Tus 3 mensajes esperan respuesta',
+        url: '/#/hablar',
+      });
+      expect(noticeText({ ...offline, count: 1 }, 'es').body).toBe('Tu mensaje espera respuesta');
+      expect(noticeText({ ...offline, count: 1 }, 'en').body).toBe('Your message awaits a reply');
+      expect(noticeText(offline, 'en').body).toBe('Your 3 messages await a reply');
+    });
+  });
+
   it('keeps a long title short', () => {
     const long = noticeText({ ...review, title: 'x'.repeat(300) }, 'en');
     expect(long.body.length).toBeLessThanOrEqual(100);
     expect(long.body.endsWith('…')).toBe(true);
+  });
+
+  describe('a question on a Bandeja note', () => {
+    const ask: Notice = {
+      kind: 'ask',
+      item: 'B-3',
+      bandeja: true,
+      title: 'El botón Aprobar queda tapado',
+      by: 'lia',
+      text: '¿Solo Aprobar o todas?',
+      options: ['Solo Aprobar', 'Todas'],
+    };
+
+    it('says it with its options, and opens Hablar at the note, not an item', () => {
+      expect(noticeText(ask, 'es')).toEqual({
+        title: 'lia te pregunta · B-3',
+        body: '¿Solo Aprobar o todas?\n1) Solo Aprobar  2) Todas',
+        tag: 'otea-bandeja-B-3',
+        url: '/#/hablar/B-3',
+        item: null,
+      });
+      expect(noticeText(ask, 'en').title).toBe('lia asks you · B-3');
+    });
+
+    it('names the note and not the question when the person hid the text', () => {
+      const {
+        text: _text,
+        options: _options,
+        ...hidden
+      } = ask as Notice & {
+        text?: string;
+        options?: string[];
+      };
+      expect(noticeText(hidden as Notice, 'es')).toMatchObject({
+        title: 'lia te pregunta',
+        body: 'B-3 · El botón Aprobar queda tapado',
+        url: '/#/hablar/B-3',
+      });
+    });
   });
 });

@@ -27,7 +27,17 @@ export type CaptureOpen = {
   board?: string | undefined;
   // The button it was opened from: the sheet grows out of it as it rises.
   from?: (() => Element | null) | undefined;
+  // How it starts: a free note that lands in the Bandeja (the default), or the board's form. A
+  // board asked for starts the form.
+  mode?: CaptureMode | undefined;
 };
+
+export type CaptureMode = 'note' | 'board';
+
+// The way the sheet starts: the one asked for, the form when it was opened from a board, else a note.
+export function startMode(o: CaptureOpen): CaptureMode {
+  return o.mode ?? (o.board === undefined ? 'note' : 'board');
+}
 
 type CaptureState = { open: boolean; seq: number; o: CaptureOpen };
 

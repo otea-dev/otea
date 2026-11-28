@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { sequenceIds } from '../core/board/ids.ts';
 import { creatures } from '../core/board/testing.ts';
 import { OteaError } from '../core/errors.ts';
+import { selectMessages, selectPending } from '../store/conversation.ts';
 import { insertEvidence, selectEvents } from '../store/queries.ts';
 import { askingItem } from './asking.ts';
+import { declareAssistant } from './assistant.ts';
 import { createBoard, publishBoard, saveDraft } from './boards.ts';
 import type { Context } from './context.ts';
+import { postPersonMessage } from './conversation.ts';
 import { createItem, getItem, listItems, moveItem, showItem } from './items.ts';
 import { claimItem, releaseItem } from './leases.ts';
 import {
@@ -16,10 +19,10 @@ import {
   liveBoardOf,
   nextFor,
 } from './next.ts';
-import { endProcess, endWaiter, waitBeat } from './presence.ts';
+import { endProcess, endWaiter, seeAgent, waitBeat } from './presence.ts';
 import { answerQuestion, answerWaiting, askQuestion, noteChatAnswer } from './questions.ts';
 import { restartItem } from './restart.ts';
-import { memoryContext } from './testing.ts';
+import { memoryContext, projectOf } from './testing.ts';
 import { undoMove } from './undo.ts';
 
 const you = { kind: 'human' as const, name: 'fede' };
@@ -161,6 +164,40 @@ describe('an agent asks the person', () => {
 });
 
 describe('the person answers', () => {
+  it('leaves what they chose in the conversation, read at once, waking nobody', () => {
+    const ctx = memoryContext();
+    const item = working(ctx);
+    askQuestion(
+      ctx,
+      {
+        id: item.id,
+        text: '¿Caparazón liso o con musgo?',
+        options: ['Liso', 'Con musgo'],
+        recommended: 2,
+        actor: kiln,
+        channel: 'cli',
+      },
+      now,
+    );
+
+    answerQuestion(ctx, { id: item.id, option: 2, actor: you, channel: 'ui' }, now);
+
+    expect(selectMessages(ctx.db, { limit: 10 }).messages).toEqual([
+      expect.objectContaining({
+        author: 'person',
+        text: 'Con musgo',
+        delivery: 'read',
+        choice: {
+          mode: 'option',
+          option: 2,
+          about: item.id,
+          asked: '¿Caparazón liso o con musgo?',
+        },
+      }),
+    ]);
+    expect(selectPending(ctx.db)).toEqual([]);
+  });
+
   it('gives the answer back to the agent that asked, waiting, though its lease ran out meanwhile', () => {
     const ctx = memoryContext();
     const item = working(ctx);
@@ -298,17 +335,25 @@ describe('the person answers', () => {
       expect(nextFor(ctx, 'scout', {}, now).item).toBe(item.id);
     });
 
-    it('noted from the chat by another agent, claims the item for nobody: that agent takes it', () => {
+    it('noted by the assistant from Talk, claims the item for nobody: that agent takes it', () => {
       const ctx = memoryContext();
       const item = working(ctx);
       waits(ctx);
       ask(ctx, item.id);
       releaseItem(ctx, { id: item.id, actor: kiln }, now);
       ends(ctx);
+      declareAssistant(ctx.db, 'scout', now);
+      const said = postPersonMessage(projectOf('/nowhere', ctx), { text: 'Con musgo' }, now);
 
       const noted = noteChatAnswer(
         ctx,
-        { id: item.id, text: 'Con musgo', actor: scout, channel: 'cli' },
+        {
+          id: item.id,
+          text: 'Con musgo',
+          actor: scout,
+          channel: 'cli',
+          fromMessage: said.message.id,
+        },
         now,
       );
 
@@ -318,6 +363,39 @@ describe('the person answers', () => {
       );
       expect(nextFor(ctx, 'scout', {}, now).item).toBe(item.id);
       expect(claimItem(ctx, { id: item.id, actor: scout }, now).lease?.holder).toBe('scout');
+    });
+
+    // F2 (field study 3): the person answered a few minutes after the question, with the asker's
+    // lease about to run out, and the card turned «atascado» in red right after the tap, while the
+    // asker was about to pick the answer up.
+    it('answered while its lease is about to run out, gives it a lease to pick the answer up with', () => {
+      const ctx = memoryContext();
+      const item = working(ctx);
+      waits(ctx);
+      ask(ctx, item.id);
+      tick += 14 * 60;
+      // It called Otea a moment ago (a step with no lease renewal of its own): its session is there.
+      seeAgent(ctx.db, { agent: 'kiln', channel: 'cli', call: true }, now);
+
+      answerQuestion(ctx, { id: item.id, text: 'Con musgo', actor: you, channel: 'ui' }, now);
+      tick += 3 * 60;
+
+      const after = getItem(ctx, item.id, now);
+      expect(after.lease?.holder).toBe('kiln');
+      expect(after.expiredLease).toBeUndefined();
+    });
+
+    it('answered with plenty of its lease left, writes no new lease', () => {
+      const ctx = memoryContext();
+      const item = working(ctx);
+      ask(ctx, item.id);
+      const before = getItem(ctx, item.id, now).lease;
+      tick += 2 * 60;
+      seeAgent(ctx.db, { agent: 'kiln', channel: 'cli', call: true }, now);
+
+      answerQuestion(ctx, { id: item.id, text: 'Con musgo', actor: you, channel: 'ui' }, now);
+
+      expect(getItem(ctx, item.id, now).lease?.expiresAt).toBe(before?.expiresAt);
     });
 
     it('answered in Otea, leaves it to whichever agent claims it', () => {
@@ -340,10 +418,63 @@ describe('the person answers', () => {
       waits(ctx);
       ask(ctx, item.id);
       releaseItem(ctx, { id: item.id, actor: kiln }, now);
+      declareAssistant(ctx.db, 'scout', now);
+      const said = postPersonMessage(projectOf('/nowhere', ctx), { text: 'Con musgo' }, now);
 
-      noteChatAnswer(ctx, { id: item.id, text: 'Con musgo', actor: scout, channel: 'cli' }, now);
+      noteChatAnswer(
+        ctx,
+        {
+          id: item.id,
+          text: 'Con musgo',
+          actor: scout,
+          channel: 'cli',
+          fromMessage: said.message.id,
+        },
+        now,
+      );
 
       expect(getItem(ctx, item.id, now).lease?.holder).toBe('kiln');
+    });
+  });
+
+  // D-816632: an unrelated agent answered in the person's name. Only the agent that asked, or the
+  // assistant with words the person wrote in Talk, notes an answer from the chat.
+  describe('who may note an answer from the chat', () => {
+    const asked = () => {
+      const ctx = memoryContext();
+      const item = working(ctx);
+      ask(ctx, item.id);
+      const note = (actor: typeof scout, fromMessage?: number) => () => {
+        const from = fromMessage === undefined ? {} : { fromMessage };
+        const input = { id: item.id, text: 'Con musgo', actor, channel: 'cli' as const, ...from };
+        return noteChatAnswer(ctx, input, now);
+      };
+      return { ctx, item, note };
+    };
+
+    it('refuses an agent that did not ask, and leaves the question open', () => {
+      const { ctx, item, note } = asked();
+      const refused = refusal(note(scout));
+      expect([refused.code, refused.message]).toEqual([
+        'forbidden',
+        expect.stringContaining('who asked it'),
+      ]);
+      expect(getItem(ctx, item.id, now).asks?.by).toBe('kiln');
+    });
+
+    it('refuses the assistant without a message of the person, and with words they did not write', () => {
+      const { ctx, note } = asked();
+      declareAssistant(ctx.db, 'scout', now);
+      expect(refusal(note(scout)).code).toBe('quote_required');
+      const said = postPersonMessage(projectOf('/nowhere', ctx), { text: 'Liso' }, now);
+      expect(refusal(note(scout, said.message.id)).code).toBe('quote_required');
+    });
+
+    it('refuses another agent even when the project has an assistant', () => {
+      const { ctx, note } = asked();
+      declareAssistant(ctx.db, 'sol', now);
+      const said = postPersonMessage(projectOf('/nowhere', ctx), { text: 'Con musgo' }, now);
+      expect(refusal(note(scout, said.message.id)).code).toBe('forbidden');
     });
   });
 

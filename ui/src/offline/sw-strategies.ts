@@ -227,7 +227,10 @@ export const DATA_CACHE = 'otea-data';
 
 // Each project keeps its answers in a cache of its own; the computer's own API in DATA_CACHE.
 export function dataCacheFor(url: string): string {
-  const project = projectOfUrl(url);
+  return dataCacheOf(projectOfUrl(url));
+}
+
+export function dataCacheOf(project: string | undefined): string {
   return project === undefined ? DATA_CACHE : `${DATA_CACHE}-${project}`;
 }
 

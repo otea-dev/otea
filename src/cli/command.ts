@@ -38,6 +38,8 @@ export type Input = {
   unnamedTerminal?: boolean;
   // How the agent reached the command, recorded on its writes: the CLI itself or the MCP server.
   channel: AgentChannel;
+  // The command being run, by name (`wait`, `profile`...).
+  command?: string;
   // What the agent came through, recorded with its presence: the MCP client, or the CLI itself.
   harness?: Harness | undefined;
   // The agent's first call in a new session (an MCP server it has not called before): its profile

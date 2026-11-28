@@ -62,7 +62,7 @@ describe('the agents across projects', () => {
     expect(html).toContain('Agentes');
     expect(html).toContain('en todos los proyectos');
     expect(html).toMatch(
-      /data-status="silent"[^>]*>.*sin señal.*<a href="\/p\/beta-aaaaaa\/#\/">Beta/,
+      /data-status="silent"[^>]*>.*sin novedades.*<a href="\/p\/beta-aaaaaa\/#\/">Beta/,
     );
     expect(html).toMatch(/data-status="working"[^>]*>.*trabajando.*<a href="#\/">Alfa/);
     expect(html).toContain('con 2 ítems');

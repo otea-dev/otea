@@ -21,6 +21,12 @@ function age(minutes: number): string {
   return t('when.days', { count: Math.round(minutes / 1440) });
 }
 
+// How long something has waited, as the age column says it (12 min, 3 h, yesterday), for what is no
+// item (a question on a Bandeja note).
+export function waitedText(since: string | null, now: number): string {
+  return since === null ? '' : age((now - Date.parse(since)) / MIN);
+}
+
 // How long a live lease has left, «quedan 18 min»; null when it ran out.
 export function leaseLeftText(lease: Item['lease'], now: number): string | null {
   const live = activeLease(lease, now);
@@ -44,6 +50,8 @@ export function whenText(item: Item, now: number): { text: string; warn: boolean
       const left = Math.max(1, Math.ceil((Date.parse(lease.expiresAt) - now) / MIN));
       return { text: t('when.left', { time: span(left) }), warn: false };
     }
+    // An agent still connected: its lease ran out and the item went back to the queue, no alarm.
+    if (item.expiredLease?.connected) return { text: t('when.lapsed'), warn: false };
     if (item.expiredLease) return { text: t('when.expired'), warn: true };
   }
   return { text: age((now - turnSince(item)) / MIN), warn: false };

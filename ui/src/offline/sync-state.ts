@@ -51,6 +51,17 @@ export function readOf(headers: Pick<Headers, 'get'>): Read {
 let state: SyncState = { offline: false, syncedAt: null };
 const listeners = new Set<() => void>();
 
+// Opened cold (from a notification, from the home screen), a phone takes seconds to reach the PC:
+// the service worker gives up on the first reads after four and serves what it kept, and the PC
+// answers a moment later. Offline is not said for that: a read the cache answered, or that got no
+// answer, in the first STARTUP_MS of the page counts only if no answer from the PC came by the end
+// of it. After that, or once the PC has answered, a failed read says it at once.
+export const STARTUP_MS = 7_000;
+let startedAt = Date.now();
+let answered = false;
+let held: Read | undefined;
+let settle: ReturnType<typeof setTimeout> | undefined;
+
 function set(next: SyncState) {
   const same =
     next.offline === state.offline &&
@@ -63,6 +74,23 @@ function set(next: SyncState) {
 }
 
 export function noteRead(read: Read, now = Date.now()): void {
+  if (read.kind === 'fresh' || read.kind === 'refused') {
+    answered = true;
+    held = undefined;
+  } else if (!answered && now - startedAt < STARTUP_MS) {
+    held = read;
+    clearTimeout(settle);
+    settle = setTimeout(() => settleStartup(), startedAt + STARTUP_MS - now + 1);
+    return;
+  }
+  set(afterRead(state, read, now));
+}
+
+// The end of the grace: a PC that has not answered by now is offline, as the last read said.
+export function settleStartup(now = Date.now()): void {
+  if (answered || held === undefined || now - startedAt < STARTUP_MS) return;
+  const read = held;
+  held = undefined;
   set(afterRead(state, read, now));
 }
 
@@ -78,6 +106,10 @@ export function useSync(): SyncState {
 }
 
 // For tests: back to a fresh start.
-export function resetSync(): void {
+export function resetSync(now = Date.now() - STARTUP_MS): void {
+  clearTimeout(settle);
   state = { offline: false, syncedAt: null };
+  startedAt = now;
+  answered = false;
+  held = undefined;
 }

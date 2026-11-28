@@ -3,13 +3,19 @@ import type { Catalog } from '../i18n.ts';
 // El área shell del catálogo en español: la barra de arriba, sus menús, el riel, Preferencias y la
 // nota de idioma de la primera vez. Las palabras son las del mock.
 export const shell = {
+  // Las primeras paradas de la página: saltan el riel hasta donde está el trabajo
+  'skip.label': 'Saltar a',
+  'skip.content': 'Ir al contenido',
+  'skip.compose': 'Ir al cuadro de mensaje',
+  'skip.answer': 'Ir a la pregunta',
+  'skip.review': 'Ir a la siguiente revisión',
   // La barra: el proyecto, la marca y los agentes conectados a este proyecto
   'shell.projects': 'proyectos',
   'shell.projectsTitle': 'Proyectos',
   'shell.projectSwitch': '{project}, cambiar de proyecto',
   'shell.projectOpen': 'abierto ahora',
   'shell.newProject': 'proyecto nuevo: {command} en un repo',
-  'shell.allProjectsLine': 'lo que te espera, en todos lados',
+  'shell.allProjectsLine': 'lo que te toca, en todos lados',
   'shell.unavailable': 'no se puede leer ahora',
   'shell.waitingThere': { one: '{count} te espera', other: '{count} te esperan' },
   'shell.nothingThere': 'nada te espera',
@@ -27,7 +33,7 @@ export const shell = {
   'shell.pill.working': { one: '{count} trabajando', other: '{count} trabajando' },
   'shell.pill.waiting': { one: '{count} escuchando', other: '{count} escuchando' },
   'shell.pill.connected': { one: '{count} conectado', other: '{count} conectados' },
-  'shell.pill.silent': { one: '{count} sin señal', other: '{count} sin señal' },
+  'shell.pill.silent': { one: '{count} sin novedades', other: '{count} sin novedades' },
   'shell.pill.away': { one: '{count} ausente', other: '{count} ausentes' },
   'shell.pill.noProfile': { one: '{count} sin perfil', other: '{count} sin perfil' },
   'shell.pill.of': 'de {count}',
@@ -35,11 +41,12 @@ export const shell = {
   'shell.row.work': 'trabaja en',
   'shell.row.quiet': 'ausente desde {time} ·',
   // Conectado, y la reserva de un ítem suyo venció: puede seguir en ello (se dice con el estado)
-  'shell.row.lapsed': 'su reserva de {id} venció',
+  'shell.row.lapsed': 'se acabó su tiempo en {id}',
   'shell.row.wait': 'espera tu respuesta ·',
   'shell.row.idle': 'escuchando · libre desde {time}',
   'shell.row.connected': 'conectado · libre; verá lo nuevo cuando vuelva a esperar',
-  'shell.row.silent': 'sin señal en',
+  'shell.row.silent': 'sin novedades en',
+  'shell.row.hushed': '· sin novedades hace {minutes} min',
   'shell.row.noProfile': 'no toma pasos hasta declarar modelo y esfuerzo',
   'shell.flag.noProfile': 'sin perfil',
   'shell.flag.unconfirmed': 'sin confirmar',
@@ -98,6 +105,11 @@ export const shell = {
   'prefs.dek':
     'Lo tuyo, no del proyecto: cómo se ve y habla Otea para ti, qué te avisa y tu sesión. Lo del proyecto está en Configuración.',
   'prefs.sec.appearance': 'Apariencia',
+  'prefs.sec.review': 'Revisiones',
+  'prefs.review.full': 'Todo',
+  'prefs.review.plain': 'En palabras sencillas',
+  'prefs.review.note':
+    'En palabras sencillas, una revisión empieza por lo que cambió y las imágenes; la rama, el diff, la salida de las pruebas y los archivos que comparten dos cambios esperan tras «Detalles técnicos». El celular siempre se lee así.',
   'prefs.sec.notify': 'Avisos',
   'prefs.sec.window': 'Ventana',
   'prefs.sec.app': 'Aplicación',
@@ -120,18 +132,21 @@ export const shell = {
 
   // Palabras que otras áreas todavía leen
   'rail.all': 'Todo el trabajo',
-  'rail.waiting': 'te esperan',
+  'rail.waiting': 'te toca',
   'rail.official': 'oficial',
   'rail.projects': 'Todos los proyectos',
 
   // El riel
   'nav.toca': 'Te toca',
   'nav.atasco': 'Atasco',
+  'nav.pending': { one: '{count} pendiente', other: '{count} pendientes' },
+  'nav.stuckCount': { one: '{count} atascado', other: '{count} atascados' },
   'nav.views': 'vistas',
   'nav.boards': 'tableros',
   'nav.boardPair': 'Te toca: {yours} · Abiertos: {open}',
   'nav.newBoard': 'Nuevo tablero',
   'nav.newItem': 'Nuevo ítem',
+  'nav.jot': 'Anotar idea',
   'nav.newItemIn': 'Nuevo ítem en {board}',
   'nav.project': 'proyecto',
   'nav.studio': 'Studio',

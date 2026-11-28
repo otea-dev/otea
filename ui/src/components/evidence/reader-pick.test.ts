@@ -118,7 +118,9 @@ describe('pickableOn: what a note can be on inside a file', () => {
 describe('pickHint: what the note box says a click does on the file shown', () => {
   it('names only what the file takes: a line, a node, a point, or the whole file', () => {
     setLanguage('es');
-    expect(pickHint(e('log', 'a.log'), false)).toBe('Haz clic en una línea para anclar la nota.');
+    expect(pickHint(e('log', 'a.log'), false)).toBe(
+      'Haz clic en una línea para anclar la nota, o llega a ella con las flechas y pulsa Intro.',
+    );
     expect(pickHint(e('diagram', 'flujo.mmd'), true)).toBe(
       'Toca un nodo del diagrama para anclar la nota.',
     );

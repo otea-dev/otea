@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import {
   type Cli,
   cliAt,
+  dropItemDirectly,
   presetCollection,
   type SeededRepo,
   seededLocalRepo,
@@ -141,15 +142,7 @@ describe('relations', () => {
   describe('list --parent and show', () => {
     beforeEach(async () => {
       await otea('create', '--collection', 'parts', '--title', 'Fur');
-      await otea(
-        'relay',
-        'PARTS-4',
-        'dropped',
-        '--quote',
-        'Drop it',
-        '--reason',
-        'Reused the fox fur',
-      );
+      dropItemDirectly(repo.dir, 'PARTS-4');
       await otea('link', 'PARTS-3', 'parent', 'PARTS-1');
       await otea('link', 'PARTS-4', 'parent', 'PARTS-1');
       await otea('link', 'PARTS-2', 'blocks', 'PARTS-3');

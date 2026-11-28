@@ -13,6 +13,19 @@ export function keepWaitingCommand(agent: string, collection?: string, unclaimed
   return `otea wait --turn agent${unclaimed ? ' --unclaimed' : ''}${on(collection)} --as ${agent}`;
 }
 
+// The assistant's wait (otea wait --assistant), as it runs it.
+export function assistantWaitCommand(agent: string): string {
+  return `otea wait --assistant --as ${agent}`;
+}
+
+// What otea wait --assistant ends with once it woke: act on what woke it, then wait again.
+export function assistantWaitAgainLine(agent: string, channel: AgentChannel): string {
+  const shell = assistantWaitCommand(agent);
+  return channel === 'mcp'
+    ? `Then wait again in a background shell, which keeps your chat free: $ ${shell}. Without a shell, wait { assistant: true } holds your chat until it returns.`
+    : `Then wait again: ${shell} in the background if you can.`;
+}
+
 // The wait and the next as the agent runs them: on the command line with its name; over MCP as the
 // tools (MCP words turn them into tool calls, which take the name as `as`), with the wait first as a
 // shell line ("$ ", kept as it is) to run in the background, since the wait tool holds the chat

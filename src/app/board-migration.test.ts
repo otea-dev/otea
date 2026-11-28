@@ -74,6 +74,8 @@ describe('migrateBoards', () => {
     expect(getItem(ctx, asked.id).state).toBe('incomplete');
     const migrate = selectEvents(ctx.db, asked.id).at(-1);
     expect(migrate?.data).toMatchObject({ reason: 'migrate', note: '¿Qué versión?' });
+    // Otea's own reading of old data is never signed as the person's.
+    expect(migrate?.actor).toEqual({ kind: 'otea', name: 'otea' });
     expect(getItem(ctx, dup.id).state).toBe('dropped__duplicate');
     expect(getItem(ctx, asked.id).fields.severity).toBe('high');
     expect(migrateBoards(ctx, 'es', now, sequenceIds())).toBe(0);

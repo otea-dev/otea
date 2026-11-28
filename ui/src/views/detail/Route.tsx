@@ -130,8 +130,10 @@ export function Route({ id, steps, words, ci, lane, look, dips, phone = false }:
   useLayoutEffect(() => {
     const el = wrap.current;
     if (!el) return;
-    // The phone fits the route to its width (the names give way); the desk keeps 420 at least.
-    const min = phone ? 0 : 420;
+    // The route fits the room it has, on the phone and beside the list alike (the names give way
+    // where two would touch): a route kept wider than its sheet lost its last step (HECHO) off the
+    // edge. The desk keeps 280 so the steps never crowd the lanes' own names.
+    const min = phone ? 0 : 280;
     const measure = () => setW(Math.max(min, el.clientWidth));
     measure();
     const ro = new ResizeObserver(measure);
@@ -180,7 +182,8 @@ export function Route({ id, steps, words, ci, lane, look, dips, phone = false }:
     g.xs,
     steps.map((s, i) => (words[i] ?? s.name).toLocaleUpperCase()),
     g.ci,
-    small ? 7.4 : 7.9,
+    // A capital at the labels' 11 px, with their tracking (sheet.css .rlab).
+    small ? 8.4 : 8.9,
   );
   const future = futureD(g);
   return (

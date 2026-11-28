@@ -444,6 +444,9 @@
   .row .m .bd {
     display: none;
   }
+  .row .m .pw {
+    display: inline-flex;
+  }
   .sec h2 {
     font-size: 19px;
   }
@@ -512,8 +515,14 @@
   .route-wrap {
     overflow-x: auto;
     overflow-y: hidden;
-    height: 112px;
+    /* the drawing ends at its lower lane (y 68, its light a dozen below): the 104 it is drawn in left
+       a dead band under it (field study 7: ~120 px between the route and the list) */
+    height: 86px;
     scrollbar-width: none;
+  }
+  /* …unless a send-back dips below it, with its round named at y 99 */
+  .route-wrap:has(.dips text) {
+    height: 112px;
   }
   .toast {
     bottom: 76px;
@@ -548,23 +557,22 @@
   .app {
     padding-top: env(safe-area-inset-top, 0px);
   }
-  /* The bottom bar's height, one number for what stands above it (the install banner) and what
-     ends clear of it (the pages). */
+  /* The bottom bar's height, one number for what ends clear of it (the pages). */
   :root {
     --tabbar-h: calc(74px + env(safe-area-inset-bottom, 0px));
+    --bar-h: 56px;
   }
-  /* Every page ends clear of the bottom bar, and of the install banner while that is up
-     (InstallBanner.tsx measures it into --install-h). */
+  /* Every page ends clear of the bottom bar. */
   .view > * {
-    padding-bottom: calc(var(--tabbar-h) + 16px + var(--install-h, 0px));
+    padding-bottom: calc(var(--tabbar-h) + 16px);
   }
 
-  /* The bottom bar (mobile mock 1, 4): Te toca · Nuevo · Panel, solid on the screen's foot. One
+  /* The bottom bar (mobile mock 1, 4): Hablar · Te toca · Nuevo · Panel, solid on the screen's foot. One
      create button, nothing floating over content: every page ends above it. */
   .tabbar {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    /* The three labels share a line; Nuevo's round stands a little taller than the icons. */
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    /* The four labels share a line; Nuevo's round stands a little taller than the icons. */
     align-items: end;
     position: fixed;
     left: 0;
@@ -642,6 +650,21 @@
   }
   .tabbar .plus:disabled {
     opacity: 0.45;
+  }
+  /* The keys' ring sits inside each cell (the screen's edge would cut it), and Nuevo's is the
+     round's own, not a square round the cell. */
+  .tabbar .tab:focus-visible {
+    outline-offset: -3px;
+  }
+  .tabbar .plus:focus-visible {
+    outline: none;
+  }
+  .tabbar .plus:focus-visible .disc {
+    outline: 2px solid var(--you);
+    outline-offset: 2px;
+  }
+  :root[data-input="pointer"] .tabbar .plus:focus-visible .disc {
+    outline: none;
   }
 
   /* A board on the phone (mobile mock 4): read in Lista, filtered by step with a row of chips that
@@ -1057,8 +1080,16 @@
 /* Under the title, the day as the agents column said it. */
 .p-recap {
   margin: 10px 0 0;
-  font: 400 12.5px / 1.5 var(--mono);
+  font: 400 13px / 1.5 var(--sans);
   color: var(--ink-3);
+}
+/* the figures are the machine's, in mono, as on the desk (toca.css .recap .n) */
+.p-recap .n {
+  color: var(--ink);
+  font-size: 12.5px;
+}
+.p-recap .n.you {
+  color: var(--you-ink);
 }
 /* A review says what the agent delivered: its mark, its note, how much evidence. */
 .row .p-said {
@@ -1484,10 +1515,88 @@
   height: calc(94dvh - var(--kb, 0px));
   max-height: calc(94dvh - var(--kb, 0px));
 }
+/* The sheet is a column the reader fills, so its foot (the note and Aprobar / Devolver) stands at
+   the sheet's bottom even when the file is short, instead of right under it with the sheet empty
+   beneath (field study 5). A tall file scrolls the sheet, and the foot sticks as before. */
+.nsheet.p-read {
+  display: flex;
+  flex-direction: column;
+}
+.nsheet.p-read > [data-i]:last-child {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
 .p-read .ev-reader {
-  display: grid;
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
   gap: 10px;
   min-width: 0;
+}
+.p-read .ev-reader-foot {
+  margin-top: auto;
+}
+/* the picture runs the sheet's whole width (below), and the foot over it does too: its covering
+   background reaches the edge, so no sliver of the file shows beside it */
+.p-read .ev-reader-foot {
+  margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  padding-inline: max(16px, env(safe-area-inset-left, 0px));
+}
+/* One row of tools under the file's name: which side, compare (an icon), and the zoom. Before, the
+   compare button took a row of its own at the width of its words, and the three zoom buttons
+   another, both flush right, at the size of a thumb each. */
+.p-read .ev-reader-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.p-read .ev-reader-pair {
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  min-width: 0;
+}
+.p-read .ev-reader-pair > span:first-child {
+  display: none;
+}
+.p-read .ev-reader-pair[data-blind] > span:first-child {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.p-read .ev-compare-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding-inline: 12px;
+}
+.p-read .ev-compare-btn .ic {
+  display: block;
+}
+.p-read .ev-compare-btn .lb {
+  display: none;
+}
+.p-read .ev-reader-zoom {
+  flex: none;
+  margin-left: auto;
+  gap: 2px;
+}
+.p-read .ev-reader-zoom .btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+/* the picture runs the sheet's whole width: the stage's own frame and dots stay for the desk */
+.p-read .ev-reader-view {
+  margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+}
+/* a short screen keeps the picture: the foot says its count and its moves, not the sentence under
+   them */
+@media (max-height: 640px) {
+  .p-read .ev-reader-notice {
+    display: none;
+  }
 }
 .p-read .ev-reader-bar {
   position: sticky;
@@ -1503,6 +1612,11 @@
   max-width: 100%;
   height: auto;
   touch-action: pinch-zoom;
+}
+/* A whole-page capture is read down its width, as on the desk: fitted to the height it was a sliver
+   (field study 4). The sheet scrolls; a pinch zooms. */
+.p-read .ev-stage img[data-tall] {
+  max-height: none;
 }
 .p-read .ev-code {
   font-size: 12px;
@@ -1659,8 +1773,15 @@
 .p-dock .btn,
 .p-sb .btn {
   min-height: 48px;
+  height: auto;
+  padding-block: 6px;
+  justify-content: center;
+  text-align: center;
+  /* a long step name («Devolver a Investigar») wraps inside the button instead of being cut at 390 */
+  white-space: normal;
+  overflow-wrap: anywhere;
   border-radius: 10px;
-  font: 600 15.5px var(--sans);
+  font: 600 15.5px / 1.15 var(--sans);
   letter-spacing: -0.005em;
 }
 /* The other ways on, under the two buttons: «Mover a Hecho» (P7-R2-3). */
@@ -1690,6 +1811,14 @@
 .p-says b {
   font-weight: 500;
   color: var(--ink-2);
+}
+/* what to know before Aprobar (ReviewNotices): in the page, above the dock, the full width */
+.p-rvn {
+  margin-bottom: 0;
+}
+.p-rvn .bstrip {
+  max-width: none;
+  margin: 10px 0 0;
 }
 .p-dock .hint b {
   font-weight: 500;
@@ -1836,42 +1965,30 @@
 }
 
 /* ───────── install Otea on the home screen: the first open in a phone's browser ───────── */
-/* Above the tab bar, in reach of the thumb: at the top it lay over the page's own header (its title
-   and first line). The first-run language note takes that place until it is answered, so the banner
-   waits for it. */
+/* Never over the page (field study 5: a card over the rows of Te toca and the foot of Hablar): a
+   quiet note in the header of Te toca, in the page's flow, on a rule like a margin note. A phone on
+   its side has no room for it (below), and Preferencias offers it again. */
 .install-banner {
   display: none;
 }
 @media (max-width: 720px) {
-  /* ...and on a page with its moves docked it would lie over Aprobar and Devolver, and over the
-     next-step card that rests at the foot of Te toca (P7-F1): the card goes first, once, and the
-     banner comes when it is put away. */
-  body:has(.language-note-host) .install-banner,
-  body:has(.p-dock) .install-banner,
-  body:has(.nextstep) .install-banner {
-    display: none;
-  }
   .install-banner {
-    position: fixed;
-    bottom: calc(var(--tabbar-h) + 10px);
-    left: max(12px, env(safe-area-inset-left, 0px));
-    right: max(12px, env(safe-area-inset-right, 0px));
-    z-index: 34;
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 12px 14px 12px;
-    border: 1px solid var(--rule);
-    border-radius: 12px;
-    background: var(--sheet);
-    box-shadow: 0 14px 34px -18px var(--shadow);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 14px;
+    margin: 12px 0 2px;
+    padding: 2px 0 2px 13px;
+    border-left: 2px solid var(--rule-2);
   }
   .install-banner h2 {
-    font: 500 15px / 1.35 var(--sans);
+    flex: 1 1 100%;
+    font: 500 13.5px / 1.4 var(--sans);
     color: var(--ink);
   }
   .install-banner p {
-    font: 400 13.5px / 1.45 var(--sans);
+    flex: 1 1 100%;
+    font: 400 13px / 1.45 var(--sans);
     color: var(--ink-2);
     overflow-wrap: anywhere;
   }
@@ -1882,8 +1999,11 @@
   .install-acts {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 4px;
+    gap: 6px;
+    margin-top: 2px;
+  }
+  .install-acts .btn {
+    min-height: 40px;
   }
 }
 
@@ -1937,7 +2057,38 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-
+}
+/* 320 px: the project pill, the magnifier and the connection pill together need more than the bar
+   has (the pill lay under the magnifier, and «Sin conexión» was cut). The project's name gives way
+   first, with an ellipsis; the magnifier keeps its place beside it. */
+@media (max-width: 360px) {
+  .tb-start {
+    min-width: 100px;
+  }
+  .pill {
+    min-width: 100px;
+    column-gap: 7px;
+    padding-left: 10px;
+  }
+  .tb-end .apill {
+    padding: 0 10px;
+    gap: 6px;
+    font-size: 13px;
+  }
+  /* The dock's calm status lines are one line each at 320 px (the two of them took a third of the
+     screen over the page): what a screen reader gets is whole, and what is said loudly (nobody is
+     listening, a move refused) still takes the lines it needs. */
+  .p-dock .hint.unseen,
+  .p-dock .hint.unheard[data-unheard="calm"] {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .p-dock {
+    padding-top: 8px;
+  }
+}
+@media (max-width: 720px) {
   /* The sheet keeps one height as the results come and go, and sits on the keyboard (--kb). */
   .nsheet.search {
     bottom: var(--kb, 0px);
@@ -2032,5 +2183,205 @@
     font: 400 12px / 1.35 var(--mono);
     color: var(--ink-3);
     overflow-wrap: anywhere;
+  }
+}
+
+/* ───────── a screen too short for the page (a phone on its side: 390 px, or 320) ─────────
+   The top bar is slimmer and the bottom bar leaves: it stands on the left as a strip the height of
+   the window, so what stands beside it (the thread, the first rows) keeps the whole height. By
+   height alone, so it also holds for the phone layout of a window that is short. */
+@media (max-height: 500px) {
+  :root {
+    --strip-w: calc(64px + env(safe-area-inset-left, 0px));
+    /* no bar at the foot: a page ends clear of the home bar only */
+    --tabbar-h: env(safe-area-inset-bottom, 0px);
+    --bar-h: 46px;
+  }
+  .app {
+    grid-template-rows: 46px minmax(0, 1fr);
+  }
+  .topbar {
+    height: 46px;
+  }
+  .pill,
+  .apill {
+    height: 38px;
+  }
+  /* While the strip is there the page, its top bar too, stands to its right; when the strip sinks
+     (an item, the new item page) the page glides back. The strip takes the notch's side. */
+  .app {
+    transition: padding-left var(--t-small) var(--o-settle);
+  }
+  .app:has(~ .tabbar) {
+    padding-left: calc(var(--strip-w) + 16px);
+  }
+  .app:has(~ .tabbar) > .main {
+    margin-left: -16px;
+  }
+  .app:has(~ .tabbar) .view {
+    padding-left: 16px;
+  }
+  .tabbar {
+    top: 0;
+    right: auto;
+    bottom: 0;
+    left: 0;
+    width: var(--strip-w);
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(0, 60px);
+    align-content: center;
+    align-items: stretch;
+    padding: env(safe-area-inset-top, 0px) 6px env(safe-area-inset-bottom, 0px)
+      calc(6px + env(safe-area-inset-left, 0px));
+    background: var(--ground);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-top: 0;
+    border-right: 1px solid var(--rule);
+  }
+  .tabbar .tab {
+    min-height: 48px;
+    justify-content: center;
+    gap: 2px;
+    padding: 2px 0;
+    font-size: 11px;
+  }
+  .tabbar .tab .ic {
+    width: 22px;
+    height: 22px;
+  }
+  .tabbar .disc {
+    width: 34px;
+    height: 34px;
+  }
+  .tabbar .tbadge {
+    top: 2px;
+  }
+  /* a phone on its side has no room for the install note: it is left for the next open */
+  .install-banner {
+    display: none;
+  }
+  /* An item's dock on its side: the moves on the left and what is said about them beside them,
+     instead of under them (they were half the screen over a route and a title) */
+  .p-dock {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    column-gap: 16px;
+    align-content: center;
+    align-items: center;
+    padding-block: 8px;
+  }
+  .p-dock:not(:has(> :not(.btns))) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .p-dock > .btns {
+    grid-column: 1;
+    grid-row: 1 / span 4;
+  }
+  .p-dock > :not(.btns) {
+    grid-column: 2;
+    margin: 0;
+    text-align: left;
+    justify-content: flex-start;
+  }
+  /* Hablar is the one page that fills the height (the thread and its composer): nothing under it */
+  .view > .hb {
+    padding-bottom: calc(var(--tabbar-h) + 4px);
+  }
+  /* Te toca's head on its side: the title at a headline's size with its dek on the same line, and
+     the rows right under it (they were below the fold at 844 x 390: a display title, a dek and the
+     day took the screen). The day's tally waits for an upright phone. */
+  body:has(.tabbar) .panel {
+    padding-top: 14px;
+  }
+  body:has(.tabbar) .panel .head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0 14px;
+    margin-bottom: 6px;
+  }
+  /* the assistant-away card over the rows: its title and its way to Hablar, the sentence between
+     them waits for an upright phone */
+  body:has(.tabbar) .assistant-off {
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    gap: 10px;
+  }
+  body:has(.tabbar) .assistant-off p {
+    display: none;
+  }
+  body:has(.tabbar) .assistant-off-go {
+    margin-top: 2px;
+  }
+  body:has(.tabbar) .panel .head .kicker,
+  body:has(.tabbar) .panel .head .p-recap {
+    display: none;
+  }
+  body:has(.tabbar) .panel .head .display {
+    margin-bottom: 0;
+    font-size: 29px;
+  }
+  body:has(.tabbar) .panel .head .dek {
+    flex: 1 1 12em;
+    min-width: 0;
+    font-size: 15px;
+  }
+  /* the reader on its side: the picture first. Its foot keeps only the two moves; the dots, the
+     note box and the count wait for an upright phone (they took the whole window, and the file
+     none of it) */
+  .p-read .ev-lane,
+  .p-read .ev-reader-note,
+  .p-read .ev-reader-seen {
+    display: none;
+  }
+  .p-read .ev-reader-bar .btn,
+  .p-read .ev-compare-btn,
+  .p-read .ev-reader-zoom .btn {
+    min-height: 36px;
+  }
+}
+/* the smallest phones on their side (568 x 320): one step slimmer again */
+@media (max-height: 360px) {
+  :root {
+    --bar-h: 40px;
+  }
+  .app,
+  .app[data-offline] {
+    grid-template-rows: 40px minmax(0, 1fr);
+  }
+  .app[data-offline] {
+    grid-template-rows: 40px auto minmax(0, 1fr);
+  }
+  .topbar {
+    height: 40px;
+  }
+  .pill,
+  .apill {
+    height: 34px;
+  }
+  .sbtn {
+    width: 34px;
+    height: 34px;
+  }
+  .tabbar {
+    grid-auto-rows: minmax(0, 54px);
+  }
+  .tabbar .tab {
+    min-height: 44px;
+  }
+  .tabbar .disc {
+    width: 30px;
+    height: 30px;
+  }
+}
+/* the page's glide back from the strip is a crossfade's worth under reduced motion: none */
+:root[data-motion="reduced"] .app {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) .app {
+    transition: none;
   }
 }

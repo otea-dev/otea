@@ -386,9 +386,10 @@ export function RoundsModule({
             : t('rounds.count', { count: rounds.length })}
         </span>
       </div>
-      <div className="rd-scroll">
+      {/* biome-ignore lint/a11y/noNoninteractiveTabindex: the rail scrolls sideways; the keys reach it */}
+      <section className="rd-scroll" tabIndex={0} aria-label={title}>
         <Rail rounds={rounds} closed={closed} name={name} />
-      </div>
+      </section>
       <article className="rd-current">
         <header className="rd-current-head">
           <h3 className="t-h">{t('rounds.round', { n: latest.n })}</h3>

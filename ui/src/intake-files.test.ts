@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { setLanguage } from './i18n/i18n.ts';
 import {
   MAX_FILE_BYTES,
   MAX_FILES,
   rolesFor,
+  shownFileName,
   sizeLabel,
   tooLarge,
   withFiles,
@@ -29,6 +31,37 @@ const typeWith = (evidence: LayoutEntry[]): TypeView => ({
 });
 
 const file = (name: string, size = 10) => ({ name, size }) as File;
+
+afterEach(() => setLanguage('en'));
+
+// E1: Chrome's camera names a photo by a long number («1732717234567.jpg»); the chip under the
+// box said that. A name with words of its own is the person's, and stays.
+describe('a file name as the chips show it', () => {
+  const at = (h: number, m: number) => new Date(2026, 10, 27, h, m).getTime();
+
+  it('reads a camera’s number as a photo at its time', () => {
+    setLanguage('es');
+    expect(shownFileName('1732717234567.jpg', at(14, 32))).toBe(
+      `Foto ${new Intl.DateTimeFormat('es', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(1732717234567)}`,
+    );
+    expect(shownFileName('20261127_143210.jpg', at(14, 32))).toBe('Foto 14:32');
+    expect(shownFileName('image.jpg', at(9, 5))).toBe('Foto 09:05');
+    setLanguage('en');
+    expect(shownFileName('PXL_20261127_143210123.jpg', at(14, 32))).toBe('Photo 14:32');
+  });
+
+  it('says only Foto when it does not know when', () => {
+    setLanguage('es');
+    expect(shownFileName('20261127143210.png', 0)).toBe('Foto');
+  });
+
+  it('keeps a name that says something, and calls a numbered document a file', () => {
+    setLanguage('es');
+    expect(shownFileName('boton-gris.png', at(14, 32))).toBe('boton-gris.png');
+    expect(shownFileName('informe 2026.pdf', at(14, 32))).toBe('informe 2026.pdf');
+    expect(shownFileName('20261127143210.mp4', at(14, 32))).toBe('Archivo 14:32');
+  });
+});
 
 describe('intake files', () => {
   it('offers every role to a type without evidence modules', () => {

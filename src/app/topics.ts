@@ -1,5 +1,5 @@
 import { OteaError } from '../core/errors.ts';
-import type { Actor } from '../core/item.ts';
+import { type Actor, OTEA_ACTOR } from '../core/item.ts';
 import {
   commonWords,
   type Searched,
@@ -9,7 +9,9 @@ import {
 } from '../core/search-words.ts';
 import { transaction } from '../store/database.ts';
 import { type ItemRecord, selectItems } from '../store/queries.ts';
+import { assistantName } from './assistant.ts';
 import type { Context } from './context.ts';
+import { mirrorTopicTurn } from './conversation.ts';
 import { requireItem, systemClock } from './items.ts';
 
 // Side topics: questions the person asks an agent off the work at hand. Each is a short
@@ -100,6 +102,13 @@ export function topicsOn(ctx: Context): boolean {
     | { enabled: number }
     | undefined;
   return row?.enabled === 1;
+}
+
+// Whether agents are told to record topics (the guide's rule, the reminders): the switch is on and
+// the project has no assistant. With one, a question the person asks it is a consultation it saves
+// (`otea say --consultation`), and no other agent records topics.
+export function topicsGuided(ctx: Context): boolean {
+  return topicsOn(ctx) && assistantName(ctx.db) === undefined;
 }
 
 export function setTopicsOn(ctx: Context, on: boolean): void {
@@ -207,6 +216,73 @@ function addTurn(
       turn.by.name,
       at,
     );
+  // A topic is a consultation now: each turn is also kept in the conversation (M2). The topics' own
+  // pages and commands go on reading topic_turns; M3 and M7 retire them.
+  if (turn.kind !== 'event') {
+    mirrorTopicTurn(
+      ctx,
+      {
+        topic: id,
+        kind: turn.kind === 'answer' ? 'answer' : 'question',
+        text: turn.full ?? turn.text,
+        actor: turn.by,
+      },
+      () => at,
+    );
+  }
+}
+
+// The topics of before the conversation (0.7) become consultations: each of their turns is kept
+// in the conversation as addTurn does for a new one, and the turn the topic leads to its items
+// (the links and its task). A topic that already has a message in the conversation was kept as it
+// went and is left alone, so this does nothing the second time. The topics stay readable as they are.
+export function keepOldTopicsAsConsultations(ctx: Context): void {
+  const waiting = ctx.db
+    .prepare(
+      `SELECT 1 FROM topics t
+       WHERE NOT EXISTS (SELECT 1 FROM conversation_messages m WHERE m.topic = t.id) LIMIT 1`,
+    )
+    .get();
+  if (waiting === undefined) return;
+  transaction(ctx.db, () => {
+    const turns = ctx.db
+      .prepare(
+        `SELECT u.topic_id AS topic, u.kind, u.text, u.full, u.actor_kind AS actorKind,
+                u.actor_name AS actorName, u.at
+         FROM topic_turns u JOIN topics t ON t.id = u.topic_id
+         WHERE u.kind <> 'event'
+           AND NOT EXISTS (SELECT 1 FROM conversation_messages m WHERE m.topic = t.id)
+         ORDER BY u.at, u.id`,
+      )
+      .all() as Array<{
+      topic: string;
+      kind: TopicTurnKind;
+      text: string;
+      full: string | null;
+      actorKind: Actor['kind'];
+      actorName: string;
+      at: string;
+    }>;
+    for (const turn of turns) {
+      mirrorTopicTurn(
+        ctx,
+        {
+          topic: turn.topic,
+          kind: turn.kind === 'answer' ? 'answer' : 'question',
+          text: turn.full ?? turn.text,
+          actor: { kind: turn.actorKind, name: turn.actorName },
+        },
+        () => turn.at,
+      );
+    }
+    const link = ctx.db.prepare(
+      `INSERT OR IGNORE INTO conversation_links (message_id, item_id, at)
+       SELECT (SELECT MIN(root) FROM conversation_messages WHERE topic = l.topic_id), l.item_id, l.at
+       FROM topic_links l JOIN items i ON i.id = l.item_id
+       WHERE l.topic_id = ? AND l.via <> 'dismissed'`,
+    );
+    for (const topic of new Set(turns.map((turn) => turn.topic))) link.run(topic);
+  });
 }
 
 function setState(ctx: Context, id: string, state: StoredState, at: string): void {
@@ -313,6 +389,17 @@ export function answerTopic(ctx: Context, input: AnswerTopicInput, now = systemC
       ctx.db
         .prepare("UPDATE topic_turns SET text = ?, full = ?, source = 'agent' WHERE id = ?")
         .run(summary || last.text, full ?? last.full, last.id);
+      mirrorTopicTurn(
+        ctx,
+        {
+          topic: row.id,
+          kind: 'answer',
+          text: full ?? last.full ?? summary ?? last.text,
+          actor: input.actor,
+          replace: true,
+        },
+        () => at,
+      );
     } else {
       if (!summary) refuse('invalid_fields', 'An answer needs its summary (--summary)');
       addTurn(
@@ -426,7 +513,7 @@ export function forgetTopicItem(ctx: Context, item: string, at: string): void {
     ctx.db
       .prepare('UPDATE topics SET state = ?, task = NULL, updated_at = ? WHERE id = ?')
       .run(answered ? 'answered' : 'open', at, id);
-    addTurn(ctx, id, { kind: 'event', text: item, by: { kind: 'human', name: 'otea' } }, at);
+    addTurn(ctx, id, { kind: 'event', text: item, by: OTEA_ACTOR }, at);
   }
 }
 

@@ -1,13 +1,19 @@
 // The shell area of the English catalog: the topbar, its menus, the rail, Preferences and the
 // first-run language note.
 export const shell = {
+  // The first stops of the page: they jump past the rail to where the work is
+  'skip.label': 'Skip to',
+  'skip.content': 'Skip to the content',
+  'skip.compose': 'Skip to the message box',
+  'skip.answer': 'Skip to the open question',
+  'skip.review': 'Skip to the next review',
   // The topbar: the project, the mark and the agents connected to this project
   'shell.projects': 'projects',
   'shell.projectsTitle': 'Projects',
   'shell.projectSwitch': '{project}, switch project',
   'shell.projectOpen': 'open now',
   'shell.newProject': 'new project: {command} in a repo',
-  'shell.allProjectsLine': 'what waits for you, everywhere',
+  'shell.allProjectsLine': 'your turn, everywhere',
   'shell.unavailable': 'cannot be read now',
   'shell.waitingThere': { one: '{count} waits for you', other: '{count} wait for you' },
   'shell.nothingThere': 'nothing waits for you',
@@ -19,13 +25,13 @@ export const shell = {
     other: '{count} more waiting in {where}',
   },
   'shell.agentsTitle': 'Agents',
-  'shell.offline': 'Offline',
+  'shell.offline': 'No connection',
   'shell.agentsIn': 'agents in {project}',
   'shell.pill.none': 'No agents',
   'shell.pill.working': { one: '{count} working', other: '{count} working' },
   'shell.pill.waiting': { one: '{count} listening', other: '{count} listening' },
   'shell.pill.connected': { one: '{count} connected', other: '{count} connected' },
-  'shell.pill.silent': { one: '{count} no signal', other: '{count} no signal' },
+  'shell.pill.silent': { one: '{count} quiet', other: '{count} quiet' },
   'shell.pill.away': { one: '{count} away', other: '{count} away' },
   'shell.pill.noProfile': { one: '{count} without a profile', other: '{count} without a profile' },
   'shell.pill.of': 'of {count}',
@@ -37,7 +43,8 @@ export const shell = {
   'shell.row.wait': 'waits for your answer ·',
   'shell.row.idle': 'listening · free since {time}',
   'shell.row.connected': 'connected · free; it will see new work when it waits again',
-  'shell.row.silent': 'no signal on',
+  'shell.row.silent': 'quiet on',
+  'shell.row.hushed': '· quiet for {minutes} min',
   'shell.row.noProfile': 'takes no step until it declares model and effort',
   'shell.flag.noProfile': 'no profile',
   'shell.flag.unconfirmed': 'unconfirmed',
@@ -96,6 +103,11 @@ export const shell = {
   'prefs.dek':
     'Yours, not the project’s: how Otea looks and speaks for you, what it tells you and your session. The project’s own are under Settings.',
   'prefs.sec.appearance': 'Appearance',
+  'prefs.sec.review': 'Reviews',
+  'prefs.review.full': 'Everything',
+  'prefs.review.plain': 'In plain words',
+  'prefs.review.note':
+    'In plain words a review leads with what changed and the pictures; the branch, the diff, the test output and the files two changes share wait behind “Technical details”. The phone always reads this way.',
   'prefs.sec.notify': 'Notifications',
   'prefs.sec.window': 'Window',
   'prefs.sec.app': 'App',
@@ -118,18 +130,21 @@ export const shell = {
 
   // Words other areas still read
   'rail.all': 'All work',
-  'rail.waiting': 'waiting for you',
+  'rail.waiting': 'your turn',
   'rail.official': 'official',
   'rail.projects': 'All projects',
 
   // The rail
   'nav.toca': 'Your turn',
   'nav.atasco': 'Stuck',
+  'nav.pending': { one: '{count} waiting', other: '{count} waiting' },
+  'nav.stuckCount': { one: '{count} stuck', other: '{count} stuck' },
   'nav.views': 'views',
   'nav.boards': 'boards',
   'nav.boardPair': 'Your turn: {yours} · Open: {open}',
   'nav.newBoard': 'New board',
   'nav.newItem': 'New item',
+  'nav.jot': 'Jot an idea',
   'nav.newItemIn': 'New item in {board}',
   'nav.project': 'project',
   'nav.studio': 'Studio',

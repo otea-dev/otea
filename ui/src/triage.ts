@@ -12,7 +12,9 @@ import type { Waits } from './actions.ts';
 import { moveBlock, moveVariants } from './actions.ts';
 import type { FeedEvent } from './activity.ts';
 import { handedNote, type TocaContext, tocaSection } from './derive/toca.ts';
+import { handedAsMerge } from './merge-round.ts';
 import { clamp, sstep } from './motion/curves.ts';
+import { roundOf } from './rounds.ts';
 import type { Evidence, Item, ItemView, Move } from './types.ts';
 import { heldForDraft, otherMoves, planMoves } from './views/detail/moves.ts';
 
@@ -133,6 +135,8 @@ export function triageQueue(items: readonly Item[], ctx: TocaContext): string[] 
 // out: the decided cards, in the order decided, each on the pile its move put it on.
 export type TriState = {
   q: string[];
+  // The cards in the order they came, which Later never changes: what the counter reads.
+  order: string[];
   i: number;
   decided: number;
   gone: string[];
@@ -174,12 +178,22 @@ export function pileLanding(card: Box, pile: Box): { x: number; y: number; scale
 
 export const triStart = (ids: readonly string[]): TriState => ({
   q: [...ids],
+  order: [...ids],
   i: 0,
   decided: 0,
   gone: [],
   out: [],
 });
 export const triCurrent = (s: TriState): string | undefined => s.q[s.i];
+
+// «at of n» for the card on top: its place among the cards of the pass in the order they came
+// (D-c059c9). Later puts a card at the end of the line, and the counter must still move on.
+export function triPlace(s: TriState): { at: number; n: number } {
+  const here = new Set(s.q);
+  const cur = s.q[s.i];
+  const at = cur === undefined ? 0 : s.order.filter((id) => here.has(id)).indexOf(cur) + 1;
+  return { at: Math.max(at, 1), n: s.q.length };
+}
 export const triNext = (s: TriState): string | undefined => s.q[s.i + 1];
 
 // A decided card back on top of the pass, undecided again.
@@ -218,7 +232,12 @@ export function triSync(s: TriState, waiting: readonly string[]): TriState {
     back.length === 0 &&
     gone.length === s.gone.length;
   if (same) return s;
-  let next: TriState = { ...s, q: [...kept, ...added], gone: [...gone, ...back] };
+  let next: TriState = {
+    ...s,
+    q: [...kept, ...added],
+    order: [...s.order, ...added.filter((id) => !s.order.includes(id))],
+    gone: [...gone, ...back],
+  };
   for (const id of back) next = triReturn(next, id);
   return next;
 }
@@ -237,22 +256,6 @@ export function triDecide(s: TriState, kind: TriKind, to = ''): TriState {
   return { ...s, q };
 }
 
-// The round the item is in off a board: one more for every time you sent it back with notes (on a
-// board the server sends the step engine's round with the item).
-export function roundOf(id: string, feed: readonly FeedEvent[]): number {
-  return (
-    1 +
-    feed.filter(
-      (e) =>
-        e.itemId === id &&
-        e.type === 'transitioned' &&
-        e.actor.kind === 'human' &&
-        typeof e.data.reason === 'string' &&
-        e.data.reason.trim() !== '',
-    ).length
-  );
-}
-
 // What a card says under its title: who hands it to you, in which round, and what it said.
 // With the item's own history read (view), the handoff is read there: the feed may not reach it,
 // and a board keeps the handoff's words as its note.
@@ -260,7 +263,7 @@ export function cardWords(
   item: Item,
   feed: readonly FeedEvent[],
   view?: Pick<ItemView, 'state' | 'events'>,
-): { agent: string | null; say: string; round: number } {
+): { agent: string | null; say: string; round: number; merge?: true } {
   const handed = view
     ? handoffOf(view)
     : (() => {
@@ -270,7 +273,9 @@ export function cardWords(
   return {
     agent: handed?.agent ?? null,
     say: handed?.note ?? '',
-    round: item.round ?? roundOf(item.id, feed),
+    round: roundOf(item, feed),
+    // A round that only merges main into approved work: nobody sent anything back (D-9b5288).
+    ...(view && handed && handedAsMerge(view.events, view.state) ? { merge: true as const } : {}),
   };
 }
 

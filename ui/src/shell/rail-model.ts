@@ -14,7 +14,7 @@ export type RailKey =
   | 'studio'
   | 'settings'
   | 'performance'
-  | 'topics'
+  | 'hablar'
   | null;
 
 // The row the selection pill sits on: the view in sight, if the rail lists it.
@@ -35,8 +35,8 @@ export function railKey(route: Route): RailKey {
       return 'settings';
     case 'performance':
       return 'performance';
-    case 'topics':
-      return 'topics';
+    case 'hablar':
+      return 'hablar';
     default:
       return null;
   }
@@ -64,6 +64,7 @@ export function boardIcon(icon: string | null | undefined): BoardIcon {
 export function boardEntries(
   collections: readonly CollectionView[],
   items: readonly Item[],
+  now: number,
 ): BoardEntry[] {
   const letters = iconBadges(collections.map((c) => ({ name: c.name, icon: c.icon ?? undefined })));
   return collections.map((c) => {
@@ -72,7 +73,7 @@ export function boardEntries(
       name: c.name,
       icon: boardIcon(c.icon),
       ...(letter ? { letter } : {}),
-      ...boardCounts(items, c.name),
+      ...boardCounts(items, c.name, now),
     };
   });
 }

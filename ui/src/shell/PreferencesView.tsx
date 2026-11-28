@@ -6,8 +6,10 @@ import { VersionLine } from '../components/VersionLine.tsx';
 import { isStandalone } from '../home-screen.ts';
 import { t } from '../i18n/i18n.ts';
 import { Icon } from '../kit/Icon.tsx';
+import { Seg } from '../kit/Seg.tsx';
 import { NotifyGroup } from '../notify/NotifyGroup.tsx';
 import { InstallHint, wantsInstallLine } from '../offline/InstallHint.tsx';
+import { type ReviewDetail, reviewDetail, setReviewDetail } from '../review-detail.ts';
 import { QuickPrefs } from './Preferences.tsx';
 import { prefsScope } from './prefs-model.ts';
 
@@ -17,6 +19,30 @@ import { prefsScope } from './prefs-model.ts';
 // the quiet hours, each project), Window (the desktop app's own choices), the app's install (a
 // phone in its browser), the session (the way to Settings › Phone, where this browser may connect
 // a phone) and About (the server). Nothing here is the project's: it is not behind a session.
+// How much of a review shows at first on this computer: everything where it was, or what changed in
+// words and the pictures first with the technical lines folded (the phone is always the second).
+function ReviewDetailChoice() {
+  const [choice, setChoice] = useState<ReviewDetail>(reviewDetail);
+  return (
+    <>
+      <Seg<ReviewDetail>
+        well
+        label={t('prefs.sec.review')}
+        value={choice}
+        options={[
+          { value: 'full', label: t('prefs.review.full') },
+          { value: 'plain', label: t('prefs.review.plain') },
+        ]}
+        onChange={(next) => {
+          setReviewDetail(next);
+          setChoice(next);
+        }}
+      />
+      <p className="gnote">{t('prefs.review.note')}</p>
+    </>
+  );
+}
+
 export function PreferencesView({
   server = typeof window === 'undefined' ? '' : window.location.host,
 }: {
@@ -40,6 +66,11 @@ export function PreferencesView({
         <PageSection name={t('prefs.sec.appearance')}>
           <QuickPrefs />
         </PageSection>
+        {app.phone ? null : (
+          <PageSection name={t('prefs.sec.review')} stack>
+            <ReviewDetailChoice />
+          </PageSection>
+        )}
         <NotifyGroup />
         {wantsInstallLine(app.phone) ? (
           <PageSection name={t('prefs.sec.app')} stack>

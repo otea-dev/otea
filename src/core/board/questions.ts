@@ -1,3 +1,4 @@
+import type { Actor } from '../item.ts';
 import { timeText } from '../time.ts';
 
 // An agent's question to the person (otea ask): asking hands the turn to the person without moving
@@ -10,6 +11,9 @@ import { timeText } from '../time.ts';
 
 export const QUESTION_ASKED = 'question_asked';
 export const QUESTION_ANSWERED = 'question_answered';
+// The person took back a tap on an option (Deshacer): it names the answer event it undoes
+// (`undoes`), so readers drop the pair and the question is open again.
+export const QUESTION_UNANSWERED = 'question_unanswered';
 
 // How a question was answered: one of the options the agent gave (`option`, its 1-based number, and
 // `text` its words), the person's own words, or the person leaving the decision to the agent
@@ -41,6 +45,9 @@ export type ItemQuestion = {
   round: number;
   options?: string[];
   recommended?: number;
+  // The numbers (from 1) of the options that need the person's own words: tapping one opens the
+  // text box instead of answering at once (ask --option-text).
+  optionText?: number[];
   answer?: QuestionAnswer;
 };
 
@@ -80,7 +87,7 @@ export function checkOptions(
 export type QuestionEvent = {
   id?: number;
   type: string;
-  actor: { kind: 'human' | 'agent'; name: string };
+  actor: Actor;
   at: string;
   data: Record<string, unknown>;
 };
@@ -108,13 +115,22 @@ function liveEvents(events: readonly QuestionEvent[]): readonly QuestionEvent[] 
 }
 
 // The options a question was asked with, as its event kept them.
-function optionsOf(data: Record<string, unknown>): Pick<ItemQuestion, 'options' | 'recommended'> {
+function optionsOf(
+  data: Record<string, unknown>,
+): Pick<ItemQuestion, 'options' | 'recommended' | 'optionText'> {
   const options = Array.isArray(data.options)
     ? data.options.filter((option): option is string => typeof option === 'string')
     : [];
   if (options.length === 0) return {};
   const { recommended } = data;
-  return { options, ...(typeof recommended === 'number' ? { recommended } : {}) };
+  const words = Array.isArray(data.optionText)
+    ? data.optionText.filter((n): n is number => typeof n === 'number')
+    : [];
+  return {
+    options,
+    ...(typeof recommended === 'number' ? { recommended } : {}),
+    ...(words.length === 0 ? {} : { optionText: words }),
+  };
 }
 
 // The item's questions, oldest first, each with its answer once there is one.

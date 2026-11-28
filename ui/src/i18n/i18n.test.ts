@@ -148,11 +148,28 @@ describe('t', () => {
     expect(t('common.files', { count: 1 })).toBe('1 file');
     expect(t('common.files', { count: 3 })).toBe('3 files');
     setLanguage('es');
-    expect(t('list.childOf', { id: 'BUG-1' })).toBe('Hijo de BUG-1');
+    expect(t('list.childOf', { id: 'BUG-1' })).toBe('Subítem de BUG-1');
     expect(t('common.files', { count: 1 })).toBe('1 archivo');
     expect(t('common.files', { count: 0 })).toBe('0 archivos');
     // Spanish has a `many` category for millions; without its own form, `other` says it.
     expect(t('common.files', { count: 1_000_000 })).toBe('1000000 archivos');
+  });
+
+  // Field study 7: «Sin abrir: 1 de 1 archivos». The noun agrees with the total, not with how many
+  // are left.
+  it('says «1 of 1 file», never «1 of 1 files», for what is left unopened', () => {
+    const left = (n: number, total: number) => ({ count: total, n, total });
+    expect(t('phone.r.unopened', left(1, 1))).toBe('Not opened: 1 of 1 file');
+    expect(t('phone.r.unopened', left(2, 3))).toBe('Not opened: 2 of 3 files');
+    expect(t('evidence.reader.unopened', left(1, 1))).toBe(
+      'Not opened in the reader: 1 of 1 file.',
+    );
+    setLanguage('es');
+    expect(t('phone.r.unopened', left(1, 1))).toBe('Sin abrir: 1 de 1 archivo');
+    expect(t('phone.r.unopened', left(2, 2))).toBe('Sin abrir: 2 de 2 archivos');
+    expect(t('evidence.reader.unopened', left(1, 1))).toBe(
+      'Sin abrir en el lector: 1 de 1 archivo.',
+    );
   });
 
   it('gives back a key it does not know, as a lookup by a computed key expects', () => {
@@ -195,7 +212,7 @@ describe('times and lists in Spanish', () => {
     expect(agoLabel(ago(5 * 1440), now)).toBe('hace 5 d');
     const lease = { holder: 'claude', expiresAt: new Date(now + 12 * 60_000).toISOString() };
     expect(leaseLeft(lease, now)).toBe('quedan 12 min');
-    expect(leaseLeft({ ...lease, expiresAt: ago(1) }, now)).toBe('reserva vencida');
+    expect(leaseLeft({ ...lease, expiresAt: ago(1) }, now)).toBe('sin señales');
     expect(momentLabel('2026-10-28T12:31:00.000Z', now, 'UTC')).toBe('28 oct, 12:31');
     expect(momentLabel('2025-01-02T09:05:00.000Z', now, 'UTC')).toBe('2 ene 2025, 09:05');
     expect(listOf(['A', 'B', 'C'])).toBe('A, B y C');

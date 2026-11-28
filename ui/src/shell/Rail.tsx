@@ -6,7 +6,8 @@ import type { BoardSummary } from '../board-studio/api.ts';
 import { useBoards } from '../board-studio/home/boards-store.ts';
 import { freshlyLive } from '../board-studio/home/home-model.ts';
 import { openNewBoard } from '../board-studio/home/studio-dialogs.ts';
-import { stuckCount, tocaCount } from '../derive/toca.ts';
+import type { AssistantStatus } from '../conversation.ts';
+import { stuckCount } from '../derive/toca.ts';
 import { t } from '../i18n/i18n.ts';
 import { TypeIcon } from '../icons/TypeIcon.tsx';
 import { IconButton } from '../kit/Button.tsx';
@@ -15,21 +16,36 @@ import { Icon } from '../kit/Icon.tsx';
 import { C, F, lerp } from '../motion/curves.ts';
 import { type Drive, drive } from '../motion/drive.ts';
 import { reduced } from '../motion/reduced.ts';
+import { waitingCount } from '../pending.ts';
 import { studioHash, type ViewRoute } from '../selection.ts';
-import { answeredTopics } from '../topics.ts';
-import { topicsShown, useTopics } from '../views/topics/use-topics.ts';
+import { AssistantMark } from '../views/hablar/AssistantMark.tsx';
+import { focusContentSoon, livePlace } from './focus-content.ts';
 import { PrefsButton } from './Preferences.tsx';
 import { type BoardIcon, boardEntries, foldClip, type RailKey, railKey } from './rail-model.ts';
-import { useMedia } from './use-media.ts';
 
 // The rail (SPEC §7.2, mock:159-198, 1420-1458, 4038-4069): the head (fold, + Nuevo ítem, named so
-// it never reads as a new view, P7-14), vistas with Te toca, Atasco and Temas (what waits for you),
+// it never reads as a new view, P7-14), vistas with Hablar (the assistant's mark, lit while it
+// listens), Te toca and Atasco (what waits for you),
 // the boards with yours / open, Nuevo tablero, the project's Studio, settings and performance (set
 // up and reviewed now and then), one selection pill that slides to the row in view, and
 // Preferences at the foot. It folds to a 60 px strip of icons: the rail clips, the labels fade, badges come up, and the main
-// pane slides from where it was, so nothing reflows. Below 1024 px it is always folded.
+// pane slides from where it was, so nothing reflows. A tablet (768 px) or a desk at 150% zoom keeps
+// the labels like any desk, and folds when the person says so (s-real D-3874e1: below 1024 px it was
+// always folded, with the button disabled, and nobody found "Hablar" or "Te toca").
 
-const NARROW = '(max-width: 1023px)';
+// The assistant's state on its row: a dot in its colour while it is there, a ring while it is away;
+// nothing while the project has none. The colour is for the eye; the state is also said in words.
+export function AssistantDot({ status }: { status: AssistantStatus | null | undefined }) {
+  if (!status) return null;
+  return (
+    <>
+      <i className="assistant-dot" data-state={status.state} aria-hidden="true" />
+      <span className="visually-hidden">
+        {t(`hablar.status.${status.state}`, { name: status.name })}
+      </span>
+    </>
+  );
+}
 
 export function RowIcon({ icon }: { icon: BoardIcon }) {
   return icon.kind === 'mock' ? <Icon name={icon.name} /> : <TypeIcon name={icon.name} size={16} />;
@@ -47,42 +63,72 @@ type RowProps = {
   pairTip?: string;
   badge?: { n: number; warn?: boolean };
   plus?: ReactNode;
+  // What the row's numbers say in words, after its label («1 pendiente»): its name is its label and
+  // this, never the digits drawn beside it.
+  say?: string | undefined;
+  // What more is known of the row (the assistant's state), read after its name.
+  hint?: string | undefined;
   // A small gap above it, no heading: a row of another kind in the same list (Temas under the views).
   apart?: boolean;
 };
 
-function Row({ k, on, icon, label, to, pair, pairTip, badge, plus, apart }: RowProps) {
+// A row is one control, a button laid over the whole row, named by its label and what it says; the
+// icon, the counts and the badge are the eye's and are hidden from a reader. Its «+» is a second
+// control beside it, never inside it.
+function Row({ k, on, icon, label, to, pair, pairTip, badge, plus, say, hint, apart }: RowProps) {
   const app = useApp();
   const go = () => {
     if (typeof to === 'string') window.location.hash = to;
     else app.go(to);
   };
+  const hintId = `nrow-hint-${k}`;
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a row that holds its own + button
     <div
       className={['nrow', on ? 'on' : '', apart ? 'apart' : ''].filter(Boolean).join(' ')}
-      role="button"
-      tabIndex={0}
-      aria-current={on ? 'page' : undefined}
       data-k={k}
       data-tip={pairTip ? `${label} · ${pairTip}` : label}
       data-tip-more={pairTip ? '' : undefined}
-      onClick={go}
-      onKeyDown={(e) => {
-        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault();
-          go();
-        }
-      }}
     >
-      <span className="ic">{icon}</span>
-      <span className="lb">{label}</span>
-      {pair === undefined ? <span /> : <span className="pair">{pair}</span>}
+      <button
+        type="button"
+        className="ngo"
+        aria-current={on ? 'page' : undefined}
+        aria-describedby={hint ? hintId : undefined}
+        // Enter or Space on a row (a click with no pointer, detail 0) takes the focus to the page
+        // chosen, past the rest of the rail and Preferencias (D-ab7560).
+        onClick={(e) => {
+          const heading = livePlace('.main h1');
+          go();
+          if (e.detail === 0) focusContentSoon(heading);
+        }}
+      >
+        <span className="visually-hidden">{say ? `${label}, ${say}` : label}</span>
+      </button>
+      {hint ? (
+        // Kept out of the page and still its description: a reader says it after the name.
+        <span id={hintId} hidden>
+          {hint}
+        </span>
+      ) : null}
+      <span className="ic" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="lb" aria-hidden="true">
+        {label}
+      </span>
+      {pair === undefined ? (
+        <span />
+      ) : (
+        <span className="pair" aria-hidden="true">
+          {pair}
+        </span>
+      )}
       {badge ? (
         <i
           className={['badge', badge.warn ? 'warn' : '', badge.n ? 'has' : '']
             .filter(Boolean)
             .join(' ')}
+          aria-hidden="true"
         >
           {badge.n}
         </i>
@@ -185,30 +231,20 @@ function useBoardEntrance(navs: React.RefObject<HTMLDivElement | null>, version:
 export function Rail() {
   const app = useApp();
   const ws = useWorkspace();
-  const narrow = useMedia(NARROW);
-  const folded = ws.folded || narrow;
+  const folded = ws.folded;
   const railRef = useRef<HTMLElement>(null);
   const navs = useRef<HTMLDivElement>(null);
   const key = railKey(app.route);
   const { canWrite, canConfigure } = app.session;
-  const yours = tocaCount(app.all, { now: app.now });
+  const yours = waitingCount(app);
   const stuck = stuckCount(app.all, { now: app.now });
-  const boards = boardEntries(app.collections, app.all);
-  // Side topics: listed while they are on or some were kept; the answered ones are yours.
-  const topics = useTopics();
-  const answered = answeredTopics(topics?.topics ?? []).length;
+  const boards = boardEntries(app.collections, app.all, app.now);
+  // The assistant as the whole desk shows it, read once (app.assistant), never again by the rail.
+  const assistant = app.assistant;
   const foldLabel = folded ? t('nav.show') : t('nav.hide');
 
   useSelPill(navs, key);
   useBoardEntrance(navs, app.version);
-
-  // Below 1024 px the rail is always folded: the frame reads .app[data-folded], so it says so too.
-  useLayoutEffect(() => {
-    const appEl = railRef.current?.closest('.app');
-    if (!appEl) return;
-    if (narrow) appEl.setAttribute('data-folded', '');
-    else if (!ws.folded) appEl.removeAttribute('data-folded');
-  }, [narrow, ws.folded]);
 
   // The fold (mock:4039-4054): the main pane slides from its old left, the rail clips, both 560
   // settle; a second press mid-way turns them back from where they are.
@@ -261,8 +297,7 @@ export function Rail() {
         <IconButton
           aria-expanded={!folded}
           aria-label={foldLabel}
-          {...(narrow ? {} : { 'data-tip': foldLabel })}
-          disabled={narrow}
+          data-tip={foldLabel}
           onClick={toggleFold}
         >
           <Icon name="side" />
@@ -279,6 +314,19 @@ export function Rail() {
         <div className="rail-label first">{t('nav.views')}</div>
         <nav className="nav">
           <Row
+            k="hablar"
+            on={key === 'hablar'}
+            icon={<AssistantMark />}
+            label={t('hablar.nav')}
+            to={{ view: 'hablar' }}
+            pair={<AssistantDot status={assistant} />}
+            hint={
+              assistant
+                ? t(`hablar.status.${assistant.state}`, { name: assistant.name })
+                : undefined
+            }
+          />
+          <Row
             k="toca"
             on={key === 'toca'}
             icon={<Icon name="toca" />}
@@ -286,6 +334,7 @@ export function Rail() {
             to={{ view: 'toca' }}
             pair={<Count value={yours} tone="you" hold />}
             badge={{ n: yours }}
+            say={yours > 0 ? t('nav.pending', { count: yours }) : undefined}
           />
           <Row
             k="atasco"
@@ -295,20 +344,22 @@ export function Rail() {
             to={{ view: 'atasco' }}
             pair={<Count value={stuck} tone="warn" hold />}
             badge={{ n: stuck, warn: true }}
+            say={stuck > 0 ? t('nav.stuckCount', { count: stuck }) : undefined}
           />
-          {/* Temas wait for you to read or close them, as Te toca does; conversations, not lists
-              of items, so a small gap sets them apart (the phone's Panel lists them the same). */}
-          {topicsShown(topics) ? (
-            <Row
-              k="topics"
-              on={key === 'topics'}
-              icon={<TypeIcon name="chat-bubble" size={16} />}
-              label={t('nav.topics')}
-              to={{ view: 'topics' }}
-              pair={<Count value={answered} tone="you" hold />}
-              badge={{ n: answered }}
-              apart
-            />
+          {canWrite ? (
+            // The quick note, named for what it does: in s-real nobody on a tablet or at 150% zoom
+            // found where to jot an idea (D-a0b4a2). The form opens on the note.
+            <button
+              type="button"
+              className="add jot"
+              data-tip={t('nav.jot')}
+              onClick={() => app.newItem()}
+            >
+              <span className="ic">
+                <Icon name="note" />
+              </span>
+              <span className="lb">{t('nav.jot')}</span>
+            </button>
           ) : null}
         </nav>
         <div className="rail-label">{t('nav.boards')}</div>
@@ -332,6 +383,7 @@ export function Rail() {
                 </>
               }
               pairTip={t('nav.boardPair', { yours: b.yours, open: b.open })}
+              say={t('nav.boardPair', { yours: b.yours, open: b.open })}
               badge={{ n: b.yours }}
               plus={canWrite ? plus(b.name) : undefined}
             />

@@ -1,15 +1,38 @@
+import { createHash } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import { type Context, Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 import { agentDetail } from '../app/agent-detail.ts';
-import { promptFacts, promptKindOf, roleBoard } from '../app/agent-prompts.ts';
+import { promptFacts, promptKindOf, roleFacts } from '../app/agent-prompts.ts';
+import { landedAhead } from '../app/approval-wait.ts';
 import { askingItems, holderAsksOf } from '../app/asking.ts';
+import { assistantView } from '../app/assistant-waiting.ts';
+import {
+  answerBandeja,
+  bandejaFileToServe,
+  bandejaOfItem,
+  captureToBandeja,
+  listBandeja,
+  reopenBandeja,
+  retractBandejaAnswer,
+} from '../app/bandeja.ts';
 import { syncBoardPresets } from '../app/boards.ts';
 import { briefFor } from '../app/brief.ts';
 import { listCollectionViews, listShownCollectionViews } from '../app/collections.ts';
+import {
+  attachmentToServe,
+  correctKind,
+  listConversation,
+  messageIdOf,
+  postPersonMessage,
+  retractAnswer,
+  turnsOfItem,
+} from '../app/conversation.ts';
+import { answerAssistantTap } from '../app/conversation-act.ts';
 import { deviceByToken, listDevices, touchDevice } from '../app/devices.ts';
+import { dismissOpenEscalation } from '../app/escalate.ts';
 import { listEvents } from '../app/events.ts';
 import { attachFiles, createItemWithEvidence } from '../app/intake.ts';
 import { searchItems } from '../app/item-search.ts';
@@ -25,13 +48,15 @@ import {
 } from '../app/items.ts';
 import { rememberLanguage, storedLanguage } from '../app/language.ts';
 import type { Launcher } from '../app/launcher.ts';
+import { deskSignature, livenessSignature } from '../app/liveness.ts';
 import { memoryMachine } from '../app/machine.ts';
 import { mergeOnlyOf } from '../app/merge-only.ts';
-import { boardRoundOf, landWaitOf, liveBoards, rowFactsOf } from '../app/next.ts';
+import { boardRoundOf, landWaitOf, liveBoardOf, liveBoards, rowFactsOf } from '../app/next.ts';
 import { editNote, leaveNote, notesSummary, notesView, withdrawNote } from '../app/notes.ts';
 import { listTargets } from '../app/notify-targets.ts';
 import { markOpened, openedFiles } from '../app/opened.ts';
 import { overlapsOf, scanned } from '../app/overlap.ts';
+import { pendingOf } from '../app/pending.ts';
 import { performanceAcross, performanceOf } from '../app/performance.ts';
 import {
   adoptTailscale,
@@ -45,15 +70,17 @@ import {
   setLanOpen,
   switchToTailscale,
 } from '../app/phone.ts';
-import { listAgents, presenceSignature } from '../app/presence.ts';
+import { keepLeasesOfAgentsThere, listAgents } from '../app/presence.ts';
 import { listPresetViews } from '../app/preset-views.ts';
 import { estimatesOfItems, pinItems, priorityOf, setOrder } from '../app/priority.ts';
 import { type Env, type Project, projectView } from '../app/project.ts';
 import { projectLanguage } from '../app/project-language.ts';
-import { answerQuestion } from '../app/questions.ts';
+import { answerQuestion, retractItemAnswer } from '../app/questions.ts';
 import { linkItems, unlinkItems } from '../app/relations.ts';
+import { reopenDropped } from '../app/reopen-dropped.ts';
 import { reassignItem, restartItem, resumeItem, undoRelease } from '../app/restart.ts';
 import { setAsideOf } from '../app/set-aside.ts';
+import { stepFactsOf } from '../app/step-facts.ts';
 import {
   type GuidePairing,
   NO_TAILSCALE,
@@ -77,6 +104,7 @@ import {
 import { topicsEverywhere } from '../app/topics-everywhere.ts';
 import { undoMove } from '../app/undo.ts';
 import { waiveEvidence } from '../app/waive.ts';
+import { localBehindOf } from '../cli/local-behind.ts';
 import { mergedOutside } from '../cli/merged-outside.ts';
 import { OTEA_VERSION } from '../cli/version.ts';
 import {
@@ -87,13 +115,23 @@ import {
   PROMPT_KINDS,
   ROLES,
   rolePrompt,
+  roleTakesBoard,
 } from '../core/agent-prompts.ts';
+import { bandejaIdOf, type FromBandeja } from '../core/bandeja.ts';
 import { PERIOD_HINT, parsePeriod } from '../core/board/performance.ts';
 import { LANGS, type Lang } from '../core/board/template-words.ts';
+import {
+  type FromMessage,
+  isMessageKind,
+  MAX_MESSAGE_CHARS,
+  MESSAGE_KINDS,
+} from '../core/conversation.ts';
 import { OteaError } from '../core/errors.ts';
 import { MAX_EVIDENCE_MB } from '../core/evidence.ts';
 import { isAgentName } from '../core/item.ts';
+import type { Pending } from '../core/pending.ts';
 import { TURNS, type Turn } from '../core/workflow.ts';
+import { dataVersion } from '../store/database.ts';
 import {
   type EventFilter,
   itemOfClientKey,
@@ -112,7 +150,7 @@ import {
   RejectedRequest,
   toErrorResponse,
 } from './errors.ts';
-import { serveEvidence } from './evidence.ts';
+import { serveEvidence, serveStored } from './evidence.ts';
 import { DEFAULT_PORT, isAllowedHost, isApiPath } from './hosts.ts';
 import { openProjects, type ProjectSource } from './hub.ts';
 import { AttemptLimiter, type Clock, isLoopback, PairingCodes, plainAddress } from './lan.ts';
@@ -139,6 +177,7 @@ import {
   relinkPath,
 } from './projects.ts';
 import { generateVapidKeys, type PushSender, type VapidKeys, webPushSender } from './push.ts';
+import { digestOf, keepReplay, replaying, replayOf } from './replays.ts';
 import { roundSame } from './round-same.ts';
 import {
   type Client,
@@ -161,15 +200,20 @@ import {
   assertSameOrigin,
   assertSignedIn,
   assertWritable,
+  assistantAnswerRequest,
   attachRequest,
   briefRequest,
+  captureRequest,
   chosenAnswerRequest,
   clientKeyOf,
   createRequest,
   HUMAN_IN_UI,
+  keyScopeOf,
+  kindRequest,
   linkRequest,
   MAX_CREATE_BYTES,
   MAX_INTAKE_FILES,
+  messageRequest,
   moveRequest,
   noteRequest,
   openedRequest,
@@ -206,8 +250,14 @@ export type OteaServer = {
   close(): void;
 };
 
+// How often an open desk's server looks at what a process ending or a window running out changes
+// (app/liveness.ts): the assistant's «conectado» is told false within this.
+const LIVENESS_EVERY_MS = 2000;
+
 export type ServerOptions = {
   pollIntervalMs?: number;
+  // How often liveness is looked at (default LIVENESS_EVERY_MS).
+  livenessEveryMs?: number;
   uiDir?: string;
   token?: string;
   // Takes a single-use sign-in link a command printed in place of `token` (see signin-links.ts).
@@ -311,6 +361,18 @@ function tooLarge(): never {
     413,
     'evidence_too_large',
     `Send at most ${MAX_INTAKE_FILES} files of ${MAX_EVIDENCE_MB} MB each`,
+  );
+}
+
+// A tap or a few words: 20 000 characters at four bytes each, and room for the JSON around them.
+const MAX_ANSWER_BYTES = MAX_MESSAGE_CHARS * 4 + 1024;
+const MAX_KIND_BYTES = 1024;
+
+function answerTooLarge(): never {
+  throw new RejectedRequest(
+    413,
+    'body_too_large',
+    `An answer takes at most ${MAX_MESSAGE_CHARS} characters`,
   );
 }
 
@@ -492,8 +554,24 @@ function machineApi(doors: Doors): Hono<OteaEnv> {
   );
 }
 
-function api(project: Project, { feed, streams, notifier }: Live, doors: Doors): Hono<OteaEnv> {
+const PENDING_KEPT_MS = 3_000;
+
+function api(project: Project, live: Live, doors: Doors): Hono<OteaEnv> {
+  const { streams, notifier } = live;
   const { auth, env, machine } = doors;
+  // What waits for the person, as the last read found it: every open desk asks on each change, so
+  // it is worked out again only after this server announces a change (its own writes), another
+  // process writes (the database's data version moves), or PENDING_KEPT_MS passes, for what the
+  // clock alone changes (a lease running out, the assistant going quiet). It does not subscribe to
+  // the feed: a listener of its own would keep the feed polling with no desk open.
+  let pendingKept: { at: number; version: string; value: Pending } | undefined;
+  const feed: ChangeFeed = {
+    ...live.feed,
+    notify: () => {
+      pendingKept = undefined;
+      live.feed.notify();
+    },
+  };
   return (
     new Hono<OteaEnv>()
       // A board published from another process (the CLI, another server) joins the catalog before
@@ -539,6 +617,31 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       .get('/collections', (c) => c.json(listShownCollectionViews(project)))
       .get('/presets', (c) => c.json(listPresetViews(project)))
       .get('/agents', (c) => c.json({ agents: listAgents(project.db) }))
+      // The project's assistant: connected, listening or offline since when; null while it has none.
+      .get('/assistant', (c) => c.json({ assistant: assistantView(project.db) ?? null }))
+      // What waits for the person, computed from the records: items on their turn, the questions
+      // of the Bandeja and of the assistant, the review that holds a board's queue (app/pending.ts).
+      .get('/pending', (c) => {
+        const now = Date.now();
+        // An assistant that went quiet, or an agent whose process ended, writes nothing: liveness is
+        // part of the key, so the desk's refetch after that change never reads the old answer.
+        const version = `${dataVersion(project.db)}${livenessSignature(project.db)}`;
+        if (
+          !pendingKept ||
+          pendingKept.version !== version ||
+          now - pendingKept.at > PENDING_KEPT_MS
+        ) {
+          pendingKept = { at: now, version, value: pendingOf(project) };
+        }
+        return c.json(pendingKept.value);
+      })
+      // The person sets an escalation aside (Te espera): whether the assistant acted on it or not.
+      .post('/escalations/:id/dismiss', (c) => {
+        assertWritable(c, auth);
+        dismissOpenEscalation(project, messageIdOf(c.req.param('id')));
+        feed.notify();
+        return c.json({ ok: true });
+      })
       // What to paste into an agent's chat (Conectar un agente, the empty project): the first contact,
       // one more agent joining, or one more board; without a kind, the project's moment.
       .get('/agent-prompt', (c) => {
@@ -546,21 +649,21 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         if (kind !== undefined && !isPromptKind(kind))
           throw new InvalidQuery(`kind must be one of ${PROMPT_KINDS.join(', ')}`);
         // A role's text (the canonical way of working): the same one otea prompt --role prints, for
-        // the desk to copy. A worker's board is required; a coordinator has none.
+        // the desk to copy. A worker's board is required; the assistant and the refiner have none.
         if (role === undefined && (board !== undefined || name !== undefined))
           throw new InvalidQuery(`board and as go with role (${ROLES.join(', ')})`);
         if (role !== undefined) {
           if (!isRole(role)) throw new InvalidQuery(`role must be one of ${ROLES.join(', ')}`);
           if (kind !== undefined) throw new InvalidQuery('give a kind or a role, not both');
           if (role === 'worker' && !board) throw new InvalidQuery('role worker needs a board');
-          if (role === 'coordinator' && board !== undefined)
-            throw new InvalidQuery('role coordinator takes no board');
+          if (!roleTakesBoard(role) && board !== undefined)
+            throw new InvalidQuery(`role ${role} takes no board`);
           if (name !== undefined && !isAgentName(name))
             throw new InvalidQuery(`"${name}" cannot name an agent`);
           return c.json({
             kind: role,
             prompt: rolePrompt(role, projectLanguage(project, env), {
-              ...(board ? { board: roleBoard(project, board) } : {}),
+              ...(board ? roleFacts(project, board) : {}),
               ...(name ? { name } : {}),
             }),
           });
@@ -624,7 +727,15 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
             const row = rowFactsOf(project, item, boards);
             const enteredAt = entered.get(item.id);
             // Set aside for later by an agent (otea release --later): by whom, so the desk says so.
-            const setAside = setAsideOf(selectEvents(project.db, item.id));
+            const events = selectEvents(project.db, item.id);
+            const setAside = setAsideOf(events);
+            // Approved and waiting to land, or taken back by a conflict (src/app/step-facts.ts).
+            const steps = stepFactsOf(
+              boards.find((board) => board.collection === item.collection)?.def,
+              item,
+              events,
+              landedAhead(scan, item),
+            );
             // Held by an agent whose question waits for you on another item (P7-R3-9).
             const holderAsks = holderAsksOf(asking, item, at);
             // Approved and waiting for another to land first (src/app/land-order.ts).
@@ -632,6 +743,7 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
             return {
               ...item,
               ...row,
+              ...steps,
               ...(landsAfter === undefined ? {} : { landsAfter }),
               ...(setAside === undefined ? {} : { setAside }),
               ...(holderAsks === undefined ? {} : { holderAsks }),
@@ -664,6 +776,15 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         assertWritable(c, auth, true);
         const clientKey = clientKeyOf(c);
         const { files, ...request } = await createRequest(c);
+        // The key's content: a key that made another item is refused, as Bandeja's and Hablar's are.
+        const digest = digestOf([
+          request,
+          files.map((file) => [
+            file.filename,
+            createHash('sha256').update(file.bytes).digest('hex'),
+          ]),
+        ]);
+        replayOf(c, project, digest);
         // Sent again (a phone that never heard back): the item the first send made, not a second.
         const made = clientKey === undefined ? undefined : itemOfClientKey(project.db, clientKey);
         if (made !== undefined) {
@@ -680,6 +801,7 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
           files.length === 0
             ? createItem(project, input)
             : createItemWithEvidence(project, input, files);
+        keepReplay(c, project, digest, 201, {});
         feed.notify();
         return c.json(item, 201);
       })
@@ -700,6 +822,9 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         let item: ReturnType<typeof showItem> & {
           setAside?: { by: string; at: string };
           holderAsks?: { by: string; item: string };
+          landsAfter?: { first: string; text: string; overlap?: true };
+          fromMessages?: FromMessage[];
+          fromBandeja?: FromBandeja;
         };
         try {
           item = showItem(project, id, HUMAN_IN_UI);
@@ -712,8 +837,31 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         }
         const setAside = setAsideOf(item.events);
         if (setAside) item = { ...item, setAside };
+        item = {
+          ...item,
+          ...stepFactsOf(
+            liveBoardOf(project, item.collection)?.def,
+            item,
+            item.events,
+            landedAhead(project, item),
+          ),
+        };
+        // Approved and waiting for an overlapping item to land first: the page says which, as the
+        // list's row does.
+        const landsAfter = landWaitOf(
+          scanned(project),
+          requireItem(project.db, item.id),
+          new Date().toISOString(),
+        );
+        if (landsAfter) item = { ...item, landsAfter };
         const holderAsks = holderAsksOf(askingItems(project.db), item, new Date().toISOString());
         if (holderAsks) item = { ...item, holderAsks };
+        // The turns of the conversation it came from: the page links back to them.
+        const fromMessages = turnsOfItem(project, item.id);
+        if (fromMessages.length > 0) item = { ...item, fromMessages };
+        // The Bandeja entry it was refined from, the same way.
+        const fromBandeja = bandejaOfItem(project, item.id);
+        if (fromBandeja) item = { ...item, fromBandeja };
         if (!item.archived) return c.json(item);
         // An archived board's collection is in no list: the page reads the item's words from here.
         const collection = listCollectionViews(project, { archived: true }).find(
@@ -784,6 +932,11 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         const merged = mergedOutside(project, project.root, getItem(project, c.req.param('id')));
         return c.json({ merged: merged?.land ? merged : null });
       })
+      // A Done item whose work reached the remote's base while the person's main checkout stayed
+      // behind (an agent landed from a worktree): the page says so, with how to catch up.
+      .get('/items/:id/local-behind', (c) =>
+        c.json({ behind: localBehindOf(project, c.req.param('id')) ?? null }),
+      )
       // The attached diff of an item in review, when it does not come from the tip its handoff
       // recorded (P1-R3-1): the desk says so before the person approves.
       .get('/items/:id/diff-tip', async (c) =>
@@ -869,6 +1022,178 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
         feed.notify();
         return c.json(topic);
       })
+      // The conversation with the project's assistant (app/conversation.ts). The person writes only
+      // here, signed in, from the UI's own origin: no command or tool of an agent makes a message
+      // of the person's. Reading it marks nothing; the assistant's reading does.
+      .get('/conversation', (c) => {
+        const { since, before, limit, search, kind } = c.req.query();
+        if (kind !== undefined && !isMessageKind(kind)) {
+          throw new InvalidQuery(`kind must be one of ${MESSAGE_KINDS.join(', ')}`);
+        }
+        const from = wholeNumber('since', since, 0);
+        const to = wholeNumber('before', before, 1);
+        const page = wholeNumber('limit', limit, 1);
+        if (from !== undefined && to !== undefined) {
+          throw new InvalidQuery('since and before cannot be combined');
+        }
+        return c.json(
+          listConversation(project, {
+            ...(from === undefined ? {} : { since: from }),
+            ...(to === undefined ? {} : { before: to }),
+            ...(page === undefined ? {} : { limit: page }),
+            ...(search === undefined ? {} : { search }),
+            ...(kind === undefined ? {} : { kind }),
+          }),
+        );
+      })
+      .get('/conversation/attachments/:id', (c) => {
+        assertSignedIn(c, auth, 'open the conversation files');
+        const { file, path } = attachmentToServe(project, c.req.param('id'));
+        return serveStored(
+          c,
+          project,
+          { ...file, filename: file.name, contentType: file.contentType },
+          path,
+        );
+      })
+      .post(
+        '/conversation/messages',
+        bodyLimit({ maxSize: MAX_CREATE_BYTES, onError: tooLarge }),
+        async (c) => {
+          assertWritable(c, auth, true);
+          const clientKey = clientKeyOf(c);
+          const request = await messageRequest(c);
+          const { message, replayed } = postPersonMessage(project, {
+            ...request,
+            by: HUMAN_IN_UI.actor.name,
+            // Each device keeps its own keys; the desk's browser is one more client.
+            ...(clientKey === undefined
+              ? {}
+              : { clientKey: { scope: keyScopeOf(c), key: clientKey } }),
+          });
+          feed.notify();
+          // Sent again (a phone that never heard back): the message the first send made.
+          if (replayed) c.header('idempotent-replayed', 'true');
+          return c.json(message, replayed ? 200 : 201);
+        },
+      )
+      // The person's one-tap correction of what the assistant made of a turn.
+      .post(
+        '/conversation/messages/:id/kind',
+        // A kind is one word: a few bytes of JSON, so anything large is refused before it is read.
+        bodyLimit({ maxSize: MAX_KIND_BYTES, onError: answerTooLarge }),
+        async (c) => {
+          assertWritable(c, auth);
+          const kind = await kindRequest(c);
+          const message = correctKind(project, messageIdOf(c.req.param('id')), kind);
+          feed.notify();
+          return c.json(message);
+        },
+      )
+      // The person's tap on a question of the assistant's: their own message, in reply to it.
+      .post(
+        '/conversation/messages/:id/answer',
+        // An answer is a few words: far past a message's limit is refused before it is read.
+        bodyLimit({ maxSize: MAX_ANSWER_BYTES, onError: answerTooLarge }),
+        async (c) => {
+          assertWritable(c, auth);
+          const given = await assistantAnswerRequest(c);
+          // Sent again under the same key (a phone that never heard back): the first result.
+          return replaying(c, project, given, 201, () => {
+            const message = answerAssistantTap(
+              project,
+              messageIdOf(c.req.param('id')),
+              given,
+              undefined,
+              HUMAN_IN_UI.actor.name,
+              surfaceOf(c),
+            );
+            feed.notify();
+            return message;
+          });
+        },
+      )
+      // The person takes back the answer they just gave (Deshacer), before the assistant heard it.
+      .post('/conversation/messages/:id/unanswer', (c) => {
+        assertWritable(c, auth);
+        return replaying(c, project, null, 200, () => {
+          const question = retractAnswer(project, messageIdOf(c.req.param('id')));
+          feed.notify();
+          return question;
+        });
+      })
+      // The Bandeja (app/bandeja.ts): the person's rough captures. The person captures and answers
+      // only here, signed in, from the UI's own origin: no command or tool of an agent makes an
+      // entry or answers for the person.
+      .get('/bandeja', (c) => {
+        const filed = wholeNumber('filed', c.req.query('filed'), 0);
+        return c.json({ entries: listBandeja(project, { filed: filed ?? 30 }) });
+      })
+      .get('/bandeja/attachments/:id', (c) => {
+        assertSignedIn(c, auth, 'open the Inbox files');
+        const { file, path } = bandejaFileToServe(project, c.req.param('id'));
+        return serveStored(
+          c,
+          project,
+          { ...file, filename: file.name, contentType: file.contentType },
+          path,
+        );
+      })
+      .post('/bandeja', bodyLimit({ maxSize: MAX_CREATE_BYTES, onError: tooLarge }), async (c) => {
+        assertWritable(c, auth, true);
+        const clientKey = clientKeyOf(c);
+        const request = await captureRequest(c);
+        const { entry, replayed } = captureToBandeja(project, {
+          ...request,
+          by: HUMAN_IN_UI.actor.name,
+          // Each device keeps its own keys; the desk's browser is one more client.
+          ...(clientKey === undefined
+            ? {}
+            : { clientKey: { scope: keyScopeOf(c), key: clientKey } }),
+        });
+        feed.notify();
+        // Sent again (a phone that never heard back): the entry the first send made.
+        if (replayed) c.header('idempotent-replayed', 'true');
+        return c.json(entry, replayed ? 200 : 201);
+      })
+      // The person's answer to a question a refiner asked on an entry, from the phone too.
+      .post(
+        '/bandeja/:id/answer',
+        bodyLimit({ maxSize: MAX_ANSWER_BYTES, onError: answerTooLarge }),
+        async (c) => {
+          assertWritable(c, auth);
+          const given = await chosenAnswerRequest(c);
+          const { question, ...words } = given;
+          return replaying(c, project, given, 200, () => {
+            const entry = answerBandeja(project, {
+              id: bandejaIdOf(c.req.param('id')),
+              question,
+              ...words,
+            });
+            feed.notify();
+            return entry;
+          });
+        },
+      )
+      // The person takes back the tap they just gave on a refiner's question (Deshacer).
+      .post('/bandeja/:id/unanswer', (c) => {
+        assertWritable(c, auth);
+        return replaying(c, project, null, 200, () => {
+          const entry = retractBandejaAnswer(project, { id: bandejaIdOf(c.req.param('id')) });
+          feed.notify();
+          return entry;
+        });
+      })
+      // The person reopens a note the assistant or its refiner closed: it waits for the assistant
+      // again.
+      .post('/bandeja/:id/reopen', (c) => {
+        assertWritable(c, auth);
+        return replaying(c, project, null, 200, () => {
+          const entry = reopenBandeja(project, { id: bandejaIdOf(c.req.param('id')) });
+          feed.notify();
+          return entry;
+        });
+      })
       // An item's topics: those linked to it, and those it may have come from, for the person to
       // confirm or dismiss.
       .get('/items/:id/topics', (c) => {
@@ -892,13 +1217,28 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       })
       // The person's answer to an agent's question, from the phone too: the turn goes back to the
       // agent, in the same round.
-      .post('/items/:id/answer', async (c) => {
+      .post(
+        '/items/:id/answer',
+        bodyLimit({ maxSize: MAX_ANSWER_BYTES, onError: answerTooLarge }),
+        async (c) => {
+          assertWritable(c, auth);
+          const given = await chosenAnswerRequest(c);
+          const id = c.req.param('id');
+          answerQuestion(project, { id, ...given, ...HUMAN_IN_UI });
+          feed.notify();
+          return c.json(showItem(project, id, HUMAN_IN_UI));
+        },
+      )
+      // The person takes back the tap they just gave on an agent's question (Deshacer): it waits for
+      // them again, while the agent has not acted on it.
+      .post('/items/:id/unanswer', (c) => {
         assertWritable(c, auth);
-        const given = await chosenAnswerRequest(c);
         const id = c.req.param('id');
-        answerQuestion(project, { id, ...given, ...HUMAN_IN_UI });
-        feed.notify();
-        return c.json(showItem(project, id, HUMAN_IN_UI));
+        return replaying(c, project, null, 200, () => {
+          retractItemAnswer(project, { id, ...HUMAN_IN_UI });
+          feed.notify();
+          return showItem(project, id, HUMAN_IN_UI);
+        });
       })
       // The person lets an item go on without a file its step asks for (a screenshot an agent
       // with no browser cannot make): its handoff then passes, and the review says so.
@@ -939,6 +1279,18 @@ function api(project: Project, { feed, streams, notifier }: Live, doors: Doors):
       .post('/items/:id/restart', (c) => {
         assertWritable(c, auth);
         const item = restartItem(project, { id: c.req.param('id'), ...HUMAN_IN_UI });
+        feed.notify();
+        return c.json(item);
+      })
+      // A discard the person takes back, whenever they see it was wrong (Reabrir): the item returns
+      // to the state it left.
+      .post('/items/:id/reopen-dropped', (c) => {
+        assertWritable(c, auth);
+        const item = reopenDropped(project, {
+          id: c.req.param('id'),
+          ...HUMAN_IN_UI,
+          surface: surfaceOf(c),
+        });
         feed.notify();
         return c.json(item);
       })
@@ -1180,8 +1532,18 @@ export function createServer(
 
   const open = (project: Project): Host => {
     const { id } = project.identity;
-    const feed = createChangeFeed(project.db, options.pollIntervalMs);
-    const streams = liveStreams(feed, () => presenceSignature(project.db));
+    // A process that ended writes nothing: the feed looks at liveness on a timer, and a change in
+    // it reaches every open desk as a change and a presence.
+    const feed = createChangeFeed(project.db, options.pollIntervalMs, {
+      signature: () => {
+        // A worker at a long step makes no call: its lease is kept before the desk could read it
+        // as stuck while its session runs (H2).
+        keepLeasesOfAgentsThere(project.db);
+        return livenessSignature(project.db);
+      },
+      everyMs: options.livenessEveryMs ?? LIVENESS_EVERY_MS,
+    });
+    const streams = liveStreams(feed, () => deskSignature(project.db));
     const notifier = createNotifier(project, feed, {
       sender,
       targets: machine,

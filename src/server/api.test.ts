@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { declareAssistant, emitAssistantSignal } from '../app/assistant.ts';
 import { ensureRequestsBoard } from '../app/boards.ts';
 import { addCollection, setCollectionIcon } from '../app/collections.ts';
 import { createItem, getItem, moveItem } from '../app/items.ts';
 import { claimItem } from '../app/leases.ts';
-import { CLI_HARNESS, seeAgent } from '../app/presence.ts';
+import { CLI_HARNESS, seeAgent, waitBeat } from '../app/presence.ts';
 import { type Project, setProjectIcon } from '../app/project.ts';
 import { REVIEWS } from '../app/testing.ts';
 import type { Actor } from '../core/item.ts';
@@ -161,6 +162,53 @@ describe('api', () => {
         steps: [],
       });
       expect((await get('/p/memory-aaaaaa/api/agents/ghost')).status).toBe(404);
+    });
+  });
+
+  describe('GET /api/assistant', () => {
+    it('is null while the project has none, then says where its assistant stands', async () => {
+      expect(await (await get('/p/memory-aaaaaa/api/assistant')).json()).toEqual({
+        assistant: null,
+      });
+
+      const now = () => new Date().toISOString();
+      declareAssistant(project.db, 'sol', now);
+      waitBeat(project.db, { agent: 'sol', channel: 'cli', waiter: process.pid }, now).run();
+      emitAssistantSignal(project.db, { kind: 'person_message', ref: 'm-1' }, now);
+
+      expect(await (await get('/p/memory-aaaaaa/api/assistant')).json()).toEqual({
+        assistant: {
+          name: 'sol',
+          state: 'listening',
+          since: null,
+          pending: 1,
+          waiting: { count: 0, since: null, messages: 0, notes: 0, reports: 0 },
+        },
+      });
+      // The agents list carries its role, and it is no listener on the boards.
+      const { agents } = (await (await get('/p/memory-aaaaaa/api/agents')).json()) as {
+        agents: { name: string; role: string | null; status: string }[];
+      };
+      expect(agents.find(({ name }) => name === 'sol')).toMatchObject({
+        role: 'assistant',
+        status: 'connected',
+      });
+    });
+
+    it('says offline since the last time it was heard once it went quiet', async () => {
+      const long = new Date(Date.now() - 60 * 60_000).toISOString();
+      declareAssistant(project.db, 'sol', () => long);
+      seeAgent(project.db, { agent: 'sol', channel: 'cli', harness: CLI_HARNESS }, () => long);
+
+      expect(await (await get('/p/memory-aaaaaa/api/assistant')).json()).toEqual({
+        assistant: {
+          name: 'sol',
+          state: 'offline',
+          since: long,
+          pending: 0,
+          waiting: { count: 0, since: null, messages: 0, notes: 0, reports: 0 },
+        },
+      });
     });
   });
 

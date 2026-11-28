@@ -38,6 +38,12 @@ const KINDS: {
   { kind: 'replied', label: 'notify.replied' },
   { kind: 'stuck', label: 'notify.stuck', hint: 'notify.stuckHint' },
   { kind: 'unheard', label: 'notify.unheard', hint: 'notify.unheardHint' },
+  { kind: 'assistant_reply', label: 'notify.assistantReply', hint: 'notify.assistantReplyHint' },
+  {
+    kind: 'assistant_offline',
+    label: 'notify.assistantOffline',
+    hint: 'notify.assistantOfflineHint',
+  },
   { kind: 'aside', label: 'notify.aside' },
 ];
 
@@ -149,9 +155,14 @@ export function NotifyChoices({ prefs, projects, onChange }: NotifyChoicesProps)
 const WHY: Partial<
   Record<
     NotifyOffer,
-    'notify.needsHttps' | 'notify.needsHome' | 'notify.unsupported' | 'notify.blocked'
+    | 'notify.needsHttps'
+    | 'notify.needsHome'
+    | 'notify.unsupported'
+    | 'notify.blocked'
+    | 'notify.onPhone'
   >
 > = {
+  'on-phone': 'notify.onPhone',
   'needs-https': 'notify.needsHttps',
   'needs-home-screen': 'notify.needsHome',
   unsupported: 'notify.unsupported',

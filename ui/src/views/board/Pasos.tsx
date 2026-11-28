@@ -7,15 +7,9 @@ import { Count } from '../../kit/Count.tsx';
 import { SeverityBars } from '../../kit/Marks.tsx';
 import { laneOf } from '../../lanes/geometry.ts';
 import { lookOf } from '../../lanes/looks.ts';
+import { roundOf } from '../../rounds.ts';
 import type { CollectionView, Item } from '../../types.ts';
-import {
-  type Card,
-  cardCount,
-  openBlockersOf,
-  type PasosColumn,
-  roundOf,
-  severityOf,
-} from './model.ts';
+import { type Card, cardCount, openBlockersOf, type PasosColumn, severityOf } from './model.ts';
 import { type CardSnap, pasosTransition, revealCols, snapCards } from './pasos-motion.ts';
 import { since } from './rows.tsx';
 
@@ -79,7 +73,8 @@ function WhoText({
         : blockers > 0
           ? t('boardView.blocked', { count: blockers })
           : t('boardView.queued');
-  } else if (item.expiredLease && !item.lease) suffix = t('boardView.who.quiet');
+  } else if (item.expiredLease && !item.lease)
+    suffix = item.expiredLease.connected ? t('when.lapsed') : t('boardView.who.quiet');
   return (
     <span className="who" data-s={`${item.id}:who`}>
       {agent}
@@ -119,8 +114,7 @@ function CardView({
 }) {
   const it = card.item;
   const sev = severityOf(it, p.collection);
-  const type = p.collection.types.find((ty) => ty.name === it.type) ?? p.collection.types[0];
-  const round = roundOf(it, p.feed, type);
+  const round = roundOf(it, p.feed);
   const stuck = isStuck(it, p.now);
   const when = whenText(it, p.now);
   const meta: { k: string; node: ReactNode }[] = [];

@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect } from 'react';
 import { AppProvider, useApp } from './app/context.tsx';
+import { useKeepSideways } from './app/keep-pane.ts';
 import { ViewHost } from './app/ViewHost.tsx';
 import { useWorkspace } from './app/workspace.ts';
 import { applyAttention } from './attention-dom.ts';
@@ -26,7 +27,6 @@ import { LaneDefs } from './lanes/LaneDefs.tsx';
 import { useKeepLanguage } from './language-sync.ts';
 import { MODULES } from './modules/registry.ts';
 import { useQuestionNotice } from './notify/question-notice.ts';
-import { InstallBanner } from './offline/InstallBanner.tsx';
 import { OfflineBar } from './offline/OfflineBar.tsx';
 import { CaptureSheet } from './phone/CaptureSheet.tsx';
 import { DeskOnly, deskOnlyOf } from './phone/DeskOnly.tsx';
@@ -36,11 +36,12 @@ import { TabBar } from './phone/TabBar.tsx';
 import type { Route } from './selection.ts';
 import { PreferencesView } from './shell/PreferencesView.tsx';
 import { Rail } from './shell/Rail.tsx';
+import { SkipLinks } from './shell/SkipLinks.tsx';
 import { Topbar } from './shell/Topbar.tsx';
 import { BoardView } from './views/board/BoardView.tsx';
 import { DetailHost } from './views/detail/DetailHost.tsx';
+import { HablarView } from './views/hablar/HablarView.tsx';
 import { TocaView } from './views/toca/TocaView.tsx';
-import { TopicsView } from './views/topics/TopicsView.tsx';
 
 // The app (SPEC §11): AppProvider › the lanes' gradients, the toasts, the tooltip, then .app with
 // the topbar, the rail and .main, where the view host shows the route's view, the detail sits
@@ -110,8 +111,8 @@ function View({ route }: { route: Route }): ReactNode {
       return <ModelPerformance />;
     case 'preferences':
       return <PreferencesView />;
-    case 'topics':
-      return <TopicsView topic={route.topic} />;
+    case 'hablar':
+      return <HablarView turn={route.turn} topic={route.topic} bandeja={route.bandeja} />;
     case 'studio':
       return <BoardStudio page={route.page} canWrite={app.session.canConfigure} />;
     case 'modules':
@@ -124,7 +125,7 @@ function View({ route }: { route: Route }): ReactNode {
 function Shell() {
   const app = useApp();
   const ws = useWorkspace();
-  const { yours, working } = useAttention(app.all);
+  const { yours, working } = useAttention(app.all, app.pending);
   const projectName = app.project?.name;
   const phone = app.phone;
   useEffect(
@@ -132,9 +133,11 @@ function Shell() {
     [yours, working, projectName, phone],
   );
   useQuestionNotice(app.feed, { open: app.route.item, phone: app.phone, onAnswer: app.openItem });
+  useKeepSideways();
   const route = app.route;
   return (
     <>
+      <SkipLinks />
       <LaneDefs />
       <div
         className="app"
@@ -173,7 +176,6 @@ function Shell() {
       <ConnectDialog />
       <StudioDialogs />
       <TabBar />
-      <InstallBanner />
       <NavSheet />
       <CaptureSheet />
       <SearchSheet />

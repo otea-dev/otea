@@ -136,7 +136,7 @@ describe('otea topic', () => {
     expect(before.err).toBe('');
     expect(before.out).not.toContain('otea topic');
 
-    // Turned on mid-session: the agent never read rule 13 in its guide.
+    // Turned on mid-session: the agent never read rule 14 in its guide.
     await person('topic', 'on');
     expect((await otea('next')).out).toContain('otea topic add');
 
@@ -300,8 +300,9 @@ describe('otea topic', () => {
     const geo = tempGitRepo();
     const ventas = tempGitRepo();
     try {
-      const inGeo = cliAt(geo.dir, { OTEA_AGENT: 'claude' });
-      const inVentas = cliAt(ventas.dir, { OTEA_AGENT: 'claude' });
+      // Two projects, two agents: the name `claude` is at work in the suite's other projects.
+      const inGeo = cliAt(geo.dir, { OTEA_AGENT: 'geo-claude' });
+      const inVentas = cliAt(ventas.dir, { OTEA_AGENT: 'ventas-claude' });
       await inGeo('init');
       await inVentas('init');
       await cliAt(ventas.dir)('topic', 'on');
@@ -363,6 +364,47 @@ describe('otea topic', () => {
     ]) {
       expect(guide).toContain(line);
     }
+  });
+
+  // 0.8: a question the person asks the assistant is a consultation it saves (otea say
+  // --consultation), so with an assistant declared no agent is told to record topics: not in the
+  // guide, not in next, not in what wait wakes an agent for. Without one nothing changes.
+  it('tells no agent to record topics once the project has an assistant', async () => {
+    const { repo, otea } = fresh();
+    const person = cliAt(repo.dir);
+    await otea(
+      'profile',
+      '--model',
+      'claude-opus-5-5',
+      '--effort',
+      'high',
+      '--harness',
+      'claude-code',
+    );
+    await otea(
+      'create',
+      '--collection',
+      'Cambios',
+      '--title',
+      'Arreglar el build',
+      '--field',
+      'Qué quiero=x',
+    );
+    await person('topic', 'on');
+    // Topics on and nobody the assistant: the rule is there, in the guide and in what wakes it.
+    expect((await otea('board')).out).toContain('otea topic add');
+    expect((await otea('wait', '--turn', 'agent', '--timeout', '5s')).out).toContain(
+      'otea topic add',
+    );
+
+    await cliAt(repo.dir)('profile', '--role', 'assistant', '--as', 'sol');
+    expect((await otea('board')).out).not.toContain('otea topic add');
+    expect((await otea('next')).out).not.toContain('otea topic');
+    expect((await otea('wait', '--turn', 'agent', '--timeout', '5s')).out).not.toContain(
+      'otea topic',
+    );
+    // The topics the person already has stay readable.
+    expect((await person('topic', 'list')).code).toBe(0);
   });
 
   it('reminds an agent that otea wait wakes to record side questions while topics are on', async () => {

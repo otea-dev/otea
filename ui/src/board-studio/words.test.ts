@@ -99,7 +99,7 @@ describe('the later settings, in words', () => {
         'Arreglar: quien lo hace puede regresarlo a Triar diciendo por qué.',
         'Arreglar pide una nota en cada entrega.',
         'Arreglar no se entrega mientras haya Errores sin terminar, ni mientras lo frene algo sin terminar.',
-        'Otea protege la Rama: se sube solo mientras se hace Arreglar, y se fusiona cuando está Hecho.',
+        'Otea protege la Rama: se sube solo mientras se hace Arreglar, y se integra cuando está Hecho.',
         'Al descartar se elige un motivo: Rechazado, Duplicado o No se arreglará.',
         'Descartar lo haces tú, solo desde la página.',
       ]),

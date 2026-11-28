@@ -1,7 +1,10 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { authorizeMove, type Channel, type Move, type Performer } from '../core/authority.ts';
+import { type Advice, adviceAfterHandoff } from '../core/board/advice.ts';
+import { isClosed, positionOf } from '../core/board/engine.ts';
 import { guardedBranch } from '../core/board/model.ts';
 import { openQuestion } from '../core/board/questions.ts';
+import { type RequestChanged, requestChangedAfterHandoff } from '../core/board/request-changed.ts';
 import { OteaError } from '../core/errors.ts';
 import { assertCanLeave, type FieldValues, intake, revise } from '../core/fields.ts';
 import { assertStandsAlone } from '../core/hierarchy.ts';
@@ -12,8 +15,10 @@ import { type ChildrenSummary, childrenSummary, type RelationRef } from '../core
 import type { Surface } from '../core/surface.ts';
 import { itemMoves } from '../core/views.ts';
 import { type Closing, closesOf, type Turn, turnOf, type Workflow } from '../core/workflow.ts';
+import { selectRoles } from '../store/assistant.ts';
 import { findBoardOfCollection } from '../store/boards.ts';
-import { transaction } from '../store/database.ts';
+import { closeQuestions } from '../store/conversation.ts';
+import { joinTransaction, transaction } from '../store/database.ts';
 import {
   appendEvent,
   archivedBoardOf,
@@ -36,6 +41,7 @@ import {
   updateItemContent,
   updateItemState,
 } from '../store/queries.ts';
+import { approvalData } from './approval-wait.ts';
 import { type Asks, askingItems, withAsks } from './asking.ts';
 import { assertPicked, type ChoiceInput, recordChoice } from './choices.ts';
 import { collectionNamed, getCollection, presetOf, typeOfItem } from './collections.ts';
@@ -59,6 +65,7 @@ import {
   liveBoardOf,
   relayAllowed,
 } from './next.ts';
+import { keepLeasesOfAgentsThere, listAgents } from './presence.ts';
 import {
   addRelation,
   assertMayEnter,
@@ -69,6 +76,7 @@ import {
   relatedItems,
   withRelations,
 } from './relations.ts';
+import { signalLanded, signalReview } from './review-signal.ts';
 
 export type Clock = () => string;
 
@@ -79,7 +87,9 @@ export type Item = ItemRecord & {
   closes?: Closing;
   // A lease that ran out with nobody releasing it (expiry is lazy, so it stays stored until a
   // release, a handoff or a new claim): readers see lease null and this, the abandoned hold.
-  expiredLease?: Lease;
+  // `connected`: the holder is still connected (a short lease ran out while it works), so the item
+  // is no stuck one: it only went back to the queue (field study 5, V2).
+  expiredLease?: Lease & { connected?: true };
   relations?: RelationRef[];
   children?: ChildrenSummary;
   // On a board, while an agent's question waits for the person (otea ask): the question; the turn
@@ -209,7 +219,7 @@ export function insertNewItem(
 }
 
 export function createItem(ctx: Context, input: CreateItemInput, now = systemClock): Item {
-  return transaction(ctx.db, () => insertNewItem(ctx, input, now()).created);
+  return joinTransaction(ctx.db, () => insertNewItem(ctx, input, now()).created);
 }
 
 // `availableTo` hides items whose active lease is held by anyone other than that actor; `parent`
@@ -248,14 +258,19 @@ export function listItems(ctx: Context, filter: ListItemsFilter = {}, now = syst
   if (parent !== undefined) requireItem(ctx.db, parent);
   const relations = selectRelations(ctx.db);
   const children = parent === undefined ? undefined : new Set(childIds(relations, parent));
+  keepLeasesOfAgentsThere(ctx.db, now);
   const at = now();
   const asking = askingItems(ctx.db);
-  const items = selectItems(ctx.db, stored)
-    .map((item) => withAsks(present(item, workflowFor(item), at), asking.get(item.id)))
-    .filter((item) => turn === undefined || item.turn === turn)
-    .filter(({ lease }) => availableTo === undefined || !lease || lease.holder === availableTo)
-    .filter(({ id }) => children === undefined || children.has(id))
-    .filter((item) => fields === undefined || holdsFields(item, fields));
+  const items = connectedLapses(
+    ctx,
+    selectItems(ctx.db, stored)
+      .map((item) => withAsks(present(item, workflowFor(item), at), asking.get(item.id)))
+      .filter((item) => turn === undefined || item.turn === turn)
+      .filter(({ lease }) => availableTo === undefined || !lease || lease.holder === availableTo)
+      .filter(({ id }) => children === undefined || children.has(id))
+      .filter((item) => fields === undefined || holdsFields(item, fields)),
+    now,
+  );
   if (relations.length === 0) return items;
   // A child may sit outside the filter, so the summaries read every item.
   const closings = new Map(
@@ -284,10 +299,34 @@ export function oldestWaiting(
 }
 
 export function getItem(ctx: Context, id: string, now = systemClock): ItemWithEvents {
+  keepLeasesOfAgentsThere(ctx.db, now);
   const item = requireItem(ctx.db, id);
   const workflow = workflowOf(ctx, item);
   const events = selectEvents(ctx.db, id);
-  return { ...withAsks(present(item, workflow, now()), openQuestion(events)), events };
+  const [shown] = connectedLapses(
+    ctx,
+    [withAsks(present(item, workflow, now()), openQuestion(events))],
+    now,
+  );
+  return { ...(shown as Item), events };
+}
+
+// A lease that ran out while its holder is still connected is no stuck item: a short lease (--ttl)
+// lapses under an agent that is there, and the item only goes back to the queue. The desk says so
+// plainly and neutral instead of «sin señales» in red, and `pending` does not list it as stuck
+// (field study 5, V2). Reads the agents only when some lease ran out.
+function connectedLapses<T extends Item>(ctx: Context, items: T[], now: Clock): T[] {
+  if (!items.some(({ expiredLease }) => expiredLease)) return items;
+  const connected = new Set(
+    listAgents(ctx.db, now)
+      .filter(({ live }) => live)
+      .map(({ name }) => name),
+  );
+  return items.map((item) =>
+    item.expiredLease && connected.has(item.expiredLease.holder)
+      ? { ...item, expiredLease: { ...item.expiredLease, connected: true as const } }
+      : item,
+  );
 }
 
 // `transitions` are the moves the performer may make, `relayable` the human decisions an agent
@@ -305,7 +344,39 @@ export type ItemView = ItemWithEvents & {
   board?: BoardBlock;
   // On an archived board: read-only; the board by its name and its hidden id.
   archived?: { board: string; id: string };
+  // While it waits for the person: its request was rewritten after the delivery was handed in.
+  requestChanged?: RequestChanged;
+  // While it waits for the person: what the assistant or the delivering agent said of this delivery
+  // (recommends sending it back, or doubts it). Advice, never a block.
+  advice?: Advice;
 };
+
+// While the item waits for the person: what changed in its request after the delivery was handed
+// in, each field by its name on the board (the title as `title`).
+export function requestChangedOf(
+  ctx: Context,
+  item: Pick<Item, 'collection' | 'turn'>,
+  events: Parameters<typeof requestChangedAfterHandoff>[0],
+): RequestChanged | undefined {
+  if (item.turn !== 'human') return undefined;
+  const def = liveBoardOf(ctx, item.collection)?.def;
+  // What the person asked for: the title and the board's form; off a board, the title and the
+  // description. Anything else is bookkeeping.
+  const asked = new Set(def ? def.form.map(({ ref }) => ref) : ['description']);
+  const changed = requestChangedAfterHandoff(
+    events,
+    (field) => field === 'title' || asked.has(field),
+  );
+  const parts = def?.parts;
+  if (!changed || !parts) return changed;
+  return {
+    ...changed,
+    changes: changed.changes.map((change) => ({
+      ...change,
+      field: parts[change.field]?.name ?? change.field,
+    })),
+  };
+}
 
 export function showItem(
   ctx: Context,
@@ -319,6 +390,8 @@ export function showItem(
   const children = childrenOf(ctx, item.id, at);
   const { gates: stateGates, ...offered } = itemMoves(type, item.state, item.fields, performer);
   const gates = withBranchGates(ctx, item, stateGates);
+  const changed = requestChangedOf(ctx, item, item.events);
+  const advice = item.turn === 'human' ? adviceAfterHandoff(item.events) : undefined;
   const moves = {
     ...offered,
     transitions: boardMoves(ctx, item, offered.transitions),
@@ -346,6 +419,8 @@ export function showItem(
     ...(children.length > 0 ? { children: childrenSummary(children) } : {}),
     ...(gates === undefined ? {} : { gates }),
     ...(board === undefined ? {} : { board }),
+    ...(changed === undefined ? {} : { requestChanged: changed }),
+    ...(advice === undefined ? {} : { advice }),
   };
 }
 
@@ -363,16 +438,56 @@ function withBranchGates(
   return { ...gates, push: false };
 }
 
-export type UpdateItemInput = { id: string; title?: string; fields?: FieldValues; actor: Actor };
+export type UpdateItemInput = {
+  id: string;
+  title?: string;
+  fields?: FieldValues;
+  actor: Actor;
+  // The assistant changes what a worker holds, and tells it in the same act (app/relay-change.ts);
+  // nothing else sets this.
+  overLease?: true;
+};
+
+// While an item waits for the person's review no agent changes its request or the fields handed in
+// (final red-team run, R8: `otea update <id> --field ... --as <any name>` rewrote them, and the desk
+// only warned afterwards): the delivery answers the request the person reads. The person edits it on
+// the desk, or sends it back, and the worker changes it then. An agent's own review (a step another
+// agent checks) is not the person's, and closes nothing here. The fields a board lets be filled at
+// any time (its estimates, `anytime`) are neither the request nor a handed field: an agent still
+// estimates them, as the person corrects them.
+// The files of the delivery are held the same way (app/evidence.ts), on any step: `changed` is then
+// left out, and no field is exempt.
+export function assertNotInPersonsReview(
+  ctx: Context,
+  item: ItemRecord,
+  type: ItemType,
+  actor: Actor,
+  changed?: readonly string[],
+): void {
+  if (actor.kind !== 'agent' || turnOf(type.workflow, item.state) !== 'human') return;
+  const board = liveBoardOf(ctx, item.collection);
+  if (!board) return;
+  const position = positionOf(item.state);
+  if (isClosed(position) || position.phase !== 'review') return;
+  if (changed?.every((key) => board.def.anytime.includes(key))) return;
+  const assistant = selectRoles(ctx.db).get(actor.name) === 'assistant';
+  const way = assistant
+    ? `Ask them in one tap, with a card: otea say "<question>" --send-back ${item.id} --note "<their change, in their words>" --option "<send it back>" --option "<leave it>"`
+    : 'Ask them, or let them send it back: the worker changes it then';
+  throw new OteaError(
+    'forbidden',
+    `${item.id} waits for the person's review: it does not change under them. ${way}`,
+  );
+}
 
 export function updateItem(ctx: Context, input: UpdateItemInput, now = systemClock): Item {
   const { db } = ctx;
-  return transaction(db, () => {
+  return joinTransaction(db, () => {
     const item = requireWritableItem(db, input.id);
     const preset = presetOf(ctx, getCollection(db, item.collection));
     const type: ItemType = typeOf(preset, item.type);
     const at = now();
-    assertMayWriteItem(ctx, item, input.actor, at);
+    assertMayWriteItem(ctx, item, input.actor, at, input.overLease === true);
     if (turnOf(type.workflow, item.state) === 'none') {
       throw new OteaError(
         'item_closed',
@@ -389,6 +504,7 @@ export function updateItem(ctx: Context, input: UpdateItemInput, now = systemClo
     };
     const revision = revise(type, item, changes);
     if (Object.keys(revision.changes).length === 0) return present(item, type.workflow, at);
+    assertNotInPersonsReview(ctx, item, type, input.actor, Object.keys(revision.changes));
     const content = {
       title: revision.title,
       fields: revision.fields,
@@ -449,6 +565,7 @@ export function landMove(
       from: item.state,
       to,
       ...stateNames(workflow, { from: item.state, to }),
+      ...(board ? approvalData(ctx, item, to, actor) : {}),
       ...data,
       ...trail,
     },
@@ -460,6 +577,16 @@ export function landMove(
     appendEvent(db, { itemId: item.id, type: 'released', actor, at, data: released });
   }
   if (turnOf(workflow, to) === 'none') liftWhenWaitsClose(ctx, item.id, actor, at);
+  // The person's review is news for the assistant, unless the person made the move themselves.
+  if (actor.kind === 'agent') {
+    signalReview(ctx, item, { to, turn: turnOf(workflow, to), board }, at);
+    signalLanded(ctx, item, closesOf(workflow, to), at);
+  }
+  // What the person settled by moving the item is no longer asked: the assistant's questions about
+  // it stop waiting for them (they kept counting in Te espera after the item was sent back). Only
+  // the person's own move on the desk or the phone settles anything: a relay, or a terminal, says
+  // nothing the person did.
+  else if (data.channel === 'ui') closeQuestions(db, { item: item.id }, at, 'settled');
   const moved = { ...item, state: to, updatedAt: at, lease: handoff ? null : item.lease };
   return present(moved, workflow, at);
 }

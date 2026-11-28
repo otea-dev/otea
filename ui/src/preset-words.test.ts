@@ -38,6 +38,16 @@ describe('preset words', () => {
     expect(fieldWord(repoTask, 'branch')).toBeUndefined();
   });
 
+  // E1: the item of a board the page did not have yet showed «sgp22f0j__review» in its header.
+  it('never show a board step’s hidden id when its board is not at hand', () => {
+    expect(stateWord(undefined, 'sgp22f0j__review')).toBe('…');
+    expect(stateWord(undefined, 'sgp22f0j')).toBe('…');
+    // Keys of a preset and the closed states are words already.
+    expect(stateWord(undefined, 'in_progress')).toBe('in_progress');
+    expect(stateWord(undefined, 'starting')).toBe('starting');
+    expect(stateWord(undefined, 'done')).toBe('done');
+  });
+
   it('take the preset’s Spanish labels in Spanish', () => {
     setLanguage('es');
 

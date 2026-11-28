@@ -73,6 +73,21 @@
   text-overflow: ellipsis;
   text-align: left;
 }
+/* what waits in other projects, on the phone's pill (the line beside it has no room there) */
+.pill .pelse {
+  position: absolute;
+  top: -5px;
+  right: 22px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--you);
+  color: var(--on-you);
+  font: 600 11px / 17px var(--sans);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 /* a tile holds a monogram or an icon, centred */
 .tile {
   display: inline-grid;
@@ -197,6 +212,13 @@
 .apill:disabled {
   cursor: default;
   background: var(--sheet);
+}
+/* the line under the bar says «Sin conexión»; the pill keeps what it last knew, dimmed */
+.apill[data-stale] {
+  color: var(--ink-3);
+}
+.apill[data-stale] .amw {
+  opacity: 0.6;
 }
 
 /* the mark: otea, its o a letter of the word with a dot on its ring (C · Órbita) */
@@ -446,7 +468,7 @@
   font: 600 14px / 1.3 var(--sans);
 }
 .arow .htag {
-  font: 400 10.5px / 1 var(--mono);
+  font: 400 11px / 1 var(--mono);
   color: var(--ink-3);
   padding: 2px 4px;
   border-radius: 3px;
@@ -532,6 +554,67 @@
   .tb-start .elsewhere {
     display: none;
   }
+}
+
+/* the first stops of the page: they wait out of sight and come up, as pills of the sheet's own
+   material, over the top bar when the keys reach them (pilot 1: they jump past the rail) */
+.skips {
+  position: fixed;
+  top: 10px;
+  left: 12px;
+  /* over the top bar (20) and the pops and dialogs (up to 60): it is the first thing the keys reach */
+  z-index: 70;
+  display: flex;
+  gap: 6px;
+  pointer-events: none;
+}
+.skip {
+  position: absolute;
+  inset-inline-start: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.skip:focus-visible {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+  pointer-events: auto;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: var(--sheet);
+  color: var(--ink);
+  font: 500 13px / 1 var(--sans);
+  box-shadow:
+    0 0 0 1px var(--rule-2),
+    0 10px 30px -14px var(--shadow);
+  animation: skip-in var(--t-fade) var(--o-settle);
+}
+/* While one shows, the bar is theirs: a solid strip the height of the top bar, so the pill never
+   lies half over the project's pill with its chevron showing through */
+.skips:has(.skip:focus-visible) {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--bar-h, 60px) + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) max(12px, env(safe-area-inset-right, 0px)) 0
+    max(12px, env(safe-area-inset-left, 0px));
+  align-items: center;
+  background: var(--ground);
+  box-shadow: 0 1px 0 var(--rule);
+}
+@keyframes skip-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+:root[data-motion="reduced"] .skip:focus-visible {
+  animation: none;
 }
 
 /* today's pages (Studio, Settings, the catalog) render inside .main as a view, until restyled */

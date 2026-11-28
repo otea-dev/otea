@@ -90,11 +90,23 @@ function remember(key: string, value: string): void {
 
 const SIGN: Record<DiffLine['kind'], string> = { add: '+', del: '-', ctx: ' ', note: '' };
 
+// The sign is for the eye; a line says in words whether it was added or removed, ahead of its text
+// and outside it (a line picked for a note quotes the text alone).
+function Said({ kind }: { kind: DiffLine['kind'] | 'none' }) {
+  if (kind !== 'add' && kind !== 'del') return null;
+  return (
+    <span className="visually-hidden">
+      {t(kind === 'add' ? 'evidence.diff.added' : 'evidence.diff.removed')}:{' '}
+    </span>
+  );
+}
+
 function DiffRow({ line }: { line: DiffLine }) {
   const old = line.kind === 'ctx' || line.kind === 'del' ? line.old : '';
   const now = line.kind === 'ctx' || line.kind === 'add' ? line.new : '';
   return (
     <div className="ev-line" data-kind={line.kind}>
+      <Said kind={line.kind} />
       <span className="ev-gutter">
         <span className="ev-no">{old}</span>
         <span className="ev-no">{now}</span>
@@ -128,6 +140,7 @@ function SideCell({
         : '';
   return (
     <div className="ev-line" data-kind={kind} data-side={side}>
+      <Said kind={kind} />
       <span className="ev-gutter">
         <span className="ev-no">{no}</span>
       </span>
@@ -184,10 +197,14 @@ function DiffFileView({
           <span className="ev-minus">−{file.deletions}</span>
         </span>
       </summary>
-      <div
+      {/* It scrolls sideways: a place the keys can reach, named by its file, to read it by. */}
+      <section
         className={split ? 'ev-code ev-split' : 'ev-code'}
         data-wrap={wrap ? 'true' : undefined}
         style={digits(largest)}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling box is reached with the keys
+        tabIndex={0}
+        aria-label={file.path || t('evidence.changes')}
       >
         <div className="ev-lines">
           {file.hunks.map((hunk, index) => (
@@ -211,7 +228,7 @@ function DiffFileView({
             </div>
           ))}
         </div>
-      </div>
+      </section>
     </details>
   );
 }
@@ -430,11 +447,14 @@ export function LogView({ evidence }: { evidence: Evidence }) {
           </Button>
         </span>
       </div>
-      <div
+      <section
         ref={box}
         className="ev-code"
         data-wrap={wrap ? 'true' : undefined}
         style={digits(view.total)}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling box is reached with the keys
+        tabIndex={0}
+        aria-label={evidence.filename}
       >
         <div className="ev-lines">
           <LogRows lines={view.head} found={found} current={current} />
@@ -445,7 +465,7 @@ export function LogView({ evidence }: { evidence: Evidence }) {
           ) : null}
           <LogRows lines={view.tail} found={found} current={current} />
         </div>
-      </div>
+      </section>
       <FileMeta evidence={evidence} />
     </div>
   );

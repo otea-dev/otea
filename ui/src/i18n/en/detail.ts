@@ -18,7 +18,8 @@ export const detail = {
   'detail.evidence': 'Evidence',
   'detail.missing': 'missing to complete',
   'detail.readOnly': 'Read-only. Run {command} to act from this browser.',
-  'detail.offline': 'No connection to your computer: you can act once it is back.',
+  // The line over the page says «No connection»; these say what that means for this page.
+  'detail.offline': 'You can act once the connection is back.',
   'detail.archived':
     'Read-only: {board} is archived. Restore it in Studio’s Archived to work on this item.',
   'detail.receipt': '{state} · now {turn} · {ago}',
@@ -249,12 +250,23 @@ export const detail = {
   'evidence.gap.optional': '+ {list} (optional, not provided)',
   'evidence.files': '{label}: files',
   'evidence.latest': 'latest',
+  'evidence.branchDiff': 'the branch’s diff',
+  'evidence.agentFile': 'the agent’s file',
+  'evidence.agentFileNote':
+    'This is a file the agent attached, not the branch’s diff: the branch’s own diff is the other file.',
   'evidence.before': 'before',
   'evidence.after': 'after',
   'evidence.noBefore': 'no before yet',
   'evidence.noAfter': 'no after yet',
   'evidence.alt': '{side}: {alt}',
+  'evidence.broken': 'Could not load {file}',
+  'evidence.retry': 'Try again',
   'evidence.howToCompare': 'How to compare',
+  'tech.title': 'Technical details',
+  'tech.notices': { one: '{count} notice', other: '{count} notices' },
+  'evidence.viewport.phone': 'Phone',
+  'evidence.viewport.tablet': 'Tablet',
+  'evidence.viewport.desktop': 'Desktop',
   'evidence.slider': 'slider',
   'evidence.sideBySide': 'side by side',
   'evidence.md.noImage':
@@ -273,6 +285,8 @@ export const detail = {
   'evidence.lines': { one: '{count} line', other: '{count} lines' },
   'evidence.wrap': 'wrap',
   'evidence.layout': 'How the diff reads',
+  'evidence.diff.added': 'added',
+  'evidence.diff.removed': 'removed',
   'evidence.unified': 'unified',
   'evidence.search': 'Search',
   'evidence.searchLog': 'Search the log',
@@ -294,12 +308,17 @@ export const detail = {
   'evidence.reader.opened': 'opened',
   'evidence.reader.side': 'The “{side}” side of a before and after.',
   'evidence.reader.compare': 'Compare before and after',
-  'evidence.reader.unopened': 'Not opened in the reader: {n} of {total} files.',
+  // `count` is the total: «1 of 1 file», never «1 of 1 files».
+  'evidence.reader.unopened': {
+    one: 'Not opened in the reader: {n} of {total} file.',
+    other: 'Not opened in the reader: {n} of {total} files.',
+  },
   'notes.pick.file': 'the whole file',
   'notes.pick.line': 'line {n}',
   'notes.pick.quote': 'the line picked',
   'notes.pick.node': 'node “{node}”',
-  'notes.pick.hintLine': 'Click a line to anchor the note to it.',
+  'notes.pick.hintLine':
+    'Click a line to anchor the note to it, or reach it with the arrow keys and press Enter.',
   'evidence.noteLine': 'Click a line to leave a note on it in the reader.',
   'notes.pick.hintLineTouch': 'Tap a line to anchor the note to it.',
   'notes.pick.hintNode': 'Click a diagram node to anchor the note to it.',
@@ -409,7 +428,7 @@ export const detail = {
   'sheet.missing.title': 'Item not found',
   'sheet.missing.text':
     'There is no item {id} in this project. It may have been deleted, or the link may be wrong.',
-  'sheet.unreached.title': 'No connection to your computer',
+  'sheet.unreached.title': 'No connection',
   'sheet.unreached.text': '{id} opens when your computer answers again.',
   'sheet.yourTurn': 'your turn',
   'sheet.typeBoard': '{type} · {board}',
@@ -436,6 +455,15 @@ export const detail = {
   'sheet.stand.kids': 'Waiting for its children.',
   'sheet.stand.working': '{agent} is on it.',
   'sheet.stand.workingAsks': '{agent} has it, but waits for your answer on {item}.',
+  'sheet.stand.landing': 'Approved, but not landed yet: until an agent lands it, it is not done.',
+  'sheet.stand.approvedWaits':
+    'Approved · waits for {item}, which changes the same files and lands first. Then its agent merges main into it and you review that merge once.',
+  'sheet.stand.approvedMerging':
+    'Approved. {item} landed first, so its agent is merging main into it: you review that merge once, and then it lands.',
+  'sheet.stand.bounced':
+    'It came back to its step because, once approved, it conflicted with another change that landed first: “{why}”. It goes through review again.',
+  'sheet.stand.bouncedPlain':
+    'It came back to its step because, once approved, it conflicted with another change that landed first. It goes through review again.',
   'sheet.stand.reopened': 'Reopened: “{why}”. {agent} takes it up again.',
   'sheet.stand.reopenedWaits': 'Reopened: “{why}”. It waits for an agent.',
   'sheet.stand.workingRound': '{agent} is on it, in round {round}.',
@@ -469,10 +497,13 @@ export const detail = {
   'sheet.says.landsAnyPush':
     'an agent then lands it and pushes it to the remote, as the {step} step says',
   'sheet.says.landsOwn': 'an agent then pushes {base} to the remote',
+  'sheet.says.landsLocal':
+    'an agent then lands it in {base} in your folder, as the {step} step says; nothing is pushed',
+  'sheet.says.landsOwnLocal': 'an agent then brings {base} up to date in your folder',
   'sheet.says.unpushed': 'note: {branch} was never pushed to the remote',
   'sheet.says.unchanged': 'it brings no code change: there is nothing to push',
   'sheet.says.closesUnmerged':
-    'it is Done, but its branch is not merged yet: it still has to be merged and marked merged',
+    'it is Done, but it has not landed yet: it still has to land and be marked as landed',
   'sheet.says.resume': 'back in the queue of {state}, for any agent',
   'sheet.says.free':
     'drops {agent}’s lease: back in the queue of {state}, and {agent} claims it again before going on',
@@ -513,7 +544,7 @@ export const detail = {
   'sheet.qa.delegate': 'You decide',
   'sheet.qa.delegated': 'You left the decision to the agent',
   'sheet.qa.goesOn': '{agent} goes on with what you say',
-  'sheet.qa.offline': 'No connection to your computer: you can answer once it is back.',
+  'sheet.qa.offline': 'You can answer once the connection is back.',
   'pick.label': 'Pick an option',
   'pick.recommended': 'recommended',
   'pick.comment': 'A comment for the agent (optional)',
@@ -605,8 +636,8 @@ export const detail = {
   'sheet.h.agentClosed': 'Closed it: {state}',
   'sheet.h.agentDiscarded': 'Discarded it: {state}',
   'sheet.h.delivered': 'You handed it off: on to {state}',
-  'sheet.h.merged': 'Recorded that {branch} was merged',
-  'sheet.h.mergedYou': 'You recorded that {branch} was merged',
+  'sheet.h.merged': 'Recorded that {branch} landed',
+  'sheet.h.mergedYou': 'You recorded that {branch} landed',
   'sheet.h.claimed': 'Took the lease',
   'sheet.h.claimedOver': 'Took the lease from {previous}',
   'sheet.h.released': 'Let the lease go',
@@ -634,6 +665,8 @@ export const detail = {
   'sheet.route.aria': 'Route of {id}',
   'sheet.dip': 'round {n} · sent back {when}',
   'sheet.dipRedone': 'round {n} · sent back and redone',
+  'sheet.dipBounced': 'round {n} · back after a conflict',
+  'sheet.dipMerge': 'round {n} · main merged in',
   'sheet.reopenDip': 'reopened {when}',
   'sheet.when.today': 'today',
   'sheet.when.yesterday': 'yesterday',
@@ -642,17 +675,20 @@ export const detail = {
   'sheet.toast.done': 'You marked “{title}” done. On to {state}.',
   'sheet.toast.sentBack': 'You sent “{title}” back to {state}, with your notes.',
   'sheet.toast.answered': 'You answered “{title}”.',
+  'sheet.toast.answeredWith': 'You answered “{title}”: {said}.',
   'sheet.toast.closed': 'You closed “{title}”: {state}.',
   'sheet.toast.discarded': 'You discarded “{title}”: {state}.',
   'sheet.toast.moved': 'You moved “{title}” to {state}.',
   'sheet.toast.restarted': 'You put “{title}” back in the queue of {state}.',
   'sheet.toast.reassigned': 'You left “{title}” for {agent}.',
   'sheet.toast.resumed': 'You took “{title}” up again: the agents see it once more.',
+  'sheet.toast.reopened': 'You reopened “{title}”: it is back where it was.',
+  'sheet.dropped.reopen': 'Reopen',
 
   // An item on a Studio board: its parts, its links, its branch, its rounds, the discard dialog.
   'bi.refuse.partsUnmerged': {
-    one: 'Not approved {id}: {list} is not merged yet.',
-    other: 'Not approved {id}: {list} are not merged yet.',
+    one: 'Not approved {id}: {list} has not landed yet.',
+    other: 'Not approved {id}: {list} have not landed yet.',
   },
   'bi.refuse.parts': {
     one: 'Not approved {id}: {list} is still unfinished.',
@@ -697,7 +733,7 @@ export const detail = {
   'bi.refuse.blockersEnded':
     'Not approved {id}: {other} (in {board}) holds it back and is still unfinished.',
   'bi.refuse.blockersUnmerged':
-    'Not approved {id}: {other} (in {board}) holds it back and is not merged yet: approve it once its branch is in the base.',
+    'Not approved {id}: {other} (in {board}) holds it back and has not landed yet: approve it once it has landed.',
   'bi.partOf': 'Part of',
   'bi.parts.title': 'Parts',
   'bi.parts.gloss': '{ended} of {total} finished',
@@ -741,14 +777,45 @@ export const detail = {
   'bi.branch.merge': 'can be merged',
   'bi.branch.merged': 'merged',
   'bi.branch.landed': 'merged in {step}',
-  'bi.branch.landing': 'an agent lands it in {base} now, as the {step} step says',
-  'bi.branch.landingOwn': 'an agent pushes {base} to the remote now',
+  // «next», never «now»: with no worker connected the line under it says nobody has taken it yet.
+  'bi.branch.landing': 'an agent lands it in {base} next, as the {step} step says',
+  'bi.branch.landingOwn': 'an agent pushes {base} to the remote next',
+  'bi.branch.landingOwnLocal': 'an agent brings {base} up to date in your folder next',
+  'bi.branch.behindLocal.ready':
+    'Landed in its branch (nothing is pushed: no remote), but your local {base} does not have it yet:it brings {checkout} up to date when an agent runs otea land sync',
+  'bi.branch.behindLocal.changes':
+    'Landed in its branch (nothing is pushed: no remote), but your local {base} does not have it yet:{checkout} has changes of yours, so nothing was touched',
+  'bi.branch.behindLocal.elsewhere':
+    'Landed in its branch (nothing is pushed: no remote), but your local {base} does not have it yet:{checkout} is on {on}, so nothing was touched; switch to {base} when you can',
+  'bi.branch.behindLocal.diverged':
+    'Landed in its branch (nothing is pushed: no remote), but your local {base} has commits of its own, so nothing was touched; look at git log in {checkout} and decide how to join them',
+  'bi.branch.behindLocal.collides':
+    'Landed in its branch (nothing is pushed: no remote), but {paths} would replace what you keep out of git in {checkout}, so nothing was touched; move it aside first',
   'bi.branch.mergedLocal': 'in your local {base}; push it (git push {push} {base})',
   'bi.branch.mergedOutside':
     'in {base} already, merged outside Otea: an agent closes the {step} step',
   'bi.branch.landedOwn': 'pushed in {step}',
   'bi.branch.closed': 'no longer pushed',
   'bi.branch.noPush': 'no pushes in {step}',
+  'bi.branch.behind.ready': {
+    one: 'Landed on {remote}, but your local {base} is {count} commit behind: run git pull --ff-only in {checkout}',
+    other:
+      'Landed on {remote}, but your local {base} is {count} commits behind: run git pull --ff-only in {checkout}',
+  },
+  'bi.branch.behind.changes': {
+    one: 'Landed on {remote}, but your local {base} is {count} commit behind: {checkout} has changes of yours, so nothing was touched; run git pull --ff-only there when you can',
+    other:
+      'Landed on {remote}, but your local {base} is {count} commits behind: {checkout} has changes of yours, so nothing was touched; run git pull --ff-only there when you can',
+  },
+  'bi.branch.behind.elsewhere': {
+    one: 'Landed on {remote}, but your local {base} is {count} commit behind: {checkout} is on {on}, so nothing was touched; switch to {base} and run git pull --ff-only',
+    other:
+      'Landed on {remote}, but your local {base} is {count} commits behind: {checkout} is on {on}, so nothing was touched; switch to {base} and run git pull --ff-only',
+  },
+  'bi.branch.behind.diverged':
+    'Landed on {remote}, but your local {base} and {remote} have diverged: your {base} has commits of its own, so nothing was touched and no pull can bring it up to date; look at git log {remote}..{base} in {checkout} and decide how to join them',
+  'bi.branch.behind.collides':
+    'Landed on {remote}, but {paths} would replace what you keep out of git in {checkout}, so nothing was touched; move it aside, then run git pull --ff-only there',
   'bi.branch.drift':
     'Someone pushed commits to the branch after the handoff: {list}. Approving approves only what was handed off, {handed}.',
   'bi.branch.driftBy': '{commit} by {author}',
@@ -760,23 +827,52 @@ export const detail = {
   'bi.branch.diffOffMore': '{count} more',
   'bi.branch.diffFiles':
     'The attached diff does not match what lands. The diff {diff}; the work handed off {landed}. Approving approves what was handed off, not the diff.',
+  'bi.branch.diffLines':
+    'The attached diff is the agent’s own file, not the branch’s: it names {files} but shows other lines than the work handed off changes. Approving approves what was handed off, not the diff.',
   'bi.branch.diffFilesNames': 'names {files}',
   'bi.branch.diffFilesNone': 'names no file',
   'bi.branch.diffFilesChanges': 'changes {files}',
   'bi.branch.diffFilesChangesNone': 'changes no file',
+  // Beside every Aprobar on an item in review (ReviewNotices): in the words of someone who does not
+  // read code, the technical sentences above one tap away.
+  'rvn.diff':
+    'What is attached to this review may not be what goes in. Approving approves the work the agent handed in, not the attached file. Before you approve, look at what the agent delivered, or ask the assistant.',
+  'rvn.advice.sendBack.assistant': 'The assistant recommends sending it back: {note}',
+  'rvn.advice.sendBack.agent': '{agent} recommends sending it back: {note}',
+  'rvn.advice.doubt.assistant': 'The assistant has a doubt: {note}',
+  'rvn.advice.doubt.agent': '{agent} has a doubt: {note}',
   'bi.branch.moved':
     'The branch changed on the remote after the handoff: it is now at {now}. Approving approves only what was handed off, {handed}.',
   'bi.branch.driftBase':
     '{base} holds commits made after the handoff, which are not part of this item: {list}. Approving approves only what was handed off, {handed}; a push of {base} takes them along.',
   'bi.branch.movedBase':
     '{base} changed after the handoff: it is now at {now}. Approving approves only what was handed off, {handed}.',
+  'bi.branch.waitsFirst':
+    'You approved it. {first} lands first: changes land one at a time, in the order you approved them.',
+  'bi.branch.waitsFirstSame':
+    'You approved it. {first} lands first, and the two change the same files: when it has landed, the agent brings that change in and sends this one back to your review once, for that merge alone.',
   'bi.branch.roundSame':
     'This round holds the same files as round {round} ({earlier}): nothing changed in {branch} since that round. Approving approves what that round already had.',
   'bi.branch.overlapLanding':
-    '{item} touches the same files as {other} ({files}), which lands first: main will hold its change when {item} lands, so expect to merge main and maybe resolve a conflict.',
+    '{item} changes the same files as {other} ({files}), which lands first. When it is {item}’s turn, the agent brings in that change first and the item returns to your review once, for that merge alone.',
   'bi.branch.overlapOpen':
-    '{item} touches the same files as {other} ({files}), which is open too: whichever lands second must merge main first and may meet a conflict.',
+    '{item} and {other} change the same files ({files}). Whichever lands second brings in the other’s change first: the agent does it, and it returns to your review once, for that merge alone.',
   'bi.branch.overlapMore': 'and {n} more',
+  'bi.branch.overlapGroup': {
+    one: '{item} shares files with {count} other open change ({others}). Whichever lands second brings in the other’s change first: the agent does it, and it returns to your review once, for that merge alone.',
+    other:
+      '{item} shares files with {count} other open changes ({others}). Whichever lands second brings in the others’ changes first: the agent does it, and it returns to your review once, for that merge alone.',
+  },
+  'bi.branch.overlapFirst': {
+    one: ' It lands first.',
+    other: ' {count} of them land first.',
+  },
+  'bi.branch.overlapEach': 'which files',
+  'bi.changed.lead':
+    'The request changed after this was handed in ({by}, {time}). The diff and the branch answer the earlier request: sending it back is the safe move.',
+  'bi.changed.line': '{field}: was {from} · now {to}',
+  'bi.changed.empty': 'empty',
+  'bi.changed.title': 'Title',
   'bi.branch.mergeOnly':
     'Since the commit you approved ({since}) this round only merges main into {branch}. The merge itself changed {files}: everything in this diff is new and not reviewed yet, including files that did not conflict. The rest is what you approved, and what main brought in landed through its own review. Approving takes {tip} as it is.',
   'bi.branch.mergeOnlyClean':
@@ -807,6 +903,8 @@ export const detail = {
   'bi.rounds.relayed': 'relayed by an agent',
   'bi.rounds.handed': 'handed off',
   'bi.rounds.reworked': 'sent back and redone',
+  'bi.rounds.merged': 'main merged in, reviewed again',
+  'bi.rounds.mergedBy': 'main merged in by {by}',
   'bi.rounds.sentBack': 'sent back to {step}',
   'bi.rounds.done': 'done',
   'bi.rounds.dropped': 'discarded',
@@ -871,6 +969,8 @@ export const detail = {
   'notes.allAnswered': { one: 'answered', other: 'all answered' },
   'notes.open': 'unanswered',
   'notes.you': 'you',
+  'notes.relayed.assistant': 'The assistant, for you',
+  'notes.relayed.agent': '{agent}, for you',
   'notes.waiting': '{agent} has not answered yet.',
   'notes.waitingAny': 'The agent has not answered yet.',
   'notes.waitingSmall':
@@ -896,6 +996,8 @@ export const detail = {
   'notes.sentAny': 'You left the agent a note on “{title}”.',
   'notes.failed': 'The note was not sent. Try again.',
   'notes.h.left': 'You left it a note',
+  'notes.h.leftAssistant': 'The assistant, for you, left it a note',
+  'notes.h.leftAgent': '{agent}, for you, left it a note',
   'notes.h.on': 'on {file}',
   'notes.h.answered': '{agent} answered at {time}',
   'notes.phone.title': 'Note for {agent}',
@@ -917,8 +1019,8 @@ export const detail = {
   'agent.stand.wait': 'Waiting for {answer} on {title}, for {time}.',
   'agent.stand.answer': 'your answer',
   'agent.stand.idle': 'Waiting, free for {time}.',
-  'agent.stand.silent': 'No signal since {time}: it holds {title}.',
-  'agent.stand.silentFree': 'No signal since {time}.',
+  'agent.stand.silent': 'No news since {time}: it holds {title}.',
+  'agent.stand.silentFree': 'No news since {time}.',
   'agent.stand.away': 'Away: its last sign was {time}.',
   'agent.stand.noProfile': 'Takes no step until it declares the model and effort it runs as.',
   'agent.harness': 'Harness',
