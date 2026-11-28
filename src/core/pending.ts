@@ -43,6 +43,8 @@ export type PendingEntry = {
   recommended?: number;
   // A secretary question: the turn of Hablar it sits in.
   turn?: number;
+  // A secretary question about an item: which (CAM-12), so a row never asks about «it» alone.
+  about?: string;
   // An escalation: the number the person dismisses it by.
   signal?: number;
   // A board nobody works: the items that wait on it.

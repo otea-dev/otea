@@ -122,18 +122,19 @@ describe('the language of what the CLI makes', () => {
     expect(bugs).not.toContain('Pasos para reproducirlo');
   });
 
-  it('changes what is made from then on with projects lang, and nothing that exists', async () => {
+  // The boards that exist follow the project (project-relanguage.test.ts): D-867c82.
+  it('changes what is made from then on with projects lang, and the boards that exist follow', async () => {
     await switchDeskTo('en');
     await person('init', '--local', '--template', 'changes');
     expect((await person('projects', 'lang')).out).toContain('English (en)');
-    const before = (await person('board', 'Changes')).out;
 
     expect((await person('projects', 'lang', 'es')).out).toContain('Spanish (es)');
     expect((await person('projects', 'lang')).out).toContain('Spanish (es)');
     await person('board', 'add', 'Bugs', '--template', 'bugs');
 
     expect((await person('board', 'Bugs')).out).toContain('Pasos para reproducirlo');
-    expect((await person('board', 'Changes')).out).toBe(before);
+    expect(boardNames()).toContain('Cambios');
+    expect(boardNames()).not.toContain('Changes');
     expect((await person('projects', 'lang', 'fr')).code).not.toBe(0);
   });
 

@@ -4,6 +4,7 @@ import { LANGS, type Lang } from '../core/board/template-words.ts';
 import { boardLang } from '../core/board/templates.ts';
 import { findVersion, listBoards } from '../store/boards.ts';
 import { selectProjectLang, updateProjectLang } from '../store/queries.ts';
+import { relanguageBoards } from './board-relanguage.ts';
 import { defaultLang } from './language.ts';
 import type { Env, Project } from './project.ts';
 
@@ -56,8 +57,10 @@ export function projectLanguage(project: Pick<Project, 'db'>, env: Env = process
   return storedProjectLang(project.db) ?? settleProjectLang(project.db, env);
 }
 
-// Changes it; what exists keeps the words it was made in.
-export function setProjectLanguage(project: Pick<Project, 'db'>, lang: Lang): Lang {
+// Changes it, and the boards that exist follow (board-relanguage.ts): an English project is English
+// in every word Otea writes for it, the boards a template made included.
+export function setProjectLanguage(project: Project, lang: Lang): Lang {
   updateProjectLang(project.db, lang);
+  relanguageBoards(project, lang);
   return lang;
 }

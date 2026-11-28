@@ -1,7 +1,7 @@
 import { isClosed, positionOf } from '../core/board/engine.ts';
 import { DONE } from '../core/board/model.ts';
 import type { Lang } from '../core/board/templates.ts';
-import { messageSnippet } from '../core/conversation.ts';
+import { type Message, messageSnippet } from '../core/conversation.ts';
 import { activeLease } from '../core/lease.ts';
 import {
   type BoardQueue,
@@ -16,7 +16,7 @@ import {
 import { quoteAgent } from '../core/quote.ts';
 import { timeText } from '../core/time.ts';
 import { selectOpenQuestions } from '../store/conversation.ts';
-import { selectEvents, selectStateEntries } from '../store/queries.ts';
+import { findItem, selectEvents, selectStateEntries } from '../store/queries.ts';
 import { selectOpenEscalations } from '../store/secretary.ts';
 import { landedAhead } from './approval-wait.ts';
 import { listBandeja } from './bandeja.ts';
@@ -73,6 +73,17 @@ function secretaryAway(ctx: Context, now: Clock): boolean {
   return state === undefined || state === 'offline';
 }
 
+// The item a question of the secretary's is about: the one its tap acts on, else the one it was sent
+// with (a notice's own links), else the first item the question names that the project has. A
+// question that answers a turn of the person's does not take that turn's links: they are the turn's.
+const ITEM_NAMED = /\b[A-Z][A-Z0-9]*-[1-9][0-9]*\b/g;
+
+function aboutOf(ctx: Context, message: Message): string | undefined {
+  if (message.action) return message.action.item;
+  if (message.replyTo === null && message.links[0] !== undefined) return message.links[0];
+  return message.text.match(ITEM_NAMED)?.find((id) => findItem(ctx.db, id) !== undefined);
+}
+
 // What waits for the person that no list of items holds: a refiner's question on a note, the
 // secretary's own questions, and what agents escalated while the secretary is away. Cheap: the
 // project's overview of every project reads it (server/projects.ts).
@@ -95,9 +106,11 @@ export function offItemOf(ctx: Context, now: Clock = systemClock): PendingEntry[
     });
   }
   for (const message of selectOpenQuestions(ctx.db)) {
+    const about = aboutOf(ctx, message);
     out.push({
       kind: 'secretary',
       ref: String(message.id),
+      ...(about === undefined ? {} : { about }),
       title: messageSnippet(message.text),
       since: message.at,
       by: message.by,
@@ -425,7 +438,7 @@ function lineOf(entry: PendingEntry): string {
     case 'bandeja':
       return `${entry.ref} (note ${quoted(entry.title)}): ${entry.by ?? 'a refiner'} asks ${quoted(entry.text ?? '')}${options}${ago(entry.since)}`;
     case 'secretary':
-      return `your question in message ${entry.ref} ${quoted(entry.text ?? entry.title)}${options}${ago(entry.since)}`;
+      return `your question in message ${entry.ref}${entry.about === undefined ? '' : ` (about ${entry.about})`} ${quoted(entry.text ?? entry.title)}${options}${ago(entry.since)}`;
     case 'escalation':
       return `${entry.ref} ${quoted(entry.title)}: ${entry.by ?? 'an agent'} says ${quoted(entry.text ?? '')}${ago(entry.since)}`;
     case 'stuck':

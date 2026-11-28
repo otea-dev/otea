@@ -11,7 +11,7 @@ import {
   type ProjectView,
   projectView,
 } from './project.ts';
-import { projectLanguage } from './project-language.ts';
+import { projectLanguage, setProjectLanguage } from './project-language.ts';
 import { listRepos } from './repos.ts';
 
 // otea start: what a person needs in their first minutes, in the project's folder, in one pass.
@@ -73,6 +73,10 @@ export async function startProject(cwd: string, options: StartOptions): Promise<
     project = initProject(cwd, options.lang === undefined ? {} : { lang: options.lang });
   }
   try {
+    // --lang on a project that exists says what the person is: the project follows, boards included
+    // (the first run on a Spanish computer cannot know an English person is at the keyboard).
+    if (options.lang !== undefined && options.lang !== projectLanguage(project))
+      setProjectLanguage(project, options.lang);
     const lang = options.lang ?? projectLanguage(project);
     if (created) listRepos(project);
     const made = initBoards(project, picked, lang);

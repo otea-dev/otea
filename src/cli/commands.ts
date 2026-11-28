@@ -767,7 +767,7 @@ const projectsCurrent: Command = {
 const projectsLang: Command = {
   name: 'projects lang',
   summary:
-    "Show the project's language, or change it with en or es: the language of what Otea makes for the project with no desk to ask (otea start, prompt, board add, board draft, a Pedido's title). It affects only what is made from then on; boards that exist keep their words, and the desk keeps its own language for its screen",
+    "Show the project's language, or change it with en or es: the language of what Otea makes for the project with no desk to ask (otea start, prompt, board add, board draft, a Pedido's title). The boards that exist follow: a word a template gave a board (and a board still called what its template calls it) moves to the new language, a word you wrote stays as you wrote it, and a board with an open draft is left as it is; the desk keeps its own language for its screen. otea start --lang does the same on a project that exists",
   args: ['lang?'],
   options: {},
   execute: ({ cwd, args: [asked], agent }) => {
@@ -788,7 +788,7 @@ const projectsLang: Command = {
         text:
           asked === undefined
             ? `${said} (${lang})`
-            : `The project's language is now ${said} (${lang}); what exists keeps its words`,
+            : `The project's language is now ${said} (${lang}); its boards follow, and what you wrote on them stays as you wrote it`,
       };
     });
   },

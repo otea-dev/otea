@@ -151,7 +151,11 @@ function TeRows({
             onClick={() => onJump(entry)}
           >
             <span className="hb-te-ref">
-              {entry.kind === 'secretary' || entry.kind === 'worker' ? '' : entry.ref}
+              {entry.kind === 'secretary'
+                ? (entry.about ?? '')
+                : entry.kind === 'worker'
+                  ? ''
+                  : entry.ref}
             </span>
             <span className="hb-te-t">
               <Ticked text={rowText(entry)} />

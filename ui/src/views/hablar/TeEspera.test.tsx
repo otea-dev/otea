@@ -117,6 +117,33 @@ describe('the «Te espera» strip of Hablar', () => {
     vi.unstubAllGlobals();
   });
 
+  // D-0fe98a (field study s-real): "¿lo descarto con tu toque?" said nothing of which item.
+  it('names the item a question of the secretary is about, in the id column of its row', () => {
+    const asked: PendingEntry = {
+      kind: 'secretary',
+      ref: '41',
+      title: 'Do I drop it with your tap?',
+      since: ago(2),
+      by: 'sol',
+      text: 'Do I drop it with your tap?',
+      options: ['Drop it', 'No'],
+      turn: 40,
+      about: 'CAM-12',
+    };
+    const general: PendingEntry = { ...asked, ref: '42', text: 'Which day suits you?' };
+    delete general.about;
+
+    const page = mount(
+      <AppTestProvider value={testApp({ phone: false, short: false })}>
+        <TeEspera pending={pending([asked, general, ...reviews])} onJump={none} />
+      </AppTestProvider>,
+    );
+
+    const refs = [...page.root.querySelectorAll('.hb-te-ref')].map((cell) => cell.textContent);
+    expect(refs.slice(0, 2)).toEqual(['CAM-12', '']);
+    page.unmount();
+  });
+
   it('says which review holds the queue of a board, and what waits behind it', () => {
     const html = render(
       pending(reviews, {

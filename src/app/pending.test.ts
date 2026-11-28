@@ -120,6 +120,39 @@ describe('what waits for the person', () => {
     expect(pendingOf(project, clock(3 * MIN)).count).toBe(0);
   });
 
+  // D-0fe98a (field study s-real): "¿lo descarto con tu toque?" in «Te toca ahora» did not say which
+  // item. A question of the secretary's about an item names it, in the data and in the text the
+  // secretary reads back.
+  it('names the item a question of the secretary is about', () => {
+    const own = createItem(
+      project,
+      { collection: 'reviews', title: 'CSS review', actor: agent('kiln') },
+      clock(500),
+    ).id;
+    const linked = sayAsSecretary(
+      project,
+      { agent: 'sol', text: 'Do I drop it?', links: [own], options: ['Drop it', 'No'] },
+      clock(1000),
+    ).message;
+    const mentioned = sayAsSecretary(
+      project,
+      { agent: 'sol', text: `Is ${own} ready to go?`, options: ['Yes', 'No'] },
+      clock(2000),
+    ).message;
+    const general = sayAsSecretary(
+      project,
+      { agent: 'sol', text: 'Which day suits you?', options: ['Mon', 'Tue'] },
+      clock(3000),
+    ).message;
+
+    const pending = pendingOf(project, clock(MIN));
+    const about = (id: number) => pending.entries.find(({ ref }) => ref === String(id))?.about;
+    expect(about(linked.id)).toBe(own);
+    expect(about(mentioned.id)).toBe(own);
+    expect(about(general.id)).toBeUndefined();
+    expect(pendingText(pending)).toContain(`your question in message ${linked.id} (about ${own})`);
+  });
+
   it('counts a review and a step of the person apart, oldest first', () => {
     const make = (title: string, actor: typeof you | ReturnType<typeof agent>, at: number) =>
       createItem(project, { collection: 'reviews', title, actor }, clock(at)).id;

@@ -298,7 +298,9 @@ function OffRow({ entry, now }: { entry: PendingEntry; now: number }) {
           </span>
         </div>
         <div className="m" data-leaf="">
-          <span className="id">{secretary ? t('toca.off.secretary') : entry.ref}</span>
+          <span className="id">
+            {secretary ? (entry.about ?? t('toca.off.secretary')) : entry.ref}
+          </span>
           <span className="bd">
             <span className="bdc">
               {t(secretary ? 'toca.off.inHablar' : report ? 'toca.off.report' : 'toca.off.bandeja')}
