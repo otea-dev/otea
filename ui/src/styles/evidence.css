@@ -168,6 +168,14 @@
   gap: 8px;
   margin-top: 8px;
 }
+/* A fieldset is as wide as its content unless told otherwise: two long file names side by side made
+   the item's panel 647 px wide in a 464 px sheet and cut Aprobar off (s-real D-bf48e5, D-c8b9f3). */
+.ev-picker {
+  flex-wrap: wrap;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
 /* A round that holds the very file of the round before (P5-F1). */
 .ev-same {
   margin: 8px 0 0;

@@ -1884,6 +1884,19 @@ button.hb-kid:hover {
   .hb-te-ref {
     display: none;
   }
+  /* a row with a button at its end (the board nobody works: copy its text) puts the button on a line
+     of its own: beside it, at 360 px, the title was left a few pixels and read one letter a line
+     (s-real D-513d30) */
+  .hb-te-list li[data-dismissable] {
+    flex-wrap: wrap;
+  }
+  .hb-te-list li[data-dismissable] .hb-te-row {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .hb-te-list li[data-dismissable] .hb-te-dismiss {
+    margin: 0 12px 6px;
+  }
   .hb-te-list {
     max-height: 20vh;
   }

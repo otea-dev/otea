@@ -59,7 +59,9 @@ describe('the rail', () => {
   // s-real D-a0b4a2: on a tablet and at 150% nobody found where to jot an idea.
   it('names the quick note in the views, for who can write', () => {
     const html = rail();
-    expect(html).toMatch(/<button type="button" class="add jot"[^>]*>.*?Anotar idea<\/span><\/button>/);
+    expect(html).toMatch(
+      /<button type="button" class="add jot"[^>]*>.*?Anotar idea<\/span><\/button>/,
+    );
     expect(html.indexOf('Anotar idea')).toBeGreaterThan(html.indexOf('Atasco'));
     expect(html.indexOf('Anotar idea')).toBeLessThan(html.indexOf('tableros</div>'));
     expect(

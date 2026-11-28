@@ -538,7 +538,8 @@ export function tocaBlocks(
       kind: 'sec',
       key: `sec:${sec}`,
       title: t(`toca.sec.${sec}` as PlainKey),
-      count: rows.length + asked.length,
+      // Cerrados shows the last twelve, and counts what is closed (s-real D-bcb4e2: it said 12 of 14).
+      count: (sec === 'cerrados' ? aged.length : rows.length) + asked.length,
       ...(gloss ? { gloss: t(gloss) } : {}),
       ...(triage
         ? {

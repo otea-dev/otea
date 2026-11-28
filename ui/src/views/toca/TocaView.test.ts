@@ -92,6 +92,16 @@ describe('Te toca', () => {
     expect(keys.slice(2)).toEqual(closed.slice(0, 12).map((c) => c.id));
   });
 
+  // s-real D-bcb4e2: the section said «12» with fourteen closed this week; it lists twelve and counts all.
+  it('counts every item closed this week in Cerrados, though it lists twelve', () => {
+    const closed = Array.from({ length: 14 }, (_, i) =>
+      item({ id: `C${i}`, turn: 'none', state: 'fixed', updatedAt: ago(10 + i) }),
+    );
+    const sec = tocaBlocks(app(closed), false).find((b) => b.key === 'sec:cerrados');
+    expect(sec?.kind === 'sec' && sec.count).toBe(14);
+    expect(rows(tocaBlocks(app(closed), false))).toHaveLength(12);
+  });
+
   it('offers Triaje on Revisiones when it holds more than one', () => {
     const two = app([item({ id: 'A' }), item({ id: 'B' })]);
     const sec = tocaBlocks(two, false).find((b) => b.key === 'sec:revisiones');
