@@ -76,6 +76,21 @@ describe('the thread of notes', () => {
     expect(html).toMatch(/Hacerlo · ronda 2 · \d\d:\d\d · llevaba 1 de 3 entregables/);
   });
 
+  // D-eb906c (s-real2): a note the secretary wrote for the person with `update --tell` was signed
+  // «tú»: «a note signed you that I never wrote».
+  it('signs a note an agent relayed with that agent, for you, never with «you»', () => {
+    const relayed: ItemNote = { ...(notes[1] as ItemNote), relayedBy: 'sol', bySecretary: true };
+    const render = (note: ItemNote) =>
+      renderToStaticMarkup(<Thread notes={[note]} evidence={[]} now={NOW} agent="claude-d" />);
+    setLanguage('es');
+    expect(render(relayed)).toContain('<b>La secretaria, de tu parte</b>');
+    expect(render(relayed)).not.toContain('<b>tú</b>');
+    setLanguage('en');
+    expect(render(relayed)).toContain('<b>The secretary, for you</b>');
+    expect(render({ ...relayed, bySecretary: false })).toContain('<b>sol, for you</b>');
+    expect(render(notes[1] as ItemNote)).toContain('<b>you</b>');
+  });
+
   // P5-R2-8: a note on a whole paragraph of a document was listed as «la frase».
   it('names a note on a document by what it is on: the paragraph, or the phrase', () => {
     setLanguage('es');

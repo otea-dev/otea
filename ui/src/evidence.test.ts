@@ -484,7 +484,7 @@ describe('whose a diff file is', () => {
   const agentDiff = evidence('regar.diff', { kind: 'diff' });
   const branchDiff = evidence('otea-branch-abc1234.diff', {
     kind: 'diff',
-    actor: { kind: 'human', name: 'otea' },
+    actor: { kind: 'otea', name: 'otea' },
   });
 
   it('is the branch’s for Otea’s file and the agent’s for the other, once Otea kept one', () => {
@@ -504,5 +504,8 @@ describe('whose a diff file is', () => {
     expect(diffOrigin(person, [person, branchDiff])).toBe('agent');
     expect(diffOrigin(spoof, [spoof])).toBeNull();
     expect(diffOrigin(spoof, [spoof, branchDiff])).toBe('agent');
+    // The person is not Otea, whatever name their upload carries.
+    const named = evidence('y.diff', { kind: 'diff', actor: { kind: 'human', name: 'otea' } });
+    expect(diffOrigin(named, [named, branchDiff])).toBe('agent');
   });
 });

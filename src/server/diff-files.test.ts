@@ -128,8 +128,9 @@ describe('GET /api/items/:id/diff-files', () => {
     // beside it, as the agent's file, and is compared with it.
     it('keeps the branch diff Otea computed as its own file, whatever the agent attached', async () => {
       await handOff(template, branch, () => 'nothing really, invented\n');
+      // Otea's own act, never the person's (D-eb906c: «you attached otea-branch-….diff»).
       const own = selectEvidence(project.db, 'CAM-1').filter(
-        ({ actor }) => actor.kind === 'human' && actor.name === 'otea',
+        ({ actor }) => actor.kind === 'otea' && actor.name === 'otea',
       );
       expect(own).toHaveLength(1);
       const text = readFileSync(evidenceFile(project.dataDir, own[0]?.sha256 ?? ''), 'utf8');

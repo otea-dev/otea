@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { type NoteEvent, notesOf } from '../core/board/notes.ts';
 import { creatures } from '../core/board/testing.ts';
-import { insertEvidence } from '../store/queries.ts';
+import { insertEvidence, selectEvents } from '../store/queries.ts';
 import { addCollection } from './collections.ts';
 import { createItem, getItem, updateItem } from './items.ts';
 import { claimItem } from './leases.ts';
@@ -58,6 +59,24 @@ describe('the secretary reshapes an item and tells the worker on it', () => {
     expect(heard?.item).toBe(id);
     expect(heard?.text).toContain('The person wants it quick, not slow.');
     expect(agentNotes(project, id)?.text).toContain('The person wants it quick, not slow.');
+  });
+
+  // D-eb906c (s-real2): the item page read every note as the person's and signed this one «you».
+  // The thread says whose hands wrote it: the secretary, relaying the person.
+  it('leaves the note as the secretary’s, never as the person’s', () => {
+    claimItem(project, { id, actor: quill }, now);
+    updateAndTell(
+      project,
+      { id, title: 'Rana veloz', tell: 'The person wants it quick.', actor: sol },
+      now,
+    );
+
+    const [note] = notesOf(selectEvents(project.db, id) as unknown as NoteEvent[]);
+    expect(note).toMatchObject({
+      text: 'The person wants it quick.',
+      relayedBy: 'sol',
+      bySecretary: true,
+    });
   });
 
   it('changes an item nobody holds too, and the note waits for whoever takes it', () => {
