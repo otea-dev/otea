@@ -121,6 +121,58 @@ describe('what waits for the person, from the secretary', () => {
     });
   });
 
+  // D-00b356 (s-real2): the secretary said in Hablar it recommended sending an item back, and the
+  // item's page, where the person approved, said nothing. `otea advise` records it on the item.
+  describe('otea advise', () => {
+    it('records a recommendation on an item in review, which show reads back', async () => {
+      const id = await item('Dark mode');
+      await otea('claim', id, '--as', 'worker');
+      await otea('handoff', id, '--as', 'worker');
+
+      const said = await otea(
+        'advise',
+        id,
+        'The page never loads the file it adds.',
+        '--as',
+        'sol',
+      );
+
+      expect(said.code).toBe(0);
+      expect(said.out).toContain('the decision stays theirs');
+      const shown = JSON.parse((await otea('show', id, '--as', 'sol', '--json')).out);
+      expect(shown.advice).toMatchObject({
+        kind: 'send_back',
+        note: 'The page never loads the file it adds.',
+        by: 'sol',
+        secretary: true,
+      });
+      const doubted = await otea('advise', id, 'I could not run it.', '--doubt', '--as', 'worker');
+      expect(doubted.code).toBe(0);
+      const again = JSON.parse((await otea('show', id, '--as', 'sol', '--json')).out);
+      expect(again.advice).toMatchObject({ kind: 'doubt', by: 'worker', secretary: false });
+    });
+
+    it('is refused on an item that waits for no review, and is a tool of MCP', async () => {
+      const id = await item();
+
+      const { code, err } = await otea('advise', id, 'x', '--as', 'sol');
+
+      expect(code).not.toBe(0);
+      expect(err).toContain('not waiting for your review');
+      const server = createMcpServer(COMMANDS, { cwd: repo.dir, agent: 'sol', warn: () => {} });
+      const client = new Client({ name: 'test', version: '0' });
+      const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverSide);
+      await client.connect(clientSide);
+      try {
+        const { tools } = await client.listTools();
+        expect(tools.map(({ name }) => name)).toContain('advise');
+      } finally {
+        await client.close();
+      }
+    });
+  });
+
   describe('otea escalate', () => {
     it('wakes the secretary with what a worker says, naming the item and the worker', async () => {
       const id = await item();

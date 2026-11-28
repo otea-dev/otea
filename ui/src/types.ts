@@ -1,5 +1,6 @@
 import type { AgentStatus } from '../../src/core/agent-status.ts';
 import type { FromBandeja } from '../../src/core/bandeja.ts';
+import type { Advice } from '../../src/core/board/advice.ts';
 import type { RequestChanged } from '../../src/core/board/request-changed.ts';
 import type { FromMessage } from '../../src/core/conversation.ts';
 import type { Layout } from '../../src/core/modules.ts';
@@ -187,6 +188,8 @@ export type ItemView = Omit<ItemWithEvents, 'relations'> & {
   fromBandeja?: FromBandeja;
   // While it waits for the person: its request was rewritten after the delivery was handed in.
   requestChanged?: RequestChanged;
+  // While it waits for the person: what the secretary or the delivering agent said of this delivery.
+  advice?: Advice;
 };
 
 // canManageDevices: this computer's signed-in browser, the only one that pairs and revokes devices.

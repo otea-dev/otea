@@ -5,6 +5,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { renderUnicodeCompact } from 'uqr';
+import { adviseOnItem } from '../app/advice.ts';
 import {
   draftToStartFrom,
   proposeAgentDraft,
@@ -5633,6 +5634,33 @@ const escalate: Command = {
   },
 };
 
+// The secretary, or the agent that delivered an item, tells the person on the item itself what it
+// thinks of a delivery that waits for their review: it recommends sending it back, or it doubts it.
+// The pages that offer Aprobar say it beside the button. Advice only: nothing moves.
+const advise: Command = {
+  name: 'advise',
+  summary:
+    'Tell the person, on an item in their review, that you recommend sending it back (or, with --doubt, that you have a doubt), with the reason in one plain line. The desk and the phone say it beside Aprobar, in your words; it moves nothing and the decision stays theirs. Say it in Talk too (otea say)',
+  args: ['id', 'text'],
+  options: {
+    doubt: {
+      flag: true,
+      about: 'a doubt, not a recommendation to send it back',
+    },
+  },
+  execute: (input) => {
+    const [id = '', text = ''] = input.args;
+    return withAgent(input, (project) => {
+      const kind = input.flag('doubt') ? ('doubt' as const) : ('send_back' as const);
+      const said = adviseOnItem(project, { id, agent: input.actor.name, kind, note: text });
+      return {
+        data: said,
+        text: `Recorded on ${said.id}: the person reads it beside Aprobar. It moves nothing; the decision stays theirs.`,
+      };
+    });
+  },
+};
+
 // The Bandeja (0.8): the person's rough captures, which a refiner turns into items. The person
 // captures only from the desk, so no command here makes an entry.
 const bandeja: Command = {
@@ -5846,6 +5874,7 @@ const OWN_COMMANDS: readonly Command[] = [
   say,
   pending,
   escalate,
+  advise,
   // The longer name first: a command is the first whose words all match.
   bandejaTake,
   bandejaClose,

@@ -666,6 +666,18 @@ describe('the role prompts', () => {
       expect(rule).toMatch(lang === 'es' ? /ocupa toda la cola/ : /holds the whole queue/);
     });
 
+    // s-real2 D-00b356: the secretary said in Hablar it recommended sending an item back and the
+    // item's page, where the person approved, said nothing: it records it on the item (otea advise).
+    it(`has the secretary and a worker record advice on the item, never only in Hablar (${lang})`, () => {
+      const secretary = rolePrompt('secretary', lang, { name: 'ana' });
+      const rule = secretary.split('\n').find((line) => /^9\. /.test(line)) ?? '';
+      expect(rule).toContain('otea advise <id>');
+      expect(rule).toContain('--doubt');
+      expect(rule).toContain('Aprobar');
+      const worker = rolePrompt('worker', lang, { board: 'Changes', name: 'ana' });
+      expect(worker).toContain('otea advise <id>');
+    });
+
     it(`has the secretary tell me an escalation in Hablar at once (${lang})`, () => {
       const text = rolePrompt('secretary', lang, { name: 'ana' });
       const rule = text.split('\n').find((line) => /^10\. /.test(line)) ?? '';

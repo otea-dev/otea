@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { authorizeMove, type Channel, type Move, type Performer } from '../core/authority.ts';
+import { type Advice, adviceAfterHandoff } from '../core/board/advice.ts';
 import { isClosed, positionOf } from '../core/board/engine.ts';
 import { guardedBranch } from '../core/board/model.ts';
 import { openQuestion } from '../core/board/questions.ts';
@@ -345,6 +346,9 @@ export type ItemView = ItemWithEvents & {
   archived?: { board: string; id: string };
   // While it waits for the person: its request was rewritten after the delivery was handed in.
   requestChanged?: RequestChanged;
+  // While it waits for the person: what the secretary or the delivering agent said of this delivery
+  // (recommends sending it back, or doubts it). Advice, never a block.
+  advice?: Advice;
 };
 
 // While the item waits for the person: what changed in its request after the delivery was handed
@@ -387,6 +391,7 @@ export function showItem(
   const { gates: stateGates, ...offered } = itemMoves(type, item.state, item.fields, performer);
   const gates = withBranchGates(ctx, item, stateGates);
   const changed = requestChangedOf(ctx, item, item.events);
+  const advice = item.turn === 'human' ? adviceAfterHandoff(item.events) : undefined;
   const moves = {
     ...offered,
     transitions: boardMoves(ctx, item, offered.transitions),
@@ -415,6 +420,7 @@ export function showItem(
     ...(gates === undefined ? {} : { gates }),
     ...(board === undefined ? {} : { board }),
     ...(changed === undefined ? {} : { requestChanged: changed }),
+    ...(advice === undefined ? {} : { advice }),
   };
 }
 

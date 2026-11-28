@@ -32,6 +32,8 @@ export const AGENT_COMMANDS = [
   // the secretary to relay (a worker or a refiner).
   'pending',
   'escalate',
+  // The secretary or the delivering agent says on an item in review what it recommends (advice).
+  'advise',
   // The refiner's side of the Bandeja: read the person's captures, take one, file it as an item
   // (create --from-bandeja) or ask what it lacks (ask B-n). The person's side is the desk's alone.
   'bandeja',

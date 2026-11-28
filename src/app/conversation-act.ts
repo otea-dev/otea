@@ -24,7 +24,7 @@ import type { Project } from './project.ts';
 
 // Whether the item waits for the person's review right now: the only place a send-back is theirs.
 // Returns the round of the review, which the card is bound to, and the step a send-back goes to.
-function assertInReview(project: Project, id: string): { round: number; to: string } {
+export function assertInReview(project: Project, id: string): { round: number; to: string } {
   const item = getItem(project, id);
   const board = liveBoardOf(project, item.collection);
   const at = positionOf(item.state);
