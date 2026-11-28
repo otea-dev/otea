@@ -5640,13 +5640,10 @@ const escalate: Command = {
 const advise: Command = {
   name: 'advise',
   summary:
-    'Tell the person, on an item in their review, that you recommend sending it back (or, with --doubt, that you have a doubt), with the reason in one plain line. The desk and the phone say it beside Aprobar, in your words; it moves nothing and the decision stays theirs. Say it in Talk too (otea say)',
+    'On an item in their review, tell the person you recommend sending it back (--doubt: you have a doubt), reason in one plain line. The desk says it beside Aprobar; it moves nothing',
   args: ['id', 'text'],
   options: {
-    doubt: {
-      flag: true,
-      about: 'a doubt, not a recommendation to send it back',
-    },
+    doubt: { flag: true, about: 'a doubt, not a recommendation' },
   },
   execute: (input) => {
     const [id = '', text = ''] = input.args;

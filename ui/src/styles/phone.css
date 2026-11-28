@@ -1813,6 +1813,9 @@
   color: var(--ink-2);
 }
 /* what to know before Aprobar (ReviewNotices): in the page, above the dock, the full width */
+.p-rvn {
+  margin-bottom: 0;
+}
 .p-rvn .bstrip {
   max-width: none;
   margin: 10px 0 0;

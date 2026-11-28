@@ -176,6 +176,10 @@ button.lk2:hover {
   color: var(--ink-3);
   flex: none;
 }
+/* what to know before Aprobar (ReviewNotices): the line after them keeps its distance */
+.rvn {
+  margin-bottom: 10px;
+}
 /* a round that only merges main: what the merge changed by hand, folded under the line; the open
    changes that share files, each folded under their one line; what a rewritten request said */
 .bstrip.drift details,

@@ -152,7 +152,10 @@ const BUDGETS: Readonly<Record<string, Sizes>> = {
   // opens the text box, and land sync's no-remote words (field study 5; measured at 7987).
   // Raised to 8010 for answer's --from-message, the person's message in Talk the secretary notes an
   // answer from, as relay does (D-816632; measured at 7997).
-  tools: { mcp: 8010 },
+  // Raised to 8180 for the new tool advise (s-real2 D-00b356), with which the secretary or the
+  // delivering agent tells the person, on an item in their review, what it recommends (measured at
+  // 8158).
+  tools: { mcp: 8180 },
   // Otea's agent guide, the server's instructions: in every MCP agent's context from the start, so
   // it buys only what agents keep getting wrong. Measured at 203. Raised to 270 for the line on
   // declaring the profile every agent and subagent must keep current (measured at 246). Raised to
