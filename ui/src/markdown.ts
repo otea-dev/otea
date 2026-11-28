@@ -125,7 +125,7 @@ function guardNames(text: string): string {
               /^(?: {4}|\t)/.test(line)
                 ? line
                 : line.replace(NAME_LIKE, (token) =>
-                    INSIDE.test(token) ? token.replace(/_/g, '\\_') : token,
+                    INSIDE.test(token) ? token.split('_').join('\\_') : token,
                   ),
             )
             .join('\n'),
