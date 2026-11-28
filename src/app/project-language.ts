@@ -57,10 +57,17 @@ export function projectLanguage(project: Pick<Project, 'db'>, env: Env = process
   return storedProjectLang(project.db) ?? settleProjectLang(project.db, env);
 }
 
-// Changes it, and the boards that exist follow (board-relanguage.ts): an English project is English
-// in every word Otea writes for it, the boards a template made included.
-export function setProjectLanguage(project: Project, lang: Lang): Lang {
+// Changes it; what exists keeps the words it was made in.
+export function setProjectLanguage(project: Pick<Project, 'db'>, lang: Lang): Lang {
   updateProjectLang(project.db, lang);
+  return lang;
+}
+
+// The person says the project is in `lang`: the project takes it, and the boards that exist follow
+// (board-relanguage.ts), so an English project is English in every word Otea writes for it, the
+// boards a template made included.
+export function sayProjectLanguage(project: Project, lang: Lang): Lang {
+  setProjectLanguage(project, lang);
   relanguageBoards(project, lang);
   return lang;
 }

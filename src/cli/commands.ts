@@ -186,7 +186,7 @@ import {
   projectView,
   setProjectIcon,
 } from '../app/project.ts';
-import { projectLanguage, setProjectLanguage } from '../app/project-language.ts';
+import { projectLanguage, sayProjectLanguage } from '../app/project-language.ts';
 import { type ProofSource, tickPoint } from '../app/proofs.ts';
 import {
   answerWaiting,
@@ -781,7 +781,7 @@ const projectsLang: Command = {
     if (asked !== undefined && !isLang(asked)) throw new UsageError('The language is en or es');
     return withProject(cwd, (project) => {
       const lang =
-        asked === undefined ? projectLanguage(project) : setProjectLanguage(project, asked);
+        asked === undefined ? projectLanguage(project) : sayProjectLanguage(project, asked);
       const said = lang === 'es' ? 'Spanish' : 'English';
       return {
         data: { lang },
