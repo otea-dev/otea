@@ -1899,7 +1899,6 @@ describe('Hablar for assistive technology', () => {
           text: '¿Cómo seguimos?',
           at: ago(3),
           options: ['Así', 'Asá'],
-          recommended: undefined,
         },
       });
     const { root } = await open(conversation({ messages: request(['CAM-3', 'CAM-4']) }), {

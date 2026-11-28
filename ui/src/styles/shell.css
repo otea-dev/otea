@@ -555,7 +555,8 @@
   position: fixed;
   top: 10px;
   left: 12px;
-  z-index: var(--z-flight);
+  /* over the top bar (20) and the pops and dialogs (up to 60): it is the first thing the keys reach */
+  z-index: 70;
   display: flex;
   gap: 6px;
   pointer-events: none;

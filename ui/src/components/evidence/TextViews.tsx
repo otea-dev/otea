@@ -197,10 +197,14 @@ function DiffFileView({
           <span className="ev-minus">−{file.deletions}</span>
         </span>
       </summary>
-      <div
+      {/* It scrolls sideways: a place the keys can reach, named by its file, to read it by. */}
+      <section
         className={split ? 'ev-code ev-split' : 'ev-code'}
         data-wrap={wrap ? 'true' : undefined}
         style={digits(largest)}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling box is reached with the keys
+        tabIndex={0}
+        aria-label={file.path || t('evidence.changes')}
       >
         <div className="ev-lines">
           {file.hunks.map((hunk, index) => (
@@ -224,7 +228,7 @@ function DiffFileView({
             </div>
           ))}
         </div>
-      </div>
+      </section>
     </details>
   );
 }
@@ -443,11 +447,14 @@ export function LogView({ evidence }: { evidence: Evidence }) {
           </Button>
         </span>
       </div>
-      <div
+      <section
         ref={box}
         className="ev-code"
         data-wrap={wrap ? 'true' : undefined}
         style={digits(view.total)}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling box is reached with the keys
+        tabIndex={0}
+        aria-label={evidence.filename}
       >
         <div className="ev-lines">
           <LogRows lines={view.head} found={found} current={current} />
@@ -458,7 +465,7 @@ export function LogView({ evidence }: { evidence: Evidence }) {
           ) : null}
           <LogRows lines={view.tail} found={found} current={current} />
         </div>
-      </div>
+      </section>
       <FileMeta evidence={evidence} />
     </div>
   );

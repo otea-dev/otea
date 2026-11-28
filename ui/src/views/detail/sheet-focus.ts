@@ -16,7 +16,8 @@ function focusIn(root: HTMLElement): boolean {
   // A headline takes the focus without being a stop of Tab.
   if (!first.matches(FOCUSABLE)) first.setAttribute('tabindex', '-1');
   first.focus({ preventScroll: true });
-  return true;
+  // A sheet still opening may not take it yet (hidden until its gesture shows it): it is asked again.
+  return document.activeElement === first;
 }
 
 export function useSheetFocus(
@@ -59,7 +60,27 @@ export function useSheetFocus(
       }
       pending.current = opener.current !== null;
     }
-    if (pending.current && focusIn(root)) pending.current = false;
+    if (!pending.current || focusIn(root)) {
+      pending.current = false;
+      return;
+    }
+    // What the sheet holds is not drawn yet (a form reads its boards first): ask again as it is.
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const again = () => {
+      const now = sheet.current;
+      if (!pending.current || !now) return;
+      // The person went on by themselves: the focus is theirs.
+      const at = document.activeElement;
+      if (at !== opener.current && at !== document.body && !now.contains(at)) {
+        pending.current = false;
+        return;
+      }
+      if (focusIn(now)) pending.current = false;
+      else if (tries++ < 60) timer = setTimeout(again, 50);
+    };
+    timer = setTimeout(again, 50);
+    return () => clearTimeout(timer);
   }, [shown, content]);
   const keepNav = useCallback((dir: -1 | 1) => {
     nav.current = String(dir);

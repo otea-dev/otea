@@ -539,6 +539,10 @@
   background: var(--tint);
 }
 
+/* A box that scrolls is reached with the keys: its ring stays inside it, or the box cuts it. */
+.ev-code:focus-visible {
+  outline-offset: -2px;
+}
 /* A line a note can be left on is reached with the keys: its ring stays inside the box, which
    scrolls and would cut it. */
 .ev-line[tabindex]:focus-visible {

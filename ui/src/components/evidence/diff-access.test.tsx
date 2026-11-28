@@ -79,6 +79,15 @@ describe('a diff read without seeing it', () => {
     expect(heard(q('[data-side="new"][data-kind="add"]') as HTMLElement)).toContain('added');
   });
 
+  // axe: a box that scrolls sideways must be reachable with the keys, or its long lines are not.
+  it('can be reached with the keys where it scrolls, named by its file', async () => {
+    page = mount(<EvidenceViewer evidence={diff(PATCH)} />);
+    await settle();
+    const box = q('.ev-code') as HTMLElement;
+    expect(box.getAttribute('tabindex')).toBe('0');
+    expect(box.getAttribute('aria-label')).toBe('x.ts');
+  });
+
   it('says which layout is on', async () => {
     page = mount(<EvidenceViewer evidence={diff(PATCH)} />);
     await settle();

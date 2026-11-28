@@ -264,6 +264,10 @@
 .hb-te-head:hover {
   background: var(--hov);
 }
+/* The thread scrolls and takes the keys when nothing in it does: its ring stays inside it. */
+.hb-chat:focus-visible {
+  outline-offset: -3px;
+}
 /* The heads sit flush in boxes that clip (overflow hidden): the ring stays inside, or it is cut. */
 .hb-te-head:focus-visible,
 .hb-away-toggle:focus-visible,

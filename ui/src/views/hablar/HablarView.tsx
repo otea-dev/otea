@@ -500,7 +500,8 @@ export function HablarView({
             <span className="you">{t('lanes.you')}</span>
           </div>
         ) : null}
-        <div className="hb-chat" id="hb-panel-chat" ref={scroller}>
+        {/* biome-ignore lint/a11y/noNoninteractiveTabindex: the thread scrolls; with nothing in it to focus yet, the keys still reach it */}
+        <div className="hb-chat" id="hb-panel-chat" ref={scroller} tabIndex={0}>
           {convo.status === 'loading' ? (
             <p className="hb-pane">{t('hablar.loading')}</p>
           ) : convo.status === 'failed' ? (

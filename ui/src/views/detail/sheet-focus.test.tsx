@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, useRef, useState } from 'react';
+import { act, useEffect, useRef, useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { type Mounted, mount } from '../../test-dom.tsx';
 import { useSheetFocus } from './sheet-focus.ts';
@@ -54,7 +54,42 @@ const pressed = async (id: string, byKeyboard = true) => {
   await act(async () => at(id).click());
 };
 
+// A sheet that holds nothing to focus until its form has read what it needs (the new item form).
+function Late() {
+  const sheet = useRef<HTMLElement>(null);
+  const [shown, setShown] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  useSheetFocus(sheet, shown, 'intake');
+  useEffect(() => {
+    if (shown === null) return;
+    const timer = setTimeout(() => setReady(true), 60);
+    return () => clearTimeout(timer);
+  }, [shown]);
+  return (
+    <>
+      <button type="button" id="row" onClick={() => setShown('intake')}>
+        Nuevo ítem
+      </button>
+      {shown === null ? null : (
+        <article ref={sheet} aria-label="sheet">
+          {ready ? <input id="field" aria-label="Título" /> : null}
+        </article>
+      )}
+    </>
+  );
+}
+
 describe('useSheetFocus', () => {
+  it('takes the focus once the sheet has something to take it to, if it was not drawn yet', async () => {
+    page = mount(<Late />);
+    await pressed('row');
+    expect(document.activeElement).toBe(at('row'));
+    // The form draws after a moment; the page is rendered between one wait and the next.
+    for (let i = 0; i < 6; i += 1)
+      await act(async () => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(document.activeElement).toBe(at('field'));
+  });
+
   it('takes the focus to the headline when the sheet opens from a control, and gives it back on close', async () => {
     page = mount(<Page />);
     await pressed('row');
