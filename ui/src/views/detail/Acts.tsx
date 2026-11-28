@@ -22,6 +22,8 @@ import { type MoveChoice, type MovePlan, moveSaysOf } from './moves.ts';
 import { answerDraftKeyOf, draftStore, dropDraft, keepDraft, readDraft } from './note-draft.ts';
 import { PickForm, type PickMade } from './PickForm.tsx';
 import type { Pick } from './pick.ts';
+import { ReviewNotices } from './ReviewNotices.tsx';
+import type { ReviewNotice } from './review-notices.ts';
 
 // The moves and what stands in for them (SPEC §10.3, mock:2689-2702): the moves with the line that
 // says what the hovered one does; a question answered in place; the stuck item's commands; Retomar
@@ -86,6 +88,9 @@ type ActsProps = {
   // Under the moves, when files of the round were not opened in the reader: one line, never a
   // hold on Aprobar.
   unopened?: string | undefined;
+  // Beside Aprobar: what the person should know before it (the attached diff is not what lands,
+  // what the secretary advised). Advice and warnings, never a hold on the move.
+  notices?: readonly ReviewNotice[] | undefined;
   // Reviewing an item that carries options (mode 'pick'): the options and the ways on, named for
   // the pick; `plan` then holds the rest (the send-backs, the closes).
   pick?: { pick: Pick; ways: MoveChoice[] } | undefined;
@@ -207,6 +212,7 @@ export function Acts({
   back,
   note,
   unopened,
+  notices,
   pick,
 }: ActsProps) {
   const app = useApp();
@@ -357,6 +363,7 @@ export function Acts({
           {closeAs}
         </div>
         <SaysLine text={says(pointed ?? first)} />
+        <ReviewNotices item={item.id} notices={notices ?? []} />
         {unopened && !refusedNow ? <p className="said unseen">{unopened}</p> : null}
         {refusedNow ? (
           <p className="said warn" role="alert">
@@ -391,6 +398,7 @@ export function Acts({
             {closeAs}
           </div>
         ) : null}
+        <ReviewNotices item={item.id} notices={notices ?? []} />
         {unopened && !refusedNow ? <p className="said unseen">{unopened}</p> : null}
         {refusedNow ? (
           <p className="said warn" role="alert">

@@ -171,6 +171,9 @@ export type ReaderDecide = {
   approve?: { label: string; onClick: () => void; hold?: () => boolean } | undefined;
   // What waits for the second press, said where the person is: a refusal-weight line, never a hold.
   warn?: string | undefined;
+  // What the person should know before Aprobar (the attached diff is not what lands, what the
+  // secretary advised), the same lines the page says beside the button: advice, never a hold.
+  notices?: readonly string[] | undefined;
 };
 
 // A note to the agent at work from inside the reader, on the file read: on the line or diagram node
@@ -500,6 +503,11 @@ export function EvidenceReader({
       <span className="ev-reader-seen">
         {t('evidence.seenOf', { n: decide.seen, total: evidence.length })}
         {decide.notice ? <small className="ev-reader-notice">{decide.notice}</small> : null}
+        {(decide.notices ?? []).map((line) => (
+          <small key={line} className="ev-reader-notice" data-rvn="">
+            {line}
+          </small>
+        ))}
         {decide.warn ? (
           <small className="ev-reader-notice warn" role="alert">
             {decide.warn}

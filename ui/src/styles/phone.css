@@ -1812,6 +1812,11 @@
   font-weight: 500;
   color: var(--ink-2);
 }
+/* what to know before Aprobar (ReviewNotices): in the page, above the dock, the full width */
+.p-rvn .bstrip {
+  max-width: none;
+  margin: 10px 0 0;
+}
 .p-dock .hint b {
   font-weight: 500;
   color: var(--ink-2);

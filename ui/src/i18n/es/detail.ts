@@ -838,6 +838,14 @@ export const detail = {
   'bi.branch.diffFilesNone': 'no nombra ningún archivo',
   'bi.branch.diffFilesChanges': 'cambia {files}',
   'bi.branch.diffFilesChangesNone': 'no cambia ningún archivo',
+  // Junto a cada Aprobar de un ítem en revisión (ReviewNotices): en palabras de quien no lee código,
+  // con las frases técnicas de arriba a un toque.
+  'rvn.diff':
+    'Lo que está adjunto a esta revisión puede no ser lo que entra. Aprobar aprueba el trabajo que entregó el agente, no el archivo adjunto. Antes de aprobar, mira lo que entregó el agente o pregúntale a la secretaria.',
+  'rvn.advice.sendBack.secretary': 'La secretaria recomienda devolverlo: {note}',
+  'rvn.advice.sendBack.agent': '{agent} recomienda devolverlo: {note}',
+  'rvn.advice.doubt.secretary': 'La secretaria tiene una duda: {note}',
+  'rvn.advice.doubt.agent': '{agent} tiene una duda: {note}',
   'bi.branch.moved':
     'La rama cambió en el remoto después de la entrega: ahora está en {now}. Aprobar aprueba solo lo entregado, {handed}.',
   'bi.branch.driftBase':

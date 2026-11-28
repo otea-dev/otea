@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { creatures } from '../../../../src/core/board/testing.ts';
+import { creatures, tareasDeRepo } from '../../../../src/core/board/testing.ts';
 import { type App, AppTestProvider } from '../../app/context.tsx';
 import { TriCard } from '../../components/Triage.tsx';
 import { setLanguage } from '../../i18n/i18n.ts';
@@ -98,6 +98,19 @@ const review = (extra: Partial<ItemView> = {}): ItemView =>
     ...extra,
   }) as unknown as ItemView;
 
+// The same delivery on a board that protects a branch: the attached diff is checked against it.
+const branched = (): ItemView => {
+  seen.board = { id: 'b-cri', version: 1, changed: false, live: tareasDeRepo() };
+  return review({
+    state: 'simpl__review',
+    fields: { title: 'Tortuga', frepo: 'api', fbranch: 'change/CRI-1' },
+    transitions: [
+      { to: 'done', by: 'human', reasonRequired: false, turn: 'none', closes: 'done' },
+      { to: 'simpl', by: 'human', reasonRequired: true, turn: 'agent' },
+    ],
+  } as Partial<ItemView>);
+};
+
 const MISMATCH = { mismatch: { diff: ['a.go'], landed: ['a.go', 'b.go'] } };
 const advice = (kind: 'send_back' | 'doubt', secretary = true) => ({
   kind,
@@ -161,7 +174,7 @@ const notice = (root: ParentNode, key: string) =>
 describe('the attached diff does not match what lands', () => {
   it('is said beside Aprobar on the desk page, in plain words, the technical detail inside a fold', async () => {
     serve(MISMATCH);
-    const { root } = sheet(review(), false);
+    const { root } = sheet(branched(), false);
     await vi.waitFor(() => expect(notice(root, 'diff')).not.toBeNull());
 
     const said = notice(root, 'diff') as HTMLElement;
@@ -169,13 +182,13 @@ describe('the attached diff does not match what lands', () => {
     expect(said.textContent).toMatch(/may not be what goes in/i);
     expect(said.querySelector('details')?.textContent).toMatch(/names a\.go/);
     expect(said.querySelector('details')?.hasAttribute('open')).toBe(false);
-    // Said once: the branch line no longer repeats it.
-    expect(root.querySelectorAll('[data-notice="diff"]')).toHaveLength(1);
+    // Said once: the branch line no longer repeats the technical sentence.
+    expect(root.textContent?.match(/names a\.go/g)).toHaveLength(1);
   });
 
   it('is said in the phone’s page too, outside «Detalles técnicos»', async () => {
     serve(MISMATCH);
-    const { root } = sheet(review(), true);
+    const { root } = sheet(branched(), true);
     await vi.waitFor(() => expect(notice(root, 'diff')).not.toBeNull());
 
     expect(notice(root, 'diff')?.closest('details.tech')).toBeNull();
@@ -229,7 +242,7 @@ describe('the attached diff does not match what lands', () => {
   it('says it in Spanish, plainly: what it means and what to do', async () => {
     setLanguage('es');
     serve(MISMATCH);
-    const { root } = sheet(review(), true);
+    const { root } = sheet(branched(), true);
     await vi.waitFor(() => expect(notice(root, 'diff')).not.toBeNull());
 
     const text = notice(root, 'diff')?.textContent ?? '';
@@ -305,5 +318,18 @@ describe('what the secretary or the delivering agent advised', () => {
     expect(notice(into, 'advice')?.dataset.kind).toBe('send_back');
     act(() => root.unmount());
     into.remove();
+  });
+
+  it('is said inside the reader too, beside the Aprobar it holds', async () => {
+    setLanguage('es');
+    serve();
+    const { root } = sheet(review({ advice: advice('send_back') }), false);
+    const opener = [...root.querySelectorAll('button')].find((b) =>
+      /leer uno a uno/i.test(b.textContent ?? ''),
+    );
+    await press(opener);
+
+    const dialog = document.querySelector('.rd-dialog');
+    expect(dialog?.querySelector('[data-rvn]')?.textContent).toMatch(/recomienda devolverlo/);
   });
 });

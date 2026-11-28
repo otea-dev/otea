@@ -66,6 +66,8 @@ import {
 } from './phone-review.ts';
 import type { Pick } from './pick.ts';
 import { takePick } from './pick-intent.ts';
+import { ReviewNotices } from './ReviewNotices.tsx';
+import type { ReviewNotice } from './review-notices.ts';
 import { TechDetails } from './TechDetails.tsx';
 
 // Reviewing an item on the phone (mobile mock 2, 2b): what was delivered first (the round's note,
@@ -96,6 +98,8 @@ type PhoneItemProps = {
   // «Detalles técnicos» under the delivery, and how many notices wait in it.
   technical?: ReactNode;
   technicalNotices?: number;
+  // What the person should know before Aprobar, said in the page just above the dock, never folded.
+  notices?: readonly ReviewNotice[] | undefined;
   details: ReactNode;
   detailsSummary: string;
   // On a board, the fields the agents filled in (findings, options, sources), drawn as the desk
@@ -901,6 +905,7 @@ export function PhoneItem(p: PhoneItemProps) {
               }
             : undefined,
           warn: careful.line || undefined,
+          notices: (p.notices ?? []).map(({ text }) => text),
         }
       : undefined;
   // A send-back with your review's comments goes with them: words of its own are optional (P4-7).
@@ -1142,6 +1147,9 @@ export function PhoneItem(p: PhoneItemProps) {
         </section>
       ) : docked ? (
         <>
+          {primary || picking ? (
+            <ReviewNotices item={item.id} notices={p.notices ?? []} className="p-rvn" />
+          ) : null}
           {/* What Aprobar does, in the page just above the dock: kept inside it, three lines of the
             sticky bar's quarter of the screen went to words that are read once. */}
           {!refused && says ? (

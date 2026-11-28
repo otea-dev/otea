@@ -70,6 +70,8 @@ import { toastOf } from '../views/detail/frame.ts';
 import { draftWaitsOf } from '../views/detail/moves.ts';
 import { threadOf } from '../views/detail/notes.ts';
 import { askPick } from '../views/detail/pick-intent.ts';
+import { ReviewNotices } from '../views/detail/ReviewNotices.tsx';
+import { noticeIdOf, useReviewNotices } from '../views/detail/review-notices.ts';
 import { BlindPick, type ReaderNote } from './evidence/EvidenceViewer.tsx';
 import { Pic } from './evidence/Pic.tsx';
 import { NoteText } from './NoteText.tsx';
@@ -546,6 +548,12 @@ export function TriCard({
   const blocked = plan?.blocked?.[0];
   const waitId = `tc-wait-${item.id}`;
   const pickId = `tc-pick-${item.id}`;
+  // What every page that offers Aprobar says beside it (the attached diff is not what lands, what
+  // the secretary advised), asked of the card that is on top and can approve.
+  const notices = useReviewNotices(
+    { id: item.id, updatedAt: view?.updatedAt ?? item.updatedAt, advice: view?.advice },
+    !under && !!forward,
+  );
   return (
     <article
       ref={(el) => {
@@ -575,12 +583,21 @@ export function TriCard({
       {words.say ? <NoteText className="say" text={words.say} /> : null}
       <Delivered round={round} />
       <Figures shown={round.figures} blind={round.blind ?? NO_BLIND} note={note} />
+      <ReviewNotices item={item.id} notices={notices} className="tc-rvn" />
       <div className="tc-acts">
         <Button
           variant="primary"
           disabled={!ready || !(forward || pick)}
           onClick={approve}
-          aria-describedby={blocked ? waitId : pick ? pickId : undefined}
+          aria-describedby={
+            blocked
+              ? waitId
+              : pick
+                ? pickId
+                : notices.length > 0
+                  ? notices.map(({ key }) => noticeIdOf(item.id, key)).join(' ')
+                  : undefined
+          }
           data-pick={pick ? '' : undefined}
         >
           {t(pick ? 'triage.pick' : 'triage.approve')}

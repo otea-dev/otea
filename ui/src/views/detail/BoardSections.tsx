@@ -35,7 +35,6 @@ import {
   type StepRounds,
   type WaitRow,
 } from './board-item.ts';
-import { type DiffFilesOff, type DiffOffTip, diffFilesText, diffOffTipText } from './diff-tip.ts';
 import { type Drift, driftText } from './drift.ts';
 import type { LocalBehind } from './local-behind.ts';
 import { type MergeOnly, mergeOnlyText } from './merge-only.ts';
@@ -344,35 +343,24 @@ export function WaitChecklist({
 export function branchNoticeCount(o: {
   behind?: unknown;
   drift?: unknown;
-  off?: unknown;
-  files?: unknown;
   same?: unknown;
   merge?: unknown;
   waits?: unknown;
   overlaps?: readonly unknown[];
 }): number {
-  return [
-    o.behind,
-    o.drift,
-    o.off,
-    o.files,
-    o.same,
-    o.merge,
-    o.waits,
-    (o.overlaps?.length ?? 0) > 0,
-  ].filter(Boolean).length;
+  return [o.behind, o.drift, o.same, o.merge, o.waits, (o.overlaps?.length ?? 0) > 0].filter(
+    Boolean,
+  ).length;
 }
 
 // "Rama feat/x en api · se puede subir / congelada mientras la revisas / se puede fusionar".
 // Under it, what a clone without Otea's hook pushed to the branch since the handoff (P3C-R3-1).
-// In its land step, when the PC saw it merged outside Otea, it says so instead (P1-R3-9); under
-// it too, when the attached diff does not come from the tip handed off (P1-R3-1).
+// In its land step, when the PC saw it merged outside Otea, it says so instead (P1-R3-9). What is
+// said of the attached diff is no longer here: it stands beside Aprobar (ReviewNotices).
 export function BranchLine({
   strip,
   drift = null,
   outside = null,
-  off = null,
-  files = null,
   same = null,
   item = '',
   overlaps = [],
@@ -389,8 +377,6 @@ export function BranchLine({
   behind?: LocalBehind | null;
   drift?: Drift | null;
   outside?: MergedOutside | null;
-  off?: DiffOffTip | null;
-  files?: DiffFilesOff | null;
   same?: RoundSame | null;
   item?: string;
   overlaps?: readonly Overlap[];
@@ -408,9 +394,9 @@ export function BranchLine({
       <span className="bsaid">{branchSaid(strip, outside)}</span>
     </div>
   ) : null;
-  if (!behind && !drift && !off && !files && !same && !merge && !waits && overlaps.length === 0)
+  if (!behind && !drift && !same && !merge && !waits && overlaps.length === 0)
     return plain ? <TechDetails>{line}</TechDetails> : line;
-  const notices = branchNoticeCount({ behind, drift, off, files, same, merge, waits, overlaps });
+  const notices = branchNoticeCount({ behind, drift, same, merge, waits, overlaps });
   const lines = (
     <>
       {line}
@@ -424,18 +410,6 @@ export function BranchLine({
         <div className="bstrip drift" data-c role="status">
           <Icon name="warn" />
           <span>{driftText(drift)}</span>
-        </div>
-      ) : null}
-      {off ? (
-        <div className="bstrip drift" data-c role="status">
-          <Icon name="warn" />
-          <span>{diffOffTipText(off)}</span>
-        </div>
-      ) : null}
-      {files ? (
-        <div className="bstrip drift" data-c role="status">
-          <Icon name="warn" />
-          <span>{diffFilesText(files)}</span>
         </div>
       ) : null}
       {same ? (

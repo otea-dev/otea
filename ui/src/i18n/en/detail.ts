@@ -832,6 +832,14 @@ export const detail = {
   'bi.branch.diffFilesNone': 'names no file',
   'bi.branch.diffFilesChanges': 'changes {files}',
   'bi.branch.diffFilesChangesNone': 'changes no file',
+  // Beside every Aprobar on an item in review (ReviewNotices): in the words of someone who does not
+  // read code, the technical sentences above one tap away.
+  'rvn.diff':
+    'What is attached to this review may not be what goes in. Approving approves the work the agent handed in, not the attached file. Before you approve, look at what the agent delivered, or ask the secretary.',
+  'rvn.advice.sendBack.secretary': 'The secretary recommends sending it back: {note}',
+  'rvn.advice.sendBack.agent': '{agent} recommends sending it back: {note}',
+  'rvn.advice.doubt.secretary': 'The secretary has a doubt: {note}',
+  'rvn.advice.doubt.agent': '{agent} has a doubt: {note}',
   'bi.branch.moved':
     'The branch changed on the remote after the handoff: it is now at {now}. Approving approves only what was handed off, {handed}.',
   'bi.branch.driftBase':

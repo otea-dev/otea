@@ -78,7 +78,6 @@ import {
 } from './board-item.ts';
 import { cautionKeyOf, useCaution } from './caution.ts';
 import { Details, detailCells, Value } from './Details.tsx';
-import { useDiffFiles, useDiffOffTip } from './diff-tip.ts';
 import { useDrift } from './drift.ts';
 import { boardFactsOf, factsOf, standAgentOf, standOf } from './facts.ts';
 import { pressInView, toastOf } from './frame.ts';
@@ -106,6 +105,7 @@ import { ProofChecklist } from './ProofChecklist.tsx';
 import { partNames, phoneRounds, readerOf, requestLine, unopenedOf } from './phone-review.ts';
 import { pickOf, pickWays } from './pick.ts';
 import { Route } from './Route.tsx';
+import { useReviewNotices } from './review-notices.ts';
 import { useRoundSame } from './round-same.ts';
 import { routeIndex, routeSteps } from './route.ts';
 
@@ -241,10 +241,10 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
     isClosed(position) && position.closed === DONE,
     item.updatedAt,
   );
-  // While the person reviews it: whether the attached diff comes from another tip (P1-R3-1).
-  const off = useDiffOffTip(item.id, strip?.key === 'frozen', item.updatedAt);
-  // And whether it names other files than the work handed off changes (P1-F2).
-  const files = useDiffFiles(item.id, strip?.key === 'frozen', item.updatedAt);
+  // While the person reviews it: what is said beside Aprobar, from one source for every page that
+  // offers it: the attached diff is not what lands (another tip, P1-R3-1; other files, P1-F2) and
+  // what the secretary or the delivering agent advised (D-00b356).
+  const notices = useReviewNotices(item, strip?.key === 'frozen');
   // And whether this round holds the same files as the one it answers (P5-F2).
   const same = useRoundSame(item.id, strip?.key === 'frozen', item.updatedAt);
   // And which other open items change the same files, so one of them meets a conflict.
@@ -680,6 +680,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
             }
           : undefined,
         warn: careful.line || undefined,
+        notices: notices.map(({ text }) => text),
       }
     : undefined;
   const unseen = approveChoice && deciding ? unopenedOf(reader.files, seen) : null;
@@ -948,8 +949,6 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                     behind={behind}
                     drift={drift}
                     outside={outside}
-                    off={off}
-                    files={files}
                     same={same}
                     item={item.id}
                     overlaps={overlaps}
@@ -958,11 +957,10 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                   />
                 ) : undefined
               }
+              notices={notices}
               technicalNotices={branchNoticeCount({
                 behind,
                 drift,
-                off,
-                files,
                 same,
                 merge,
                 waits: item.landsAfter?.text,
@@ -1187,6 +1185,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                 onNotes={openNotes}
                 note={leave}
                 unopened={unopenedLine}
+                notices={notices}
               />
               {canRead ? (
                 <DeskReader
@@ -1264,8 +1263,6 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                 behind={behind}
                 drift={drift}
                 outside={outside}
-                off={off}
-                files={files}
                 same={same}
                 item={item.id}
                 overlaps={overlaps}

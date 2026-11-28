@@ -551,6 +551,14 @@
   margin-top: 20px;
   flex-wrap: wrap;
 }
+/* what to know before Aprobar (ReviewNotices): just above the buttons, the card's own width */
+.tcard .tc-rvn .bstrip {
+  max-width: none;
+  margin: 14px 0 0;
+}
+.tcard .tc-rvn + .tc-acts {
+  margin-top: 14px;
+}
 .tcard .tc-acts .sp {
   flex: 1;
 }
