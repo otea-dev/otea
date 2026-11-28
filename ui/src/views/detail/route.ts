@@ -108,9 +108,15 @@ export function dipsOf(g: RouteGeom, dips: readonly DipSpec[]): Dip[] {
   // A step's dips carry one label, in the first one's place: the latest send-back's. In round 3,
   // «ronda 1 · devuelta hoy» stayed under the strip as if it were the news (P5-R2-7).
   const latest = new Map<number, string>();
-  for (const dp of dips) latest.set(dp.at, dp.label);
+  // How late each step's latest send-back came, to say which name keeps its place when two touch.
+  const lateness = new Map<number, number>();
+  dips.forEach((dp, i) => {
+    latest.set(dp.at, dp.label);
+    lateness.set(dp.at, i);
+  });
   const count = new Map<number, number>();
   const out: Dip[] = [];
+  const late: number[] = [];
   for (const dp of dips) {
     if (dp.at < 0 || dp.at >= g.n) continue;
     const k = (count.get(dp.at) ?? 0) + 1;
@@ -124,8 +130,35 @@ export function dipsOf(g: RouteGeom, dips: readonly DipSpec[]): Dip[] {
       d: `M${x - 14} ${y}C${x - 14} 84 ${x + 14} 84 ${x + 14} ${y}`,
       ...(k === 1 ? { label: latest.get(dp.at) ?? dp.label } : {}),
     });
+    late.push(lateness.get(dp.at) ?? 0);
   }
-  return out;
+  return nameApart(out, late);
+}
+
+// Two names that would touch are not both drawn (on a phone, three steps are 126 px apart and a
+// name is 130 wide): the newest round keeps its words, an older one is shortened to its first part
+// («ronda 1»), and when even that would touch, it goes: its dip stays (D-5cb337).
+function nameApart(dips: Dip[], late: readonly number[]): Dip[] {
+  const kept: Array<[number, number]> = [];
+  const free = (x: number, label: string) => {
+    const half = labelWidth(label) / 2;
+    return kept.every(([a, b]) => x - half >= b + 4 || x + half <= a - 4);
+  };
+  const byLateness = dips.map((_, i) => i).sort((p, q) => (late[q] ?? 0) - (late[p] ?? 0));
+  const named = new Map<number, string>();
+  for (const i of byLateness) {
+    const dip = dips[i];
+    if (!dip?.label) continue;
+    const short = dip.label.split(' · ')[0] ?? dip.label;
+    const label = [dip.label, short].find((l) => free(dip.x, l));
+    if (label === undefined) continue;
+    kept.push([dip.x - labelWidth(label) / 2, dip.x + labelWidth(label) / 2]);
+    named.set(i, label);
+  }
+  return dips.map(({ label: _label, ...dip }, i) => {
+    const label = named.get(i);
+    return label === undefined ? dip : { ...dip, label };
+  });
 }
 
 // Which step names show over the route: where two would touch, one gives way. The current step
