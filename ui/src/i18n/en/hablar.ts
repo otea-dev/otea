@@ -122,6 +122,7 @@ export const hablar = {
   'hablar.tooBig': 'Over the {mb} MB limit',
   'hablar.failed': 'Not sent ({message}). Try again.',
   'hablar.offline': 'No connection: you can write once it is back.',
+  'hablar.notSent': 'Not sent: there is no connection. Your words stay here until it is back.',
   'hablar.placeholderOffline': 'Write once it is back',
   'hablar.readOnly':
     'This browser can only read the conversation. To write, open Otea from your computer with otea open.',

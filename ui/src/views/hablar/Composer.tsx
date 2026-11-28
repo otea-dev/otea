@@ -14,6 +14,7 @@ import {
   withFiles,
 } from '../../intake-files.ts';
 import { Icon } from '../../kit/index.ts';
+import { toast } from '../../kit/pop/toast.tsx';
 import { useClearAbove } from './clear-above.ts';
 
 // Where you write to your secretary: the words, files to attach (picked, pasted or dropped, the
@@ -141,6 +142,12 @@ export function Composer({ onSent }: { onSent: () => void }) {
     // The phone's Enter is a new line (Enviar is its button); the desk's sends, Shift+Enter breaks.
     if (app.phone || event.shiftKey) return;
     event.preventDefault();
+    // A key that is refused says so: the line under the box can be below the window's fold, and a
+    // lost key reads as a lost message (D-0607d1). The words stay where they are.
+    if (offline && canWrite && (words !== '' || drafts.length > 0)) {
+      toast({ msg: t('hablar.notSent') });
+      return;
+    }
     send();
   };
 
