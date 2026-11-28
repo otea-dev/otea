@@ -850,6 +850,8 @@ export function Triage() {
       stack.current.style.minHeight = `${top.offsetHeight + 40}px`;
       stack.current.style.setProperty('--h', `${top.offsetHeight}px`);
     }
+    // No card left: the stack is no longer as tall as the one that went.
+    if (!cur && stack.current) stack.current.style.minHeight = '';
     if (cur === settled.current) return;
     const first = settled.current === undefined;
     settled.current = cur;
@@ -1144,6 +1146,9 @@ export function Done({ decided, onBack }: { decided: number; onBack: () => void 
   const el = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (decided > 0 && el.current) {
+      // The card that went was tall and the page was scrolled down to its buttons: this is short and
+      // at the top, so without this the screen stays on blank space (D-14cde0).
+      el.current.scrollIntoView({ block: 'start', inline: 'nearest' });
       const kf = reduced()
         ? [{ opacity: 0 }, { opacity: 1 }]
         : [
