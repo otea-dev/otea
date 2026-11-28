@@ -377,6 +377,27 @@ describe('cardWords', () => {
     expect(cardWords(item({ id: 'A' }), [])).toEqual({ agent: null, say: '', round: 1 });
   });
 
+  // D-9b5288 (s-real2): a round that only merges main into approved work read «after your notes».
+  it('says a round that only merges main into approved work is one, not a send-back', () => {
+    const handoff = (data: Record<string, unknown>): ItemEvent => ({
+      id: 1,
+      type: 'transitioned',
+      actor: agent('mender'),
+      at: ago(5),
+      data: { from: 'fixing', to: 'verify', ...data },
+    });
+    const merge = { since: 'a1b2c3d', tip: 'e4f5a6b', joined: 'c7d8e9f', files: ['README.md'] };
+    const it0 = item({ id: 'A', state: 'verify', round: 2 });
+    expect(cardWords(it0, [], { state: 'verify', events: [handoff({ merge })] })).toMatchObject({
+      agent: 'mender',
+      round: 2,
+      merge: true,
+    });
+    expect(cardWords(it0, [], { state: 'verify', events: [handoff({})] })).not.toHaveProperty(
+      'merge',
+    );
+  });
+
   it('says the round the step engine counts on a board (the server sends it)', () => {
     const feed = [moved('A', 'fixing', you, { reason: 'falta' })];
     expect(cardWords({ ...item({ id: 'A' }), round: 1 }, feed).round).toBe(1);

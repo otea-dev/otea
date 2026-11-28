@@ -186,6 +186,75 @@ describe('boardItemOf: the item page reads a published board through the step en
     expect(bounced?.route.dips.map((dip) => dip.label)).toEqual(['ronda 1 · volvió']);
   });
 
+  // D-9b5288, D-0879d9 (s-real2): the round that only merges main into approved work was drawn as
+  // «ronda 1 · devuelta hoy» and listed as «sent back and redone», though nothing was sent back.
+  describe('a round that only merges main into approved work', () => {
+    const merge = { since: 'a1b2c3d', tip: 'e4f5a6b', joined: 'c7d8e9f', files: ['README.md'] };
+    const withData = (event: ItemEvent, data: Record<string, unknown>): ItemEvent => ({
+      ...event,
+      data: { ...event.data, ...data },
+    });
+    // Approved into the step after concept, an agent takes it back to merge what landed first and
+    // hands it off again; the person approves the merge.
+    const flow = (returned: Record<string, unknown>, handed: Record<string, unknown>) => [
+      created('sconcept'),
+      moved('sconcept', 'sconcept__review', agent('quill'), '2026-01-02T00:00:00Z'),
+      moved('sconcept__review', 'sanimate', you, '2026-01-03T00:00:00Z'),
+      withData(moved('sanimate', 'sconcept', agent('quill'), '2026-01-04T00:00:00Z'), returned),
+      withData(
+        moved('sconcept', 'sconcept__review', agent('quill'), '2026-01-05T00:00:00Z'),
+        handed,
+      ),
+    ];
+    const said = {
+      ...words,
+      bounce: (n: number) => `ronda ${n} · volvió`,
+      merge: (n: number) => `ronda ${n} · fusión`,
+    };
+
+    it('says so on the route, whether it came back after others landed or merged a clash', () => {
+      const labels = (events: ItemEvent[]) =>
+        boardItemOf(creatures(), item('sconcept__review', events), said)?.route.dips.map(
+          (dip) => dip.label,
+        );
+      expect(labels(flow({ waited: ['CAM-2'] }, {}))).toEqual(['ronda 1 · fusión']);
+      expect(labels(flow({}, { merge }))).toEqual(['ronda 1 · fusión']);
+    });
+
+    it('leaves a plain send-back and a bounce on a clash as they were', () => {
+      const labels = (events: ItemEvent[]) =>
+        boardItemOf(creatures(), item('sconcept__review', events), said)?.route.dips.map(
+          (dip) => dip.label,
+        );
+      expect(labels(flow({}, {}))).toEqual(['ronda 1']);
+    });
+
+    it('is no «sent back and redone» in Rondas, and its opening note says who merged', () => {
+      const events = [
+        ...flow({ waited: ['CAM-2'], reason: 'CAM-2 landed first' }, { merge }),
+        moved('sconcept__review', 'sanimate', you, '2026-01-06T00:00:00Z'),
+      ];
+      const [concept] = stepRounds(creatures(), 'sanimate', events);
+      expect(concept?.outcome).toEqual({ kind: 'merged' });
+      expect(roundNotes(creatures(), 'sconcept', events)[1]?.notes[0]).toMatchObject({
+        kind: 'back',
+        merged: true,
+        text: 'CAM-2 landed first',
+      });
+      // A send-back by the person into the same step is still one.
+      const sent = [
+        created('sconcept'),
+        moved('sconcept', 'sconcept__review', agent('quill'), '2026-01-02T00:00:00Z'),
+        withData(moved('sconcept__review', 'sconcept', you, '2026-01-03T00:00:00Z'), {
+          reason: 'no',
+        }),
+        moved('sconcept', 'sconcept__review', agent('quill'), '2026-01-04T00:00:00Z'),
+        moved('sconcept__review', 'sanimate', you, '2026-01-05T00:00:00Z'),
+      ];
+      expect(stepRounds(creatures(), 'sanimate', sent)[0]?.outcome).toEqual({ kind: 'reworked' });
+    });
+  });
+
   it('draws a closed item at Hecho, and leaves a state the board does not know to the preset', () => {
     expect(boardItemOf(creatures(), item('done', [created('sconcept')]), words)?.route.ci).toBe(4);
     expect(boardItemOf(creatures(), item('fixing', [created('fixing')]), words)).toBeNull();
