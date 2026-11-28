@@ -119,6 +119,11 @@ function NoSecretary() {
         <h2 className="hb-h">{t('hablar.none.title')}</h2>
       </div>
       <p>{t('hablar.none.text')}</p>
+      <ol className="hb-steps">
+        <li>{t('hablar.none.step1')}</li>
+        <li>{t('hablar.none.step2')}</li>
+        <li>{t('hablar.none.step3')}</li>
+      </ol>
       <Button variant="primary" disabled={text === ''} onClick={copy}>
         <CopyGlyph />
         {copied ? t('hablar.none.copied') : t('hablar.none.copy')}

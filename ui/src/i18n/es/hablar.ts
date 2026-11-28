@@ -32,6 +32,10 @@ export const hablar = {
   'hablar.none.title': 'Todavía no hay secretario',
   'hablar.none.text':
     'Abre la sesión de un agente y pégale este texto: desde ahí es tu secretario y te responde aquí.',
+  'hablar.none.step1': 'Pulsa «Copiar el texto del secretario».',
+  'hablar.none.step2':
+    'Abre la app de tu agente (Claude Code, Codex, OpenCode…) y empieza una conversación nueva.',
+  'hablar.none.step3': 'Pega el texto y envíalo. Vuelve aquí: ya puedes escribirle.',
   'hablar.none.copy': 'Copiar el texto del secretario',
   'hablar.none.copied': 'Copiado',
   'hablar.none.orRun': 'O, desde una terminal, imprime el texto con este comando:',

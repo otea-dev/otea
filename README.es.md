@@ -41,6 +41,16 @@ Esta es la guía corta en español: instalar y empezar a usar Otea. Todo lo dem�
 - **¿`npm i -g` dice permiso denegado?** Instala en una carpeta tuya, sin `sudo`: `npm i -g --prefix "$HOME/.otea-npm" @otea/cli`, y pon la subcarpeta `bin` de esa carpeta en tu `PATH` en macOS y Linux, o la carpeta misma en Windows ([detalles](#el-comando-otea-desde-npm)).
 - **¿Sin Node, o prefieres Otea en su propia ventana?** Instala la app de escritorio: la sección siguiente tiene las dos formas.
 
+## ¿No programas?
+
+No necesitas terminal, ni Node, ni npm. Empieza por la app de escritorio:
+
+1. **Descarga el instalador** de tu sistema desde la [última versión](https://github.com/otea-dev/otea/releases/latest) y ábrelo. [La app de escritorio](#la-app-de-escritorio) cuenta cómo pasar el aviso de «sin firmar».
+2. **Abre Otea y elige una carpeta**: la de tu proyecto, o una nueva y vacía. Otea crea ahí el proyecto; haz un primer tablero en **Studio** eligiendo una plantilla (Cambios, Pendientes…).
+3. **Entra en Hablar.** Queda un paso, y se hace fuera de Otea: Hablar te da un texto para copiar; abre la app de tu agente (Claude Code, Codex, OpenCode…), empieza una conversación nueva, pega el texto y envíalo. Ese agente ya es tu secretario. Vuelve a Hablar y pídele cosas.
+
+Otea necesita un agente que haga el trabajo, y el agente viene de su propia app: Otea no lo arranca por ti.
+
 ## 1. Instalar
 
 Hay dos formas de instalar Otea: la **app de escritorio** o el **comando `otea` desde npm**. Las dos son el mismo Otea, con los mismos tableros, el mismo teléfono y los mismos agentes.

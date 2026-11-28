@@ -29,6 +29,10 @@ export const hablar = {
   'hablar.none.title': 'No secretary yet',
   'hablar.none.text':
     'Open an agent session and paste this text into it: from then on it is your secretary and answers you here.',
+  'hablar.none.step1': 'Press “Copy the secretary text”.',
+  'hablar.none.step2':
+    'Open your agent’s app (Claude Code, Codex, OpenCode…) and start a new conversation.',
+  'hablar.none.step3': 'Paste the text and send it. Come back here: you can write to it now.',
   'hablar.none.copy': 'Copy the secretary text',
   'hablar.none.copied': 'Copied',
   'hablar.none.orRun': 'Or, from a terminal, print the text with this command:',

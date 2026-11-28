@@ -1404,6 +1404,21 @@ describe('the secretary away, or never there', () => {
     expect(q<HTMLTextAreaElement>(root, '.hb-input textarea')?.disabled).toBe(false);
   });
 
+  // D-2a14ae (field study s-real, a person who does not code): «paste it into your agent» was all the
+  // empty state said, and they stopped there. It says the one step that is left, outside Otea, as
+  // three numbered moves in plain words.
+  it('explains the one step left as a numbered mini-guide, in plain words', async () => {
+    const { root } = await open(conversation({ secretary: null }));
+
+    const steps = all(root, '.hb-nosec ol.hb-steps li').map((step) => text(step));
+
+    expect(steps).toEqual([
+      'Pulsa «Copiar el texto del secretario».',
+      'Abre la app de tu agente (Claude Code, Codex, OpenCode…) y empieza una conversación nueva.',
+      'Pega el texto y envíalo. Vuelve aquí: ya puedes escribirle.',
+    ]);
+  });
+
   it('says nothing about a secretary that is there and has not been spoken to yet', async () => {
     const { root } = await open(conversation());
     expect(q(root, '.hb-nosec')).toBeNull();

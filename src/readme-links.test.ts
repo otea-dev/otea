@@ -86,6 +86,30 @@ describe('the first steps of the READMEs', () => {
     expect(pasos).toContain('1-2 minutos');
   });
 
+  // D-2a14ae (field study s-real): a person who does not code gave up at «npm i -g». Each README has
+  // a path for them that starts from the desktop installer and says the one step left outside Otea.
+  it('open a path for a person who does not code, from the installer, in both languages', () => {
+    const section = (name: string, heading: string) => {
+      const markdown = readFileSync(join(ROOT, name), 'utf8');
+      const at = markdown.indexOf(heading);
+      expect(at, `${name} has no ${heading}`).toBeGreaterThan(-1);
+      const rest = markdown.slice(at + heading.length);
+      return rest.slice(0, rest.indexOf('\n## '));
+    };
+
+    const english = section('README.md', "## You don't code?");
+    expect(english).toMatch(/no terminal/);
+    expect(english).toMatch(/Download the installer/);
+    expect(english).toMatch(/open your agent's app/);
+    expect(english).not.toMatch(/npm i -g/);
+
+    const spanish = section('README.es.md', '## ¿No programas?');
+    expect(spanish).toMatch(/terminal/);
+    expect(spanish).toMatch(/Descarga el instalador/);
+    expect(spanish).toMatch(/abre la app de tu agente/);
+    expect(spanish).not.toMatch(/npm i -g/);
+  });
+
   it('give the two-line pitch under the tagline, and name no coordinator', () => {
     const english = readFileSync(join(ROOT, 'README.md'), 'utf8');
     expect(english.indexOf('You talk with one agent, your secretary')).toBeLessThan(

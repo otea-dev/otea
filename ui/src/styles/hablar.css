@@ -486,6 +486,14 @@
   font: 400 14px / 1.5 var(--sans);
   color: var(--ink-2);
 }
+.hb-nosec .hb-steps {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 22px;
+  font: 400 14px / 1.5 var(--sans);
+  color: var(--ink-2);
+}
 .hb-nosec .hb-after {
   font: 400 italic 14.5px / 1.45 var(--serif);
   color: var(--ink-3);

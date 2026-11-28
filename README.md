@@ -39,6 +39,16 @@ You only review and decide, on the desk or on your phone, and nothing leaves you
 - **`npm i -g` says permission denied?** Install into a folder of your own, with no `sudo`: `npm i -g --prefix "$HOME/.otea-npm" @otea/cli`, then put that folder's `bin` on your `PATH` on macOS and Linux, or the folder itself on Windows ([details](#the-otea-command-from-npm)).
 - **No Node, or you prefer Otea in its own window?** Install the desktop app instead: [Install](#install) has both ways.
 
+## You don't code?
+
+You need no terminal, no Node and no npm. Start from the desktop app:
+
+1. **Download the installer** for your system from the [latest release](https://github.com/otea-dev/otea/releases/latest) and open it. [The desktop app](#the-desktop-app) says how to get past the "unsigned" warning.
+2. **Open Otea and pick a folder**: the one your project lives in, or a new empty one. Otea makes the project there; make a first board in **Studio** by picking a template (Changes, To-dos…).
+3. **Open Talk.** One step is left, and it happens outside Otea: Talk gives you a text to copy; open your agent's app (Claude Code, Codex, OpenCode…), start a new conversation, paste the text and send it. That agent is now your secretary. Come back to Talk and ask it for things.
+
+Otea needs an agent to do the work, and the agent comes from its own app: Otea does not start one for you.
+
 > From the Spanish verb *otear*: to scan from a high vantage point, to watch what is happening and what is coming.
 
 Agents produce work faster than a human can follow it live. Otea is where work changes hands: agents leave findings, deliverables and evidence; you leave decisions and feedback; both can see at any moment where each thing stands and whose turn it is.
