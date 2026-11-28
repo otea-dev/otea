@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sequenceIds } from '../../../src/core/board/ids.ts';
 import { instantiate, requireTemplate } from '../../../src/core/board/templates.ts';
 import type { FeedEvent } from '../activity.ts';
+import { waitingTotal } from '../pending.ts';
 import type { Item } from '../types.ts';
 import { agent, ago, inMinutes, item, moved, NOW, officialType, you } from './fixtures.ts';
 import {
@@ -13,7 +14,6 @@ import {
   stuckCount,
   tocaSection,
 } from './toca.ts';
-import { waitingTotal } from '../pending.ts';
 
 const bug = officialType('bug-triage');
 const ctx = (feed: FeedEvent[] = []) => ({ now: NOW, feed, types: () => bug });

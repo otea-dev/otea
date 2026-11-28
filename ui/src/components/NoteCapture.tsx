@@ -241,9 +241,7 @@ export function NoteCapture({
         value={text}
         disabled={!canWrite}
         aria-label={t('bandeja.note')}
-        placeholder={t(
-          app.secretary === null ? 'bandeja.placeholderAlone' : 'bandeja.placeholder',
-        )}
+        placeholder={t(app.secretary === null ? 'bandeja.placeholderAlone' : 'bandeja.placeholder')}
         enterKeyHint="enter"
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => {

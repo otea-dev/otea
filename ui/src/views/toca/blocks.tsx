@@ -554,7 +554,10 @@ export function tocaBlocks(
     }
     if (phone && !YOURS.includes(sec)) quietBlock();
     if (sec === 'encamino') {
-      blocks.push(...offBlocks('avisos', reports, app.now), ...offBlocks('sinagente', noWorker, app.now));
+      blocks.push(
+        ...offBlocks('avisos', reports, app.now),
+        ...offBlocks('sinagente', noWorker, app.now),
+      );
     }
     const aged = (by.get(sec) ?? []).sort((a, b) => at(a) - at(b));
     // Your own steps follow the order you fixed on the Matrix, then the rest by age (P4-R3-11).

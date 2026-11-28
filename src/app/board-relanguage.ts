@@ -1,6 +1,7 @@
 import { speak } from '../core/board/localize.ts';
 import { type BoardDefinition, clone } from '../core/board/model.ts';
 import { boardLang, type Lang, requestsBoard, TEMPLATES } from '../core/board/templates.ts';
+import { OTEA_ACTOR } from '../core/item.ts';
 import { listBoards } from '../store/boards.ts';
 import { getBoardRecord, publishBoard, saveDraft } from './boards.ts';
 import type { Context } from './context.ts';
@@ -48,7 +49,9 @@ export function relanguageBoards(
     if (name !== live.name && !taken.has(name)) definition.name = name;
     try {
       saveDraft(ctx, row.id, { definition, baseVersion: row.liveVersion }, now);
-      publishBoard(ctx, row.id, { moves: {}, by: { kind: 'human', name: 'otea' } }, now);
+      // Otea moves the board's words itself: the person asked for the language, not for each new
+      // version, so it is Otea's act and no publish of theirs.
+      publishBoard(ctx, row.id, { moves: {}, by: OTEA_ACTOR }, now);
       moved.push(label);
     } catch {
       // A board that cannot be republished as it is keeps its words, and loses nothing: it is

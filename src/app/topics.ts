@@ -1,5 +1,5 @@
 import { OteaError } from '../core/errors.ts';
-import type { Actor } from '../core/item.ts';
+import { type Actor, OTEA_ACTOR } from '../core/item.ts';
 import {
   commonWords,
   type Searched,
@@ -513,7 +513,7 @@ export function forgetTopicItem(ctx: Context, item: string, at: string): void {
     ctx.db
       .prepare('UPDATE topics SET state = ?, task = NULL, updated_at = ? WHERE id = ?')
       .run(answered ? 'answered' : 'open', at, id);
-    addTurn(ctx, id, { kind: 'event', text: item, by: { kind: 'human', name: 'otea' } }, at);
+    addTurn(ctx, id, { kind: 'event', text: item, by: OTEA_ACTOR }, at);
   }
 }
 

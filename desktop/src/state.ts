@@ -45,7 +45,10 @@ export function deskAttention(
   // What Otea counts that is no item (GET /api/pending), so the tray says the number the rail says.
   pending?: Pending,
 ): DeskAttention {
-  const attention = { ...attentionOf(items, now), yours: waitingCount({ all: items, now, pending }) };
+  const attention = {
+    ...attentionOf(items, now),
+    yours: waitingCount({ all: items, now, pending }),
+  };
   const live = (item: DeskItem) => activeLease(item.lease, now);
   const holders = new Set(items.flatMap((item) => live(item)?.holder ?? []));
   const waitingYours = items

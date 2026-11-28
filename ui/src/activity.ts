@@ -368,5 +368,7 @@ export function mergeFeed(
   const all = [...current, ...fresh];
   if (today === undefined || all.length <= FEED_SIZE) return all.slice(-FEED_SIZE);
   const newest = all.length - FEED_SIZE;
-  return all.filter((event, i) => i >= newest || Date.parse(event.at) >= today).slice(-FEED_DAY_MAX);
+  return all
+    .filter((event, i) => i >= newest || Date.parse(event.at) >= today)
+    .slice(-FEED_DAY_MAX);
 }

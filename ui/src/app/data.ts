@@ -104,7 +104,10 @@ export function useFeed(version: number): FeedEvent[] {
     const arrive = (arrived: FeedEvent[]) =>
       setFeed((was) => ({ events: mergeFeed(was.events, arrived, today), loaded: true }));
     if (loaded) {
-      fetchEvents({ since: events.at(-1)?.id ?? 0 }, controller.signal).then(arrive, () => undefined);
+      fetchEvents({ since: events.at(-1)?.id ?? 0 }, controller.signal).then(
+        arrive,
+        () => undefined,
+      );
     } else {
       firstFeed(today, (latest) => fetchEvents({ latest }, controller.signal)).then(
         arrive,

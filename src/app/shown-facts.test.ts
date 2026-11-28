@@ -7,15 +7,14 @@ import { sequenceIds } from '../core/board/ids.ts';
 import { creatures } from '../core/board/testing.ts';
 import { signalsOf } from '../core/notify/signals.ts';
 import { counted, OFF_ITEM, pendingCounts } from '../core/pending.ts';
+import { countedOff, waitsForPerson } from '../core/waiting.ts';
 import { countsOf } from '../server/projects.ts';
-import type { Item as DeskItem } from '../../ui/src/types.ts';
-import { waitingCount } from '../../ui/src/pending.ts';
 import { askOnBandeja, captureToBandeja, takeBandeja } from './bandeja.ts';
 import { createBoard, publishBoard, saveDraft } from './boards.ts';
 import { addCollection } from './collections.ts';
 import { listConversation, postPersonMessage, sayAsSecretary } from './conversation.ts';
 import { escalateToSecretary } from './escalate.ts';
-import { createItem, type Item, listItems } from './items.ts';
+import { createItem, listItems } from './items.ts';
 import { claimItem } from './leases.ts';
 import { pendingLine, pendingOf, pendingText } from './pending.ts';
 import { CLI_HARNESS, endProcess, seeAgent, waitBeat } from './presence.ts';
@@ -65,7 +64,12 @@ describe('what waits for the person, from every place that counts it', () => {
     createItem(project, { collection: 'reviews', title: 'Call the bank', actor: you }, ago(49));
     sayAsSecretary(
       project,
-      { agent: 'sol', text: 'Send CSS review back?', links: [review], options: ['Send back', 'No'] },
+      {
+        agent: 'sol',
+        text: 'Send CSS review back?',
+        links: [review],
+        options: ['Send back', 'No'],
+      },
       ago(40),
     );
     sayAsSecretary(project, { agent: 'sol', text: 'Which day?', options: ['Mon', 'Tue'] }, ago(39));
@@ -76,7 +80,11 @@ describe('what waits for the person, from every place that counts it', () => {
       { id: noteId, agent: 'lia', text: 'Which screen?', options: ['Te toca', 'Hablar'] },
       ago(36),
     );
-    escalateToSecretary(project, { agent: 'kiln', about: review, text: 'the build is red' }, ago(30));
+    escalateToSecretary(
+      project,
+      { agent: 'kiln', about: review, text: 'the build is red' },
+      ago(30),
+    );
 
     const def = creatures();
     const board = createBoard(project, { name: def.name, lang: 'es' }, ago(200), sequenceIds());
@@ -117,7 +125,9 @@ describe('what waits for the person, from every place that counts it', () => {
     const one = pending.count;
     expect(one).toBeGreaterThan(5);
     // `otea pending`: the count, the per-kind sum and the line at the foot of a wait.
-    expect(Object.values(pendingCounts(pending.entries)).reduce((n, each) => n + each, 0)).toBe(one);
+    expect(Object.values(pendingCounts(pending.entries)).reduce((n, each) => n + each, 0)).toBe(
+      one,
+    );
     expect(pendingText(pending)).toContain(`${one} things wait for the person`);
     expect(pendingLine(pending)).toContain(`${one} things wait for the person`);
     // The projects overview (the switcher, «Todos los proyectos»): items and what is no item.
@@ -129,10 +139,11 @@ describe('what waits for the person, from every place that counts it', () => {
     );
     const itemEntries = pending.entries.filter(({ kind }) => !OFF_ITEM.includes(kind));
     expect(toldItems).toHaveLength(itemEntries.length);
-    // The desk, deriving it from the same items and the same pending answer.
-    expect(
-      waitingCount({ all: items as unknown as DeskItem[], now: Date.now(), pending }),
-    ).toBe(one);
+    // The desk's number (ui/src/pending.ts waitingCount) is these two rules over the same items and
+    // the same pending answer; the UI half of this is in ui/src/shown-facts.test.tsx.
+    const theirs = items.filter((item) => waitsForPerson(item, Date.now()));
+    const off = pending.entries.filter(({ kind }) => OFF_ITEM.includes(kind));
+    expect(theirs.length + countedOff(off, new Set(theirs.map(({ id }) => id))).length).toBe(one);
   });
 
   it('counts a secretary’s question about an item once, with the item', () => {
@@ -171,7 +182,7 @@ describe('the secretary, from every place that says where it stands', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  const T = (minutes: number) => ago(minutes);
+  const earlier = (minutes: number) => ago(minutes);
   const running = () => true;
   const gone = () => false;
 
@@ -181,19 +192,23 @@ describe('the secretary, from every place that says where it stands', () => {
     [
       'in its wait',
       () => {
-        declareSecretary(project.db, 'sol', T(1), running);
-        waitBeat(project.db, { agent: 'sol', channel: 'cli', waiter: process.pid }, T(0)).run();
+        declareSecretary(project.db, 'sol', earlier(1), running);
+        waitBeat(
+          project.db,
+          { agent: 'sol', channel: 'cli', waiter: process.pid },
+          earlier(0),
+        ).run();
       },
       'listening',
     ],
     [
       'heard, not waiting',
       () => {
-        declareSecretary(project.db, 'sol', T(1), running);
+        declareSecretary(project.db, 'sol', earlier(1), running);
         seeAgent(
           project.db,
           { agent: 'sol', channel: 'mcp', harness: { name: 'claude-code' }, session: process.pid },
-          T(0),
+          earlier(0),
         );
       },
       'connected',
@@ -201,8 +216,8 @@ describe('the secretary, from every place that says where it stands', () => {
     [
       'its session killed',
       () => {
-        declareSecretary(project.db, 'sol', T(5), running);
-        waitBeat(project.db, { agent: 'sol', channel: 'cli', waiter: 4242 }, T(4)).run();
+        declareSecretary(project.db, 'sol', earlier(5), running);
+        waitBeat(project.db, { agent: 'sol', channel: 'cli', waiter: 4242 }, earlier(4)).run();
         endProcess(project.db, 4242);
       },
       'offline',
@@ -210,8 +225,8 @@ describe('the secretary, from every place that says where it stands', () => {
     [
       'not heard for an hour',
       () => {
-        declareSecretary(project.db, 'sol', T(60), running);
-        seeAgent(project.db, { agent: 'sol', channel: 'cli', harness: CLI_HARNESS }, T(60));
+        declareSecretary(project.db, 'sol', earlier(60), running);
+        seeAgent(project.db, { agent: 'sol', channel: 'cli', harness: CLI_HARNESS }, earlier(60));
       },
       'offline',
     ],
@@ -221,15 +236,23 @@ describe('the secretary, from every place that says where it stands', () => {
     it(`says the same everywhere while it is ${name}, and a new session may take over only when it is offline`, () => {
       arrange();
       // A message the person wrote and nobody read, a report an agent escalated, and a note.
-      postPersonMessage(project, { text: 'are you there?' }, T(2));
-      const note = captureToBandeja(project, { text: 'a rough idea' }, T(2)).entry;
-      escalateToSecretary(project, { agent: 'kiln', about: bandejaRef(note.id), text: 'build red' }, T(2));
+      postPersonMessage(project, { text: 'are you there?' }, earlier(2));
+      const note = captureToBandeja(project, { text: 'a rough idea' }, earlier(2)).entry;
+      escalateToSecretary(
+        project,
+        { agent: 'kiln', about: bandejaRef(note.id), text: 'build red' },
+        earlier(2),
+      );
 
       const view = secretaryView(project.db, now);
       const conversation = listConversation(project, {}, now);
       const pending = pendingOf(project, now);
       expect(view?.state).toBe(expected);
-      for (const other of [conversation.secretary, pending.secretary, secretaryStatus(project.db, now)]) {
+      for (const other of [
+        conversation.secretary,
+        pending.secretary,
+        secretaryStatus(project.db, now),
+      ]) {
         expect(other).toMatchObject({ name: 'sol', state: view?.state, since: view?.since });
       }
       // What waits for it is one object, counted once, by what each is.
@@ -256,7 +279,11 @@ describe('the secretary, from every place that says where it stands', () => {
   it('counts an escalation or a note as what it is, never as a message', () => {
     declareSecretary(project.db, 'sol', ago(60), () => true);
     const note = captureToBandeja(project, { text: 'a rough idea' }, ago(20)).entry;
-    escalateToSecretary(project, { agent: 'kiln', about: bandejaRef(note.id), text: 'build red' }, ago(30));
+    escalateToSecretary(
+      project,
+      { agent: 'kiln', about: bandejaRef(note.id), text: 'build red' },
+      ago(30),
+    );
 
     expect(secretaryView(project.db, now)?.waiting).toMatchObject({
       messages: 0,

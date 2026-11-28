@@ -5,11 +5,7 @@ import {
   type MessageKind,
   messageSnippet,
 } from '../../src/core/conversation.ts';
-import type {
-  SecretaryStatus,
-  SecretaryView,
-  SecretaryWaiting,
-} from '../../src/core/secretary.ts';
+import type { SecretaryStatus, SecretaryView, SecretaryWaiting } from '../../src/core/secretary.ts';
 import { activeLease } from './active-lease.ts';
 import type { Look } from './lanes/looks.ts';
 import { lookOf } from './lanes/looks.ts';

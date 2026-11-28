@@ -1,6 +1,6 @@
 import { isListedKey, isSetKey, type Lang, TEMPLATES } from '../core/board/templates.ts';
 import { OteaError } from '../core/errors.ts';
-import type { Actor } from '../core/item.ts';
+import { type Actor, OTEA_ACTOR } from '../core/item.ts';
 import { addBoard, addBoardSet, type BoardRecord, listBoardSummaries } from './boards.ts';
 import type { Context } from './context.ts';
 
@@ -9,7 +9,8 @@ import type { Context } from './context.ts';
 // template, or with `none`, it makes none: the person picks them. A template is checked even when
 // no board is made, so a typo always fails.
 
-const BY: Actor = { kind: 'human', name: 'otea' };
+// Otea publishes the starting boards itself; no one pressed Publish.
+const BY: Actor = OTEA_ACTOR;
 
 // Starts the project without boards (they are made later in Studio or with otea board add).
 export const NO_BOARDS = 'none';

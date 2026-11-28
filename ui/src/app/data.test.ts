@@ -1,6 +1,32 @@
 import { describe, expect, it } from 'vitest';
+import type { FeedEvent } from '../activity.ts';
 import type { CollectionView, Item } from '../types.ts';
-import { boardsKey, canCaptureNow, newlyUnknown, unknownBoards } from './data.ts';
+import { boardsKey, canCaptureNow, firstFeed, newlyUnknown, unknownBoards } from './data.ts';
+
+// s-real2, D-a55c6d: the day's recap read the newest 200 events, so a busy afternoon lost the
+// morning's. The first look reads back until it reaches the start of the day.
+describe('the first look at the feed', () => {
+  const day = Date.parse('2026-11-11T00:00:00Z');
+  // A server with `total` events, one a minute, the last at noon; `latest` gives the newest n.
+  const server = (total: number) => {
+    const all = Array.from({ length: total }, (_, i) => ({
+      id: i + 1,
+      at: new Date(day + 12 * 3_600_000 - (total - 1 - i) * 60_000).toISOString(),
+    })) as unknown as FeedEvent[];
+    return async (latest: number) => all.slice(-latest);
+  };
+
+  it('reaches back to the start of the day when the newest events are all of today', async () => {
+    const events = await firstFeed(day, server(450));
+    expect(events).toHaveLength(450);
+  });
+
+  it('stops at the newest 200 once they reach into yesterday', async () => {
+    const events = await firstFeed(day + 11 * 3_600_000 + 30 * 60_000, server(450));
+    expect(events.length).toBeLessThan(450);
+    expect(events.length).toBeGreaterThanOrEqual(200);
+  });
+});
 
 // P5-R3-9: a board published elsewhere (another window, the phone, an agent's change) left this
 // desk on the boards it first read, and an item's new field showed by its hidden key («DSI4K2MQ:

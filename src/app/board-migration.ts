@@ -15,6 +15,7 @@ import {
 } from '../core/board/readings.ts';
 import { parseDefinition, readDefinition, storedDefinition } from '../core/board/schema.ts';
 import type { Lang } from '../core/board/templates.ts';
+import { OTEA_ACTOR } from '../core/item.ts';
 import {
   findBoardOfCollection,
   findVersion,
@@ -48,7 +49,8 @@ import { type Clock, systemClock } from './items.ts';
 // becomes Completar's next round, with the person's question as its note. Collections on presets
 // Otea never shipped read as one step that keeps their data. Returns how many collections it read.
 
-const OTEA = { kind: 'human' as const, name: 'otea' };
+// Otea's own act, never the person's: a reading of the old data moves items by itself.
+const OTEA = OTEA_ACTOR;
 
 type Plan = {
   collection: CollectionRecord;
