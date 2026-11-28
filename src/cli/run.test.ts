@@ -53,6 +53,23 @@ describe('run', () => {
       expect(out).not.toContain('Exit codes:');
     });
 
+    // D-f32f30 (field study s-real, a person who lives in the terminal): looked for a command to
+    // approve, send back or answer, found none, and read it as a gap. It is by design, and the help
+    // says so and why, so nobody looks for one.
+    it('says which acts of the person are the desk’s alone, and why', async () => {
+      const { out } = await otea('help');
+
+      expect(out).toContain('Only on the desk');
+      expect(out).toMatch(/approve.*send back.*answer/is);
+      expect(out).toMatch(/an\s+agent\s+shares\s+this\s+command\s+line/i);
+      expect(out).toContain('docs/desk.md');
+      // The page the help points to says it, with the reason.
+      const page = readFileSync(new URL('../../docs/desk.md', import.meta.url), 'utf8');
+      expect(page).toContain('### What only the desk does');
+      expect(page).toMatch(/cannot tell it from you/);
+      expect((await otea('help', 'all')).out).toContain('Only on the desk');
+    });
+
     it('prints a command help for help <command>', async () => {
       const { code, out } = await otea('help', 'projects', 'add');
 
