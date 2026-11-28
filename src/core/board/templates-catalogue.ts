@@ -127,7 +127,7 @@ const BUG_REPORTS: Template = {
       kind: 'branch',
       name: w('Branch', 'Rama'),
       hint: w('fix/<id>-<topic>, from main', 'fix/<id>-<tema>, desde main'),
-      guard: { push: ['sfix', 'sland'] },
+      guard: { push: ['sfix', 'sland'], base: 'main', commit: 'fcommit' },
     },
     {
       key: 'ediff',

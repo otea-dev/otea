@@ -431,6 +431,29 @@ describe('templates that fit the work', () => {
   });
 });
 
+// D-a9f8d4 (final study, u6): a Bugs board in a repo with no remote showed Done and «merged in Land»
+// while the local main never got the commit: the board's branch guard named no base and no commit
+// field, so the hash its Land step takes was never checked against the base nor brought to it.
+// A board whose Land step records the commit that landed says where it lands and where it writes it.
+describe('a board that lands code', () => {
+  const landing = TEMPLATES.flatMap((template) =>
+    template.parts.flatMap((part) =>
+      part.guard?.push.some((step) => /^s?land$/.test(step)) ? [[template.key, part] as const] : [],
+    ),
+  );
+
+  it('names the base it lands on and the field holding the commit', () => {
+    expect(landing.length).toBeGreaterThan(0);
+    for (const [key, part] of landing) {
+      expect({ key, base: part.guard?.base, commit: part.guard?.commit }).toEqual({
+        key,
+        base: 'main',
+        commit: expect.any(String),
+      });
+    }
+  });
+});
+
 describe('LISTED_KEYS', () => {
   it('holds the keys Studio offers, in its order', () => {
     expect(LISTED_KEYS).toEqual(listedTemplates('en').map(({ key }) => key));
