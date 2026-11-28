@@ -39,26 +39,23 @@ export { dayLine, roundOf, rowCall, tocaBlocks, universeOf } from './blocks.tsx'
 // The day's recap under the title: what they handed over, what you approved (in your colour) and
 // what you sent back.
 function Recap({ today, phone }: { today: Today; phone: boolean }) {
+  // The sentence is the interface's voice (sans) with its figures in mono, on the desk and on the
+  // phone alike; only the phone's line has no hairline running out to the edge.
+  const sentence = tx('toca.colophon', {
+    handed: <Count value={today.handed} hold />,
+    approved: <Count className="you" value={today.approved} hold />,
+    sent: <Count value={today.sent} hold />,
+  });
   if (phone) {
     return (
       <p className="p-recap" data-leaf="">
-        {t('toca.colophon', {
-          handed: String(today.handed),
-          approved: String(today.approved),
-          sent: String(today.sent),
-        })}
+        {sentence}
       </p>
     );
   }
   return (
     <div className="recap" data-leaf="">
-      <span>
-        {tx('toca.colophon', {
-          handed: <Count value={today.handed} hold />,
-          approved: <Count className="you" value={today.approved} hold />,
-          sent: <Count value={today.sent} hold />,
-        })}
-      </span>
+      <span>{sentence}</span>
       <span className="rule" />
     </div>
   );

@@ -302,7 +302,11 @@ export const detail = {
   'evidence.reader.opened': 'opened',
   'evidence.reader.side': 'The “{side}” side of a before and after.',
   'evidence.reader.compare': 'Compare before and after',
-  'evidence.reader.unopened': 'Not opened in the reader: {n} of {total} files.',
+  // `count` is the total: «1 of 1 file», never «1 of 1 files».
+  'evidence.reader.unopened': {
+    one: 'Not opened in the reader: {n} of {total} file.',
+    other: 'Not opened in the reader: {n} of {total} files.',
+  },
   'notes.pick.file': 'the whole file',
   'notes.pick.line': 'line {n}',
   'notes.pick.quote': 'the line picked',

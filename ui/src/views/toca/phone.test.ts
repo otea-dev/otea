@@ -219,7 +219,10 @@ describe("Te toca's head on the phone", () => {
     expect(html).toContain('Una cosa te espera');
     expect(html).not.toContain('Los agentes entregaron');
     expect(html).toContain('class="p-recap"');
-    expect(html).toContain('Hoy entregaron 1, aprobaste 0 y devolviste 0 con notas.');
+    // The sentence is words with its figures set apart (mono, as on the desk): `.n` is a figure.
+    expect(html).toMatch(
+      /Hoy entregaron <span class="n">.*1.*<\/span>, aprobaste <span class="n you">.*0.*<\/span> y devolviste <span class="n">.*0.*<\/span> con notas\./,
+    );
   });
 
   it('says the day under the title on the desk too, now that the agents column is gone', () => {

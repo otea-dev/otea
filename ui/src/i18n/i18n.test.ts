@@ -155,6 +155,23 @@ describe('t', () => {
     expect(t('common.files', { count: 1_000_000 })).toBe('1000000 archivos');
   });
 
+  // Field study 7: «Sin abrir: 1 de 1 archivos». The noun agrees with the total, not with how many
+  // are left.
+  it('says «1 of 1 file», never «1 of 1 files», for what is left unopened', () => {
+    const left = (n: number, total: number) => ({ count: total, n, total });
+    expect(t('phone.r.unopened', left(1, 1))).toBe('Not opened: 1 of 1 file');
+    expect(t('phone.r.unopened', left(2, 3))).toBe('Not opened: 2 of 3 files');
+    expect(t('evidence.reader.unopened', left(1, 1))).toBe(
+      'Not opened in the reader: 1 of 1 file.',
+    );
+    setLanguage('es');
+    expect(t('phone.r.unopened', left(1, 1))).toBe('Sin abrir: 1 de 1 archivo');
+    expect(t('phone.r.unopened', left(2, 2))).toBe('Sin abrir: 2 de 2 archivos');
+    expect(t('evidence.reader.unopened', left(1, 1))).toBe(
+      'Sin abrir en el lector: 1 de 1 archivo.',
+    );
+  });
+
   it('gives back a key it does not know, as a lookup by a computed key expects', () => {
     const lookup = t as (key: string) => string;
     expect(lookup('boardView.dek.bk3j9x2q')).toBe('boardView.dek.bk3j9x2q');

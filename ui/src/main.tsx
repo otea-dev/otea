@@ -9,6 +9,7 @@ import { App } from './App.tsx';
 import { currentProjectId, homeTarget, rememberProject } from './base.ts';
 import { PairScreen } from './components/PairScreen.tsx';
 import { startLanguage } from './i18n/i18n.ts';
+import { trackModality } from './kit/input-modality.ts';
 import { keepFocus } from './kit/pop/keep-focus.ts';
 import { applyMotionPref } from './motion/reduced.ts';
 import { startPushCheck } from './notify/push-client.ts';
@@ -71,6 +72,8 @@ startLanguage();
 // The focus never drops to the page's body when the control that held it goes (a question
 // answered, a move made, a notice closed).
 keepFocus();
+// A ring is for the keys: a tap or a click draws none (base.css).
+trackModality();
 
 // A phone on the LAN that has not paired yet is only served this screen.
 const pairing = window.location.pathname === '/pair';

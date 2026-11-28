@@ -570,12 +570,18 @@ function AgentsPill() {
   // Until the server first answers, the pill says nothing rather than «Sin agentes» or «Sin
   // conexión» (P1-R2-8); a stream that cannot open still says it is offline.
   if (app.agents === undefined && connection !== 'reconnecting') return null;
+  // On the phone the line under the bar already says «Sin conexión» (and since when, and
+  // Reintentar): the pill gives way to it and keeps the agents as they were last known, dimmed
+  // (field study 7: the same words twice, one above the other).
+  const stale = app.phone && app.sync.offline;
+  if (stale && app.agents === undefined) return null;
   const agents = app.agents ?? [];
   // One source for the pill and its menu: the menu's rows.
   const rows = agentRows(agents, app.all, app.now, app.feed);
-  const mark = pillMark(connection, rows);
-  const summary = pillSummary(connection, rows);
-  const offline = mark === 'offline';
+  const known = stale ? 'live' : connection;
+  const mark = stale ? (agentCounts(rows).live > 0 ? 'idle' : 'none') : pillMark(known, rows);
+  const summary = pillSummary(known, rows);
+  const offline = mark === 'offline' || stale;
   const counts = agentCounts(rows);
   const close = () => setOpen(false);
   return (
@@ -585,6 +591,7 @@ function AgentsPill() {
         type="button"
         className="apill"
         data-quiet={offline || counts.live === 0 || undefined}
+        data-stale={stale || undefined}
         aria-haspopup={offline ? undefined : 'dialog'}
         aria-expanded={offline ? undefined : open}
         disabled={offline}

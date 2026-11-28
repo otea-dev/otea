@@ -515,8 +515,14 @@
   .route-wrap {
     overflow-x: auto;
     overflow-y: hidden;
-    height: 112px;
+    /* the drawing ends at its lower lane (y 68, its light a dozen below): the 104 it is drawn in left
+       a dead band under it (field study 7: ~120 px between the route and the list) */
+    height: 86px;
     scrollbar-width: none;
+  }
+  /* …unless a send-back dips below it, with its round named at y 99 */
+  .route-wrap:has(.dips text) {
+    height: 112px;
   }
   .toast {
     bottom: 76px;
@@ -554,6 +560,7 @@
   /* The bottom bar's height, one number for what ends clear of it (the pages). */
   :root {
     --tabbar-h: calc(74px + env(safe-area-inset-bottom, 0px));
+    --bar-h: 56px;
   }
   /* Every page ends clear of the bottom bar. */
   .view > * {
@@ -643,6 +650,21 @@
   }
   .tabbar .plus:disabled {
     opacity: 0.45;
+  }
+  /* The keys' ring sits inside each cell (the screen's edge would cut it), and Nuevo's is the
+     round's own, not a square round the cell. */
+  .tabbar .tab:focus-visible {
+    outline-offset: -3px;
+  }
+  .tabbar .plus:focus-visible {
+    outline: none;
+  }
+  .tabbar .plus:focus-visible .disc {
+    outline: 2px solid var(--you);
+    outline-offset: 2px;
+  }
+  :root[data-input="pointer"] .tabbar .plus:focus-visible .disc {
+    outline: none;
   }
 
   /* A board on the phone (mobile mock 4): read in Lista, filtered by step with a row of chips that
@@ -1058,8 +1080,16 @@
 /* Under the title, the day as the agents column said it. */
 .p-recap {
   margin: 10px 0 0;
-  font: 400 12.5px / 1.5 var(--mono);
+  font: 400 13px / 1.5 var(--sans);
   color: var(--ink-3);
+}
+/* the figures are the machine's, in mono, as on the desk (toca.css .recap .n) */
+.p-recap .n {
+  color: var(--ink);
+  font-size: 12.5px;
+}
+.p-recap .n.you {
+  color: var(--you-ink);
 }
 /* A review says what the agent delivered: its mark, its note, how much evidence. */
 .row .p-said {
@@ -2037,6 +2067,18 @@
     gap: 6px;
     font-size: 13px;
   }
+  /* The dock's calm status lines are one line each at 320 px (the two of them took a third of the
+     screen over the page): what a screen reader gets is whole, and what is said loudly (nobody is
+     listening, a move refused) still takes the lines it needs. */
+  .p-dock .hint.unseen,
+  .p-dock .hint.unheard[data-unheard="calm"] {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .p-dock {
+    padding-top: 8px;
+  }
 }
 @media (max-width: 720px) {
   /* The sheet keeps one height as the results come and go, and sits on the keyboard (--kb). */
@@ -2137,11 +2179,15 @@
 }
 
 /* ───────── a screen too short for the page (a phone on its side: 390 px, or 320) ─────────
-   The top bar and the bottom bar are slimmer, so what stands between them keeps the height. By
+   The top bar is slimmer and the bottom bar leaves: it stands on the left as a strip the height of
+   the window, so what stands beside it (the thread, the first rows) keeps the whole height. By
    height alone, so it also holds for the phone layout of a window that is short. */
 @media (max-height: 500px) {
   :root {
-    --tabbar-h: calc(46px + env(safe-area-inset-bottom, 0px));
+    --strip-w: calc(64px + env(safe-area-inset-left, 0px));
+    /* no bar at the foot: a page ends clear of the home bar only */
+    --tabbar-h: env(safe-area-inset-bottom, 0px);
+    --bar-h: 46px;
   }
   .app {
     grid-template-rows: 46px minmax(0, 1fr);
@@ -2153,17 +2199,45 @@
   .apill {
     height: 38px;
   }
+  /* While the strip is there the page, its top bar too, stands to its right; when the strip sinks
+     (an item, the new item page) the page glides back. The strip takes the notch's side. */
+  .app {
+    transition: padding-left var(--t-small) var(--o-settle);
+  }
+  .app:has(~ .tabbar) {
+    padding-left: calc(var(--strip-w) + 16px);
+  }
+  .app:has(~ .tabbar) > .main {
+    margin-left: -16px;
+  }
+  .app:has(~ .tabbar) .view {
+    padding-left: 16px;
+  }
   .tabbar {
-    align-items: center;
-    padding-top: 2px;
-    padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px));
+    top: 0;
+    right: auto;
+    bottom: 0;
+    left: 0;
+    width: var(--strip-w);
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(0, 60px);
+    align-content: center;
+    align-items: stretch;
+    padding: env(safe-area-inset-top, 0px) 6px env(safe-area-inset-bottom, 0px)
+      calc(6px + env(safe-area-inset-left, 0px));
+    background: var(--ground);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-top: 0;
+    border-right: 1px solid var(--rule);
   }
   .tabbar .tab {
-    min-height: 42px;
-    flex-direction: row;
+    min-height: 48px;
     justify-content: center;
-    gap: 8px;
-    padding-bottom: 0;
+    gap: 2px;
+    padding: 2px 0;
+    font-size: 11px;
   }
   .tabbar .tab .ic {
     width: 22px;
@@ -2173,14 +2247,78 @@
     width: 34px;
     height: 34px;
   }
-  /* the count follows the label on the same row, it no longer hangs over the icon's corner */
   .tabbar .tbadge {
-    position: static;
-    flex: none;
+    top: 2px;
   }
   /* a phone on its side has no room for the install note: it is left for the next open */
   .install-banner {
     display: none;
+  }
+  /* An item's dock on its side: the moves on the left and what is said about them beside them,
+     instead of under them (they were half the screen over a route and a title) */
+  .p-dock {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    column-gap: 16px;
+    align-content: center;
+    align-items: center;
+    padding-block: 8px;
+  }
+  .p-dock:not(:has(> :not(.btns))) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .p-dock > .btns {
+    grid-column: 1;
+    grid-row: 1 / span 4;
+  }
+  .p-dock > :not(.btns) {
+    grid-column: 2;
+    margin: 0;
+    text-align: left;
+    justify-content: flex-start;
+  }
+  /* Hablar is the one page that fills the height (the thread and its composer): nothing under it */
+  .view > .hb {
+    padding-bottom: calc(var(--tabbar-h) + 4px);
+  }
+  /* Te toca's head on its side: the title at a headline's size with its dek on the same line, and
+     the rows right under it (they were below the fold at 844 x 390: a display title, a dek and the
+     day took the screen). The day's tally waits for an upright phone. */
+  body:has(.tabbar) .panel {
+    padding-top: 14px;
+  }
+  body:has(.tabbar) .panel .head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0 14px;
+    margin-bottom: 6px;
+  }
+  /* the secretary-away card over the rows: its title and its way to Hablar, the sentence between
+     them waits for an upright phone */
+  body:has(.tabbar) .secoff {
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    gap: 10px;
+  }
+  body:has(.tabbar) .secoff p {
+    display: none;
+  }
+  body:has(.tabbar) .secoff-go {
+    margin-top: 2px;
+  }
+  body:has(.tabbar) .panel .head .kicker,
+  body:has(.tabbar) .panel .head .p-recap {
+    display: none;
+  }
+  body:has(.tabbar) .panel .head .display {
+    margin-bottom: 0;
+    font-size: 29px;
+  }
+  body:has(.tabbar) .panel .head .dek {
+    flex: 1 1 12em;
+    min-width: 0;
+    font-size: 15px;
   }
   /* the reader on its side: the picture first. Its foot keeps only the two moves; the dots, the
      note box and the count wait for an upright phone (they took the whole window, and the file
@@ -2199,7 +2337,7 @@
 /* the smallest phones on their side (568 x 320): one step slimmer again */
 @media (max-height: 360px) {
   :root {
-    --tabbar-h: calc(40px + env(safe-area-inset-bottom, 0px));
+    --bar-h: 40px;
   }
   .app,
   .app[data-offline] {
@@ -2219,11 +2357,23 @@
     width: 34px;
     height: 34px;
   }
+  .tabbar {
+    grid-auto-rows: minmax(0, 54px);
+  }
   .tabbar .tab {
-    min-height: 36px;
+    min-height: 44px;
   }
   .tabbar .disc {
     width: 30px;
     height: 30px;
+  }
+}
+/* the page's glide back from the strip is a crossfade's worth under reduced motion: none */
+:root[data-motion="reduced"] .app {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) .app {
+    transition: none;
   }
 }

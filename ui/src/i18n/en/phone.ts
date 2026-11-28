@@ -78,7 +78,10 @@ export const phone = {
   'phone.r.delivered': 'What it delivered',
   'phone.r.newIn': 'new in round {n}',
   'phone.r.noNote': 'It left no note.',
-  'phone.r.unopened': 'Not opened: {n} of {total} files',
+  'phone.r.unopened': {
+    one: 'Not opened: {n} of {total} file',
+    other: 'Not opened: {n} of {total} files',
+  },
   'phone.r.noEvidence': 'No files in this round.',
   'phone.r.pictures': 'Pictures',
   'phone.r.noPicture': 'no picture',

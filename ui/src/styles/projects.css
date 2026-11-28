@@ -903,15 +903,35 @@
 /* ───────── a project with no items yet (the empty-big grammar) ───────── */
 .pj-empty-project {
   position: relative;
-  padding: 8px 0 40px 72px;
+  padding: 8px 0 28px 72px;
   min-height: 320px;
 }
+/* the two lanes run beside the card and end with it, each on its resting ring (the lanes' foot: a
+   trunk of closed work takes them on a list that has some; here there is none yet) */
 .pj-empty-lanes {
   position: absolute;
   left: 0;
   top: 0;
+  bottom: 7px;
+  height: calc(100% - 7px);
+}
+.pj-empty-project::before,
+.pj-empty-project::after {
+  content: "";
+  position: absolute;
   bottom: 0;
-  height: 100%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ground);
+}
+.pj-empty-project::before {
+  left: 13px;
+  box-shadow: inset 0 0 0 1px var(--ink-3);
+}
+.pj-empty-project::after {
+  left: 37px;
+  box-shadow: inset 0 0 0 1px var(--you);
 }
 .pj-empty-lanes .ln {
   stroke: var(--lane);
@@ -937,26 +957,68 @@
 .pj-empty-body > .tech {
   margin-top: 14px;
 }
-.pj-facts {
+/* the boards, a row of ways in under the card: the caption on the left of the desk's row, over the
+   links on a phone, each link a pill at a thumb's height with its arrow */
+.pj-boards {
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
   gap: 6px 20px;
-  margin-top: 22px;
+  align-items: center;
+  margin-top: 18px;
   padding-top: 14px;
   border-top: 1px solid var(--rule);
 }
-.pj-facts dt {
+/* the fold above already ends on a rule */
+.tech + .pj-boards {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 0;
+}
+.pj-boards-k {
   font: 400 11.5px / 1.5 var(--mono);
   color: var(--ink-3);
 }
-.pj-facts dd {
+.pj-boards-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
   margin: 0;
-  font-size: 13.5px;
-  color: var(--ink-2);
+  padding: 0;
+  list-style: none;
+}
+.pj-board {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px 0 13px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--rule);
+  font: 500 13.5px / 1.2 var(--sans);
+  color: var(--ink);
+  text-decoration: none;
   overflow-wrap: anywhere;
+  transition:
+    background-color 120ms var(--ease),
+    box-shadow 240ms var(--o-drift);
+}
+.pj-board:hover {
+  background: var(--hov);
+  box-shadow: inset 0 0 0 1px var(--rule-2);
+}
+.pj-board .ic {
+  width: 14px;
+  height: 14px;
+  color: var(--ink-3);
 }
 
 @media (max-width: 720px) {
+  .pj-boards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pj-board {
+    min-height: 44px;
+  }
   .page {
     padding: 20px 16px 60px;
   }

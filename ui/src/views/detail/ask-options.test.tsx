@@ -99,7 +99,8 @@ describe('a question with options', () => {
 
     expect(rows(root).map((row) => row.textContent)).toEqual([
       'Sí, también el río',
-      'Solo el puente · recomendada',
+      // The word stands at the row's end, apart from the option; read aloud it still follows it.
+      'Solo el puente recomendada',
       'Déjalo así',
     ]);
     expect(root.querySelector('.qa textarea')).not.toBeNull();

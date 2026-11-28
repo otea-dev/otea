@@ -37,10 +37,19 @@ button {
   cursor: pointer;
   text-align: inherit;
 }
+/* The ring follows the control's own radius (a pill's ring is a pill, a round button's a circle): a
+   control with none gets the small one, from a rule no other rule can lose to. */
 :focus-visible {
   outline: 2px solid var(--you);
   outline-offset: 2px;
+}
+:where(:focus-visible) {
   border-radius: 4px;
+}
+/* …and only for the keys: after a tap or a click the page draws none (kit/input-modality.ts says
+   which hand was last on it). A text field keeps the ring its own style draws. */
+:root[data-input="pointer"] :focus-visible:not(input, textarea, select, [contenteditable]) {
+  outline: none;
 }
 [hidden] {
   /* biome-ignore lint/complexity/noImportantStyles: hidden must win over any display */

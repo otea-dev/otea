@@ -419,6 +419,34 @@
   margin-right: -12px;
   padding-right: 12px;
 }
+/* What scrolls out under the tabs (or the lane names) fades out instead of ending in a hard cut
+   through a line (field study 7: «CAM-5» sliced across its middle). The fade grows with the first
+   pixels scrolled, so the thread at rest, its first line at the top, is whole. A browser that
+   cannot tie a style to the scroll keeps the plain edge. */
+@property --hb-fade {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes hb-fade-in {
+  from {
+    --hb-fade: 0px;
+  }
+  to {
+    --hb-fade: var(--hb-fade-to, 22px);
+  }
+}
+@media (max-width: 720px) {
+  @supports (animation-timeline: scroll()) {
+    .hb-chat {
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--hb-fade));
+      mask-image: linear-gradient(to bottom, transparent 0, #000 var(--hb-fade));
+      animation: hb-fade-in linear both;
+      animation-timeline: scroll(self block);
+      animation-range: 0 24px;
+    }
+  }
+}
 .hb-pane {
   padding: 8px 0 18px var(--pl);
   font: 400 italic 15px / 1.4 var(--serif);
@@ -1987,11 +2015,23 @@ button.hb-kid:hover {
   .hb-note-off {
     display: none;
   }
-  /* the thread is a small window here: what scrolls out under the tabs fades out, never ends in a
-     hard cut through a line */
+  /* the thread is a small window here: its fade is shorter */
   .hb-chat {
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14px);
-    mask-image: linear-gradient(to bottom, transparent 0, #000 14px);
+    --hb-fade-to: 14px;
+  }
+  /* and the composer under it a slimmer one: the thread is what the height is for */
+  .hb-composer {
+    margin-top: 4px;
+    padding: 5px 5px 5px 12px;
+  }
+  .hb-attach,
+  .hb-send {
+    width: 40px;
+    height: 40px;
+  }
+  .hb-input textarea {
+    min-height: 40px;
+    padding-block: 9px;
   }
 }
 /* on the phone on its side, one row over the conversation: the tabs, and at its end «Te toca

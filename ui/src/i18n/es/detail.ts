@@ -301,7 +301,10 @@ export const detail = {
   'evidence.reader.opened': 'abierto',
   'evidence.reader.side': 'Lado «{side}» de un antes y después.',
   'evidence.reader.compare': 'Comparar antes y después',
-  'evidence.reader.unopened': 'Sin abrir en el lector: {n} de {total} archivos.',
+  'evidence.reader.unopened': {
+    one: 'Sin abrir en el lector: {n} de {total} archivo.',
+    other: 'Sin abrir en el lector: {n} de {total} archivos.',
+  },
   'notes.pick.file': 'el archivo entero',
   'notes.pick.line': 'línea {n}',
   'notes.pick.quote': 'la línea elegida',

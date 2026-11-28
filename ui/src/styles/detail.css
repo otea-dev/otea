@@ -1347,7 +1347,9 @@ p.st-lines {
 .tech > summary::-webkit-details-marker {
   display: none;
 }
-.tech > summary::before {
+/* a fold whose summary draws its own chevron (the agent's details, pairing.css) gets this one
+   only when it has none: two arrows side by side were one too many (field study 7) */
+.tech > summary:not(:has(> svg))::before {
   content: "";
   flex: none;
   align-self: center;
@@ -1358,7 +1360,7 @@ p.st-lines {
   transform: rotate(-45deg);
   transition: transform 240ms var(--o-settle);
 }
-.tech[open] > summary::before {
+.tech[open] > summary:not(:has(> svg))::before {
   transform: rotate(45deg);
 }
 .tech > summary small {

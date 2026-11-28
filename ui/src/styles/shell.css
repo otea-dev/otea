@@ -213,6 +213,13 @@
   cursor: default;
   background: var(--sheet);
 }
+/* the line under the bar says «Sin conexión»; the pill keeps what it last knew, dimmed */
+.apill[data-stale] {
+  color: var(--ink-3);
+}
+.apill[data-stale] .amw {
+  opacity: 0.6;
+}
 
 /* the mark: otea, its o a letter of the word with a dot on its ring (C · Órbita) */
 .tb-mid {
@@ -586,6 +593,19 @@
     0 0 0 1px var(--rule-2),
     0 10px 30px -14px var(--shadow);
   animation: skip-in var(--t-fade) var(--o-settle);
+}
+/* While one shows, the bar is theirs: a solid strip the height of the top bar, so the pill never
+   lies half over the project's pill with its chevron showing through */
+.skips:has(.skip:focus-visible) {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--bar-h, 60px) + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) max(12px, env(safe-area-inset-right, 0px)) 0
+    max(12px, env(safe-area-inset-left, 0px));
+  align-items: center;
+  background: var(--ground);
+  box-shadow: 0 1px 0 var(--rule);
 }
 @keyframes skip-in {
   from {

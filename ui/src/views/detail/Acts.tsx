@@ -464,15 +464,19 @@ export function Acts({
                   className="opt"
                   disabled={offline}
                   data-words={words.includes(i + 1) ? '' : undefined}
+                  data-rec={recommended === i + 1 ? '' : undefined}
                   onClick={() => {
                     if (!words.includes(i + 1)) return answerWith({ option: i + 1 });
                     setFree(`${text} — `);
                     freeBox.current?.focus();
                   }}
                 >
-                  {text}
+                  <span className="opt-t">{text}</span>
                   {recommended === i + 1 ? (
-                    <span className="opt-rec"> · {t('pick.recommended')}</span>
+                    <>
+                      {' '}
+                      <span className="opt-rec">{t('pick.recommended')}</span>
+                    </>
                   ) : null}
                 </button>
               ))}

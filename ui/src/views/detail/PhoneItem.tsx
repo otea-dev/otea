@@ -1192,7 +1192,11 @@ export function PhoneItem(p: PhoneItemProps) {
             ) : null}
             {(primary || picking) && unseen.unopened > 0 && !refused ? (
               <p className="hint unseen">
-                {t('phone.r.unopened', { n: unseen.unopened, total: unseen.total })}
+                {t('phone.r.unopened', {
+                  count: unseen.total,
+                  n: unseen.unopened,
+                  total: unseen.total,
+                })}
               </p>
             ) : null}
             {refused ? (

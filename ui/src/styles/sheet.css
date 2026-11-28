@@ -572,11 +572,36 @@ section.evidence,
   align-items: stretch;
 }
 .opts.stack .opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   height: auto;
   min-height: 36px;
   padding: 8px 13px;
   text-align: left;
   line-height: 1.35;
+}
+.opts.stack .opt-t {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* The recommended answer wears Hablar's skin (views/hablar .hb-opt[data-rec]): a quiet wash, never a
+   blue line (that is what a focused control wears), and its word at the end of the row. */
+.opt[data-rec] {
+  border-color: var(--rule-2);
+  background: color-mix(in oklch, var(--you-wash) 55%, var(--sheet));
+}
+.opt[data-rec].on {
+  border-color: var(--you);
+  background: var(--you-wash);
+}
+.opts.stack .opt-rec {
+  flex: none;
+  margin-left: auto;
+  font: 500 10.5px / 1.2 var(--sans);
+  color: var(--you-ink);
+  white-space: nowrap;
 }
 .opt:disabled {
   opacity: 0.5;

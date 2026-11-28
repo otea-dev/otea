@@ -80,7 +80,10 @@ export const phone = {
   'phone.r.delivered': 'Lo que entregó',
   'phone.r.newIn': 'nuevo en la ronda {n}',
   'phone.r.noNote': 'No dejó nota.',
-  'phone.r.unopened': 'Sin abrir: {n} de {total} archivos',
+  'phone.r.unopened': {
+    one: 'Sin abrir: {n} de {total} archivo',
+    other: 'Sin abrir: {n} de {total} archivos',
+  },
   'phone.r.noEvidence': 'Sin archivos en esta ronda.',
   'phone.r.pictures': 'Imágenes',
   'phone.r.noPicture': 'sin imagen',

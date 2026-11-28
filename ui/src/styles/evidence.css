@@ -1946,9 +1946,8 @@
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
-  /* the lane the files hang on: it runs the whole strip and scrolls with it */
-  background: linear-gradient(var(--lane), var(--lane)) no-repeat 0 50% / 100% 1px;
-  background-attachment: local;
+  /* the lane the files hang on is drawn by the nodes themselves (below), first dot to last, so it
+     never runs on past the last one */
   -webkit-mask-image: linear-gradient(
     90deg,
     transparent,
@@ -1967,9 +1966,26 @@
   width: 40px;
   height: 44px;
 }
+.p-read .ev-node::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--lane);
+}
+.p-read .ev-node:first-child::after {
+  left: 50%;
+}
+.p-read .ev-node:last-child::after {
+  right: 50%;
+}
 .p-read .ev-node::before {
   content: "";
   position: absolute;
+  z-index: 1;
   left: 50%;
   top: 50%;
   width: 9px;
@@ -2003,6 +2019,21 @@
   background-color: var(--ground);
   background-image: radial-gradient(circle at 1px 1px, var(--dot) 0.9px, transparent 1.15px);
   background-size: 22px 22px;
+  /* A short file is a picture on a well that takes the room between the tools and the foot, the
+     picture in the middle of it: the foot stands at the bottom, and what lay empty under a short
+     file (75 px, field study 7) is the well's own ground. */
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+/* its name is the head's already (once, over the dots), so the line under the picture is only a
+   caption of the agent's, when it wrote one */
+.p-read .ev-reader-view .ev-meta .ev-file {
+  display: none;
+}
+.p-read .ev-reader-view figcaption:not(:has(.t-small)) {
+  display: none;
 }
 .p-read .ev-left-head,
 .p-read .ev-reader-on b {

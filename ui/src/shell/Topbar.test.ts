@@ -183,6 +183,27 @@ describe('the topbar', () => {
     expect(html).toMatch(/class="apill"[^>]*disabled=""/);
   });
 
+  // Field study 7: on the phone the line under the bar said «Sin conexión» (with the hour and
+  // Reintentar) and the pill above it said the same: the pill gives way and keeps the agents as they
+  // were last known, dimmed. The desk has no such line, so its pill keeps saying it.
+  it('gives the pill’s «Sin conexión» to the offline line on the phone, keeping the agents dimmed', () => {
+    setLanguage('es');
+    const down = {
+      connection: 'reconnecting' as const,
+      sync: { offline: true, syncedAt: NOW },
+      agents: [agent('Scout', { profile: opus, holding: ['X'] })],
+      all: [item({ id: 'X', turn: 'agent', lease: { holder: 'Scout', expiresAt: inMinutes(20) } })],
+    };
+    const phone = topbar({ ...down, phone: true });
+    expect(phone).not.toContain('Sin conexión');
+    expect(phone).toContain('1 trabajando');
+    expect(phone).toMatch(/class="apill"[^>]*data-stale="true"/);
+    expect(phone).toMatch(/class="apill"[^>]*disabled=""/);
+    // Never before the server has said who is there.
+    expect(topbar({ ...down, agents: undefined, phone: true })).not.toContain('apill');
+    expect(topbar({ ...down, phone: false })).toContain('Sin conexión');
+  });
+
   // P1-R2-8: the header said «Sin conexión» for the first seconds of every page load.
   it('never says Sin conexión while the page first connects', () => {
     setLanguage('es');

@@ -41,6 +41,7 @@ export function PickForm({
               className={option === o.letter ? 'opt on' : 'opt'}
               aria-pressed={option === o.letter}
               data-option={o.letter}
+              data-rec={o.recommended ? '' : undefined}
               onClick={() => setOption(o.letter)}
             >
               <b>{o.letter}</b> · {o.name}

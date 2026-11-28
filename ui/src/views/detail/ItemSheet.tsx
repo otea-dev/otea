@@ -688,7 +688,11 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
   const unopenedLine =
     [
       unseen && unseen.unopened > 0
-        ? t('evidence.reader.unopened', { n: unseen.unopened, total: unseen.total })
+        ? t('evidence.reader.unopened', {
+            count: unseen.total,
+            n: unseen.unopened,
+            total: unseen.total,
+          })
         : '',
       deciding && reviewComments.length
         ? t('notes.review.notice', { count: reviewComments.length })

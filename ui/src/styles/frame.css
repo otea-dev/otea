@@ -2,6 +2,10 @@
    pane, the dotted ground, the views that scroll inside it, the FLIP layer and the overlay layer.
    The topbar and the rail place themselves here only; the shell slice styles them. */
 
+/* the top bar's height, for what covers it (the keys' first stops) */
+:root {
+  --bar-h: 60px;
+}
 .app {
   display: grid;
   grid-template-columns: var(--rail-w) minmax(0, 1fr);
