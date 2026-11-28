@@ -259,6 +259,8 @@ export const detail = {
   'evidence.noBefore': 'no before yet',
   'evidence.noAfter': 'no after yet',
   'evidence.alt': '{side}: {alt}',
+  'evidence.broken': 'Could not load {file}',
+  'evidence.retry': 'Try again',
   'evidence.howToCompare': 'How to compare',
   'tech.title': 'Technical details',
   'tech.notices': { one: '{count} notice', other: '{count} notices' },

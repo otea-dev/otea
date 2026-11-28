@@ -15,6 +15,7 @@ import type { Evidence } from '../../types.ts';
 import { stepWithArrows } from './arrows.ts';
 import { FileMeta } from './FileMeta.tsx';
 import { ItemReview } from './item-evidence.ts';
+import { Pic } from './Pic.tsx';
 
 function altOf(evidence: Evidence): string {
   return evidence.caption ?? evidence.filename;
@@ -45,7 +46,13 @@ export function ImageSingle({ evidence }: { evidence: Evidence }) {
   return (
     <figure className="ev-figure">
       <div className="ev-stage well">
-        <img className="ev-img ev-set" src={fileUrl(evidence)} alt={altOf(evidence)} {...tall} />
+        <Pic
+          className="ev-img ev-set"
+          src={fileUrl(evidence)}
+          alt={altOf(evidence)}
+          name={evidence.filename}
+          {...tall}
+        />
       </div>
       <figcaption>
         <FileMeta evidence={evidence} />
@@ -120,11 +127,12 @@ export function ImageGallery({ evidence, label }: { evidence: Evidence[]; label:
       onKeyDown={many ? onKeyDown : undefined}
     >
       <div className="ev-stage well">
-        <img
+        <Pic
           key={current.id}
           className="ev-img ev-set"
           src={fileUrl(current)}
           alt={altOf(current)}
+          name={current.filename}
         />
         {many ? (
           <>
@@ -219,7 +227,12 @@ function Framed({ evidence, label }: { evidence: Evidence; label: string }) {
     <figure className="ev-frame">
       <span className="ev-tag out">{label}</span>
       <div className="ev-stage well">
-        <img className="ev-img" src={fileUrl(evidence)} alt={sideAlt(label, evidence)} />
+        <Pic
+          className="ev-img"
+          src={fileUrl(evidence)}
+          alt={sideAlt(label, evidence)}
+          name={evidence.filename}
+        />
       </div>
       <figcaption>
         <FileMeta evidence={evidence} />

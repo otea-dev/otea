@@ -334,6 +334,18 @@
   gap: 10px;
 }
 
+/* A picture that did not load: its file's name, and the way to ask again, where it should be. */
+.ev-broken {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 8px;
+  min-height: 120px;
+  padding: 12px;
+  text-align: center;
+  color: var(--ink-3);
+}
+
 .ev-missing {
   display: grid;
   place-items: center;

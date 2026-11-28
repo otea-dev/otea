@@ -4,6 +4,7 @@ import { attachFiles } from '../../api.ts';
 import { EvidenceList } from '../../components/EvidenceList.tsx';
 import { EvidenceGaps } from '../../components/evidence/EvidenceGaps.tsx';
 import { EvidenceModule } from '../../components/evidence/EvidenceModule.tsx';
+import { Pic } from '../../components/evidence/Pic.tsx';
 import { OptionsModule } from '../../components/OptionsModule.tsx';
 import { RoundsModule } from '../../components/RoundsModule.tsx';
 import { agoText } from '../../derive/when.ts';
@@ -457,9 +458,13 @@ function Figures({ images }: { images: Evidence[] }) {
     <div className={shown.length === 1 ? 'figs one' : 'figs'}>
       {shown.map((e) => (
         <figure key={e.id}>
-          <a href={url(e)} target="_blank" rel="noreferrer">
-            <img src={url(e)} alt={e.caption ?? e.filename} loading="lazy" />
-          </a>
+          <Pic
+            src={url(e)}
+            opens={url(e)}
+            alt={e.caption ?? e.filename}
+            name={e.filename}
+            loading="lazy"
+          />
           <figcaption>
             <b>{kicker(e)}</b>
             {e.caption ?? e.filename}

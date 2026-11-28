@@ -71,6 +71,7 @@ import { draftWaitsOf } from '../views/detail/moves.ts';
 import { threadOf } from '../views/detail/notes.ts';
 import { askPick } from '../views/detail/pick-intent.ts';
 import { BlindPick, type ReaderNote } from './evidence/EvidenceViewer.tsx';
+import { Pic } from './evidence/Pic.tsx';
 import { NoteText } from './NoteText.tsx';
 import {
   arriveUnder,
@@ -145,9 +146,10 @@ export function Figures({
           const side = sideWord(e, blind);
           return (
             <figure key={e.id}>
-              <img
+              <Pic
                 src={evidenceFileUrl(e.id)}
                 alt={e.caption ?? e.filename}
+                name={e.filename}
                 loading="lazy"
                 draggable={false}
               />
