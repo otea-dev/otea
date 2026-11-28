@@ -56,6 +56,11 @@ export const afterHold = (left: number): number => Math.max(RESUME, left);
 const isCalm = (): boolean =>
   reduced() || (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches);
 
+// How long a notice that goes with a toast stands, for this person now: the one rule, for whatever
+// says the same thing as its toast (the bulk tray's receipt).
+export const noticeDwell = (o: Pick<ToastOptions, 'undo' | 'action'>): number =>
+  dwellFor(o, isCalm());
+
 // The key that goes to the toast's move from wherever the focus is (the toast stands at the end of
 // the page, past the rail and the thread). Alt+Shift+Z: «Z» for Deshacer, and no text box or
 // browser menu owns it.

@@ -283,7 +283,7 @@ export const board = {
   'boardView.tray.movingTo': 'Moving to {state}, one at a time:',
   'boardView.tray.ofTotal': 'of {total}',
   'boardView.tray.receipt': { one: '{count} item → {state}.', other: '{count} items → {state}.' },
-  'boardView.tray.closesIn': 'This notice closes in 6 s.',
+  'boardView.tray.closesIn': 'This notice closes in {s} s.',
   'boardView.tray.toast': {
     one: 'You moved {count} item → {state}.',
     other: 'You moved {count} items → {state}.',

@@ -297,7 +297,7 @@ export const board = {
   'boardView.tray.movingTo': 'Moviendo a {state}, de uno en uno:',
   'boardView.tray.ofTotal': 'de {total}',
   'boardView.tray.receipt': { one: '{count} ítem → {state}.', other: '{count} ítems → {state}.' },
-  'boardView.tray.closesIn': 'Este aviso se cierra en 6 s.',
+  'boardView.tray.closesIn': 'Este aviso se cierra en {s} s.',
   'boardView.tray.toast': {
     one: 'Moviste {count} ítem → {state}.',
     other: 'Moviste {count} ítems → {state}.',
