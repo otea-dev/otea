@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppTestProvider } from '../app/context.tsx';
+import type { SecretaryView } from '../conversation.ts';
 import { setLanguage } from '../i18n/i18n.ts';
-import type { Pending } from '../pending.ts';
 import { testApp } from '../shell/test-app.ts';
 import { type Mounted, mount, settle } from '../test-dom.tsx';
 import { NoteCapture } from './NoteCapture.tsx';
@@ -19,25 +19,21 @@ afterEach(() => {
   setLanguage('en');
 });
 
-const pending = (secretary: Pending['secretary']): Pending => ({
-  count: 0,
-  entries: [],
-  blocks: [],
-  queues: [],
-  secretary,
-});
-
-async function hintWith(p: Pending | undefined): Promise<string> {
-  return (await shown(p)).hint;
+async function hintWith(secretary: SecretaryView | null | undefined): Promise<string> {
+  return (await shown(secretary)).hint;
 }
 
-async function shown(p: Pending | undefined): Promise<{ hint: string; placeholder: string }> {
+// `secretary`: the one the desk holds (app.secretary): null, the project has none; undefined, not
+// read yet.
+async function shown(
+  secretary: SecretaryView | null | undefined,
+): Promise<{ hint: string; placeholder: string }> {
   page = mount(
     <AppTestProvider
       value={testApp({
         project: { id: 'p1', name: 'P', icon: null },
         canCapture: true,
-        pending: p,
+        secretary,
       })}
     >
       <NoteCapture onSent={() => undefined} />
@@ -52,7 +48,7 @@ async function shown(p: Pending | undefined): Promise<{ hint: string; placeholde
 
 describe('what a quick note says it will do', () => {
   it('says the note waits in the Bandeja and that a refiner takes it once one runs, with no secretary', async () => {
-    const { hint, placeholder } = await shown(pending(null));
+    const { hint, placeholder } = await shown(null);
     expect(hint).toContain('Bandeja');
     expect(hint).toMatch(/no hay secretario/i);
     expect(hint).toContain('refinador');
@@ -62,9 +58,13 @@ describe('what a quick note says it will do', () => {
   });
 
   it('keeps the plain promise while a secretary is declared, or before it is known', async () => {
-    const withOne = await hintWith(
-      pending({ name: 'sec', state: 'listening', since: null, waiting: { count: 0, since: null } }),
-    );
+    const withOne = await hintWith({
+      name: 'sec',
+      state: 'listening',
+      since: null,
+      pending: 0,
+      waiting: { count: 0, since: null, messages: 0, notes: 0, reports: 0 },
+    });
     expect(withOne).toContain('tu secretario lo convierte');
     page?.unmount();
     expect(await hintWith(undefined)).toContain('tu secretario lo convierte');

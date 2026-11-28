@@ -84,8 +84,9 @@ describe('the rail', () => {
   it('lists each board with its icon, yours over open, and a + for a new item in it', () => {
     const html = rail();
     expect(html).toContain('<div class="rail-label">tableros</div>');
+    // What waits on the board is what Te toca counts: its item on your turn and the one stuck.
     expect(html).toMatch(
-      /Errores<\/span><span class="pair"[^>]*><span class="n you"><span class="nv" data-v="1">1<\/span><\/span> \/ <span class="n"><span class="nv" data-v="3">3/,
+      /Errores<\/span><span class="pair"[^>]*><span class="n you"><span class="nv" data-v="2">2<\/span><\/span> \/ <span class="n"><span class="nv" data-v="3">3/,
     );
     expect(html).toContain('aria-label="Nuevo ítem en Errores"');
     expect(html).toContain('Nuevo tablero');
@@ -95,14 +96,14 @@ describe('the rail', () => {
   // folded or not.
   it('says what a board’s pair counts when you rest on its row', () => {
     expect(rail()).toMatch(
-      /data-k="board:Errores" data-tip="Errores · Te toca: 1 · Abiertos: 3" data-tip-more=""/,
+      /data-k="board:Errores" data-tip="Errores · Te toca: 2 · Abiertos: 3" data-tip-more=""/,
     );
     setLanguage('en');
     const en = renderIn(
       testApp({ all, collections: [board('Errores', 'bug'), board('Criaturas', 'paw')] }),
       createElement(Rail),
     );
-    expect(en).toContain('data-tip="Errores · Your turn: 1 · Open: 3" data-tip-more=""');
+    expect(en).toContain('data-tip="Errores · Your turn: 2 · Open: 3" data-tip-more=""');
     // Te toca and Atasco count one thing each: their rows name it, and say nothing more.
     expect(rail()).toMatch(/data-k="toca" data-tip="Te toca">/);
   });

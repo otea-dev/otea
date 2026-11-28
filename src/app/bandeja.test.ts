@@ -152,7 +152,13 @@ describe('the Bandeja', () => {
       const first = captureToBandeja(project, { text: 'one' }).entry;
       captureToBandeja(project, { text: 'two' });
       postPersonMessage(project, { text: 'hello' });
-      expect(secretaryWaiting(project.db)).toEqual({ count: 3, since: expect.any(String) });
+      expect(secretaryWaiting(project.db)).toEqual({
+        count: 3,
+        since: expect.any(String),
+        messages: 1,
+        notes: 2,
+        reports: 0,
+      });
       // The oldest of what waits.
       expect(secretaryWaiting(project.db).since).toBe(first.at);
 
