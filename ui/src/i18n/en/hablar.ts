@@ -77,6 +77,7 @@ export const hablar = {
   'hablar.picture': 'Open {name}',
   'hablar.pictureClose': 'Close',
   'hablar.file': 'Download {name}',
+  'hablar.fileRead': 'Read {name}',
   'hablar.st.working': 'working',
   'hablar.st.queued': 'queued',
   'hablar.st.waiting': 'waiting',

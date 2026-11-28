@@ -80,6 +80,7 @@ export const hablar = {
   'hablar.picture': 'Abrir {name}',
   'hablar.pictureClose': 'Cerrar',
   'hablar.file': 'Descargar {name}',
+  'hablar.fileRead': 'Leer {name}',
   'hablar.st.working': 'en curso',
   'hablar.st.queued': 'en cola',
   'hablar.st.waiting': 'en espera',

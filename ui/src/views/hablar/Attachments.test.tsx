@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { act } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setLanguage } from '../../i18n/i18n.ts';
 import { type Mounted, mount, press, settle } from '../../test-dom.tsx';
 import { Attachments } from './Attachments.tsx';
@@ -39,6 +39,47 @@ const tab = async (from: Element, shift = false) => {
   });
   return event.defaultPrevented;
 };
+
+// D-774400 (field study s-real): the release note and the test steps the secretary sent as .md files
+// only offered «Descargar», and a person on the desk could not read them. A Markdown file opens in
+// a reader on the page, formatted; the download stays one tap away.
+describe('a Markdown file the secretary sent', () => {
+  const note = {
+    id: 9,
+    name: 'nota-de-version.md',
+    contentType: 'text/markdown',
+    kind: 'file',
+    size: 80,
+    sha256: '',
+  } as const;
+
+  it('opens formatted in a dialog, and keeps its download', async () => {
+    vi.stubGlobal('fetch', async () => new Response('# Versión 0.8\n\n- Hablar\n- Bandeja\n'));
+    page = mount(<Attachments files={[note]} />);
+
+    await press(document.querySelector('.hb-file'));
+    await settle();
+
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog?.querySelector('h1')?.textContent).toBe('Versión 0.8');
+    expect([...(dialog?.querySelectorAll('li') ?? [])].map((li) => li.textContent)).toEqual([
+      'Hablar',
+      'Bandeja',
+    ]);
+    const download = dialog?.querySelector<HTMLAnchorElement>('a[download]');
+    expect(download?.getAttribute('download')).toBe('nota-de-version.md');
+    expect(download?.textContent).toBe('Descargar');
+    vi.unstubAllGlobals();
+  });
+
+  it('leaves another file as a download chip', () => {
+    page = mount(
+      <Attachments files={[{ ...note, name: 'hoja.xlsx', contentType: 'application/zip' }]} />,
+    );
+
+    expect(document.querySelector('a.hb-file[download]')).not.toBeNull();
+  });
+});
 
 describe('a picture opened large', () => {
   it('is a dialog named for the picture, with a visible way to close it that takes the focus', async () => {

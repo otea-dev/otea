@@ -1255,9 +1255,18 @@ button.hb-chip:hover {
   border-radius: 8px;
 }
 /* the way out of an enlarged picture: always under it, so a keyboard has a stop to close from */
-.dialog.hb-big .hb-big-x {
-  display: block;
+.dialog.hb-big .hb-big-bar {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
   margin: 12px auto 0;
+}
+/* a Markdown file the secretary sent, read in the same dialog: it scrolls, the bar stays under it */
+.dialog.hb-big .hb-read {
+  max-height: calc(100dvh - 200px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  text-align: start;
 }
 
 /* ───────── the composer ───────── */
