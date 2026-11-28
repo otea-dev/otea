@@ -590,6 +590,26 @@ describe('the role prompts', () => {
       }
     });
 
+    // Pilot 1 (a1): the secretary recommended screenshots to a blind person. The pictures of the
+    // product are the worker's evidence; the person is never asked for them.
+    it(`has the secretary and the worker never ask the person for screenshots of the product (${lang})`, () => {
+      const never =
+        lang === 'es'
+          ? /Nunca me pidas que tome, envíe ni aporte capturas del producto/
+          : /Never ask me to take, send or provide screenshots of the product/;
+      const secretary = rolePrompt('secretary', lang, { name: 'ana' });
+      const worker = rolePrompt('worker', lang, { board: 'Cambios', name: 'ana' });
+      expect(secretary).toMatch(never);
+      expect(worker).toMatch(never);
+      // …and it says whose they are: the worker takes them and attaches them with otea.
+      expect(worker).toContain('`otea attach`');
+      expect(secretary).toMatch(lang === 'es' ? /evidencia del trabajador/ : /worker's evidence/);
+      // A board with no code keeps the rule too (its text has no worktree).
+      expect(rolePrompt('worker', lang, { board: 'Notas', name: 'ana', code: false })).toMatch(
+        never,
+      );
+    });
+
     // Field study 3 (S1 P2): a remote added after init reached the person as a technical question.
     it(`has the worker put the remote-added question to the person in plain words, with options (${lang})`, () => {
       const text = rolePrompt('worker', lang, { board: 'Cambios', name: 'ana' });
