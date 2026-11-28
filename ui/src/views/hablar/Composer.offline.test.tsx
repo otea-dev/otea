@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { act } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppTestProvider } from '../../app/context.tsx';
 import { setLanguage } from '../../i18n/i18n.ts';
 import { ToastHost } from '../../kit/pop/toast.tsx';
@@ -58,6 +58,46 @@ describe('Enter while the connection is cut', () => {
   it('says nothing for an Enter on an empty box', async () => {
     const box = await mountOffline(true);
     await enter(box);
+    expect(said()).toBe('');
+  });
+});
+
+// The page does not always know the connection is cut: the send goes, fails, and the box says so on
+// the line under it, which a small window (or a zoomed one) keeps below its fold. A notice over the
+// page says it where it can be seen; where the line is in sight, it is not said twice.
+describe('Enter when the send fails', () => {
+  const lineAt = (bottom: number) =>
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const at = this.classList.contains('hb-err') ? bottom : 0;
+      return { top: at - 20, bottom: at, left: 0, right: 0, width: 0, height: 20 } as DOMRect;
+    });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+  const failing = async () => {
+    vi.stubGlobal('fetch', async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    const box = await mountOffline(false);
+    await typeInto(box, 'Cambia el precio del olivo');
+    await enter(box);
+    await settle();
+  };
+
+  it('says it was not sent over the page when the line under the box is out of sight', async () => {
+    lineAt(window.innerHeight + 400);
+    await failing();
+    expect(page?.root.querySelector('.hb-err')).not.toBeNull();
+    expect(said()).toMatch(/no se envió/i);
+  });
+
+  it('keeps to the line under the box when it is in sight', async () => {
+    lineAt(window.innerHeight - 40);
+    await failing();
+    expect(page?.root.querySelector('.hb-err')).not.toBeNull();
     expect(said()).toBe('');
   });
 });
