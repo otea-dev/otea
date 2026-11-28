@@ -2886,16 +2886,19 @@ function noteHarnessOfOwner(
 ): void {
   if (!workerHarnessUnknown(project, input)) return;
   const me = input.actor.name;
-  void Promise.all([owner.harness, owner.harnessKnown, owner.harnessStarted]).then(
-    ([pid, known, started]) => {
-      if (pid === undefined || pid === process.pid) return;
-      try {
-        noteHarness(project.db, me, pid, systemClock, known, started);
-      } catch {
-        // The wait ended and closed the project first: nothing left to note it for.
-      }
-    },
-  );
+  void Promise.all([
+    owner.harness,
+    owner.harnessKnown,
+    owner.harnessStarted,
+    owner.harnessAbove,
+  ]).then(([pid, known, started, above]) => {
+    if (pid === undefined || pid === process.pid) return;
+    try {
+      noteHarness(project.db, me, pid, systemClock, known, started, processAlive, above);
+    } catch {
+      // The wait ended and closed the project first: nothing left to note it for.
+    }
+  });
 }
 
 async function lookUpWorkerHarness(input: Input, me: string): Promise<void> {
@@ -2947,21 +2950,25 @@ async function waitForSecretary(input: Input): Promise<Output> {
   };
   const result = await withAgentWhile(input, async (project) => {
     requireSecretary(project.db, me);
-    const noted = Promise.all([owner.harness, owner.harnessKnown, owner.harnessStarted]).then(
-      ([pid, known, started]) => {
-        if (pid === undefined || pid === process.pid) return;
-        try {
-          // A harness known by name is the session at once; any other process is a candidate until
-          // a second wait finds it too (it may be an intermediary that ends with its command).
-          if (!noteHarness(project.db, me, pid, systemClock, known, started)) {
-            lostToAnother = true;
-            lost.abort();
-          }
-        } catch {
-          // The wait ended and closed the project first: nothing left to note it for.
+    const noted = Promise.all([
+      owner.harness,
+      owner.harnessKnown,
+      owner.harnessStarted,
+      owner.harnessAbove,
+    ]).then(([pid, known, started, above]) => {
+      if (pid === undefined || pid === process.pid) return;
+      try {
+        // A harness known by name is the session at once; any other process is a candidate until
+        // a second wait finds it too (it may be an intermediary that ends with its command). One
+        // that stands below the harness noted is that session's own (D-6f56ce).
+        if (!noteHarness(project.db, me, pid, systemClock, known, started, processAlive, above)) {
+          lostToAnother = true;
+          lost.abort();
         }
-      },
-    );
+      } catch {
+        // The wait ended and closed the project first: nothing left to note it for.
+      }
+    });
     // A board the person publishes while it waits joins the catalog before the check reads its items.
     const secretaryWait = startSecretaryWait();
     const look = () => {

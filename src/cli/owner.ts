@@ -146,6 +146,24 @@ export function harnessOf(rows: readonly ProcessRow[], start: number): number | 
   return undefined;
 }
 
+// The processes above `pid`, nearest first, as far as the table's parent links can be trusted: a
+// parent that started after its child is a process id handed out again, not the child's parent, and
+// the walk stops there.
+export function ancestorsOf(rows: readonly ProcessRow[], pid: number): number[] {
+  const byPid = new Map(rows.map((row) => [row.pid, row]));
+  const above: number[] = [];
+  let row = byPid.get(pid);
+  while (row && above.length < 64) {
+    const parent = byPid.get(row.parent);
+    if (!parent || parent.pid === pid || above.includes(parent.pid)) break;
+    if (row.started !== undefined && parent.started !== undefined && parent.started > row.started)
+      break;
+    above.push(parent.pid);
+    row = parent;
+  }
+  return above;
+}
+
 // The agent harnesses Otea knows by name: a process that is one (or node running one) is the
 // session itself, never an intermediary that ends with its command (bwrap, docker exec, ssh,
 // wsl.exe, script). Its first find is trusted at once; an unknown process needs two waits.
@@ -382,6 +400,9 @@ export type OwnerWatch = {
   harnessKnown: Promise<boolean>;
   // When that process started (epoch ms), when the system says.
   harnessStarted: Promise<number | undefined>;
+  // The processes above that harness that the table's parent links vouch for (ancestorsOf): the
+  // session noted for the agent may be one of them.
+  harnessAbove: Promise<number[]>;
   // Ends an early listing still running (a watch started with `early` leaves it to its caller).
   release: () => void;
 };
@@ -419,6 +440,7 @@ export function watchOwner(
   const harness = Promise.withResolvers<number | undefined>();
   const known = Promise.withResolvers<boolean>();
   const started = Promise.withResolvers<number | undefined>();
+  const above = Promise.withResolvers<number[]>();
   const look = () => {
     if (listed) return;
     listed = true;
@@ -428,6 +450,7 @@ export function watchOwner(
       harness.resolve(pid);
       known.resolve(table !== undefined && pid !== undefined && isKnownHarness(table.rows, pid));
       started.resolve(table?.rows.find((row) => row.pid === pid)?.started);
+      above.resolve(table ? ancestorsOf(table.rows, start) : []);
     });
   };
   const timer = setInterval(() => {
@@ -445,6 +468,7 @@ export function watchOwner(
     harness.resolve(undefined);
     known.resolve(false);
     started.resolve(undefined);
+    above.resolve([]);
   };
   const stop = () => {
     clearInterval(timer);
@@ -463,6 +487,7 @@ export function watchOwner(
     harness: harness.promise,
     harnessKnown: known.promise,
     harnessStarted: started.promise,
+    harnessAbove: above.promise,
     release,
   };
 }

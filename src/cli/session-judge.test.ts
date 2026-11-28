@@ -33,6 +33,31 @@ describe('the verdict on a caller read from the processes', () => {
     expect(judgeCaller(mcp, callerIn(rows, 999)).verdict).toBe('other');
   });
 
+  // D-6f56ce: the secretary's own wait was refused as «another session» and the secretary, told so,
+  // retired. A process of the harness that is a harness itself (claude below claude) holds the
+  // command: its first harness is not the noted one, but the noted one is above it.
+  it('takes a command under a harness the noted one started for the same session', () => {
+    const nested: ProcessRow[] = [
+      ...rows,
+      { pid: 170, parent: 100, name: 'claude', started: 1_050_000 },
+      { pid: 175, parent: 170, name: 'bash' },
+      { pid: 180, parent: 175, name: 'node', started: 1_060_000 },
+    ];
+    expect(judgeCaller(cli, callerIn(nested, 175)).verdict).toBe('bound');
+    expect(judgeCaller(mcp, callerIn(nested, 175)).verdict).toBe('bound');
+  });
+
+  // The noted session does not cover whatever started later under a process id it never had: a
+  // parent that started after its child is a process id handed out again, not an ancestor.
+  it('does not take a harness for the session through a process id handed out again', () => {
+    const recycled: ProcessRow[] = [
+      { pid: 100, parent: 1, name: 'claude', started: 1_000_000 },
+      { pid: 170, parent: 100, name: 'claude', started: 3_000_000 },
+      { pid: 175, parent: 170, name: 'bash', started: 2_000_000 },
+    ];
+    expect(judgeCaller(cli, callerIn(recycled, 175)).verdict).toBe('other');
+  });
+
   it('lets a command through, unverified, only when nothing can be checked', () => {
     expect(judgeCaller(cli, undefined).verdict).toBe('unverified');
     // The harness an MCP server was started by is not listed: it cannot be resolved either.

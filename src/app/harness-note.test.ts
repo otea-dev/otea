@@ -30,4 +30,21 @@ describe('the harness noted for an agent', () => {
     expect(selectListenerProcesses(db).get('sol')?.harnessStarted).toBe(1_700_000_100_000);
     db.close();
   });
+
+  // D-6f56ce: a wait that runs under a harness the noted one started is the same session: it is
+  // not a loser (the secretary's wait ended with «runs in another session» and it retired), and it
+  // does not take the binding from the harness above it.
+  it('takes a wait under a harness the noted one started for the same session', () => {
+    const db = agentWith();
+    noteHarness(db, 'sol', 100, at, true, 1_700_000_000_000, () => true);
+
+    const same = noteHarness(db, 'sol', 170, at, true, 1_700_000_050_000, () => true, [100, 1]);
+    expect(same).toBe(true);
+    expect(noted(db)).toBe(100);
+
+    // Not one that merely lives beside it.
+    expect(noteHarness(db, 'sol', 300, at, true, 1_700_000_100_000, () => true, [1])).toBe(false);
+    expect(noted(db)).toBe(100);
+    db.close();
+  });
 });

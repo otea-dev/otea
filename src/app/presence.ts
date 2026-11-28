@@ -238,6 +238,9 @@ export function noteHarness(
   // When that process started (epoch ms), kept with its id.
   started?: number,
   alive: (pid: number) => boolean = processAlive,
+  // The processes above this harness: the one noted among them is the session this harness is a
+  // part of (a helper it started), so this wait is the session's, not another's.
+  above: readonly number[] = [],
 ): boolean {
   // Read and written under one lock: sessions that start together under one name (four waits at
   // once) must find one winner, not each its own turn at an empty binding.
@@ -247,7 +250,11 @@ export function noteHarness(
     // refused at its acts (cli/session-guard.ts). A new session takes over once that one is gone.
     // Says whether this harness is the one noted: false for the session that lost.
     const bound = selectListenerProcesses(db).get(agent)?.harness ?? null;
-    if (bound !== null && bound !== pid && alive(bound)) return false;
+    if (bound !== null && bound !== pid && alive(bound)) {
+      if (!above.includes(bound)) return false;
+      beatProcess(db, bound, now);
+      return true;
+    }
     saveHarness(db, agent, pid, known, started);
     beatProcess(db, pid, now);
     // The secretary's session is another one: the messages the earlier sessions read and left

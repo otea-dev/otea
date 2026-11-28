@@ -6,7 +6,7 @@ import { type Noted, notedSession, type SessionVerdict, sameStart } from '../app
 import { OteaError } from '../core/errors.ts';
 import { findItem, forgetHarness } from '../store/queries.ts';
 import type { Command, Input } from './command.ts';
-import { harnessOf, isKnownHarness, listProcesses, type ProcessRow } from './owner.ts';
+import { ancestorsOf, harnessOf, isKnownHarness, listProcesses, type ProcessRow } from './owner.ts';
 import { STARTED_BY } from './started-by.ts';
 
 // An agent name proves nothing: `otea say "..." --as <the secretary>` from any process spoke as it
@@ -81,6 +81,8 @@ type Caller = {
   started: number | undefined;
   known: boolean;
   rows: ProcessRow[];
+  // The process that started the command, from which the harness was found.
+  start: number;
 };
 
 // The caller, from the processes read; the harness is none when the table does not reach one.
@@ -91,6 +93,7 @@ export function callerIn(rows: ProcessRow[], startedBy: number): Caller {
     started: pid === undefined ? undefined : rows.find((row) => row.pid === pid)?.started,
     known: pid !== undefined && isKnownHarness(rows, pid),
     rows,
+    start: startedBy,
   };
 }
 
@@ -174,7 +177,13 @@ export function judgeCaller(
   if (noted.kind === 'cli' && !sameStart(noted.started, row.started)) {
     return { verdict: 'gone', harness: bound };
   }
-  return { verdict: caller.pid === bound ? 'bound' : 'other' };
+  // A harness the noted one started (a helper of the same session) is the session; so is a command
+  // under the noted harness itself. Only what stands below it, by parent links that hold: another
+  // session's harness is never an ancestor of the noted one's command, nor of an orphan's.
+  const inside =
+    caller.pid !== undefined &&
+    (caller.pid === bound || ancestorsOf(caller.rows, caller.start).includes(bound));
+  return { verdict: inside ? 'bound' : 'other' };
 }
 
 // Throws when the command acts under a name bound to another session; otherwise notes what it
