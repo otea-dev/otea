@@ -1,12 +1,63 @@
 import { getItem } from '../app/items.ts';
 import { liveBoardOf } from '../app/next.ts';
 import type { Project } from '../app/project.ts';
-import { approvedTipOf } from '../app/tips.ts';
+import { approvedTipOf, type Tip } from '../app/tips.ts';
 import { isClosed, positionOf } from '../core/board/engine.ts';
 import { DONE, guardedBranch } from '../core/board/model.ts';
-import { type LocalBehind, localBehind } from './gitrepo.ts';
+import { fastForward, isAncestor, type LocalBehind, landsExactly, localBehind } from './gitrepo.ts';
 
 export type { LocalBehind };
+
+// A repo with no remote has nowhere to push to, so what the person approved lands by bringing their
+// base up to the commit the worker named: the item's branch, with the base merged into it when the
+// base moved on. Done here with the checks of `otea land sync` (only a fast-forward, only a
+// checkout that is on the base with no change to a tracked file and no file of its own in the way)
+// and only for a commit that holds exactly what the person approved. The refusal, in plain words,
+// is what the item waits on; undefined once the base holds the commit.
+export function landOnBase(
+  checkout: string,
+  id: string,
+  base: string,
+  branch: string,
+  commits: readonly string[],
+  approved?: Tip,
+): string | undefined {
+  const refused = `${id} not handed off:`;
+  const target = commits.find((commit) =>
+    commits.every((each) => isAncestor(checkout, each, commit)),
+  );
+  if (target === undefined) {
+    return `${refused} the commits it names are not one line of work: write the hash of the last commit of ${branch} (git rev-parse --short HEAD in your worktree).`;
+  }
+  if (!landsExactly(checkout, target, base, branch, approved)) {
+    return `${refused} ${target.slice(0, 7)} would not make ${base} hold exactly what the person approved of ${branch}${approved ? ` (${approved.commit.slice(0, 7)})` : ''}: it brings in changes nobody reviewed, or a merge whose conflicts the review never saw, so ${base} was not moved. Land the approved commit as it is, or with ${base} merged into ${branch} and nothing else; for anything else take ${id} back to the step before this one so it is reviewed again.`;
+  }
+  const behind = localBehind(checkout, base, target);
+  if (behind === undefined) return undefined;
+  const to = target.slice(0, 7);
+  const waits = (why: string): string =>
+    `${refused} ${why} Do not merge, pull or switch branches there yourself: tell the person what blocks it (otea ask ${id} "<what blocks it>"), and once it is clear hand off again and ${base} moves up to ${to}. The item waits in this step.`;
+  const where = `your folder (${behind.checkout})`;
+  if (behind.state === 'changes') {
+    return waits(
+      `${where} has changes of its own to tracked files, so ${base} was left where it is (nothing is pushed: this repository has no remote).`,
+    );
+  }
+  if (behind.state === 'elsewhere') {
+    return waits(
+      `${where} is on ${behind.on ?? 'another branch'}, not on ${base}, so ${base} was left where it is.`,
+    );
+  }
+  if (behind.state === 'collides') {
+    return waits(
+      `${behind.paths?.join(', ') ?? 'a file'} would replace ${behind.paths?.length === 1 ? 'a file' : 'files'} you keep out of git in ${where}, so ${base} was left where it is.`,
+    );
+  }
+  if (!fastForward(behind)) {
+    return waits(`${where} changed while ${base} was being moved, so it was left where it is.`);
+  }
+  return undefined;
+}
 
 // The commit a hash field names: its first word that reads as one.
 const HASH = /^[0-9a-f]{7,64}$/i;

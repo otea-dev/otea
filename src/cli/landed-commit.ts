@@ -251,6 +251,10 @@ function notItsOwn(
 // person approved (the approved commit in its history, or all it changes in the commit, as a rebase
 // or a squash leaves it), so an older commit of the base, such as git rev-parse origin/main before
 // any push, is no proof. When the remote cannot be reached it fails closed. Never throws.
+//
+// With no remote and `ahead` given, a commit the local base lacks but that has the base in its
+// history (the item's branch, with the base merged into it) counts too, and its full id is added to
+// `ahead`: nothing is pushed there, so the caller brings the base up to it once every check passed.
 export function landedCommitRefusal(
   cwd: string,
   name: string,
@@ -258,6 +262,7 @@ export function landedCommitRefusal(
   base: string,
   approved?: ApprovedWork,
   own: Ownership = { landed: [] },
+  ahead?: string[],
 ): string | undefined {
   const words = [...new Set((value.match(HASH) ?? []).map((id) => id.toLowerCase()))];
   const said = `${name} says "${value.trim().slice(0, 60)}"`;
@@ -306,7 +311,17 @@ export function landedCommitRefusal(
         return `${name}: this checkout has no ${base}, so ${word} cannot be one of its commits.`;
       }
       if (!holds(cwd, local, full)) {
-        return `${name}: commit ${word} is not in ${base}. Write the hash of a commit that is (git rev-parse --short ${base}).`;
+        // Nowhere to push to: the base moves up to a commit that has it in its history, and the
+        // caller brings it there once every check passed.
+        if (ahead !== undefined && holds(cwd, full, local)) {
+          ahead.push(full);
+          continue;
+        }
+        const moved =
+          ahead === undefined || holds(cwd, full, local)
+            ? ''
+            : ` If ${base} moved on after the branch was made, merge ${base} into the branch in your worktree (git merge ${base}), write the hash of the commit that results (git rev-parse --short HEAD) and hand off again; if that merge conflicts, take the item back to the step before this one so the resolution is reviewed.`;
+        return `${name}: commit ${word} is not in ${base}. Write the hash of a commit that is (git rev-parse --short ${base}).${moved}`;
       }
       continue;
     }

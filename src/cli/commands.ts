@@ -361,7 +361,7 @@ import {
   removeGitHook,
 } from './hooks.ts';
 import { baseTipsOf, landedCommitRefusal } from './landed-commit.ts';
-import { type LocalBehind, localBehindOf, localBehindText } from './local-behind.ts';
+import { type LocalBehind, landOnBase, localBehindOf, localBehindText } from './local-behind.ts';
 import { longPathNote } from './long-path.ts';
 import { mergedOutside, mergedOutsideLine } from './merged-outside.ts';
 import { boardsOf, eventData, itemCollections, itemData, readableEvent } from './names.ts';
@@ -2104,8 +2104,14 @@ function refuseUnlandedCommit(project: Project, cwd: string, move: BoardMoveInpu
   const firstTips = item.events.find(({ type }) => type === 'claimed')?.data.baseTips;
   const claimTips = Array.isArray(firstTips) ? (firstTips as string[]) : undefined;
   const own = { landed, ...(claimTips ? { claimTips } : {}) };
-  const refused = landedCommitRefusal(cwd, part.name, value, base, approved, own);
+  // With no remote the commit may be the item's branch, which the person's base is then brought up
+  // to (landOnBase), once every check passed.
+  const ahead: string[] = [];
+  const refused = landedCommitRefusal(cwd, part.name, value, base, approved, own, ahead);
   if (refused) throw new OteaError('missing_fields', `${item.id} not handed off: ${refused}`);
+  if (ahead.length === 0) return;
+  const waits = landOnBase(project.root, item.id, base, branch, ahead, tip);
+  if (waits) throw new OteaError('missing_fields', waits);
 }
 
 // A board with no branch to protect (a text, a document: it lands nowhere) closes a piece only when

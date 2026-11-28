@@ -254,6 +254,20 @@ function landsAs(
   return tree !== undefined && tree === treeOf(cwd, tip);
 }
 
+// Whether `commit` holds exactly what the person approved of `branch` (at `approved`, else as the
+// branch stands), merged onto the local `base`: the approved commit itself, a merge of the base into
+// it, or any commit with the same result. Commits nobody reviewed, or a merge with conflicts, never.
+export function landsExactly(
+  cwd: string,
+  commit: string,
+  base: string,
+  branch: string,
+  approved?: Tip,
+): boolean {
+  const start = commitOf(cwd, `refs/heads/${base}`);
+  return landsAs(cwd, commit, start, [{ branch, ...(approved ? { tip: approved } : {}) }]);
+}
+
 // Runs git, giving back its output, or when it failed the first error line it wrote to stderr.
 function tried(cwd: string, ...args: string[]): { out: string } | { error: string } {
   try {
@@ -537,7 +551,7 @@ function configured(cwd: string, key: string): string | undefined {
   }
 }
 
-function isAncestor(cwd: string, ancestor: string, of: string): boolean {
+export function isAncestor(cwd: string, ancestor: string, of: string): boolean {
   try {
     git(cwd, 'merge-base', '--is-ancestor', ancestor, of);
     return true;
