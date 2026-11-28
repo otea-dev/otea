@@ -825,6 +825,8 @@ export const detail = {
   'bi.branch.diffOffMore': '{count} más',
   'bi.branch.diffFiles':
     'El diff adjunto no coincide con lo que aterriza. El diff {diff}; lo entregado {landed}. Aprobar aprueba lo entregado, no el diff.',
+  'bi.branch.diffLines':
+    'El diff adjunto es un archivo del agente, no el de la rama: nombra {files} pero muestra otras líneas que las que cambia lo entregado. Aprobar aprueba lo entregado, no el diff.',
   'bi.branch.diffFilesNames': 'nombra {files}',
   'bi.branch.diffFilesNone': 'no nombra ningún archivo',
   'bi.branch.diffFilesChanges': 'cambia {files}',

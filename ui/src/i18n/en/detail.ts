@@ -819,6 +819,8 @@ export const detail = {
   'bi.branch.diffOffMore': '{count} more',
   'bi.branch.diffFiles':
     'The attached diff does not match what lands. The diff {diff}; the work handed off {landed}. Approving approves what was handed off, not the diff.',
+  'bi.branch.diffLines':
+    'The attached diff is the agent’s own file, not the branch’s: it names {files} but shows other lines than the work handed off changes. Approving approves what was handed off, not the diff.',
   'bi.branch.diffFilesNames': 'names {files}',
   'bi.branch.diffFilesNone': 'names no file',
   'bi.branch.diffFilesChanges': 'changes {files}',

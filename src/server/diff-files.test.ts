@@ -122,6 +122,23 @@ describe('GET /api/items/:id/diff-files', () => {
       expect(await mismatch()).toEqual({ diff: ['b.txt', 'z.txt'], landed: ['b.txt', 'c.txt'] });
     });
 
+    // D-492953: the attached diff named the right file and showed other lines (`+Make the buy
+    // button red` for a change that wrote `button.buy { background: red }`): the names matched, so
+    // the desk said nothing and the person approved a diff that is not what lands.
+    it('warns when the diff names the files the work changes but shows other lines', async () => {
+      await handOff(template, branch, () => git('diff', range).replaceAll('+regar', '+invented'));
+      expect(await mismatch()).toEqual({
+        diff: ['b.txt', 'c.txt'],
+        landed: ['b.txt', 'c.txt'],
+        lines: true,
+      });
+    });
+
+    it('does not mind the context lines or the hunk headers around the same changes', async () => {
+      await handOff(template, branch, () => git('diff', '-U8', range));
+      expect(await mismatch()).toBeNull();
+    });
+
     // The persona's case: an empty commit and an invented diff. Both lists are empty, which is
     // still no match for work that changes nothing.
     it('warns when the work changes no file, whatever the diff names', async () => {

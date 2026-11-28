@@ -59,6 +59,18 @@ describe('diffFilesText', () => {
   });
 });
 
+// D-492953: the files match and the lines do not; the warning says the attached file is the agent's.
+describe('diffFilesText of a diff with the right files and other lines', () => {
+  afterEach(() => setLanguage('en'));
+
+  it('says the attached diff is the agent’s own file, in both languages', () => {
+    const off = { diff: ['button.css'], landed: ['button.css'], lines: true as const };
+    expect(diffFilesText(off)).toContain('is the agent’s own file, not the branch’s');
+    setLanguage('es');
+    expect(diffFilesText(off)).toContain('es un archivo del agente, no el de la rama');
+  });
+});
+
 // An empty commit and an invented diff list no file on either side: the warning still says so.
 describe('diffFilesText of work that changes no file', () => {
   afterEach(() => setLanguage('en'));
