@@ -846,6 +846,10 @@ export const detail = {
     '{base} holds commits made after the handoff, which are not part of this item: {list}. Approving approves only what was handed off, {handed}; a push of {base} takes them along.',
   'bi.branch.movedBase':
     '{base} changed after the handoff: it is now at {now}. Approving approves only what was handed off, {handed}.',
+  'bi.branch.waitsFirst':
+    'You approved it. {first} lands first: changes land one at a time, in the order you approved them.',
+  'bi.branch.waitsFirstSame':
+    'You approved it. {first} lands first, and the two change the same files: when it has landed, the agent brings that change in and sends this one back to your review once, for that merge alone.',
   'bi.branch.roundSame':
     'This round holds the same files as round {round} ({earlier}): nothing changed in {branch} since that round. Approving approves what that round already had.',
   'bi.branch.overlapLanding':

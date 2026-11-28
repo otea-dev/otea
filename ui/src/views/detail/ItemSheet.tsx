@@ -83,6 +83,7 @@ import { boardFactsOf, factsOf, standAgentOf, standOf } from './facts.ts';
 import { pressInView, toastOf } from './frame.ts';
 import { History } from './History.tsx';
 import { historyOf } from './history.ts';
+import { landsAfterText } from './lands-after.ts';
 import { useLocalBehind } from './local-behind.ts';
 import { useMergeOnly } from './merge-only.ts';
 import { useMergedOutside } from './merged-outside.ts';
@@ -953,7 +954,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                     item={item.id}
                     overlaps={overlaps}
                     merge={merge}
-                    waits={item.landsAfter?.text}
+                    waits={landsAfterText(item.landsAfter)}
                   />
                 ) : undefined
               }
@@ -963,7 +964,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                 drift,
                 same,
                 merge,
-                waits: item.landsAfter?.text,
+                waits: landsAfterText(item.landsAfter),
                 overlaps,
               })}
               details={<Details cells={cells} k={`${item.state}:${item.updatedAt}`} />}
@@ -1267,7 +1268,7 @@ export function ItemSheet({ item, full, nav, onNav, onFull, onClose }: ItemSheet
                 item={item.id}
                 overlaps={overlaps}
                 merge={merge}
-                waits={item.landsAfter?.text}
+                waits={landsAfterText(item.landsAfter)}
                 plain={plain}
               />
               {block?.request ? (

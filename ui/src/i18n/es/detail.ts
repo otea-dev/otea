@@ -852,6 +852,10 @@ export const detail = {
     '{base} tiene commits hechos después de la entrega, que no son de este ítem: {list}. Aprobar aprueba solo lo entregado, {handed}; subir {base} los sube también.',
   'bi.branch.movedBase':
     '{base} cambió después de la entrega: ahora está en {now}. Aprobar aprueba solo lo entregado, {handed}.',
+  'bi.branch.waitsFirst':
+    'Lo aprobaste. {first} se integra primero: los cambios se integran de uno en uno, en el orden en que los aprobaste.',
+  'bi.branch.waitsFirstSame':
+    'Lo aprobaste. {first} se integra primero y los dos cambian los mismos archivos: cuando se integre, el agente trae ese cambio y este vuelve a tu revisión una vez, solo por esa integración.',
   'bi.branch.roundSame':
     'Esta ronda tiene los mismos archivos que la ronda {round} ({earlier}): no cambió nada en {branch} desde esa ronda. Aprobar aprueba lo que esa ronda ya tenía.',
   'bi.branch.overlapLanding':

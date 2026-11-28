@@ -162,7 +162,7 @@ export const LEAD_CHARS = 140;
 // Words after which a full stop does not end a sentence (e.g., p. ej., etc., vs.), and a bare
 // number: the «1.» of a list item.
 const ABBREVIATIONS =
-  /(?:^|\s)(?:[A-Za-zÁÉÍÓÚáéíóú]|\d+|e\.g|i\.e|ej|etc|vs|sr|sra|dr|dra|aprox|nº)$/i;
+  /(?:^|[\s([{«"“'])(?:[A-Za-zÁÉÍÓÚáéíóú]|\d+|e\.g|i\.e|ej|etc|vs|sr|sra|dr|dra|aprox|nº)$/i;
 
 // Where the first sentence of a line ends: after . ! ? or … followed by a space or the end, and not
 // at an abbreviation. A line with no such end is one sentence.

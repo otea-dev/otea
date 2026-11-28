@@ -143,10 +143,13 @@ describe('Triaje', () => {
     expect(html).not.toContain('## Resumen');
   });
 
-  it('is all caught up when nothing waits for review', () => {
+  // s-real2 D-362fa3: «Todo al día» told the person nothing was left while questions and steps of
+  // their own still waited in Te toca. The end of Triage speaks of the reviews only.
+  it('says the reviews are done when none waits, never that everything is up to date', () => {
     setLanguage('es');
     const html = render(createElement(Triage, {}), fakeApp({ all: items.slice(2) }));
-    expect(html).toContain('Todo al día.');
+    expect(html).toContain('No quedan revisiones.');
+    expect(html).not.toContain('Todo al día');
     expect(html).toContain('Volver a Te toca');
   });
 });

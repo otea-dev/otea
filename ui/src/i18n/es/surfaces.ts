@@ -412,7 +412,7 @@ export const surfaces = {
   'triage.hands': '{agent} te lo entrega.',
   'triage.handsRound': '{agent} te lo entrega en la ronda {round}, después de tus notas.',
   'triage.yours': 'Es tuyo para revisar.',
-  'triage.done': 'Todo al día.',
+  'triage.done': 'No quedan revisiones.',
   'triage.doneBody': {
     one: 'Decidiste uno. Lo que devuelvas vuelve aquí cuando el agente lo entregue.',
     other: 'Decidiste {count}. Lo que devuelvas vuelve aquí cuando el agente lo entregue.',

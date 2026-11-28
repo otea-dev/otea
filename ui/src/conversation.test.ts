@@ -361,6 +361,18 @@ describe('a question leading its card', () => {
     );
     expect(splitQuestion('Elegí cómo seguir.')).toEqual(splitReply('Elegí cómo seguir.'));
   });
+
+  // s-real2 D-995717: «(e.g. ?limit=500) do?» ended the sentence at «e.g.», so the card led with the
+  // tail «?limit=500) do?». An abbreviation right after an opening bracket is no end of sentence.
+  it('does not end a sentence at an abbreviation inside brackets', () => {
+    const asked = 'what should a limit above the max of 100 (e.g. ?limit=500) do?';
+    expect(splitQuestion(`GET /bookings pagination: ${asked}`).lead).toBe(
+      `GET /bookings pagination: ${asked}`,
+    );
+    expect(splitReply('Pick one (p. ej. the first) and go on. Then rest.').lead).toBe(
+      'Pick one (p. ej. the first) and go on.',
+    );
+  });
 });
 
 describe('a reply folding', () => {
