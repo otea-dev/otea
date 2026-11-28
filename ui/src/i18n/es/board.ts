@@ -152,6 +152,7 @@ export const board = {
     '«{board}» está archivado. Sus ítems se pueden leer y buscar en Archivados, en Studio.',
   'boardView.archived.open': 'Ver en Archivados',
   'boardView.doneCol': 'Hecho',
+  'boardView.droppedCol': 'Descartado',
   'boardView.dek.bug-triage': 'Los errores, del primer aviso al arreglo.',
   'boardView.dek.tasks': 'El trabajo por hacer, del plan a hecho.',
   'boardView.dek.review': 'Lo que espera una revisión, ronda a ronda.',

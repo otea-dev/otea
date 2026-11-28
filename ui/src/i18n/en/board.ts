@@ -140,6 +140,7 @@ export const board = {
     '“{board}” is archived. Its items can be read and searched in Archived, in Studio.',
   'boardView.archived.open': 'See it in Archived',
   'boardView.doneCol': 'Done',
+  'boardView.droppedCol': 'Discarded',
   'boardView.dek.bug-triage': 'Bugs, from the first report to the fix.',
   'boardView.dek.tasks': 'The work to do, from the plan to done.',
   'boardView.dek.review': 'What waits for a review, round by round.',

@@ -108,9 +108,11 @@ describe('a board', () => {
   it('lists Lista grouped by step, each row on its lane with its id, step and who', () => {
     const html = render('list');
     expect(html).toContain('data-list="board"');
+    // ERR-3 was discarded: it is listed as that, never under «Hecho» (D-db4167).
     expect(html).toMatch(
-      /<h2[^>]*>En arreglo<\/h2>.*ERR-2.*<h2[^>]*>A verificar<\/h2>.*ERR-1.*<h2[^>]*>Hecho<\/h2>.*ERR-3/,
+      /<h2[^>]*>En arreglo<\/h2>.*ERR-2.*<h2[^>]*>A verificar<\/h2>.*ERR-1.*<h2[^>]*>Descartado<\/h2>.*ERR-3/,
     );
+    expect(html).not.toMatch(/<h2[^>]*>Hecho<\/h2>/);
     expect(html).toMatch(/data-k="ERR-1" data-h="you" data-look="yours"/);
     expect(html).toContain('<span class="stp you">A verificar</span>');
     expect(html).toContain('class="svb s3"');

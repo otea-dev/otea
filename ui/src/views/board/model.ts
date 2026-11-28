@@ -428,6 +428,9 @@ export function sortBoard(items: readonly Item[], sort: BoardSort, ctx: BoardCtx
 
 export type Group = { key: string; title: string; items: Item[] };
 
+// The list's group for the work thrown away: Pasos' closed column holds it with Done's.
+const DROPPED_GROUP = '__dropped';
+
 const GROUP_TITLE_TURN = {
   human: 'section.human',
   agent: 'section.agent',
@@ -445,13 +448,19 @@ export function groupBoard(
   if (by === 'none') return [{ key: 'all', title: '', items: sorted }];
   const of = (it: Item) => {
     const v = holds(it, by, ctx);
+    if (by === 'state' && v === CLOSED_COL && it.closes === 'discarded') return DROPPED_GROUP;
     return by === 'who' && (v === 'done' || v === 'dropped') ? 'closed' : v;
   };
+  // Pasos has one closed column; the list says which of its work was thrown away, apart from Done
+  // (D-db4167).
   const order =
     by === 'who'
       ? [...orderOf('who', items, ctx).filter((v) => v !== 'done' && v !== 'dropped'), 'closed']
-      : orderOf(by, items, ctx);
+      : by === 'state'
+        ? orderOf(by, items, ctx).flatMap((v) => (v === CLOSED_COL ? [v, DROPPED_GROUP] : [v]))
+        : orderOf(by, items, ctx);
   const title = (key: string) => {
+    if (by === 'state' && key === DROPPED_GROUP) return t('boardView.droppedCol');
     if (by === 'turn')
       return t(GROUP_TITLE_TURN[key as keyof typeof GROUP_TITLE_TURN] ?? 'section.none');
     if (by === 'who') {
